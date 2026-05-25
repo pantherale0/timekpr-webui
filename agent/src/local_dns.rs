@@ -1,4 +1,4 @@
-use hickory_proto::op::{Message, MessageType, ResponseCode};
+use hickory_proto::op::{Message, MessageType, OpCode, ResponseCode};
 use std::collections::{HashMap, HashSet};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::sync::Arc;
@@ -142,7 +142,8 @@ async fn handle_udp_query(
     blocked_domains: Arc<RwLock<HashSet<String>>>,
     upstream_servers: Arc<Vec<SocketAddr>>,
 ) -> Result<Vec<u8>, String> {
-    if query_matches_blocked_domain(query_bytes, &blocked_domains.read().await)? {
+    let blocked_domains_guard = blocked_domains.read().await;
+    if query_matches_blocked_domain(query_bytes, &*blocked_domains_guard)? {
         return build_blocked_response(query_bytes);
     }
 
@@ -166,7 +167,8 @@ async fn handle_tcp_client(
         .await
         .map_err(|error| format!("failed to read TCP DNS payload: {}", error))?;
 
-    let response = if query_matches_blocked_domain(&query_bytes, &blocked_domains.read().await)? {
+    let blocked_domains_guard = blocked_domains.read().await;
+    let response = if query_matches_blocked_domain(&query_bytes, &*blocked_domains_guard)? {
         build_blocked_response(&query_bytes)?
     } else {
         forward_tcp_query(&query_bytes, upstream_servers.as_ref()).await?
@@ -193,7 +195,7 @@ fn query_matches_blocked_domain(
         .map_err(|error| format!("failed to parse DNS query: {}", error))?;
 
     Ok(query
-        .queries()
+        .queries
         .iter()
         .any(|entry| domain_is_blocked(&entry.name().to_ascii(), blocked_domains)))
 }
@@ -216,16 +218,15 @@ pub fn build_blocked_response(query_bytes: &[u8]) -> Result<Vec<u8>, String> {
     let query = Message::from_vec(query_bytes)
         .map_err(|error| format!("failed to parse DNS query: {}", error))?;
 
-    let mut response = Message::new();
-    response.set_id(query.id());
-    response.set_message_type(MessageType::Response);
-    response.set_op_code(query.op_code());
-    response.set_recursion_desired(query.recursion_desired());
-    response.set_recursion_available(true);
-    response.set_response_code(ResponseCode::NXDomain);
-    for entry in query.queries() {
-        response.add_query(entry.clone());
-    }
+    let mut response = Message::error_msg(
+        query.metadata.id,
+        query.metadata.op_code,
+        ResponseCode::NXDomain,
+    );
+    response.metadata.recursion_desired = query.metadata.recursion_desired;
+    response.metadata.recursion_available = true;
+    response.metadata.checking_disabled = query.metadata.checking_disabled;
+    response.queries = query.queries.clone();
 
     response
         .to_vec()
@@ -318,14 +319,12 @@ fn load_upstream_servers() -> Vec<SocketAddr> {
 #[cfg(test)]
 mod tests {
     use super::{build_blocked_response, domain_is_blocked};
-    use hickory_proto::op::{Message, MessageType, ResponseCode};
+    use hickory_proto::op::{Message, MessageType, OpCode, ResponseCode};
     use hickory_proto::rr::{Name, RecordType};
     use std::collections::HashSet;
 
     fn build_query(name: &str) -> Vec<u8> {
-        let mut query = Message::new();
-        query.set_id(7);
-        query.set_message_type(MessageType::Query);
+        let mut query = Message::new(7, MessageType::Query, OpCode::Query);
         query.add_query(hickory_proto::op::Query::query(
             Name::from_ascii(name).unwrap(),
             RecordType::A,
@@ -351,9 +350,9 @@ mod tests {
         let response = build_blocked_response(&query).unwrap();
         let parsed = Message::from_vec(&response).unwrap();
 
-        assert_eq!(parsed.id(), 7);
-        assert_eq!(parsed.message_type(), MessageType::Response);
-        assert_eq!(parsed.response_code(), ResponseCode::NXDomain);
-        assert_eq!(parsed.queries().len(), 1);
+        assert_eq!(parsed.metadata.id, 7);
+        assert_eq!(parsed.metadata.message_type, MessageType::Response);
+        assert_eq!(parsed.metadata.response_code, ResponseCode::NXDomain);
+        assert_eq!(parsed.queries.len(), 1);
     }
 }
