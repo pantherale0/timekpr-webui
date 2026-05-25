@@ -138,7 +138,7 @@
         <div class="stats-header">
             <div class="stats-header-title">
                 <h1>{{ user.username }}</h1>
-                <p>{{ user.system_ip }} &mdash; Usage History</p>
+                <p>{{ user.device_mappings|length }} linked device mapping(s) &mdash; Usage History</p>
             </div>
             <div style="display: flex; align-items: center; gap: var(--space-4);">
                 {% if oidc_enabled and session_user %}

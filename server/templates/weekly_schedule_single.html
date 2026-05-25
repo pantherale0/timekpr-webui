@@ -301,7 +301,9 @@
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-4);">
                     <div>
                         <h2 style="margin: 0;">{{ user.username }}</h2>
-                        <p style="margin: 0; color: var(--text-secondary); font-family: monospace;">{{ user.system_ip }}</p>
+                        <p style="margin: 0; color: var(--text-secondary);">
+                            {{ user.device_mappings|length }} linked device mapping(s)
+                        </p>
                     </div>
                     <div class="status-info">
                         <div id="sync-status-badge" class="badge" style="display: none;">

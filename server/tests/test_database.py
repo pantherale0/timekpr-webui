@@ -4,6 +4,7 @@ from src.database import (
     Settings,
     AgentDevice,
     ManagedUser,
+    ManagedUserDeviceMap,
     UserTimeUsage,
     UserWeeklySchedule,
     UserDailyTimeInterval,
@@ -81,16 +82,27 @@ def test_managed_user_and_usage(db_session):
 
     user = ManagedUser(
         username="john",
-        system_id="dev-123",
-        system_ip="192.168.1.100",
+        system_ip="Unassigned",
         is_valid=True,
         last_config='{"TIME_SPENT_DAY": 1800, "LIMIT": 3600}'
     )
     db_session.add(user)
+    db_session.flush()
+
+    mapping = ManagedUserDeviceMap(
+        managed_user_id=user.id,
+        system_id="dev-123",
+        linux_username="john",
+        is_valid=True,
+        last_config='{"TIME_SPENT_DAY": 1800, "LIMIT": 3600, "LINUX_UID": 1000}'
+    )
+    db_session.add(mapping)
     db_session.commit()
 
-    assert repr(user) == "<ManagedUser john@192.168.1.100>"
-    assert user.device == device
+    assert repr(user) == "<ManagedUser john>"
+    assert mapping.device == device
+    assert mapping.managed_user == user
+    assert mapping.get_config_value("LINUX_UID") == 1000
     assert user.get_config_value("TIME_SPENT_DAY") == 1800
     assert user.get_config_value("nonexistent") is None
     
@@ -140,7 +152,7 @@ def test_managed_user_and_usage(db_session):
     assert user.get_all_usage_monthly() == []
 
 def test_user_weekly_schedule(db_session):
-    user = ManagedUser(username="test_user", system_ip="127.0.0.1")
+    user = ManagedUser(username="test_user", system_ip="Unassigned")
     db_session.add(user)
     db_session.commit()
 
@@ -177,7 +189,7 @@ def test_user_weekly_schedule(db_session):
     assert schedule.last_synced is not None
 
 def test_user_daily_time_interval(db_session):
-    user = ManagedUser(username="test_user", system_ip="127.0.0.1")
+    user = ManagedUser(username="test_user", system_ip="Unassigned")
     db_session.add(user)
     db_session.commit()
 
@@ -236,7 +248,7 @@ def test_user_daily_time_interval(db_session):
     assert interval.to_timekpr_format() == ["9[15-45]"]
 
 def test_database_model_missing_lines(db_session):
-    user = ManagedUser(username="jack", system_ip="127.0.0.1")
+    user = ManagedUser(username="jack", system_ip="Unassigned")
     db_session.add(user)
     db_session.commit()
 

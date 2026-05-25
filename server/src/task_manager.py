@@ -1,6 +1,5 @@
 import threading
 import time
-import sqlite3
 from datetime import datetime, date
 import logging
 import json
@@ -10,14 +9,19 @@ from src.database import (
     db,
     ManagedUser,
     UserTimeUsage,
-    Settings,
-    UserWeeklySchedule,
     UserDailyTimeInterval,
     coerce_time_spent_day,
 )
 from src.agent_helper import AgentClient, AgentConnectionManager
 
 logger = logging.getLogger(__name__)
+
+
+def _safe_int(value, default=0):
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
 
 class BackgroundTaskManager:
     def __init__(self, app=None):
@@ -109,187 +113,187 @@ class BackgroundTaskManager:
             
             # Sleep for 10 seconds before next run
             logger.info("Task cycle finished, sleeping for 10 seconds")
-            for i in range(10):
+            for _ in range(10):
                 if not self.running:
                     logger.info("Task loop stopping during sleep")
                     break
                 time.sleep(1)
     
     def _update_user_data(self):
-        """Update data for all valid users"""
+        """Update data for all managed users and their device mappings."""
         try:
-            # Get all users with SQLAlchemy in a single query
             users = ManagedUser.query.all()
             logger.info("Found %d users in database", len(users))
 
             for user in users:
                 try:
-                    logger.info("Processing user: %s @ %s", user.username, user.system_ip)
-                    
-                    # Check if the agent is online before doing any commands
-                    if not AgentConnectionManager.is_online(user.system_id):
-                        logger.info(f"Agent for {user.username} (system_id: {user.system_id}) is offline. Skipping sync.")
+                    mappings = list(user.device_mappings)
+                    logger.info("Processing managed user: %s across %d mapping(s)", user.username, len(mappings))
+
+                    if not mappings:
+                        user.is_valid = False
                         user.last_checked = datetime.utcnow()
                         db.session.commit()
                         continue
-                        
-                    # Instantiate AgentClient
-                    agent_client = AgentClient(system_id=user.system_id)
-                    
-                    # Check if there's a pending time adjustment
-                    if user.pending_time_adjustment is not None and user.pending_time_operation is not None:
-                        logger.info(f"Attempting to apply pending time adjustment for {user.username}: {user.pending_time_operation}{user.pending_time_adjustment} seconds")
-                        
-                        success, message = agent_client.modify_time_left(
-                            user.username, 
-                            user.pending_time_operation, 
-                            user.pending_time_adjustment
-                        )
-                        
-                        if success:
-                            logger.info(f"Successfully applied pending time adjustment for {user.username}")
-                            # Clear the pending adjustment immediately
-                            user.pending_time_adjustment = None
-                            user.pending_time_operation = None
-                            db.session.commit()
-                            logger.info("Cleared pending adjustment in database")
-                        else:
-                            logger.warning(f"Failed to apply pending time adjustment for {user.username}: {message}")
-                    else:
-                        logger.info(f"No pending time adjustment for {user.username}")
-                    
-                    # Check if there's a pending weekly schedule sync
-                    if user.weekly_schedule and not user.weekly_schedule.is_synced:
-                        schedule_dict = user.weekly_schedule.get_schedule_dict()
-                        logger.info(f"DEBUG - schedule_dict from database: {schedule_dict}")
-                        _week_days = (
-                            'monday', 'tuesday', 'wednesday', 'thursday',
-                            'friday', 'saturday', 'sunday',
-                        )
-                        has_positive_limits = any(
-                            (schedule_dict.get(d, 0) or 0) > 0 for d in _week_days
-                        )
-                        # set_weekly_time_limits rejects "all zero" — nothing to push; avoid endless WARNING loop
-                        if not has_positive_limits:
-                            logger.info(
-                                "No daily limits > 0 in UI for %s; marking weekly schedule synced (remote unchanged)",
-                                user.username,
-                            )
-                            user.weekly_schedule.mark_synced()
-                            db.session.commit()
-                        else:
-                            logger.info(f"Attempting to sync weekly schedule for {user.username}")
-                            success, message = agent_client.set_weekly_time_limits(
-                                user.username, schedule_dict
-                            )
-                            if success:
-                                logger.info(f"Successfully synced weekly schedule for {user.username}")
-                                user.weekly_schedule.mark_synced()
-                                db.session.commit()
-                                logger.info("Marked weekly schedule as synced in database")
-                            else:
-                                logger.warning(
-                                    f"Failed to sync weekly schedule for {user.username}: {message}"
-                                )
-                    else:
-                        if user.weekly_schedule:
-                            logger.info(f"Weekly schedule already synced for {user.username}")
-                        else:
-                            logger.info(f"No weekly schedule configured for {user.username}")
-                    
-                    # Check if there are pending time interval syncs
+
                     unsynced_intervals = UserDailyTimeInterval.query.filter_by(
                         user_id=user.id,
                         is_synced=False
                     ).all()
-                    
-                    if unsynced_intervals:
-                        logger.info(f"Attempting to sync {len(unsynced_intervals)} time intervals for {user.username}")
-                        
-                        # Build intervals dict for agent command
-                        intervals_dict = {}
-                        for interval in user.time_intervals:
-                            intervals_dict[interval.day_of_week] = interval
-                        
-                        success, message = agent_client.set_allowed_hours(user.username, intervals_dict)
-                        
-                        if success:
-                            logger.info(f"Successfully synced time intervals for {user.username}")
-                            # Mark all intervals as synced
-                            for interval in unsynced_intervals:
-                                interval.mark_synced()
-                            db.session.commit()
-                            logger.info("Marked time intervals as synced in database")
-                        else:
-                            logger.warning(f"Failed to sync time intervals for {user.username}: {message}")
-                    else:
-                        logger.info(f"No pending time interval syncs for {user.username}")
-                    
-                    # Then update user info
-                    logger.info("Validating user %s", user.username)
-                    try:
-                        is_valid, result_message, config_dict = agent_client.validate_user(user.username)
-                        logger.info("Validation result for %s: %s", user.username, is_valid)
-                        
-                        if is_valid and config_dict:
-                            # Update the last checked time
-                            user.last_checked = datetime.utcnow()
-                            user.last_config = json.dumps(config_dict)
-                            user.is_valid = True  # Ensure is_valid is set to True
-                            
-                            # Update or create today's usage data
-                            today = date.today()
-                            time_spent = coerce_time_spent_day(config_dict.get('TIME_SPENT_DAY', 0))
-                            
-                            # Look for an existing record for today
-                            usage = UserTimeUsage.query.filter_by(
-                                user_id=user.id,
-                                date=today
-                            ).first()
-                            
-                            if usage:
-                                usage.time_spent = time_spent
-                                logger.info(f"Updated existing usage record for {user.username}, time_spent={time_spent}")
+
+                    intervals_dict = {interval.day_of_week: interval for interval in user.time_intervals}
+                    schedule_dict = user.weekly_schedule.get_schedule_dict() if user.weekly_schedule else None
+                    has_positive_limits = False
+                    if schedule_dict:
+                        week_days = (
+                            'monday', 'tuesday', 'wednesday', 'thursday',
+                            'friday', 'saturday', 'sunday',
+                        )
+                        has_positive_limits = any((schedule_dict.get(day, 0) or 0) > 0 for day in week_days)
+
+                    pending_adjustment_failed = False
+                    applied_pending_adjustment = False
+                    online_mappings = 0
+                    shared_time_spent = 0
+                    shared_time_left_candidates = []
+                    any_valid_mapping = False
+                    all_schedule_synced = True
+                    all_interval_synced = True
+
+                    for mapping in mappings:
+                        mapping.last_checked = datetime.utcnow()
+
+                        if not AgentConnectionManager.is_online(mapping.system_id):
+                            logger.info(
+                                "Mapping offline for %s on %s",
+                                mapping.linux_username,
+                                mapping.system_id,
+                            )
+                            all_schedule_synced = False
+                            all_interval_synced = False
+                            continue
+
+                        online_mappings += 1
+                        agent_client = AgentClient(system_id=mapping.system_id)
+
+                        if user.pending_time_adjustment is not None and user.pending_time_operation is not None:
+                            success, message = agent_client.modify_time_left(
+                                mapping.linux_username,
+                                user.pending_time_operation,
+                                user.pending_time_adjustment
+                            )
+                            if success:
+                                applied_pending_adjustment = True
                             else:
-                                # Create a new record
-                                usage = UserTimeUsage(
-                                    user_id=user.id,
-                                    date=today,
-                                    time_spent=time_spent
+                                pending_adjustment_failed = True
+                                logger.warning(
+                                    "Pending adjustment failed for mapping %s on %s: %s",
+                                    mapping.linux_username,
+                                    mapping.system_id,
+                                    message,
                                 )
-                                db.session.add(usage)
-                                logger.info(f"Created new usage record for {user.username}, time_spent={time_spent}")
-                            
-                            # Make sure to commit after each user update
-                            db.session.commit()
-                            logger.info(f"Database committed for {user.username}")
+
+                        if schedule_dict and not user.weekly_schedule.is_synced:
+                            if not has_positive_limits:
+                                logger.info(
+                                    "No positive limits for %s; marking schedule synced locally",
+                                    user.username,
+                                )
+                            else:
+                                success, message = agent_client.set_weekly_time_limits(
+                                    mapping.linux_username,
+                                    schedule_dict
+                                )
+                                if not success:
+                                    all_schedule_synced = False
+                                    logger.warning(
+                                        "Schedule sync failed for %s on %s: %s",
+                                        mapping.linux_username,
+                                        mapping.system_id,
+                                        message,
+                                    )
+
+                        if unsynced_intervals:
+                            success, message = agent_client.set_allowed_hours(
+                                mapping.linux_username,
+                                intervals_dict
+                            )
+                            if not success:
+                                all_interval_synced = False
+                                logger.warning(
+                                    "Interval sync failed for %s on %s: %s",
+                                    mapping.linux_username,
+                                    mapping.system_id,
+                                    message,
+                                )
+
+                        is_valid, result_message, config_dict = agent_client.validate_user(mapping.linux_username)
+                        if is_valid and config_dict:
+                            any_valid_mapping = True
+                            mapping.is_valid = True
+                            mapping.last_config = json.dumps(config_dict)
+                            mapping.linux_uid = _safe_int(config_dict.get("LINUX_UID"), mapping.linux_uid)
+                            shared_time_spent += coerce_time_spent_day(config_dict.get('TIME_SPENT_DAY', 0))
+                            time_left = config_dict.get("TIME_LEFT_DAY")
+                            if isinstance(time_left, int):
+                                shared_time_left_candidates.append(time_left)
                         else:
-                            # Just update the last checked time
-                            user.last_checked = datetime.utcnow()
-                            
-                            # Don't change is_valid status for temporary failures
-                            # This allows the user to stay visible on the dashboard
-                            # Only set is_valid to False during the initial validation
-                            if not user.is_valid and is_valid:
-                                # If the user was previously invalid but is now valid, update status
-                                user.is_valid = True
-                            
-                            db.session.commit()
-                            logger.warning(f"Failed to get data for {user.username}, keeping previous valid status")
-                    except Exception as e:
-                        # Connection error (e.g., PC is offline)
-                        logger.error(f"Connection error for user {user.username}: {str(e)}")
-                        
-                        # Update the last checked time but don't change validation status
-                        user.last_checked = datetime.utcnow()
-                        db.session.commit()
-                        logger.info(f"Updated last_checked time for {user.username} but kept validation status")
-                
+                            mapping.is_valid = False
+                            logger.warning(
+                                "Validation failed for mapping %s on %s: %s",
+                                mapping.linux_username,
+                                mapping.system_id,
+                                result_message,
+                            )
+
+                    if user.weekly_schedule and not user.weekly_schedule.is_synced and (has_positive_limits is False or all_schedule_synced):
+                        user.weekly_schedule.mark_synced()
+
+                    if unsynced_intervals and all_interval_synced:
+                        for interval in unsynced_intervals:
+                            interval.mark_synced()
+
+                    if user.pending_time_adjustment is not None and user.pending_time_operation is not None:
+                        if online_mappings > 0 and applied_pending_adjustment and not pending_adjustment_failed:
+                            user.pending_time_adjustment = None
+                            user.pending_time_operation = None
+
+                    today = date.today()
+                    usage = UserTimeUsage.query.filter_by(user_id=user.id, date=today).first()
+                    if usage:
+                        usage.time_spent = shared_time_spent
+                    else:
+                        db.session.add(UserTimeUsage(
+                            user_id=user.id,
+                            date=today,
+                            time_spent=shared_time_spent
+                        ))
+
+                    shared_config = {
+                        "TIME_SPENT_DAY": shared_time_spent,
+                        "TIME_LEFT_DAY": min(shared_time_left_candidates) if shared_time_left_candidates else None,
+                        "MAPPING_COUNT": len(mappings),
+                        "ONLINE_MAPPING_COUNT": online_mappings,
+                    }
+                    user.last_config = json.dumps(shared_config)
+                    user.last_checked = datetime.utcnow()
+                    user.is_valid = any_valid_mapping
+                    db.session.commit()
+
                 except Exception as e:
-                    logger.error(f"Error updating user {user.username}: {str(e)}\n{traceback.format_exc()}")
+                    logger.error(
+                        "Error updating user %s: %s\n%s",
+                        user.username,
+                        str(e),
+                        traceback.format_exc(),
+                    )
                     # Continue with the next user, but make sure we commit any pending changes
                     db.session.rollback()
                     
         except Exception as e:
-            logger.error(f"Error in user data update: {str(e)}\n{traceback.format_exc()}")
+            logger.error(
+                "Error in user data update: %s\n%s",
+                str(e),
+                traceback.format_exc(),
+            )
             db.session.rollback()

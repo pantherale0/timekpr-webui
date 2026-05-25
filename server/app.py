@@ -8,6 +8,7 @@ import pytz
 from src.database import (
     db,
     ManagedUser,
+    ManagedUserDeviceMap,
     UserTimeUsage,
     Settings,
     UserWeeklySchedule,
@@ -88,6 +89,68 @@ def inject_timezone():
     return {'timezone': TIMEZONE_STR}
 
 import secrets
+from sqlalchemy import text
+
+
+def _format_seconds(seconds):
+    if seconds is None:
+        return "Unknown"
+    hours = seconds // 3600
+    minutes = (seconds % 3600) // 60
+    return f"{hours}h {minutes}m"
+
+
+def _mapping_config(mapping):
+    if not mapping.last_config:
+        return {}
+    try:
+        return json.loads(mapping.last_config)
+    except (TypeError, ValueError):
+        return {}
+
+
+def _refresh_managed_user_summary(user):
+    valid_mappings = [mapping for mapping in user.device_mappings if mapping.is_valid]
+    user.is_valid = bool(valid_mappings)
+
+    if not valid_mappings:
+        user.last_checked = datetime.utcnow()
+        user.last_config = json.dumps({
+            "TIME_SPENT_DAY": 0,
+            "TIME_LEFT_DAY": None,
+            "MAPPING_COUNT": len(user.device_mappings),
+            "ONLINE_MAPPING_COUNT": 0,
+        })
+        return
+
+    shared_spent = 0
+    time_left_values = []
+    for mapping in valid_mappings:
+        config = _mapping_config(mapping)
+        shared_spent += coerce_time_spent_day(config.get("TIME_SPENT_DAY", 0))
+        time_left = config.get("TIME_LEFT_DAY")
+        if isinstance(time_left, int):
+            time_left_values.append(time_left)
+
+    user.last_checked = max(
+        (mapping.last_checked for mapping in valid_mappings if mapping.last_checked),
+        default=datetime.utcnow(),
+    )
+    user.last_config = json.dumps({
+        "TIME_SPENT_DAY": shared_spent,
+        "TIME_LEFT_DAY": min(time_left_values) if time_left_values else None,
+        "MAPPING_COUNT": len(user.device_mappings),
+        "ONLINE_MAPPING_COUNT": sum(
+            1 for mapping in user.device_mappings if AgentConnectionManager.is_online(mapping.system_id)
+        ),
+    })
+
+    today = date.today()
+    usage = UserTimeUsage.query.filter_by(user_id=user.id, date=today).first()
+    if usage:
+        usage.time_spent = shared_spent
+    else:
+        db.session.add(UserTimeUsage(user_id=user.id, date=today, time_spent=shared_spent))
 
 def ws_agent_handler(ws):
     """
@@ -201,14 +264,13 @@ def ws_agent_handler(ws):
                 AgentConnectionManager.register(system_id, ws, remote_ip)
                 ws.send(json.dumps({"type": "auth_result", "success": True, "message": "Authenticated successfully"}))
                 
-                # Dynamically update the system_ip snapshot for all managed users on this host!
-                users = ManagedUser.query.filter_by(system_id=system_id).all()
-                for u in users:
-                    u.system_ip = remote_ip
-                
                 device.last_seen = datetime.utcnow()
                 db.session.commit()
-                logging.info(f"Device {system_id} authenticated successfully. Snapshotted IP {remote_ip} for {len(users)} users.")
+                logging.info(
+                    "Device %s authenticated successfully. Updated device IP snapshot to %s.",
+                    system_id,
+                    remote_ip,
+                )
                 
     except Exception as e:
         logging.error(f"Error during WebSocket handshake / loop for {system_id}: {e}")
@@ -329,7 +391,7 @@ def dashboard():
     
     # Get all valid users - make sure we're getting fresh data by expiring SQLAlchemy's cache
     db.session.expire_all()
-    users = ManagedUser.query.filter_by(is_valid=True).all()
+    users = ManagedUser.query.all()
     
     # Track users with pending time adjustments
     pending_adjustments = {}
@@ -339,18 +401,12 @@ def dashboard():
     for user in users:
         # Get usage data for charts
         usage_data = user.get_recent_usage(days=7)
-        
-        # Get time left today if available
-        time_left = user.get_config_value('TIME_LEFT_DAY')
-        if time_left is not None:
-            time_left_hours = time_left // 3600
-            time_left_minutes = (time_left % 3600) // 60
-            time_left_formatted = f"{time_left_hours}h {time_left_minutes}m"
-        else:
-            time_left_formatted = "Unknown"
-        
-        # Do NOT format last_checked time - pass the datetime object directly
-        # So the template can format it
+        mapping_count = len(user.device_mappings)
+        online_mapping_count = sum(
+            1 for mapping in user.device_mappings if AgentConnectionManager.is_online(mapping.system_id)
+        )
+        valid_mapping_count = sum(1 for mapping in user.device_mappings if mapping.is_valid)
+        time_left_formatted = _format_seconds(user.get_config_value('TIME_LEFT_DAY'))
         
         # Check for pending time adjustments
         if user.pending_time_adjustment is not None and user.pending_time_operation is not None:
@@ -361,16 +417,18 @@ def dashboard():
         user_data.append({
             'id': user.id,
             'username': user.username,
-            'system_id': user.system_id,
-            'system_ip': user.system_ip,
-            'is_online': AgentConnectionManager.is_online(user.system_id),
-            'last_checked': user.last_checked,  # Keep as datetime object
+            'is_online': online_mapping_count > 0,
+            'mapping_count': mapping_count,
+            'online_mapping_count': online_mapping_count,
+            'valid_mapping_count': valid_mapping_count,
+            'last_checked': user.last_checked,
             'usage_data': usage_data,
             'time_left': time_left_formatted,
             'weekly_schedule': user.weekly_schedule
         })
-    
-    return render_template('dashboard.html', users=user_data, pending_adjustments=pending_adjustments)
+
+    users_sorted = sorted(user_data, key=lambda item: item['username'].lower())
+    return render_template('dashboard.html', users=users_sorted, pending_adjustments=pending_adjustments)
 
 @app.route('/admin')
 def admin():
@@ -379,7 +437,7 @@ def admin():
         return redirect(url_for('login'))
     
     # Get all managed users
-    users = ManagedUser.query.all()
+    users = ManagedUser.query.order_by(ManagedUser.username.asc()).all()
     approved_devices = AgentDevice.query.filter_by(status='approved').all()
     pending_devices = AgentDevice.query.filter_by(status='pending').all()
     return render_template('admin.html', users=users, approved_devices=approved_devices, pending_devices=pending_devices)
@@ -521,118 +579,227 @@ def logout():
         flash('You have been logged out', 'info')
         return redirect(url_for('login'))
 
-@app.route('/users/add', methods=['GET', 'POST'])
-def add_user():
+@app.route('/managed-users/add', methods=['POST'])
+def create_managed_user():
     if not session.get('logged_in'):
-        if request.method == 'GET':
-            flash('Please login first', 'warning')
-            return redirect(url_for('login'))
         return jsonify({'success': False, 'message': 'Not authenticated'}), 401
 
-    if request.method == 'GET':
+    username = (request.form.get('username') or '').strip()
+    if not username:
+        flash('Managed user name is required', 'danger')
         return redirect(url_for('admin'))
-    
-    username = request.form.get('username')
-    system_id = request.form.get('system_id')
-    
-    if not username or not system_id:
-        flash('Both username and system ID are required', 'danger')
+
+    existing_user = ManagedUser.query.filter_by(username=username).first()
+    if existing_user:
+        flash(f'Managed user {username} already exists', 'warning')
         return redirect(url_for('admin'))
-    
-    # Validate the submitted system_id exists and has status == 'approved'
+
+    managed_user = ManagedUser(
+        username=username,
+        is_valid=False,
+        system_ip='Unassigned',
+    )
+    db.session.add(managed_user)
+    db.session.commit()
+
+    flash(f'Managed user {username} created', 'success')
+    return redirect(url_for('admin'))
+
+
+@app.route('/managed-users/<int:user_id>/mappings/add', methods=['POST'])
+def add_user_mapping(user_id):
+    if not session.get('logged_in'):
+        return jsonify({'success': False, 'message': 'Not authenticated'}), 401
+
+    user = ManagedUser.query.get_or_404(user_id)
+    system_id = (request.form.get('system_id') or '').strip()
+    linux_username = (request.form.get('linux_username') or '').strip()
+    linux_uid_raw = (request.form.get('linux_uid') or '').strip()
+
+    if not system_id or not linux_username:
+        flash('Device and Linux username are required', 'danger')
+        return redirect(url_for('admin'))
+
     device = AgentDevice.query.get(system_id)
     if not device or device.status != 'approved':
         flash(f'System ID {system_id} is not registered or approved', 'danger')
         return redirect(url_for('admin'))
-        
-    # Check if user already exists
-    existing_user = ManagedUser.query.filter_by(username=username, system_id=system_id).first()
-    
-    if existing_user:
+
+    existing_mapping = ManagedUserDeviceMap.query.filter_by(
+        managed_user_id=user.id,
+        system_id=system_id,
+    ).first()
+    if existing_mapping:
+        flash(f'{user.username} is already linked to {system_id}', 'warning')
+        return redirect(url_for('admin'))
+
+    linux_uid = None
+    if linux_uid_raw:
+        try:
+            linux_uid = int(linux_uid_raw)
+        except ValueError:
+            flash('Linux UID must be numeric', 'danger')
+            return redirect(url_for('admin'))
+
+    mapping = ManagedUserDeviceMap(
+        managed_user_id=user.id,
+        system_id=system_id,
+        linux_username=linux_username,
+        linux_uid=linux_uid,
+        is_valid=False,
+    )
+    db.session.add(mapping)
+    db.session.commit()
+
+    flash(f'Mapping added: {user.username} -> {linux_username}@{system_id}', 'success')
+    return redirect(url_for('admin'))
+
+
+@app.route('/users/add', methods=['GET', 'POST'])
+def add_user():
+    """
+    Backward-compatible endpoint that creates a managed user and one mapping.
+    """
+    if request.method == 'GET':
+        return redirect(url_for('admin'))
+    if not session.get('logged_in'):
+        return jsonify({'success': False, 'message': 'Not authenticated'}), 401
+
+    username = (request.form.get('username') or '').strip()
+    system_id = (request.form.get('system_id') or '').strip()
+
+    if not username or not system_id:
+        flash('Both username and system ID are required', 'danger')
+        return redirect(url_for('admin'))
+
+    device = AgentDevice.query.get(system_id)
+    if not device or device.status != 'approved':
+        flash(f'System ID {system_id} is not registered or approved', 'danger')
+        return redirect(url_for('admin'))
+
+    user = ManagedUser.query.filter_by(username=username).first()
+    if not user:
+        user = ManagedUser(username=username, is_valid=False, system_ip='Unassigned')
+        db.session.add(user)
+        db.session.flush()
+
+    existing_mapping = ManagedUserDeviceMap.query.filter_by(
+        managed_user_id=user.id,
+        system_id=system_id,
+    ).first()
+    if existing_mapping:
+        db.session.rollback()
         flash(f'User {username} on {system_id} already exists', 'warning')
         return redirect(url_for('admin'))
-    
-    # Create new user
-    new_user = ManagedUser(username=username, system_id=system_id, system_ip="Offline")
-    
-    # Validate with agent
-    agent_client = AgentClient(system_id=system_id)
-    is_valid, message, config_dict = agent_client.validate_user(username)
-    
-    new_user.is_valid = is_valid
-    new_user.last_checked = datetime.utcnow()
-    
-    if is_valid and config_dict:
-        new_user.last_config = json.dumps(config_dict)
-        
-        # Add the user to get an ID first
-        db.session.add(new_user)
-        db.session.commit()
-        
-        # Add today's usage data
-        today = date.today()
-        time_spent = coerce_time_spent_day(config_dict.get('TIME_SPENT_DAY', 0))
-        
-        usage = UserTimeUsage(
-            user_id=new_user.id,
-            date=today,
-            time_spent=time_spent
-        )
-        db.session.add(usage)
-        db.session.commit()
-        
-        flash(f'User {username} added and validated successfully', 'success')
-    else:
-        db.session.add(new_user)
-        db.session.commit()
-        flash(f'User {username} added but validation failed: {message}', 'warning')
-    
+
+    mapping = ManagedUserDeviceMap(
+        managed_user_id=user.id,
+        system_id=system_id,
+        linux_username=username,
+    )
+    db.session.add(mapping)
+    db.session.commit()
+    flash(f'Managed user {username} and mapping added', 'success')
     return redirect(url_for('admin'))
+
 
 @app.route('/users/validate/<int:user_id>')
 def validate_user(user_id):
     if not session.get('logged_in'):
         return jsonify({'success': False, 'message': 'Not authenticated'}), 401
-    
+
     user = ManagedUser.query.get_or_404(user_id)
-    
-    # Validate with agent
-    agent_client = AgentClient(system_id=user.system_id)
-    is_valid, message, config_dict = agent_client.validate_user(user.username)
-    
-    user.is_valid = is_valid
-    user.last_checked = datetime.utcnow()
-    
-    if is_valid and config_dict:
-        user.last_config = json.dumps(config_dict)
-        
-        # Update today's usage data
-        today = date.today()
-        time_spent = coerce_time_spent_day(config_dict.get('TIME_SPENT_DAY', 0))
-        
-        # Look for an existing record for today
-        usage = UserTimeUsage.query.filter_by(
-            user_id=user.id,
-            date=today
-        ).first()
-        
-        if usage:
-            usage.time_spent = time_spent
+    mappings = list(user.device_mappings)
+    if not mappings:
+        flash('No device mappings configured for this managed user', 'warning')
+        return redirect(url_for('admin'))
+
+    total_spent = 0
+    total_valid = 0
+    messages = []
+    for mapping in mappings:
+        agent_client = AgentClient(system_id=mapping.system_id)
+        is_valid, message, config_dict = agent_client.validate_user(mapping.linux_username)
+        mapping.last_checked = datetime.utcnow()
+        mapping.is_valid = is_valid
+        if is_valid and config_dict:
+            mapping.last_config = json.dumps(config_dict)
+            if config_dict.get("LINUX_UID") is not None:
+                try:
+                    mapping.linux_uid = int(config_dict.get("LINUX_UID"))
+                except (TypeError, ValueError):
+                    pass
+            total_spent += coerce_time_spent_day(config_dict.get('TIME_SPENT_DAY', 0))
+            total_valid += 1
         else:
-            # Create a new record
-            usage = UserTimeUsage(
-                user_id=user.id,
-                date=today,
-                time_spent=time_spent
-            )
-            db.session.add(usage)
-        
-        db.session.commit()
-        flash(f'User {user.username} validated successfully', 'success')
+            messages.append(f"{mapping.linux_username}@{mapping.system_id}: {message}")
+
+    user.is_valid = total_valid > 0
+    user.last_checked = datetime.utcnow()
+    user.last_config = json.dumps({
+        "TIME_SPENT_DAY": total_spent,
+        "MAPPING_COUNT": len(mappings),
+        "VALID_MAPPING_COUNT": total_valid,
+    })
+
+    today = date.today()
+    usage = UserTimeUsage.query.filter_by(user_id=user.id, date=today).first()
+    if usage:
+        usage.time_spent = total_spent
     else:
-        db.session.commit()
-        flash(f'User validation failed: {message}', 'danger')
-    
+        db.session.add(UserTimeUsage(user_id=user.id, date=today, time_spent=total_spent))
+
+    db.session.commit()
+    if total_valid:
+        flash(f'Validated {total_valid}/{len(mappings)} mapping(s) for {user.username}', 'success')
+    else:
+        flash(f'User validation failed: {"; ".join(messages) if messages else "No mappings validated"}', 'danger')
+    return redirect(url_for('admin'))
+
+
+@app.route('/managed-users/<int:user_id>/mappings/<int:mapping_id>/validate')
+def validate_mapping(user_id, mapping_id):
+    if not session.get('logged_in'):
+        return jsonify({'success': False, 'message': 'Not authenticated'}), 401
+
+    user = ManagedUser.query.get_or_404(user_id)
+    mapping = ManagedUserDeviceMap.query.filter_by(id=mapping_id, managed_user_id=user.id).first_or_404()
+    agent_client = AgentClient(system_id=mapping.system_id)
+    is_valid, message, config_dict = agent_client.validate_user(mapping.linux_username)
+
+    mapping.last_checked = datetime.utcnow()
+    mapping.is_valid = is_valid
+    if is_valid and config_dict:
+        mapping.last_config = json.dumps(config_dict)
+        if config_dict.get("LINUX_UID") is not None:
+            try:
+                mapping.linux_uid = int(config_dict.get("LINUX_UID"))
+            except (TypeError, ValueError):
+                pass
+
+    _refresh_managed_user_summary(user)
+    db.session.commit()
+
+    if is_valid:
+        flash(f'Mapping validated: {mapping.linux_username}@{mapping.system_id}', 'success')
+    else:
+        flash(f'Mapping validation failed: {message}', 'danger')
+    return redirect(url_for('admin'))
+
+
+@app.route('/managed-users/<int:user_id>/mappings/<int:mapping_id>/delete', methods=['POST'])
+def delete_mapping(user_id, mapping_id):
+    if not session.get('logged_in'):
+        return jsonify({'success': False, 'message': 'Not authenticated'}), 401
+
+    user = ManagedUser.query.get_or_404(user_id)
+    mapping = ManagedUserDeviceMap.query.filter_by(id=mapping_id, managed_user_id=user.id).first_or_404()
+    mapping_label = f"{mapping.linux_username}@{mapping.system_id}"
+    db.session.delete(mapping)
+    db.session.flush()
+    _refresh_managed_user_summary(user)
+    db.session.commit()
+    flash(f'Mapping removed: {mapping_label}', 'success')
     return redirect(url_for('admin'))
 
 @app.route('/users/delete/<int:user_id>', methods=['POST'])
@@ -969,67 +1136,121 @@ def modify_time():
     # Get user from database
     user = ManagedUser.query.get_or_404(user_id)
     
-    # Create Agent client
-    agent_client = AgentClient(system_id=user.system_id)
-    
-    # Execute the command
-    success, message = agent_client.modify_time_left(user.username, operation, seconds)
-    
-    if success:
-        # Update user info to reflect changes
-        is_valid, _, config_dict = agent_client.validate_user(user.username)
-        if is_valid and config_dict:
-            user.last_checked = datetime.utcnow()
-            user.last_config = json.dumps(config_dict)
-            # Clear any pending adjustments since we succeeded
-            user.pending_time_adjustment = None
-            user.pending_time_operation = None
-            db.session.commit()
-            
-        return jsonify({
-            'success': True,
-            'message': message,
-            'username': user.username,
-            'refresh': True
-        })
-    else:
-        # Store as pending adjustment if it failed
-        # First clear any existing pending adjustment
+    mappings = list(user.device_mappings)
+    if not mappings:
+        return jsonify({'success': False, 'message': 'No device mappings configured for this user'}), 400
+
+    online_mappings = [mapping for mapping in mappings if AgentConnectionManager.is_online(mapping.system_id)]
+    if not online_mappings:
         user.pending_time_adjustment = seconds
         user.pending_time_operation = operation
         db.session.commit()
-        
         return jsonify({
-            'success': True,  # We report success since we stored it for later
-            'message': f"Computer seems to be offline. Time adjustment of {operation}{seconds} seconds has been queued and will be applied when the computer comes online.",
+            'success': True,
+            'message': f"All mapped devices are offline. Adjustment {operation}{seconds}s queued.",
             'username': user.username,
             'pending': True,
             'refresh': True
         })
 
-# With app context
+    failures = []
+    for mapping in online_mappings:
+        agent_client = AgentClient(system_id=mapping.system_id)
+        success, message = agent_client.modify_time_left(mapping.linux_username, operation, seconds)
+        if not success:
+            failures.append(f"{mapping.linux_username}@{mapping.system_id}: {message}")
+
+    if failures:
+        user.pending_time_adjustment = seconds
+        user.pending_time_operation = operation
+        db.session.commit()
+        return jsonify({
+            'success': True,
+            'message': f"Applied to {len(online_mappings) - len(failures)}/{len(online_mappings)} online mapping(s). Remaining queued.",
+            'details': failures,
+            'username': user.username,
+            'pending': True,
+            'refresh': True
+        })
+
+    user.pending_time_adjustment = None
+    user.pending_time_operation = None
+    user.last_checked = datetime.utcnow()
+    db.session.commit()
+    return jsonify({
+        'success': True,
+        'message': f"Adjustment applied to {len(online_mappings)} mapping(s).",
+        'username': user.username,
+        'refresh': True
+    })
+
+def run_schema_migrations():
+    """Run lightweight SQLite migrations and backfill mapping table."""
+    db.session.execute(text("""
+        CREATE TABLE IF NOT EXISTS managed_user_device_map (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            managed_user_id INTEGER NOT NULL,
+            system_id VARCHAR(50) NOT NULL,
+            linux_username VARCHAR(50) NOT NULL,
+            linux_uid INTEGER NULL,
+            is_valid BOOLEAN DEFAULT 0,
+            last_checked DATETIME NULL,
+            last_config TEXT NULL,
+            date_added DATETIME NULL,
+            last_modified DATETIME NULL,
+            FOREIGN KEY(managed_user_id) REFERENCES managed_user(id),
+            FOREIGN KEY(system_id) REFERENCES agent_device(system_id),
+            UNIQUE(managed_user_id, system_id),
+            UNIQUE(system_id, linux_username),
+            UNIQUE(system_id, linux_uid)
+        )
+    """))
+    db.session.commit()
+
+    users = ManagedUser.query.filter(ManagedUser.system_id.isnot(None)).all()
+    for user in users:
+        if not user.system_id:
+            continue
+        existing = ManagedUserDeviceMap.query.filter_by(
+            managed_user_id=user.id,
+            system_id=user.system_id,
+        ).first()
+        if existing:
+            continue
+
+        linux_uid = None
+        if user.last_config:
+            try:
+                parsed = json.loads(user.last_config)
+                if parsed.get("LINUX_UID") is not None:
+                    linux_uid = int(parsed.get("LINUX_UID"))
+            except (TypeError, ValueError):
+                linux_uid = None
+
+        mapping = ManagedUserDeviceMap(
+            managed_user_id=user.id,
+            system_id=user.system_id,
+            linux_username=user.username,
+            linux_uid=linux_uid,
+            is_valid=user.is_valid,
+            last_checked=user.last_checked,
+            last_config=user.last_config,
+        )
+        db.session.add(mapping)
+    db.session.commit()
+
+
 if not os.environ.get('TESTING'):
     with app.app_context():
         db.create_all()
+        run_schema_migrations()
         print("Database tables verified")
-        
-        # Auto-migration: check if system_id column exists, if not add it
-        try:
-            from sqlalchemy import text
-            result = db.session.execute(text("PRAGMA table_info(managed_user)")).fetchall()
-            column_names = [row[1] for row in result]
-            if 'system_id' not in column_names:
-                db.session.execute(text("ALTER TABLE managed_user ADD COLUMN system_id VARCHAR(50)"))
-                db.session.commit()
-                print("Successfully migrated database: added system_id column to managed_user")
-        except Exception as e:
-            print(f"Database migration error: {e}")
-        
+
         # Initialize admin password if it doesn't exist
         if not Settings.get_value('admin_password_hash', None) and not Settings.get_value('admin_password', None):
             Settings.set_admin_password('admin')
             print("Admin password initialized")
-        
+
         # Start background tasks automatically
         task_manager.start()
         print("Background tasks started automatically")

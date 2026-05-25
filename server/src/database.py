@@ -95,8 +95,13 @@ class AgentDevice(db.Model):
     date_added = db.Column(db.DateTime, default=datetime.utcnow)
     last_seen = db.Column(db.DateTime, nullable=True)
     
-    # Relationship back to managed users on this device
-    managed_users = db.relationship('ManagedUser', backref='device', lazy=True)
+    # Relationship to per-user Linux account mappings on this device
+    user_mappings = db.relationship(
+        'ManagedUserDeviceMap',
+        backref='device',
+        lazy=True,
+        cascade="all, delete-orphan",
+    )
 
     def __repr__(self):
         return f'<AgentDevice {self.system_id} [{self.status}]>'
@@ -105,6 +110,8 @@ class ManagedUser(db.Model):
     __tablename__ = 'managed_user'
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(50), nullable=False)
+    # Legacy fields kept for compatibility during schema migration.
+    # New code should use ManagedUserDeviceMap for device/account bindings.
     system_id = db.Column(db.String(50), db.ForeignKey('agent_device.system_id'), nullable=True)
     system_ip = db.Column(db.String(50), nullable=False)
     is_valid = db.Column(db.Boolean, default=False)
@@ -117,9 +124,15 @@ class ManagedUser(db.Model):
     # Relationship with usage data and weekly schedules
     usage_data = db.relationship('UserTimeUsage', backref='user', lazy=True, cascade="all, delete-orphan")
     weekly_schedule = db.relationship('UserWeeklySchedule', backref='user', uselist=False, cascade="all, delete-orphan")
+    device_mappings = db.relationship(
+        'ManagedUserDeviceMap',
+        backref='managed_user',
+        lazy=True,
+        cascade="all, delete-orphan",
+    )
     
     def __repr__(self):
-        return f'<ManagedUser {self.username}@{self.system_ip}>'
+        return f'<ManagedUser {self.username}>'
     
     def get_recent_usage(self, days=7):
         """Get usage data for the last n days"""
@@ -226,7 +239,50 @@ class ManagedUser(db.Model):
         try:
             config = json.loads(self.last_config)
             return config.get(key)
-        except:
+        except (TypeError, ValueError, json.JSONDecodeError):
+            return None
+
+    def get_device_online_summary(self, online_checker):
+        """Return tuple of (online_count, total_count) for mapped devices."""
+        total = len(self.device_mappings)
+        online = 0
+        for mapping in self.device_mappings:
+            if online_checker(mapping.system_id):
+                online += 1
+        return online, total
+
+
+class ManagedUserDeviceMap(db.Model):
+    __tablename__ = 'managed_user_device_map'
+
+    id = db.Column(db.Integer, primary_key=True)
+    managed_user_id = db.Column(db.Integer, db.ForeignKey('managed_user.id'), nullable=False)
+    system_id = db.Column(db.String(50), db.ForeignKey('agent_device.system_id'), nullable=False)
+    linux_username = db.Column(db.String(50), nullable=False)
+    linux_uid = db.Column(db.Integer, nullable=True)
+    is_valid = db.Column(db.Boolean, default=False)
+    last_checked = db.Column(db.DateTime, nullable=True)
+    last_config = db.Column(db.Text, nullable=True)
+    date_added = db.Column(db.DateTime, default=datetime.utcnow)
+    last_modified = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        db.UniqueConstraint('managed_user_id', 'system_id', name='managed_user_system_uc'),
+        db.UniqueConstraint('system_id', 'linux_username', name='system_linux_username_uc'),
+        db.UniqueConstraint('system_id', 'linux_uid', name='system_linux_uid_uc'),
+    )
+
+    def __repr__(self):
+        return f'<ManagedUserDeviceMap user={self.managed_user_id} {self.linux_username}@{self.system_id}>'
+
+    def get_config_value(self, key):
+        """Extract a specific value from the stored mapping config."""
+        if not self.last_config:
+            return None
+        try:
+            config = json.loads(self.last_config)
+            return config.get(key)
+        except (TypeError, ValueError, json.JSONDecodeError):
             return None
 
 class UserTimeUsage(db.Model):

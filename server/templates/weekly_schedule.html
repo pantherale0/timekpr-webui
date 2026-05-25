@@ -64,7 +64,7 @@
                         <div class="user-card-header">
                             <div class="user-info">
                                 <h2 class="user-name">{{ user.username }}</h2>
-                                <p class="user-location">{{ user.system_ip }}</p>
+                                <p class="user-location">{{ user.device_mappings|length }} linked device mapping(s)</p>
                             </div>
                             <div style="display: flex; flex-direction: column; gap: var(--space-2);">
                                 {% if user.weekly_schedule and not user.weekly_schedule.is_synced %}

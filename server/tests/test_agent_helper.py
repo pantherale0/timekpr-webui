@@ -148,7 +148,7 @@ def test_agent_client(db_session):
 
     # Mock full timekpr output format
     # DummyWS send will trigger immediate routing of this stdout output
-    stdout_output = "TIME_SPENT_DAY: 1200\nLIMIT: 3600\nENABLED: true\nLIST: a;b;c\n"
+    stdout_output = "TIME_SPENT_DAY: 1200\nLIMIT: 3600\nENABLED: true\nLIST: a;b;c\nLINUX_UID: 1000\n"
     # Customize DummyWS for this test
     class CustomWS:
         def send(self, message):
@@ -167,6 +167,7 @@ def test_agent_client(db_session):
     assert config["LIMIT"] == 3600
     assert config["ENABLED"] is True
     assert config["LIST"] == ["a", "b", "c"]
+    assert config["LINUX_UID"] == 1000
 
     # Test modify_time_left
     success, msg = client.modify_time_left("john", "+", 60)

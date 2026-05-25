@@ -170,9 +170,24 @@ fn handle_command(action: &str, username: &str, args: &serde_json::Value) -> (bo
                 (code, stdout, stderr)
             };
 
+            let mut enriched_stdout = stdout.clone();
+            if code == 0 && !stdout.contains("LINUX_UID:") {
+                let uid_cmd = ["id", "-u", username];
+                let (uid_code, uid_stdout, _) = execute_command_with_sudo(&uid_cmd);
+                if uid_code == 0 {
+                    let uid_clean = uid_stdout.trim();
+                    if !uid_clean.is_empty() {
+                        if !enriched_stdout.ends_with('\n') {
+                            enriched_stdout.push('\n');
+                        }
+                        enriched_stdout.push_str(&format!("LINUX_UID: {}\n", uid_clean));
+                    }
+                }
+            }
+
             let data = serde_json::json!({
                 "exit_code": code,
-                "stdout": stdout,
+                "stdout": enriched_stdout,
                 "stderr": stderr
             });
 

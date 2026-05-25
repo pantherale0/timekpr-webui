@@ -1,5 +1,5 @@
 from flask import Flask
-from src.database import db, ManagedUser, UserTimeUsage, AgentDevice
+from src.database import db
 
 # Create a minimal Flask app
 app = Flask(__name__)

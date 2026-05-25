@@ -5,7 +5,15 @@ import hashlib
 from datetime import datetime
 from unittest.mock import patch, MagicMock
 from app import ws_agent_handler
-from src.database import AgentDevice, ManagedUser, Settings, UserDailyTimeInterval, UserWeeklySchedule, db
+from src.database import (
+    AgentDevice,
+    ManagedUser,
+    ManagedUserDeviceMap,
+    Settings,
+    UserDailyTimeInterval,
+    UserWeeklySchedule,
+    db,
+)
 from src.agent_helper import AgentConnectionManager
 
 def test_login_routes(client, db_session):
@@ -78,8 +86,16 @@ def test_dashboard_routes(client, db_session):
 
     # Create dummy users for dashboard listing
     device = AgentDevice(system_id="sys-1", status="approved", secure_token="token")
-    user = ManagedUser(username="jack", system_id="sys-1", system_ip="10.0.0.9", is_valid=True)
+    user = ManagedUser(username="jack", system_ip="Unassigned", is_valid=True)
     db_session.add_all([device, user])
+    db_session.flush()
+    mapping = ManagedUserDeviceMap(
+        managed_user_id=user.id,
+        system_id="sys-1",
+        linux_username="jack",
+        is_valid=True
+    )
+    db_session.add(mapping)
     db_session.commit()
 
     res = client.get('/dashboard')
@@ -139,11 +155,9 @@ def test_user_operations(client, db_session):
     res = client.post('/users/add', data={'username': 'bob', 'system_id': 'device-unapproved'}, follow_redirects=True)
     assert b"is not registered or approved" in res.data
 
-    # 3. Add new user - success (validated user mock)
-    with patch('src.agent_helper.AgentClient.validate_user') as mock_val:
-        mock_val.return_value = (True, "Valid User", {"TIME_SPENT_DAY": 600})
-        res = client.post('/users/add', data={'username': 'bob', 'system_id': 'device-abc'}, follow_redirects=True)
-        assert b"added and validated successfully" in res.data
+    # 3. Add new user - success
+    res = client.post('/users/add', data={'username': 'bob', 'system_id': 'device-abc'}, follow_redirects=True)
+    assert b"and mapping added" in res.data
 
     # 4. Add existing user
     res = client.post('/users/add', data={'username': 'bob', 'system_id': 'device-abc'}, follow_redirects=True)
@@ -153,11 +167,27 @@ def test_user_operations(client, db_session):
     bob_user = ManagedUser.query.filter_by(username="bob").first()
     assert bob_user is not None
 
+    # 4b. Create managed user using new endpoint
+    res = client.post('/managed-users/add', data={'username': 'alice'}, follow_redirects=True)
+    assert b"Managed user alice created" in res.data
+    alice = ManagedUser.query.filter_by(username="alice").first()
+    assert alice is not None
+
+    # 4c. Add mapping using new endpoint
+    res = client.post(
+        f'/managed-users/{alice.id}/mappings/add',
+        data={'system_id': 'device-abc', 'linux_username': 'alice', 'linux_uid': '1001'},
+        follow_redirects=True
+    )
+    assert b"Mapping added" in res.data
+    alice_mapping = ManagedUserDeviceMap.query.filter_by(managed_user_id=alice.id, system_id='device-abc').first()
+    assert alice_mapping is not None
+
     # 5. Validate user manual triggers
     with patch('src.agent_helper.AgentClient.validate_user') as mock_val:
         mock_val.return_value = (True, "Valid User", {"TIME_SPENT_DAY": 1200})
         res = client.get(f'/users/validate/{bob_user.id}', follow_redirects=True)
-        assert b"validated successfully" in res.data
+        assert b"Validated" in res.data
 
     # 6. Delete user
     res = client.post(f'/users/delete/{bob_user.id}', follow_redirects=True)
@@ -313,8 +343,16 @@ def test_new_endpoints(client, db_session):
     client.post('/', data={'username': 'admin', 'password': 'admin'})
 
     device = AgentDevice(system_id="sys-new", status="approved", secure_token="tkn")
-    user = ManagedUser(username="jack", system_id="sys-new", system_ip="127.0.0.1", is_valid=True)
+    user = ManagedUser(username="jack", system_ip="Unassigned", is_valid=True)
     db_session.add_all([device, user])
+    db_session.flush()
+    mapping = ManagedUserDeviceMap(
+        managed_user_id=user.id,
+        system_id="sys-new",
+        linux_username="jack",
+        is_valid=True
+    )
+    db_session.add(mapping)
     db_session.commit()
 
     res = client.get(f'/stats/{user.id}')
@@ -343,8 +381,14 @@ def test_new_endpoints(client, db_session):
     assert data['success']
     assert not data['is_synced']
 
-    user_no_sched = ManagedUser(username="nosched", system_id="sys-new", system_ip="127.0.0.1")
+    user_no_sched = ManagedUser(username="nosched", system_ip="Unassigned")
     db_session.add(user_no_sched)
+    db_session.flush()
+    db_session.add(ManagedUserDeviceMap(
+        managed_user_id=user_no_sched.id,
+        system_id="sys-new",
+        linux_username="nosched",
+    ))
     db_session.commit()
     res = client.get(f'/api/schedule-sync-status/{user_no_sched.id}')
     assert res.status_code == 200

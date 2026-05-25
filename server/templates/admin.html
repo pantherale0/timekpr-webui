@@ -12,25 +12,9 @@
         <header class="dashboard-header">
             <div class="dashboard-title">
                 <h1>Admin Panel</h1>
-                <p class="dashboard-subtitle">User Management & System Control</p>
+                <p class="dashboard-subtitle">Managed users and device mappings</p>
             </div>
             <div class="dashboard-controls">
-                <div class="task-status-container">
-                    <span class="status-indicator" id="task-status-indicator">Unknown</span>
-                    <a href="{{ url_for('restart_tasks') }}" class="btn btn-sm btn-secondary btn-icon" title="Restart Background Tasks">
-                        <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-                            <path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2v1z"/>
-                            <path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z"/>
-                        </svg>
-                </div>
-                {% if oidc_enabled and session_user %}
-                <div class="user-badge" style="display: flex; align-items: center; gap: var(--space-2); font-size: var(--font-size-sm); color: var(--text-secondary); background: var(--bg-elevated); padding: var(--space-1) var(--space-3); border-radius: var(--radius-full); border: 1px solid var(--border-primary);">
-                    <svg width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
-                        <path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm2-3a2 2 0 1 1-4 0 2 2 0 0 1 4 0zm4 8c0 1-1 1-1 1H3s-1 0-1-1 1-4 6-4 6 3 6 4zm-1-.004c-.001-.246-.154-.986-.832-1.664C11.516 10.68 10.289 10 8 10c-2.29 0-3.516.68-4.168 1.332-.678.678-.83 1.418-.832 1.664h10z"/>
-                    </svg>
-                    <span>{{ session_user.username }}</span>
-                </div>
-                {% endif %}
                 <a href="{{ url_for('dashboard') }}" class="btn btn-sm btn-secondary">Dashboard</a>
                 <a href="{{ url_for('settings') }}" class="btn btn-sm btn-secondary">Settings</a>
                 {% if not oidc_enabled %}
@@ -38,102 +22,27 @@
                 {% endif %}
             </div>
         </header>
-        
-        <script>
-            // Function to update the task status indicator
-            function updateTaskStatus() {
-                fetch('/api/task-status')
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.success) {
-                            const indicator = document.getElementById('task-status-indicator');
-                            const status = data.status;
-                            
-                            if (status.running && status.thread_alive) {
-                                indicator.className = 'status-active';
-                                indicator.textContent = 'Active';
-                            } else {
-                                indicator.className = 'status-inactive';
-                                indicator.textContent = 'Inactive';
-                            }
-                            
-                            // Set tooltip to show last error if any
-                            if (status.last_error) {
-                                indicator.title = `Last error: ${status.last_error.message} at ${status.last_error.time}`;
-                            } else {
-                                indicator.title = 'Background tasks are running normally';
-                            }
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Error fetching task status:', error);
-                        const indicator = document.getElementById('task-status-indicator');
-                        indicator.className = 'status-error';
-                        indicator.textContent = 'Error';
-                    });
-            }
-            
-            // Check status immediately and then every 30 seconds
-            updateTaskStatus();
-            setInterval(updateTaskStatus, 30000);
-        </script>
-        
+
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 {% for category, message in messages %}
-                    <div class="alert alert-{{ category }}">
-                        <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-                            {% if category == 'success' %}
-                                <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zm-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.061L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z"/>
-                            {% elif category == 'danger' or category == 'error' %}
-                                <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zM5.354 4.646a.5.5 0 1 0-.708.708L7.293 8l-2.647 2.646a.5.5 0 0 0 .708.708L8 8.707l2.646 2.647a.5.5 0 0 0 .708-.708L8.707 8l2.647-2.646a.5.5 0 0 0-.708-.708L8 7.293 5.354 4.646z"/>
-                            {% elif category == 'warning' %}
-                                <path d="M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767L8.982 1.566zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5zm.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2z"/>
-                            {% else %}
-                                <path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16zm.93-9.412-1 4.705c-.07.34.029.533.304.533.194 0 .487-.07.686-.246l-.088.416c-.287.346-.92.598-1.465.598-.703 0-1.002-.422-.808-1.319l.738-3.468c.064-.293.006-.399-.287-.47l-.451-.081.082-.381 2.29-.287zM8 5.5a1 1 0 1 1 0-2 1 1 0 0 1 0 2z"/>
-                            {% endif %}
-                        </svg>
-                        {{ message }}
-                    </div>
+                    <div class="alert alert-{{ category }}">{{ message }}</div>
                 {% endfor %}
             {% endif %}
         {% endwith %}
-        
+
         <div class="users-grid" style="grid-template-columns: 1fr;">
             <div class="card">
                 <div class="card-header">
-                    <h2>Add New User</h2>
-                    <p style="margin: 0; color: var(--text-tertiary); font-size: var(--font-size-sm);">Add a new user to monitor and manage across your network</p>
+                    <h2>Create Managed User</h2>
                 </div>
                 <div class="card-body">
-                    <form action="{{ url_for('add_user') }}" method="POST">
-                        <div style="display: grid; grid-template-columns: 1fr 1fr auto; gap: var(--space-4); align-items: end;">
-                            <div class="form-group" style="margin-bottom: 0;">
-                                <label for="username" class="form-label">Username</label>
-                                <input type="text" id="username" name="username" class="form-control" placeholder="Enter username" required>
-                            </div>
-                            <div class="form-group" style="margin-bottom: 0;">
-                                <label for="system_id" class="form-label">Approved Device</label>
-                                <select id="system_id" name="system_id" class="form-control form-select" required>
-                                    {% if approved_devices %}
-                                        <option value="" disabled selected>Select an approved device...</option>
-                                        {% for device in approved_devices %}
-                                            <option value="{{ device.system_id }}">{{ device.system_id }} ({{ device.system_ip }})</option>
-                                        {% endfor %}
-                                    {% else %}
-                                        <option value="" disabled selected>No approved devices. Pair a device first.</option>
-                                    {% endif %}
-                                </select>
-                            </div>
-                            <div class="form-group" style="margin-bottom: 0;">
-                                <button type="submit" class="btn btn-primary">
-                                    <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-                                        <path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4z"/>
-                                    </svg>
-                                    Add User
-                                </button>
-                            </div>
+                    <form action="{{ url_for('create_managed_user') }}" method="POST" style="display: grid; grid-template-columns: 1fr auto; gap: var(--space-4); align-items: end;">
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label for="username" class="form-label">Managed User Name</label>
+                            <input type="text" id="username" name="username" class="form-control" placeholder="e.g. Jordan" required>
                         </div>
+                        <button type="submit" class="btn btn-primary">Create</button>
                     </form>
                 </div>
             </div>
@@ -141,56 +50,32 @@
             <div class="card">
                 <div class="card-header">
                     <h2>Pending Device Approvals</h2>
-                    <p style="margin: 0; color: var(--text-tertiary); font-size: var(--font-size-sm);">Review and approve client agents attempting to connect</p>
                 </div>
                 <div class="card-body">
                     {% if pending_devices %}
-                        <div style="overflow-x: auto;">
-                            <table style="width: 100%; border-collapse: collapse; font-size: var(--font-size-sm);">
-                                <thead>
-                                    <tr style="border-bottom: 2px solid var(--border-primary);">
-                                        <th style="padding: var(--space-4); text-align: left; font-weight: 600; color: var(--text-primary);">System ID (UUID)</th>
-                                        <th style="padding: var(--space-4); text-align: left; font-weight: 600; color: var(--text-primary);">IP Address</th>
-                                        <th style="padding: var(--space-4); text-align: left; font-weight: 600; color: var(--text-primary);">Requested On</th>
-                                        <th style="padding: var(--space-4); text-align: left; font-weight: 600; color: var(--text-primary);">Actions</th>
+                        <table style="width: 100%; border-collapse: collapse;">
+                            <thead>
+                                <tr>
+                                    <th style="text-align:left;padding:8px;">System ID</th>
+                                    <th style="text-align:left;padding:8px;">IP</th>
+                                    <th style="text-align:left;padding:8px;">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for device in pending_devices %}
+                                    <tr>
+                                        <td style="padding:8px;font-family:monospace;">{{ device.system_id }}</td>
+                                        <td style="padding:8px;">{{ device.system_ip }}</td>
+                                        <td style="padding:8px;">
+                                            <button onclick="approveDevice('{{ device.system_id }}')" class="btn btn-sm btn-success">Approve</button>
+                                            <button onclick="rejectDevice('{{ device.system_id }}')" class="btn btn-sm btn-danger">Reject</button>
+                                        </td>
                                     </tr>
-                                </thead>
-                                <tbody>
-                                    {% for device in pending_devices %}
-                                        <tr style="border-bottom: 1px solid var(--border-primary); transition: background-color var(--transition-fast);" onmouseover="this.style.backgroundColor='var(--bg-tertiary)'" onmouseout="this.style.backgroundColor='transparent'">
-                                            <td style="padding: var(--space-4); font-family: monospace; font-size: var(--font-size-xs); font-weight: 500;">{{ device.system_id }}</td>
-                                            <td style="padding: var(--space-4); font-family: monospace; color: var(--text-secondary);">{{ device.system_ip }}</td>
-                                            <td style="padding: var(--space-4); color: var(--text-secondary); font-size: var(--font-size-xs);">{{ (device.date_added|localtime).strftime('%Y-%m-%d %H:%M') }}</td>
-                                            <td style="padding: var(--space-4);">
-                                                <div style="display: flex; gap: var(--space-2);">
-                                                    <button onclick="approveDevice('{{ device.system_id }}')" class="btn btn-sm btn-success">
-                                                        <svg width="12" height="12" fill="currentColor" viewBox="0 0 16 16">
-                                                            <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zm-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.061L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z"/>
-                                                        </svg>
-                                                        Approve
-                                                    </button>
-                                                    <button onclick="rejectDevice('{{ device.system_id }}')" class="btn btn-sm btn-danger">
-                                                        <svg width="12" height="12" fill="currentColor" viewBox="0 0 16 16">
-                                                            <path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z"/>
-                                                        </svg>
-                                                        Reject
-                                                    </button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
+                                {% endfor %}
+                            </tbody>
+                        </table>
                     {% else %}
-                        <div class="empty-state">
-                            <svg width="48" height="48" fill="var(--text-muted)" viewBox="0 0 16 16" style="margin-bottom: var(--space-4);">
-                                <path d="M11 6a3 3 0 1 1-6 0 3 3 0 0 1 6 0z"/>
-                                <path fill-rule="evenodd" d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8zm8-7a7 7 0 0 0-5.468 11.37C3.242 11.226 4.805 10 8 10s4.757 1.225 5.468 2.37A7 7 0 0 0 8 1z"/>
-                            </svg>
-                            <h3 style="margin-bottom: var(--space-2); color: var(--text-primary);">No Pending Requests</h3>
-                            <p style="margin-bottom: var(--space-4); color: var(--text-secondary);">Start your client agents to see connection requests here.</p>
-                        </div>
+                        <p>No pending devices.</p>
                     {% endif %}
                 </div>
             </div>
@@ -198,188 +83,163 @@
             <div class="card">
                 <div class="card-header">
                     <h2>Approved Devices</h2>
-                    <p style="margin: 0; color: var(--text-tertiary); font-size: var(--font-size-sm);">Manage paired client machines connected to the system</p>
                 </div>
                 <div class="card-body">
                     {% if approved_devices %}
-                        <div style="overflow-x: auto;">
-                            <table style="width: 100%; border-collapse: collapse; font-size: var(--font-size-sm);">
-                                <thead>
-                                    <tr style="border-bottom: 2px solid var(--border-primary);">
-                                        <th style="padding: var(--space-4); text-align: left; font-weight: 600; color: var(--text-primary);">System ID (UUID)</th>
-                                        <th style="padding: var(--space-4); text-align: left; font-weight: 600; color: var(--text-primary);">Last IP</th>
-                                        <th style="padding: var(--space-4); text-align: left; font-weight: 600; color: var(--text-primary);">Added On</th>
-                                        <th style="padding: var(--space-4); text-align: left; font-weight: 600; color: var(--text-primary);">Last Seen</th>
-                                        <th style="padding: var(--space-4); text-align: left; font-weight: 600; color: var(--text-primary);">Actions</th>
+                        <table style="width: 100%; border-collapse: collapse;">
+                            <thead>
+                                <tr>
+                                    <th style="text-align:left;padding:8px;">System ID</th>
+                                    <th style="text-align:left;padding:8px;">IP</th>
+                                    <th style="text-align:left;padding:8px;">Mapped Accounts</th>
+                                    <th style="text-align:left;padding:8px;">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for device in approved_devices %}
+                                    <tr>
+                                        <td style="padding:8px;font-family:monospace;">{{ device.system_id }}</td>
+                                        <td style="padding:8px;">{{ device.system_ip }}</td>
+                                        <td style="padding:8px;">{{ device.user_mappings|length }}</td>
+                                        <td style="padding:8px;">
+                                            <button onclick="rejectDevice('{{ device.system_id }}')" class="btn btn-sm btn-danger">Revoke</button>
+                                        </td>
                                     </tr>
-                                </thead>
-                                <tbody>
-                                    {% for device in approved_devices %}
-                                        <tr style="border-bottom: 1px solid var(--border-primary); transition: background-color var(--transition-fast);" onmouseover="this.style.backgroundColor='var(--bg-tertiary)'" onmouseout="this.style.backgroundColor='transparent'">
-                                            <td style="padding: var(--space-4); font-family: monospace; font-size: var(--font-size-xs); font-weight: 500;">{{ device.system_id }}</td>
-                                            <td style="padding: var(--space-4); font-family: monospace; color: var(--text-secondary);">{{ device.system_ip }}</td>
-                                            <td style="padding: var(--space-4); color: var(--text-secondary); font-size: var(--font-size-xs);">{{ (device.date_added|localtime).strftime('%Y-%m-%d %H:%M') }}</td>
-                                            <td style="padding: var(--space-4); color: var(--text-secondary); font-size: var(--font-size-xs);">
-                                                {% if device.last_seen %}
-                                                    {{ (device.last_seen|localtime).strftime('%Y-%m-%d %H:%M') }}
-                                                {% else %}
-                                                    <span style="color: var(--text-muted);">Never</span>
-                                                {% endif %}
-                                            </td>
-                                            <td style="padding: var(--space-4);">
-                                                <button onclick="rejectDevice('{{ device.system_id }}')" class="btn btn-sm btn-danger">
-                                                    <svg width="12" height="12" fill="currentColor" viewBox="0 0 16 16">
-                                                        <path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z"/>
-                                                    </svg>
-                                                    Revoke
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
+                                {% endfor %}
+                            </tbody>
+                        </table>
                     {% else %}
-                        <div class="empty-state">
-                            <svg width="48" height="48" fill="var(--text-muted)" viewBox="0 0 16 16" style="margin-bottom: var(--space-4);">
-                                <path d="M11 6a3 3 0 1 1-6 0 3 3 0 0 1 6 0z"/>
-                                <path fill-rule="evenodd" d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8zm8-7a7 7 0 0 0-5.468 11.37C3.242 11.226 4.805 10 8 10s4.757 1.225 5.468 2.37A7 7 0 0 0 8 1z"/>
-                            </svg>
-                            <h3 style="margin-bottom: var(--space-2); color: var(--text-primary);">No Approved Devices</h3>
-                            <p style="margin-bottom: var(--space-4); color: var(--text-secondary);">Approve connection requests to add client machines to the system.</p>
-                        </div>
+                        <p>No approved devices.</p>
                     {% endif %}
                 </div>
             </div>
-            
+
             <div class="card">
                 <div class="card-header">
                     <h2>Managed Users</h2>
-                    <p style="margin: 0; color: var(--text-tertiary); font-size: var(--font-size-sm);">Monitor and control all users across your network</p>
                 </div>
                 <div class="card-body">
                     {% if users %}
-                        <div style="overflow-x: auto;">
-                            <table style="width: 100%; border-collapse: collapse; font-size: var(--font-size-sm);">
-                                <thead>
-                                    <tr style="border-bottom: 2px solid var(--border-primary);">
-                                        <th style="padding: var(--space-4); text-align: left; font-weight: 600; color: var(--text-primary);">Username</th>
-                                        <th style="padding: var(--space-4); text-align: left; font-weight: 600; color: var(--text-primary);">System ID</th>
-                                        <th style="padding: var(--space-4); text-align: left; font-weight: 600; color: var(--text-primary);">IP Snapshot</th>
-                                        <th style="padding: var(--space-4); text-align: left; font-weight: 600; color: var(--text-primary);">Status</th>
-                                        <th style="padding: var(--space-4); text-align: left; font-weight: 600; color: var(--text-primary);">Added On</th>
-                                        <th style="padding: var(--space-4); text-align: left; font-weight: 600; color: var(--text-primary);">Last Checked</th>
-                                        <th style="padding: var(--space-4); text-align: left; font-weight: 600; color: var(--text-primary);">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for user in users %}
-                                        <tr style="border-bottom: 1px solid var(--border-primary); transition: background-color var(--transition-fast);" onmouseover="this.style.backgroundColor='var(--bg-tertiary)'" onmouseout="this.style.backgroundColor='transparent'">
-                                            <td style="padding: var(--space-4); font-weight: 500;">{{ user.username }}</td>
-                                            <td style="padding: var(--space-4); color: var(--text-secondary); font-family: monospace; font-size: var(--font-size-xs);">{{ user.system_id if user.system_id else 'None' }}</td>
-                                            <td style="padding: var(--space-4); color: var(--text-secondary); font-family: monospace;">{{ user.system_ip }}</td>
-                                            <td style="padding: var(--space-4);">
-                                                {% if user.is_valid %}
-                                                    <span class="badge badge-success">
-                                                        <svg width="12" height="12" fill="currentColor" viewBox="0 0 16 16">
-                                                            <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zm-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.061L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z"/>
-                                                        </svg>
-                                                        Valid
-                                                    </span>
-                                                {% else %}
-                                                    <span class="badge badge-danger">
-                                                        <svg width="12" height="12" fill="currentColor" viewBox="0 0 16 16">
-                                                            <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zM5.354 4.646a.5.5 0 1 0-.708.708L7.293 8l-2.647 2.646a.5.5 0 0 0 .708.708L8 8.707l2.646 2.647a.5.5 0 0 0 .708-.708L8.707 8l2.647-2.646a.5.5 0 0 0-.708-.708L8 7.293 5.354 4.646z"/>
-                                                        </svg>
-                                                        Invalid
-                                                    </span>
-                                                {% endif %}
-                                            </td>
-                                            <td style="padding: var(--space-4); color: var(--text-secondary); font-size: var(--font-size-xs);">{{ (user.date_added|localtime).strftime('%Y-%m-%d %H:%M') }}</td>
-                                            <td style="padding: var(--space-4); color: var(--text-secondary); font-size: var(--font-size-xs);">
-                                                {% if user.last_checked %}
-                                                    {{ (user.last_checked|localtime).strftime('%Y-%m-%d %H:%M') }}
-                                                {% else %}
-                                                    <span style="color: var(--text-muted);">Never</span>
-                                                {% endif %}
-                                            </td>
-                                            <td style="padding: var(--space-4);">
-                                                <div style="display: flex; gap: var(--space-2);">
-                                                    <a href="{{ url_for('validate_user', user_id=user.id) }}" class="btn btn-sm btn-secondary">
-                                                        <svg width="12" height="12" fill="currentColor" viewBox="0 0 16 16">
-                                                            <path d="M10.067.87a2.89 2.89 0 0 0-4.134 0l-.622.638-.89-.011a2.89 2.89 0 0 0-2.924 2.924l.01.89-.636.622a2.89 2.89 0 0 0 0 4.134l.637.622-.011.89a2.89 2.89 0 0 0 2.924 2.924l.89-.01.622.636a2.89 2.89 0 0 0 4.134 0l.622-.637.89.011a2.89 2.89 0 0 0 2.924-2.924l-.01-.89.636-.622a2.89 2.89 0 0 0 0-4.134l-.637-.622.011-.89a2.89 2.89 0 0 0-2.924-2.924l-.89.01-.622-.636zm.287 5.984-3 3a.5.5 0 0 1-.708 0l-1.5-1.5a.5.5 0 1 1 .708-.708L7 8.793l2.646-2.647a.5.5 0 0 1 .708.708z"/>
-                                                        </svg>
-                                                        Validate
-                                                    </a>
-                                                    <form action="{{ url_for('delete_user', user_id=user.id) }}" method="POST" style="display: inline;" onsubmit="return confirm('Are you sure you want to delete this user?')">
-                                                        <button type="submit" class="btn btn-sm btn-danger">
-                                                            <svg width="12" height="12" fill="currentColor" viewBox="0 0 16 16">
-                                                                <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/>
-                                                                <path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/>
-                                                            </svg>
-                                                            Delete
-                                                        </button>
-                                                    </form>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
+                        {% for user in users %}
+                            <div style="border: 1px solid var(--border-primary); border-radius: var(--radius-lg); padding: var(--space-4); margin-bottom: var(--space-4);">
+                                <div style="display:flex; justify-content:space-between; align-items:center; gap:var(--space-3);">
+                                    <div>
+                                        <h3 style="margin:0;">{{ user.username }}</h3>
+                                        <p style="margin:0; color:var(--text-secondary);">
+                                            {{ user.device_mappings|length }} mapping(s), {{ user.device_mappings|selectattr('is_valid')|list|length }} valid
+                                        </p>
+                                    </div>
+                                    <div style="display:flex; gap: var(--space-2);">
+                                        <a href="{{ url_for('validate_user', user_id=user.id) }}" class="btn btn-sm btn-secondary">Validate All</a>
+                                        <form action="{{ url_for('delete_user', user_id=user.id) }}" method="POST" onsubmit="return confirm('Delete managed user and all mappings?')">
+                                            <button type="submit" class="btn btn-sm btn-danger">Delete User</button>
+                                        </form>
+                                    </div>
+                                </div>
+
+                                <div style="margin-top: var(--space-4);">
+                                    <form action="{{ url_for('add_user_mapping', user_id=user.id) }}" method="POST" style="display:grid; grid-template-columns: 2fr 2fr 1fr auto; gap: var(--space-3); align-items:end;">
+                                        <div class="form-group" style="margin-bottom:0;">
+                                            <label class="form-label">Device</label>
+                                            <select name="system_id" class="form-control form-select" required>
+                                                <option value="" disabled selected>Select approved device</option>
+                                                {% for device in approved_devices %}
+                                                    <option value="{{ device.system_id }}">{{ device.system_id }} ({{ device.system_ip }})</option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                        <div class="form-group" style="margin-bottom:0;">
+                                            <label class="form-label">Linux Username</label>
+                                            <input type="text" name="linux_username" class="form-control" placeholder="e.g. jordan" required>
+                                        </div>
+                                        <div class="form-group" style="margin-bottom:0;">
+                                            <label class="form-label">Linux UID (optional)</label>
+                                            <input type="text" name="linux_uid" class="form-control" placeholder="1000">
+                                        </div>
+                                        <button type="submit" class="btn btn-sm btn-primary">Add Mapping</button>
+                                    </form>
+                                </div>
+
+                                {% if user.device_mappings %}
+                                    <table style="width: 100%; border-collapse: collapse; margin-top: var(--space-4);">
+                                        <thead>
+                                            <tr>
+                                                <th style="text-align:left;padding:8px;">Linux Account</th>
+                                                <th style="text-align:left;padding:8px;">Device</th>
+                                                <th style="text-align:left;padding:8px;">UID</th>
+                                                <th style="text-align:left;padding:8px;">Status</th>
+                                                <th style="text-align:left;padding:8px;">Last Checked</th>
+                                                <th style="text-align:left;padding:8px;">Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for mapping in user.device_mappings %}
+                                                <tr>
+                                                    <td style="padding:8px;">{{ mapping.linux_username }}</td>
+                                                    <td style="padding:8px;font-family:monospace;">{{ mapping.system_id }}</td>
+                                                    <td style="padding:8px;">{{ mapping.linux_uid if mapping.linux_uid is not none else '-' }}</td>
+                                                    <td style="padding:8px;">
+                                                        {% if mapping.is_valid %}
+                                                            <span class="badge badge-success">Valid</span>
+                                                        {% else %}
+                                                            <span class="badge badge-warning">Unverified</span>
+                                                        {% endif %}
+                                                    </td>
+                                                    <td style="padding:8px;">
+                                                        {% if mapping.last_checked %}
+                                                            {{ (mapping.last_checked|localtime).strftime('%Y-%m-%d %H:%M') }}
+                                                        {% else %}
+                                                            Never
+                                                        {% endif %}
+                                                    </td>
+                                                    <td style="padding:8px; display:flex; gap:6px;">
+                                                        <a href="{{ url_for('validate_mapping', user_id=user.id, mapping_id=mapping.id) }}" class="btn btn-sm btn-secondary">Validate</a>
+                                                        <form action="{{ url_for('delete_mapping', user_id=user.id, mapping_id=mapping.id) }}" method="POST" onsubmit="return confirm('Delete this mapping?')">
+                                                            <button type="submit" class="btn btn-sm btn-danger">Remove</button>
+                                                        </form>
+                                                    </td>
+                                                </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                {% else %}
+                                    <p style="margin-top:var(--space-3); color:var(--text-secondary);">No mappings configured yet.</p>
+                                {% endif %}
+                            </div>
+                        {% endfor %}
                     {% else %}
-                        <div class="empty-state">
-                            <svg width="48" height="48" fill="var(--text-muted)" viewBox="0 0 16 16" style="margin-bottom: var(--space-4);">
-                                <path d="M15 14s1 0 1-1-1-4-5-4-5 3-5 4 1 1 1 1h8zm-7.978-1A.261.261 0 0 1 7 12.996c.001-.264.167-1.03.76-1.72C8.312 10.629 9.282 10 11 10c1.717 0 2.687.63 3.24 1.276.593.69.758 1.457.76 1.72l-.008.002a.274.274 0 0 1-.014.002H7.022zM11 7a2 2 0 1 0 0-4 2 2 0 0 0 0 4zm3-2a3 3 0 1 1-6 0 3 3 0 0 1 6 0zM6.936 9.28a5.88 5.88 0 0 0-1.23-.247A7.35 7.35 0 0 0 5 9c-4 0-5 3-5 4 0 .667.333 1 1 1h4.216A2.238 2.238 0 0 1 5 13c0-1.01.377-2.042 1.09-2.904.243-.294.526-.569.846-.816zM4.92 10A5.493 5.493 0 0 0 4 13H1c0-.26.164-1.03.76-1.724.545-.636 1.492-1.256 3.16-1.275zM1.5 5.5a3 3 0 1 1 6 0 3 3 0 0 1-6 0zm3-2a2 2 0 1 0 0 4 2 2 0 0 0 0-4z"/>
-                            </svg>
-                            <h3 style="margin-bottom: var(--space-2); color: var(--text-primary);">No Users Added</h3>
-                            <p style="margin-bottom: var(--space-4); color: var(--text-secondary);">Get started by adding your first user to monitor and manage.</p>
-                        </div>
+                        <p>No managed users yet.</p>
                     {% endif %}
                 </div>
             </div>
         </div>
     </div>
-    
+
     <script>
         function approveDevice(systemId) {
-            if (!confirm('Are you sure you want to approve this device?')) return;
-            fetch(`/api/device/approve/${systemId}`, {
-                method: 'POST'
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    alert(data.message);
+            if (!confirm('Approve this device?')) return;
+            fetch(`/api/device/approve/${systemId}`, { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    if (!data.success) {
+                        alert(data.message || 'Failed to approve device');
+                    }
                     window.location.reload();
-                } else {
-                    alert('Error: ' + data.message);
-                }
-            })
-            .catch(error => {
-                console.error('Error approving device:', error);
-                alert('An error occurred while approving the device.');
-            });
+                })
+                .catch(() => alert('Failed to approve device'));
         }
 
         function rejectDevice(systemId) {
-            if (!confirm('Are you sure you want to reject/revoke this device? This will disconnect the agent.')) return;
-            fetch(`/api/device/reject/${systemId}`, {
-                method: 'POST'
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    alert(data.message);
+            if (!confirm('Reject/Revoke this device?')) return;
+            fetch(`/api/device/reject/${systemId}`, { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    if (!data.success) {
+                        alert(data.message || 'Failed to reject device');
+                    }
                     window.location.reload();
-                } else {
-                    alert('Error: ' + data.message);
-                }
-            })
-            .catch(error => {
-                console.error('Error rejecting device:', error);
-                alert('An error occurred while rejecting the device.');
-            });
+                })
+                .catch(() => alert('Failed to reject device'));
         }
     </script>
 </body>

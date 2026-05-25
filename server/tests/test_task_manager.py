@@ -2,7 +2,15 @@ import pytest
 import json
 from datetime import datetime, date, timedelta
 from src.task_manager import BackgroundTaskManager
-from src.database import ManagedUser, UserTimeUsage, UserWeeklySchedule, UserDailyTimeInterval, db
+from src.database import (
+    ManagedUser,
+    ManagedUserDeviceMap,
+    UserTimeUsage,
+    UserWeeklySchedule,
+    UserDailyTimeInterval,
+    AgentDevice,
+    db,
+)
 from src.agent_helper import AgentConnectionManager
 
 class DummyWS:
@@ -62,11 +70,19 @@ def test_task_manager_update_user_data(app, db_session):
     # 1. Create a user who is offline
     user_offline = ManagedUser(
         username="offline_user",
-        system_id="sys-offline",
-        system_ip="10.0.0.1",
+        system_ip="Unassigned",
         is_valid=True
     )
+    device_offline = AgentDevice(system_id="sys-offline", status="approved", secure_token="tok")
     db_session.add(user_offline)
+    db_session.flush()
+    offline_mapping = ManagedUserDeviceMap(
+        managed_user_id=user_offline.id,
+        system_id="sys-offline",
+        linux_username="offline_user",
+        is_valid=True,
+    )
+    db_session.add_all([device_offline, offline_mapping])
     db_session.commit()
 
     # Verify task manager skips offline user
@@ -80,13 +96,22 @@ def test_task_manager_update_user_data(app, db_session):
     # 2. Create online user with pending time adjustment
     user_online = ManagedUser(
         username="online_user",
-        system_id="sys-online",
-        system_ip="10.0.0.2",
+        system_ip="Unassigned",
         is_valid=True,
         pending_time_adjustment=300,
         pending_time_operation="+"
     )
-    db_session.add(user_online)
+    device_online = AgentDevice(system_id="sys-online", status="approved", secure_token="tok")
+    db_session.add_all([user_online, device_online])
+    db_session.flush()
+    online_mapping = ManagedUserDeviceMap(
+        managed_user_id=user_online.id,
+        system_id="sys-online",
+        linux_username="online_user",
+        is_valid=True,
+        last_config='{"TIME_SPENT_DAY": 450, "TIME_LEFT_DAY": 1000}'
+    )
+    db_session.add(online_mapping)
     db_session.commit()
 
     ws = DummyWS()
@@ -148,8 +173,8 @@ def test_task_manager_update_user_data(app, db_session):
     with app.app_context():
         manager._update_user_data()
         
-    # Check that validation status didn't change
-    assert user_online.is_valid
+    # When all mappings are offline, user becomes invalid until validation recovers
+    assert not user_online.is_valid
 
     # Clean up registry
     AgentConnectionManager.unregister("sys-offline")
@@ -160,13 +185,21 @@ def test_task_manager_failures_and_threads(app, db_session):
 
     user = ManagedUser(
         username="fail_user",
-        system_id="sys-fail",
-        system_ip="10.0.0.3",
+        system_ip="Unassigned",
         is_valid=True,
         pending_time_adjustment=100,
         pending_time_operation="+"
     )
-    db_session.add(user)
+    device = AgentDevice(system_id="sys-fail", status="approved", secure_token="tok")
+    db_session.add_all([user, device])
+    db_session.flush()
+    mapping = ManagedUserDeviceMap(
+        managed_user_id=user.id,
+        system_id="sys-fail",
+        linux_username="fail_user",
+        is_valid=True,
+    )
+    db_session.add(mapping)
     db_session.commit()
 
     schedule = UserWeeklySchedule(user_id=user.id, monday_hours=2.0, is_synced=False)
