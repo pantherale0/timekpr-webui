@@ -1,9 +1,6 @@
-# SSH Keys - NEVER commit private keys!
-ssh/
+# Private keys and certificates - NEVER commit secrets!
 *.pem
 *.key
-id_rsa*
-timekpr_ui_key*
 
 # Python
 venv/
