@@ -64,7 +64,9 @@
                             <tbody>
                                 {% for device in pending_devices %}
                                     <tr>
-                                        <td style="padding:8px;">{{ device_labels.get(device.system_id, device.display_name) }}</td>
+                                        <td style="padding:8px;">
+                                            <a href="{{ url_for('device_detail', system_id=device.system_id) }}">{{ device_labels.get(device.system_id, device.display_name) }}</a>
+                                        </td>
                                         <td style="padding:8px;">{{ device.system_ip }}</td>
                                         <td style="padding:8px;">
                                             <button onclick="approveDevice('{{ device.system_id }}')" class="btn btn-sm btn-success">Approve</button>
@@ -98,7 +100,9 @@
                             <tbody>
                                 {% for device in approved_devices %}
                                     <tr>
-                                        <td style="padding:8px;">{{ device_labels.get(device.system_id, device.display_name) }}</td>
+                                        <td style="padding:8px;">
+                                            <a href="{{ url_for('device_detail', system_id=device.system_id) }}">{{ device_labels.get(device.system_id, device.display_name) }}</a>
+                                        </td>
                                         <td style="padding:8px;">{{ device.system_ip }}</td>
                                         <td style="padding:8px;">{{ device.user_mappings|length }}</td>
                                         <td style="padding:8px;">
@@ -176,7 +180,9 @@
                                             {% for mapping in user.device_mappings %}
                                                 <tr>
                                                     <td style="padding:8px;">{{ mapping.linux_username }}</td>
-                                                    <td style="padding:8px;">{{ device_labels.get(mapping.system_id, mapping.system_id) }}</td>
+                                                    <td style="padding:8px;">
+                                                        <a href="{{ url_for('device_detail', system_id=mapping.system_id) }}">{{ device_labels.get(mapping.system_id, mapping.system_id) }}</a>
+                                                    </td>
                                                     <td style="padding:8px;">{{ mapping.linux_uid if mapping.linux_uid is not none else '-' }}</td>
                                                     <td style="padding:8px;">
                                                         {% if mapping.is_valid %}

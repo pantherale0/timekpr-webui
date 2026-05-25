@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ device_label }} - Device Alerts - TimeKpr WebUI</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
+    <style>
+        .device-main {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: var(--space-6);
+        }
+
+        .device-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: var(--space-4);
+            flex-wrap: wrap;
+            margin-bottom: var(--space-6);
+        }
+
+        .device-meta-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: var(--space-4);
+            margin-bottom: var(--space-6);
+        }
+
+        .device-card {
+            background: var(--bg-elevated);
+            border: 1px solid var(--border-primary);
+            border-radius: var(--radius-xl);
+            padding: var(--space-5);
+        }
+
+        .device-card h2 {
+            margin-top: 0;
+            margin-bottom: var(--space-4);
+            font-size: var(--font-size-lg);
+        }
+
+        .meta-label {
+            color: var(--text-tertiary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            font-size: var(--font-size-xs);
+            font-weight: 600;
+            margin-bottom: var(--space-1);
+        }
+
+        .meta-value {
+            font-size: var(--font-size-lg);
+            font-weight: 700;
+        }
+
+        .mapped-accounts-list {
+            display: grid;
+            gap: var(--space-3);
+        }
+
+        .mapped-account-item {
+            border: 1px solid var(--border-primary);
+            border-radius: var(--radius-lg);
+            padding: var(--space-4);
+            background: var(--bg-primary);
+        }
+
+        .alerts-toolbar {
+            display: flex;
+            gap: var(--space-3);
+            align-items: end;
+            flex-wrap: wrap;
+            margin-bottom: var(--space-5);
+        }
+
+        .alerts-toolbar form {
+            display: flex;
+            gap: var(--space-3);
+            align-items: end;
+            flex-wrap: wrap;
+            width: 100%;
+        }
+
+        .alerts-table-wrapper {
+            overflow-x: auto;
+        }
+
+        .alerts-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .alerts-table th,
+        .alerts-table td {
+            padding: 10px 8px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-primary);
+            vertical-align: top;
+            font-size: var(--font-size-sm);
+        }
+
+        .alerts-table th {
+            color: var(--text-tertiary);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            font-size: var(--font-size-xs);
+        }
+
+        .alerts-details {
+            max-width: 360px;
+            overflow-wrap: anywhere;
+            color: var(--text-secondary);
+            font-family: var(--font-family-mono, monospace);
+            font-size: var(--font-size-xs);
+        }
+    </style>
+</head>
+<body>
+    <div class="device-main">
+        <div class="device-header">
+            <div>
+                <h1 style="margin: 0;">{{ device_label }}</h1>
+                <p style="margin: var(--space-1) 0 0 0; color: var(--text-tertiary);">
+                    Device details, linked accounts, and alert history
+                </p>
+            </div>
+            <div style="display:flex; gap: var(--space-3); flex-wrap: wrap;">
+                <a href="{{ url_for('admin') }}" class="btn btn-secondary">Back to Admin</a>
+                <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">Dashboard</a>
+            </div>
+        </div>
+
+        <div class="device-meta-grid">
+            <div class="device-card">
+                <div class="meta-label">System ID</div>
+                <div class="meta-value" style="font-size: var(--font-size-base);">{{ device.system_id }}</div>
+            </div>
+            <div class="device-card">
+                <div class="meta-label">Status</div>
+                <div class="meta-value">{{ device.status|title }}</div>
+            </div>
+            <div class="device-card">
+                <div class="meta-label">Last Known IP</div>
+                <div class="meta-value">{{ device.system_ip or 'Unknown' }}</div>
+            </div>
+            <div class="device-card">
+                <div class="meta-label">Alerts</div>
+                <div class="meta-value">{{ alert_summary.total }}</div>
+            </div>
+        </div>
+
+        <div class="device-card" style="margin-bottom: var(--space-6);">
+            <h2>Mapped Accounts</h2>
+            {% if mapped_accounts %}
+            <div class="mapped-accounts-list">
+                {% for mapping in mapped_accounts %}
+                <div class="mapped-account-item">
+                    <div style="font-weight: 600;">{{ mapping.managed_user.username }} -> {{ mapping.linux_username }}</div>
+                    <div style="font-size: var(--font-size-sm); color: var(--text-tertiary); margin-top: var(--space-1);">
+                        UID: {{ mapping.linux_uid if mapping.linux_uid is not none else '-' }}
+                        <span style="margin-left: var(--space-3);">
+                            Status: {{ 'Valid' if mapping.is_valid else 'Unverified' }}
+                        </span>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p style="margin: 0; color: var(--text-tertiary);">No managed accounts are currently mapped to this device.</p>
+            {% endif %}
+        </div>
+
+        <div class="device-card">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; gap: var(--space-4); flex-wrap: wrap; margin-bottom: var(--space-5);">
+                <div>
+                    <h2 style="margin-bottom: var(--space-1);">Alert History</h2>
+                    <p style="margin: 0; color: var(--text-tertiary); font-size: var(--font-size-sm);">
+                        Includes device-wide and account-specific alerts for this host.
+                    </p>
+                </div>
+                <div style="display:flex; gap: var(--space-4); flex-wrap: wrap;">
+                    <div><strong>{{ alert_summary.device_wide }}</strong> device-wide</div>
+                    <div><strong>{{ alert_summary.account_specific }}</strong> account-specific</div>
+                </div>
+            </div>
+
+            {% if alert_summary.counts_by_type %}
+            <div style="display:flex; gap: var(--space-2); flex-wrap: wrap; margin-bottom: var(--space-5);">
+                {% for label, count in alert_summary.counts_by_type %}
+                <span class="badge badge-secondary">{{ label }}: {{ count }}</span>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <div class="alerts-toolbar">
+                <form method="GET">
+                    <div class="form-group" style="margin: 0; flex: 1 1 280px;">
+                        <label for="alert_search" class="form-label">Search alerts</label>
+                        <input
+                            type="text"
+                            id="alert_search"
+                            name="alert_search"
+                            class="form-control"
+                            placeholder="Search by event, account, status, or details"
+                            value="{{ alert_search }}"
+                        >
+                    </div>
+                    <button type="submit" class="btn btn-secondary">Search</button>
+                    {% if alert_search %}
+                    <a href="{{ url_for('device_detail', system_id=device.system_id) }}" class="btn btn-secondary">Clear</a>
+                    {% endif %}
+                </form>
+            </div>
+
+            {% if alert_entries %}
+            <div class="alerts-table-wrapper">
+                <table class="alerts-table">
+                    <thead>
+                        <tr>
+                            <th>When</th>
+                            <th>Event</th>
+                            <th>Scope</th>
+                            <th>Delivery</th>
+                            <th>Details</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for alert in alert_entries %}
+                        <tr>
+                            <td>
+                                {% if alert.occurred_at %}
+                                {{ (alert.occurred_at|localtime).strftime('%Y-%m-%d %H:%M') }}
+                                {% else %}
+                                Unknown
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div>{{ alert.event_label }}</div>
+                                <div style="font-size: var(--font-size-xs); color: var(--text-tertiary);">#{{ alert.id }}</div>
+                            </td>
+                            <td>{{ alert.scope_label }}</td>
+                            <td>
+                                <div>{{ alert.delivery_status|replace('_', ' ')|title }}</div>
+                                <div style="font-size: var(--font-size-xs); color: var(--text-tertiary);">
+                                    {{ alert.delivery_attempts }} attempt(s)
+                                    {% if alert.last_delivery_error %}
+                                    <br>{{ alert.last_delivery_error }}
+                                    {% endif %}
+                                </div>
+                            </td>
+                            <td class="alerts-details">{{ alert.details_text }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p style="margin: 0; color: var(--text-tertiary);">
+                {% if alert_search %}
+                No alerts matched "{{ alert_search }}".
+                {% else %}
+                No alerts recorded yet for this device.
+                {% endif %}
+            </p>
+            {% endif %}
+        </div>
+    </div>
+</body>
+</html>

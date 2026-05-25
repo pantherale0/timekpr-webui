@@ -661,6 +661,100 @@ def test_new_endpoints(client, db_session):
     })
     assert res.status_code == 400
 
+
+def test_alert_pages_for_user_and_device(client, db_session):
+    Settings.set_admin_password("admin")
+    client.post('/', data={'username': 'admin', 'password': 'admin'})
+
+    device = AgentDevice(
+        system_id="device-alert-aa",
+        system_hostname="family-pc",
+        system_ip="10.0.0.22",
+        status="approved",
+        secure_token="tok",
+    )
+    user = ManagedUser(username="jack", system_ip="Unassigned", is_valid=True)
+    db_session.add_all([device, user])
+    db_session.flush()
+    db_session.add(ManagedUserDeviceMap(
+        managed_user_id=user.id,
+        system_id=device.system_id,
+        linux_username="jack",
+        is_valid=True,
+    ))
+    db_session.add_all([
+        AgentAlert(
+            system_id=device.system_id,
+            event_type='user_signed_in',
+            linux_username='jack',
+            occurred_at=datetime.utcnow(),
+            payload_json=json.dumps({
+                'system_id': device.system_id,
+                'event_type': 'user_signed_in',
+                'linux_username': 'jack',
+                'details': {'session_id': 'c1', 'source': 'login'},
+            }),
+            webhook_enabled_snapshot=False,
+            delivery_status=AgentAlert.DELIVERY_DISABLED,
+        ),
+        AgentAlert(
+            system_id=device.system_id,
+            event_type='system_sleep',
+            linux_username=None,
+            occurred_at=datetime.utcnow(),
+            payload_json=json.dumps({
+                'system_id': device.system_id,
+                'event_type': 'system_sleep',
+                'details': {'phase': 'prepare'},
+            }),
+            webhook_enabled_snapshot=False,
+            delivery_status=AgentAlert.DELIVERY_DISABLED,
+        ),
+        AgentAlert(
+            system_id=device.system_id,
+            event_type='user_signed_out',
+            linux_username='other-user',
+            occurred_at=datetime.utcnow(),
+            payload_json=json.dumps({
+                'system_id': device.system_id,
+                'event_type': 'user_signed_out',
+                'linux_username': 'other-user',
+                'details': {'session_id': 'hidden'},
+            }),
+            webhook_enabled_snapshot=False,
+            delivery_status=AgentAlert.DELIVERY_DISABLED,
+        ),
+    ])
+    db_session.commit()
+
+    res = client.get(f'/stats/{user.id}')
+    assert res.status_code == 200
+    assert b'Alert Audit' in res.data
+    assert b'User Signed In' in res.data
+    assert b'System Sleep' in res.data
+    assert b'other-user' not in res.data
+    assert f'/devices/{device.system_id}'.encode() in res.data
+
+    filtered = client.get(f'/stats/{user.id}?alert_search=prepare')
+    assert filtered.status_code == 200
+    assert b'System Sleep' in filtered.data
+    assert b'User Signed In' not in filtered.data
+
+    device_page = client.get(f'/devices/{device.system_id}')
+    assert device_page.status_code == 200
+    assert b'Device details, linked accounts, and alert history' in device_page.data
+    assert b'jack -> jack' in device_page.data
+    assert b'other-user' in device_page.data
+
+    device_filtered = client.get(f'/devices/{device.system_id}?alert_search=other-user')
+    assert device_filtered.status_code == 200
+    assert b'other-user' in device_filtered.data
+    assert b'User Signed In' not in device_filtered.data
+
+    admin_res = client.get('/admin')
+    assert admin_res.status_code == 200
+    assert f'/devices/{device.system_id}'.encode() in admin_res.data
+
 def test_run_schema_migrations_upgrades_time_intervals(app, db_session):
     user = ManagedUser(username="legacy-user", system_ip="Unassigned")
     db_session.add(user)

@@ -131,6 +131,107 @@
             padding: var(--space-12) 0;
             font-size: var(--font-size-sm);
         }
+
+        .alerts-section {
+            margin-top: var(--space-6);
+            background: var(--bg-elevated);
+            border: 1px solid var(--border-primary);
+            border-radius: var(--radius-xl);
+            padding: var(--space-6);
+        }
+
+        .alerts-section h2 {
+            margin: 0;
+            font-size: var(--font-size-xl);
+        }
+
+        .alerts-section-header {
+            display: flex;
+            justify-content: space-between;
+            gap: var(--space-4);
+            align-items: flex-start;
+            flex-wrap: wrap;
+            margin-bottom: var(--space-5);
+        }
+
+        .alerts-toolbar {
+            display: flex;
+            gap: var(--space-3);
+            align-items: end;
+            flex-wrap: wrap;
+            margin-bottom: var(--space-5);
+        }
+
+        .alerts-toolbar form {
+            display: flex;
+            gap: var(--space-3);
+            align-items: end;
+            flex-wrap: wrap;
+            width: 100%;
+        }
+
+        .alerts-group-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: var(--space-4);
+            margin-bottom: var(--space-5);
+        }
+
+        .alerts-group-card {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-primary);
+            border-radius: var(--radius-lg);
+            padding: var(--space-4);
+        }
+
+        .alerts-group-card-title {
+            font-weight: 600;
+            margin-bottom: var(--space-2);
+        }
+
+        .alerts-group-card-sub {
+            color: var(--text-tertiary);
+            font-size: var(--font-size-sm);
+        }
+
+        .alerts-table-wrapper {
+            overflow-x: auto;
+        }
+
+        .alerts-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .alerts-table th,
+        .alerts-table td {
+            padding: 10px 8px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-primary);
+            vertical-align: top;
+            font-size: var(--font-size-sm);
+        }
+
+        .alerts-table th {
+            color: var(--text-tertiary);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            font-size: var(--font-size-xs);
+        }
+
+        .alerts-details {
+            max-width: 320px;
+            overflow-wrap: anywhere;
+            color: var(--text-secondary);
+            font-family: var(--font-family-mono, monospace);
+            font-size: var(--font-size-xs);
+        }
+
+        .alerts-empty {
+            color: var(--text-tertiary);
+            padding: var(--space-6) 0;
+        }
     </style>
 </head>
 <body>
@@ -216,6 +317,118 @@
                 <div class="no-data-msg">No data recorded yet.</div>
             {% endif %}
         </div>
+
+        <section class="alerts-section">
+            <div class="alerts-section-header">
+                <div>
+                    <h2>Alert Audit</h2>
+                    <p style="margin: var(--space-1) 0 0 0; color: var(--text-tertiary); font-size: var(--font-size-sm);">
+                        Alerts tied to this user's linked accounts and device-wide alerts on their mapped devices.
+                    </p>
+                </div>
+                <div style="display:flex; gap: var(--space-4); flex-wrap: wrap;">
+                    <div class="summary-card" style="min-width: 120px; margin: 0;">
+                        <div class="summary-label">Alerts</div>
+                        <div class="summary-value">{{ alert_summary.total }}</div>
+                    </div>
+                    <div class="summary-card" style="min-width: 120px; margin: 0;">
+                        <div class="summary-label">Account Specific</div>
+                        <div class="summary-value">{{ alert_summary.account_specific }}</div>
+                    </div>
+                    <div class="summary-card" style="min-width: 120px; margin: 0;">
+                        <div class="summary-label">Device Wide</div>
+                        <div class="summary-value">{{ alert_summary.device_wide }}</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="alerts-toolbar">
+                <form method="GET">
+                    <div class="form-group" style="margin: 0; flex: 1 1 280px;">
+                        <label for="alert_search" class="form-label">Search alerts</label>
+                        <input
+                            type="text"
+                            id="alert_search"
+                            name="alert_search"
+                            class="form-control"
+                            placeholder="Search by event, device, account, status, or details"
+                            value="{{ alert_search }}"
+                        >
+                    </div>
+                    <button type="submit" class="btn btn-secondary">Search</button>
+                    {% if alert_search %}
+                    <a href="{{ url_for('user_stats', user_id=user.id) }}" class="btn btn-secondary">Clear</a>
+                    {% endif %}
+                </form>
+            </div>
+
+            {% if alert_groups %}
+            <div class="alerts-group-grid">
+                {% for group in alert_groups %}
+                <div class="alerts-group-card">
+                    <div class="alerts-group-card-title">{{ group.title }}</div>
+                    <div class="alerts-group-card-sub">{{ group.count }} matching alert(s)</div>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            {% if alert_entries %}
+            <div class="alerts-table-wrapper">
+                <table class="alerts-table">
+                    <thead>
+                        <tr>
+                            <th>When</th>
+                            <th>Event</th>
+                            <th>Scope</th>
+                            <th>Device</th>
+                            <th>Delivery</th>
+                            <th>Details</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for alert in alert_entries %}
+                        <tr>
+                            <td>
+                                {% if alert.occurred_at %}
+                                {{ (alert.occurred_at|localtime).strftime('%Y-%m-%d %H:%M') }}
+                                {% else %}
+                                Unknown
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div>{{ alert.event_label }}</div>
+                                <div style="font-size: var(--font-size-xs); color: var(--text-tertiary);">#{{ alert.id }}</div>
+                            </td>
+                            <td>{{ alert.scope_label }}</td>
+                            <td>
+                                <a href="{{ url_for('device_detail', system_id=alert.system_id) }}">{{ alert.device_label }}</a>
+                            </td>
+                            <td>
+                                <div>{{ alert.delivery_status|replace('_', ' ')|title }}</div>
+                                <div style="font-size: var(--font-size-xs); color: var(--text-tertiary);">
+                                    {{ alert.delivery_attempts }} attempt(s)
+                                    {% if alert.last_delivery_error %}
+                                    <br>{{ alert.last_delivery_error }}
+                                    {% endif %}
+                                </div>
+                            </td>
+                            <td class="alerts-details">{{ alert.details_text }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="alerts-empty">
+                {% if alert_search %}
+                No alerts matched "{{ alert_search }}".
+                {% else %}
+                No alerts recorded yet for this user's linked devices.
+                {% endif %}
+            </div>
+            {% endif %}
+        </section>
     </div>
 
     <script>
