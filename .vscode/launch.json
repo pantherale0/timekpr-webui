@@ -1,0 +1,25 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python: Flask App",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/app.py",
+            "console": "integratedTerminal",
+            "jinja": true,
+            "justMyCode": true,
+            "env": {
+                "FLASK_ENV": "development",
+                "FLASK_DEBUG": "1",
+                "TZ": "UTC"
+                // OIDC Testing configuration environment variables:
+                // "OIDC_ISSUER_URL": "https://keycloak.example.com/realms/myrealm",
+                // "OIDC_CLIENT_ID": "timekpr-webui",
+                // "OIDC_CLIENT_SECRET": "your-client-secret",
+                // "OIDC_REDIRECT_URI": "http://localhost:5000/callback",
+                // "OIDC_VERIFY_SSL": "False"
+            }
+        }
+    ]
+}

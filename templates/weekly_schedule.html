@@ -14,16 +14,25 @@
                 <h1>Weekly Schedule Management</h1>
                 <p class="dashboard-subtitle">Set time limits for all users at once</p>
             </div>
-            <div class="dashboard-controls">
+                {% if oidc_enabled and session_user %}
+                <div class="user-badge" style="display: flex; align-items: center; gap: var(--space-2); font-size: var(--font-size-sm); color: var(--text-secondary); background: var(--bg-elevated); padding: var(--space-1) var(--space-3); border-radius: var(--radius-full); border: 1px solid var(--border-primary);">
+                    <svg width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
+                        <path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm2-3a2 2 0 1 1-4 0 2 2 0 0 1 4 0zm4 8c0 1-1 1-1 1H3s-1 0-1-1 1-4 6-4 6 3 6 4zm-1-.004c-.001-.246-.154-.986-.832-1.664C11.516 10.68 10.289 10 8 10c-2.29 0-3.516.68-4.168 1.332-.678.678-.83 1.418-.832 1.664h10z"/>
+                    </svg>
+                    <span>{{ session_user.username }}</span>
+                </div>
+                {% endif %}
                 <a href="{{ url_for('dashboard') }}" class="btn btn-sm btn-secondary">
-                    <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                    <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16" style="margin-right: 4px;">
                         <path fill-rule="evenodd" d="M15 8a.5.5 0 0 0-.5-.5H2.707l3.147-3.146a.5.5 0 1 0-.708-.708l-4 4a.5.5 0 0 0 0 .708l4 4a.5.5 0 0 0 .708-.708L2.707 8.5H14.5A.5.5 0 0 0 15 8z"/>
                     </svg>
                     Dashboard
                 </a>
                 <a href="{{ url_for('admin') }}" class="btn btn-sm btn-secondary">Admin</a>
                 <a href="{{ url_for('settings') }}" class="btn btn-sm btn-secondary">Settings</a>
+                {% if not oidc_enabled %}
                 <a href="{{ url_for('logout') }}" class="btn btn-sm btn-danger">Logout</a>
+                {% endif %}
             </div>
         </header>
         

@@ -16,6 +16,7 @@ from src.database import (
 )
 from src.ssh_helper import SSHClient
 from src.task_manager import BackgroundTaskManager
+from src.oidc_helper import OIDCHelper
 
 # Configure logging
 logging.basicConfig(
@@ -45,8 +46,20 @@ db.init_app(app)
 task_manager = BackgroundTaskManager()
 task_manager.init_app(app)
 
+# Initialize OIDC helper
+oidc_helper = OIDCHelper()
+
 # Admin username remains hardcoded
 ADMIN_USERNAME = 'admin'
+
+# Make OIDC status available globally in templates
+@app.context_processor
+def inject_oidc_status():
+    """Inject OIDC status and session user into templates"""
+    return {
+        'oidc_enabled': oidc_helper.is_enabled,
+        'session_user': session.get('user')
+    }
 
 # Jinja2 filter to convert UTC datetime to local timezone
 @app.template_filter('localtime')
@@ -71,8 +84,28 @@ def inject_timezone():
 
 @app.route('/', methods=['GET', 'POST'])
 def login():
+    # If already logged in, go straight to dashboard
+    if session.get('logged_in'):
+        return redirect(url_for('dashboard'))
+
+    if oidc_helper.is_enabled:
+        # SSO Auto-redirect flow
+        state = oidc_helper.generate_state()
+        session['oidc_state'] = state
+        
+        # Generate redirect URI pointing to our callback endpoint
+        redirect_uri = url_for('oidc_callback', _external=True)
+        
+        try:
+            auth_url = oidc_helper.get_authorization_url(state, redirect_uri)
+            return redirect(auth_url)
+        except Exception as e:
+            logging.error(f"OIDC login redirection failed: {e}")
+            flash(f"OIDC Login failed to initialize: OIDC provider is offline or misconfigured. Falling back to local credentials.", "warning")
+            return render_template('login.html', error="OIDC provider connection error.")
+
+    # Fallback: Traditional form-based local login
     error = None
-    
     if request.method == 'POST':
         username = request.form.get('username')
         password = request.form.get('password')
@@ -87,6 +120,49 @@ def login():
             flash(error, 'danger')
     
     return render_template('login.html', error=error)
+
+@app.route('/callback')
+def oidc_callback():
+    if not oidc_helper.is_enabled:
+        flash("OIDC is not enabled.", "danger")
+        return redirect(url_for('login'))
+
+    state_param = request.args.get('state')
+    if not state_param or state_param != session.get('oidc_state'):
+        flash("Authentication failed: Invalid state token (CSRF attempt prevented).", "danger")
+        return redirect(url_for('login'))
+
+    # Clear state after verification
+    session.pop('oidc_state', None)
+
+    code = request.args.get('code')
+    if not code:
+        flash("Authentication failed: No authorization code returned from provider.", "danger")
+        return redirect(url_for('login'))
+
+    try:
+        redirect_uri = url_for('oidc_callback', _external=True)
+        # Exchange code for tokens
+        tokens = oidc_helper.exchange_code(code, redirect_uri)
+        access_token = tokens.get('access_token')
+        
+        # Get user details from userinfo endpoint
+        user_info = oidc_helper.get_user_info(access_token)
+        
+        # Extract details and log in
+        session['logged_in'] = True
+        session['user'] = {
+            'username': user_info.get('preferred_username') or user_info.get('sub') or 'OIDC User',
+            'email': user_info.get('email'),
+            'name': user_info.get('name')
+        }
+        
+        flash(f"Logged in successfully as {session['user']['username']}!", "success")
+        return redirect(url_for('dashboard'))
+    except Exception as e:
+        logging.error(f"OIDC callback processing failed: {e}")
+        flash(f"Authentication failed: {str(e)}", "danger")
+        return redirect(url_for('login'))
 
 @app.route('/dashboard')
 def dashboard():
@@ -210,8 +286,12 @@ def restart_tasks():
 @app.route('/logout')
 def logout():
     session.pop('logged_in', None)
-    flash('You have been logged out', 'info')
-    return redirect(url_for('login'))
+    session.pop('user', None)
+    if oidc_helper.is_enabled:
+        return redirect(url_for('login'))
+    else:
+        flash('You have been logged out', 'info')
+        return redirect(url_for('login'))
 
 @app.route('/users/add', methods=['GET', 'POST'])
 def add_user():
