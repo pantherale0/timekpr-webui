@@ -141,7 +141,17 @@ class BackgroundTaskManager:
                         is_synced=False
                     ).all()
 
-                    intervals_dict = {interval.day_of_week: interval for interval in user.time_intervals}
+                    intervals_dict = {day: [] for day in range(1, 8)}
+                    for interval in sorted(
+                        user.time_intervals,
+                        key=lambda item: (
+                            item.day_of_week,
+                            item.sort_order,
+                            item.start_total_minutes,
+                            item.id or 0,
+                        ),
+                    ):
+                        intervals_dict.setdefault(interval.day_of_week, []).append(interval)
                     schedule_dict = user.weekly_schedule.get_schedule_dict() if user.weekly_schedule else None
                     has_positive_limits = False
                     if schedule_dict:

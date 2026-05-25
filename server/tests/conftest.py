@@ -25,7 +25,7 @@ if os.path.isdir(venv_site_packages):
     sys.path.insert(0, venv_site_packages)
 
 import pytest
-from app import app as flask_app
+from app import app as flask_app, run_schema_migrations
 from src.database import db
 
 @pytest.fixture(scope='session')
@@ -42,6 +42,7 @@ def app():
 def db_session(app):
     with app.app_context():
         db.create_all()
+        run_schema_migrations()
         yield db.session
         db.session.remove()
         db.drop_all()

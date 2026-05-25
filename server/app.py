@@ -109,6 +109,43 @@ def _mapping_config(mapping):
         return {}
 
 
+def _hostname_key(hostname):
+    normalized = (hostname or '').strip()
+    return normalized.casefold() if normalized else None
+
+
+def _build_device_label_map(devices):
+    hostname_counts = {}
+    for device in devices:
+        key = _hostname_key(device.system_hostname)
+        if key:
+            hostname_counts[key] = hostname_counts.get(key, 0) + 1
+
+    label_map = {}
+    for device in devices:
+        key = _hostname_key(device.system_hostname)
+        label_map[device.system_id] = device.format_display_name(
+            include_suffix=bool(key and hostname_counts.get(key, 0) > 1)
+        )
+    return label_map
+
+
+def _get_device_label_map():
+    return _build_device_label_map(AgentDevice.query.all())
+
+
+def _device_display_label(system_id, label_map=None):
+    if not system_id:
+        return 'Unknown device'
+
+    labels = label_map if label_map is not None else _get_device_label_map()
+    return labels.get(system_id, system_id)
+
+
+def _mapping_display_label(mapping, label_map=None):
+    return f"{mapping.linux_username}@{_device_display_label(mapping.system_id, label_map)}"
+
+
 def _refresh_managed_user_summary(user):
     valid_mappings = [mapping for mapping in user.device_mappings if mapping.is_valid]
     user.is_valid = bool(valid_mappings)
@@ -152,6 +189,95 @@ def _refresh_managed_user_summary(user):
     else:
         db.session.add(UserTimeUsage(user_id=user.id, date=today, time_spent=shared_spent))
 
+
+INTERVAL_STEP_MINUTES = 15
+INTERVAL_DAY_NAMES = {
+    1: 'Monday',
+    2: 'Tuesday',
+    3: 'Wednesday',
+    4: 'Thursday',
+    5: 'Friday',
+    6: 'Saturday',
+    7: 'Sunday',
+}
+
+
+def _serialize_interval(interval):
+    return {
+        'id': interval.id,
+        'day_name': interval.get_day_name(),
+        'sort_order': interval.sort_order,
+        'start_hour': interval.start_hour,
+        'start_minute': interval.start_minute,
+        'end_hour': interval.end_hour,
+        'end_minute': interval.end_minute,
+        'is_enabled': interval.is_enabled,
+        'is_synced': interval.is_synced,
+        'time_range': interval.get_time_range_string(),
+        'last_synced': interval.last_synced.strftime('%Y-%m-%d %H:%M') if interval.last_synced else None,
+    }
+
+
+def _normalize_interval_entries(raw_entries):
+    if raw_entries is None:
+        return []
+    if isinstance(raw_entries, dict):
+        return [raw_entries]
+    if not isinstance(raw_entries, list):
+        raise ValueError('Each day must contain a list of intervals')
+    return raw_entries
+
+
+def _build_intervals_for_day(day_of_week, raw_entries):
+    if day_of_week not in INTERVAL_DAY_NAMES:
+        raise ValueError(f'Invalid day of week: {day_of_week}')
+
+    interval_rows = []
+    for raw_interval in _normalize_interval_entries(raw_entries):
+        if not isinstance(raw_interval, dict):
+            raise ValueError(f'Invalid interval payload for {INTERVAL_DAY_NAMES[day_of_week]}')
+
+        if not bool(raw_interval.get('is_enabled', True)):
+            continue
+
+        interval_rows.append(UserDailyTimeInterval(
+            day_of_week=day_of_week,
+            sort_order=len(interval_rows),
+            start_hour=int(raw_interval.get('start_hour', 9)),
+            start_minute=int(raw_interval.get('start_minute', 0)),
+            end_hour=int(raw_interval.get('end_hour', 17)),
+            end_minute=int(raw_interval.get('end_minute', 0)),
+            is_enabled=True,
+        ))
+
+    ordered_rows = UserDailyTimeInterval.sort_intervals(interval_rows)
+    for index, interval in enumerate(ordered_rows):
+        interval.sort_order = index
+
+    if not UserDailyTimeInterval.validate_interval_collection(
+        ordered_rows,
+        step_minutes=INTERVAL_STEP_MINUTES,
+    ):
+        raise ValueError(
+            f'Invalid time intervals for {INTERVAL_DAY_NAMES[day_of_week]}: '
+            f'intervals must be ordered, non-overlapping, and use '
+            f'{INTERVAL_STEP_MINUTES}-minute increments'
+        )
+
+    return ordered_rows
+
+
+def _build_disabled_interval_placeholder(day_of_week):
+    return UserDailyTimeInterval(
+        day_of_week=day_of_week,
+        sort_order=0,
+        start_hour=0,
+        start_minute=0,
+        end_hour=0,
+        end_minute=15,
+        is_enabled=False,
+    )
+
 def ws_agent_handler(ws):
     """
     WebSocket endpoint for client agents.
@@ -178,6 +304,9 @@ def ws_agent_handler(ws):
             return
             
         system_id = hello_msg.get("system_id")
+        system_hostname = hello_msg.get("system_hostname")
+        if isinstance(system_hostname, str):
+            system_hostname = system_hostname.strip() or None
         reg_token = hello_msg.get("registration_token")
         
         if not system_id:
@@ -200,12 +329,19 @@ def ws_agent_handler(ws):
                     return
                 
                 # Register a new device in 'pending' state
-                device = AgentDevice(system_id=system_id, system_ip=remote_ip, status='pending')
+                device = AgentDevice(
+                    system_id=system_id,
+                    system_hostname=system_hostname,
+                    system_ip=remote_ip,
+                    status='pending',
+                )
                 db.session.add(device)
                 db.session.commit()
                 logging.info(f"New pending device registered: {system_id} from {remote_ip}")
             else:
-                # Existing device, update IP snapshot
+                # Existing device, update latest hostname and IP snapshot
+                if "system_hostname" in hello_msg:
+                    device.system_hostname = system_hostname
                 device.system_ip = remote_ip
                 db.session.commit()
 
@@ -438,9 +574,16 @@ def admin():
     
     # Get all managed users
     users = ManagedUser.query.order_by(ManagedUser.username.asc()).all()
+    device_labels = _get_device_label_map()
     approved_devices = AgentDevice.query.filter_by(status='approved').all()
     pending_devices = AgentDevice.query.filter_by(status='pending').all()
-    return render_template('admin.html', users=users, approved_devices=approved_devices, pending_devices=pending_devices)
+    return render_template(
+        'admin.html',
+        users=users,
+        approved_devices=approved_devices,
+        pending_devices=pending_devices,
+        device_labels=device_labels,
+    )
 
 @app.route('/api/device/approve/<system_id>', methods=['POST'])
 def approve_device(system_id):
@@ -459,6 +602,7 @@ def approve_device(system_id):
     device.secure_token = secure_token
     device.status = 'approved'
     db.session.commit()
+    device_label = _device_display_label(system_id)
     
     # Check if there is an active pending connection
     ws = AgentConnectionManager.get_pending_connection(system_id)
@@ -474,7 +618,7 @@ def approve_device(system_id):
             logging.error(f"Failed to send pairing_approved to device {system_id}: {e}")
             
     logging.info(f"Approved device {system_id} and generated secure token.")
-    return jsonify({'success': True, 'message': f'Device {system_id} approved successfully.'})
+    return jsonify({'success': True, 'message': f'Device {device_label} approved successfully.'})
 
 @app.route('/api/device/reject/<system_id>', methods=['POST'])
 def reject_device(system_id):
@@ -488,6 +632,7 @@ def reject_device(system_id):
     device.status = 'rejected'
     device.secure_token = None
     db.session.commit()
+    device_label = _device_display_label(system_id)
     
     # Close any active or pending connection
     ws_pending = AgentConnectionManager.get_pending_connection(system_id)
@@ -507,7 +652,7 @@ def reject_device(system_id):
         AgentConnectionManager.unregister(system_id)
         
     logging.info(f"Rejected device {system_id} and closed connections.")
-    return jsonify({'success': True, 'message': f'Device {system_id} rejected successfully.'})
+    return jsonify({'success': True, 'message': f'Device {device_label} rejected successfully.'})
 
 @app.route('/settings', methods=['GET', 'POST'])
 def settings():
@@ -622,15 +767,16 @@ def add_user_mapping(user_id):
 
     device = AgentDevice.query.get(system_id)
     if not device or device.status != 'approved':
-        flash(f'System ID {system_id} is not registered or approved', 'danger')
+        flash(f'Device {_device_display_label(system_id)} is not registered or approved', 'danger')
         return redirect(url_for('admin'))
 
+    device_label = _device_display_label(system_id)
     existing_mapping = ManagedUserDeviceMap.query.filter_by(
         managed_user_id=user.id,
         system_id=system_id,
     ).first()
     if existing_mapping:
-        flash(f'{user.username} is already linked to {system_id}', 'warning')
+        flash(f'{user.username} is already linked to {device_label}', 'warning')
         return redirect(url_for('admin'))
 
     linux_uid = None
@@ -651,7 +797,7 @@ def add_user_mapping(user_id):
     db.session.add(mapping)
     db.session.commit()
 
-    flash(f'Mapping added: {user.username} -> {linux_username}@{system_id}', 'success')
+    flash(f'Mapping added: {user.username} -> {linux_username}@{device_label}', 'success')
     return redirect(url_for('admin'))
 
 
@@ -669,14 +815,15 @@ def add_user():
     system_id = (request.form.get('system_id') or '').strip()
 
     if not username or not system_id:
-        flash('Both username and system ID are required', 'danger')
+        flash('Both username and device are required', 'danger')
         return redirect(url_for('admin'))
 
     device = AgentDevice.query.get(system_id)
     if not device or device.status != 'approved':
-        flash(f'System ID {system_id} is not registered or approved', 'danger')
+        flash(f'Device {_device_display_label(system_id)} is not registered or approved', 'danger')
         return redirect(url_for('admin'))
 
+    device_label = _device_display_label(system_id)
     user = ManagedUser.query.filter_by(username=username).first()
     if not user:
         user = ManagedUser(username=username, is_valid=False, system_ip='Unassigned')
@@ -689,7 +836,7 @@ def add_user():
     ).first()
     if existing_mapping:
         db.session.rollback()
-        flash(f'User {username} on {system_id} already exists', 'warning')
+        flash(f'User {username} on {device_label} already exists', 'warning')
         return redirect(url_for('admin'))
 
     mapping = ManagedUserDeviceMap(
@@ -717,6 +864,7 @@ def validate_user(user_id):
     total_spent = 0
     total_valid = 0
     messages = []
+    device_labels = _get_device_label_map()
     for mapping in mappings:
         agent_client = AgentClient(system_id=mapping.system_id)
         is_valid, message, config_dict = agent_client.validate_user(mapping.linux_username)
@@ -732,7 +880,7 @@ def validate_user(user_id):
             total_spent += coerce_time_spent_day(config_dict.get('TIME_SPENT_DAY', 0))
             total_valid += 1
         else:
-            messages.append(f"{mapping.linux_username}@{mapping.system_id}: {message}")
+            messages.append(f"{_mapping_display_label(mapping, device_labels)}: {message}")
 
     user.is_valid = total_valid > 0
     user.last_checked = datetime.utcnow()
@@ -779,9 +927,10 @@ def validate_mapping(user_id, mapping_id):
 
     _refresh_managed_user_summary(user)
     db.session.commit()
+    device_labels = _get_device_label_map()
 
     if is_valid:
-        flash(f'Mapping validated: {mapping.linux_username}@{mapping.system_id}', 'success')
+        flash(f'Mapping validated: {_mapping_display_label(mapping, device_labels)}', 'success')
     else:
         flash(f'Mapping validation failed: {message}', 'danger')
     return redirect(url_for('admin'))
@@ -794,7 +943,7 @@ def delete_mapping(user_id, mapping_id):
 
     user = ManagedUser.query.get_or_404(user_id)
     mapping = ManagedUserDeviceMap.query.filter_by(id=mapping_id, managed_user_id=user.id).first_or_404()
-    mapping_label = f"{mapping.linux_username}@{mapping.system_id}"
+    mapping_label = _mapping_display_label(mapping)
     db.session.delete(mapping)
     db.session.flush()
     _refresh_managed_user_summary(user)
@@ -925,28 +1074,22 @@ def get_user_intervals(user_id):
     user = ManagedUser.query.get_or_404(user_id)
     
     # Get all intervals for this user
-    intervals = UserDailyTimeInterval.query.filter_by(user_id=user.id).all()
-    
-    # Format intervals by day
-    intervals_dict = {}
+    intervals = UserDailyTimeInterval.query.filter_by(user_id=user.id).order_by(
+        UserDailyTimeInterval.day_of_week,
+        UserDailyTimeInterval.sort_order,
+        UserDailyTimeInterval.id,
+    ).all()
+
+    intervals_dict = {str(day): [] for day in range(1, 8)}
     for interval in intervals:
-        intervals_dict[interval.day_of_week] = {
-            'id': interval.id,
-            'day_name': interval.get_day_name(),
-            'start_hour': interval.start_hour,
-            'start_minute': interval.start_minute,
-            'end_hour': interval.end_hour,
-            'end_minute': interval.end_minute,
-            'is_enabled': interval.is_enabled,
-            'is_synced': interval.is_synced,
-            'time_range': interval.get_time_range_string(),
-            'last_synced': interval.last_synced.strftime('%Y-%m-%d %H:%M') if interval.last_synced else None
-        }
-    
+        if interval.is_enabled:
+            intervals_dict[str(interval.day_of_week)].append(_serialize_interval(interval))
+
     return jsonify({
         'success': True,
         'intervals': intervals_dict,
-        'username': user.username
+        'username': user.username,
+        'step_minutes': INTERVAL_STEP_MINUTES,
     })
 
 @app.route('/api/user/<int:user_id>/intervals/update', methods=['POST'])
@@ -963,49 +1106,42 @@ def update_user_intervals(user_id):
         if not data:
             return jsonify({'success': False, 'message': 'No data provided'}), 400
         
-        intervals_data = data.get('intervals', {})
-        
-        for day_str, interval_data in intervals_data.items():
+        intervals_data = data.get('intervals')
+        if not isinstance(intervals_data, dict):
+            return jsonify({'success': False, 'message': 'Intervals payload must be an object'}), 400
+
+        replacement_map = {}
+        for day_str, raw_entries in intervals_data.items():
             try:
                 day_of_week = int(day_str)
-                if not (1 <= day_of_week <= 7):
-                    continue
-                
-                # Get or create interval for this day
-                interval = UserDailyTimeInterval.query.filter_by(
-                    user_id=user.id,
-                    day_of_week=day_of_week
-                ).first()
-                
-                if not interval:
-                    interval = UserDailyTimeInterval(
-                        user_id=user.id,
-                        day_of_week=day_of_week
-                    )
-                    db.session.add(interval)
-                
-                # Update interval properties
-                interval.start_hour = int(interval_data.get('start_hour', 9))
-                interval.start_minute = int(interval_data.get('start_minute', 0))
-                interval.end_hour = int(interval_data.get('end_hour', 17))
-                interval.end_minute = int(interval_data.get('end_minute', 0))
-                interval.is_enabled = bool(interval_data.get('is_enabled', False))
-                
-                # Validate the interval
-                if not interval.is_valid_interval():
-                    return jsonify({
-                        'success': False,
-                        'message': f'Invalid time interval for {interval.get_day_name()}: start time must be before end time'
-                    }), 400
-                
-                # Mark as modified (needs sync)
-                interval.mark_modified()
-                
-            except (ValueError, KeyError) as e:
+            except (TypeError, ValueError):
                 return jsonify({
                     'success': False,
-                    'message': f'Invalid data format: {str(e)}'
+                    'message': f'Invalid day value: {day_str}'
                 }), 400
+
+            try:
+                replacement_map[day_of_week] = _build_intervals_for_day(day_of_week, raw_entries)
+            except (ValueError, TypeError) as e:
+                return jsonify({
+                    'success': False,
+                    'message': str(e)
+                }), 400
+
+        for day_of_week, new_intervals in replacement_map.items():
+            existing_intervals = UserDailyTimeInterval.query.filter_by(
+                user_id=user.id,
+                day_of_week=day_of_week,
+            ).all()
+            for interval in existing_intervals:
+                db.session.delete(interval)
+            db.session.flush()
+
+            persisted_intervals = new_intervals or [_build_disabled_interval_placeholder(day_of_week)]
+            for interval in persisted_intervals:
+                interval.user_id = user.id
+                interval.mark_modified()
+                db.session.add(interval)
         
         db.session.commit()
         
@@ -1046,7 +1182,7 @@ def get_intervals_sync_status(user_id):
     
     # Count enabled vs total intervals
     enabled_count = sum(1 for i in intervals if i.is_enabled)
-    total_count = len(intervals)
+    total_count = enabled_count
     
     return jsonify({
         'success': True,
@@ -1141,6 +1277,7 @@ def modify_time():
         return jsonify({'success': False, 'message': 'No device mappings configured for this user'}), 400
 
     online_mappings = [mapping for mapping in mappings if AgentConnectionManager.is_online(mapping.system_id)]
+    device_labels = _get_device_label_map()
     if not online_mappings:
         user.pending_time_adjustment = seconds
         user.pending_time_operation = operation
@@ -1158,7 +1295,7 @@ def modify_time():
         agent_client = AgentClient(system_id=mapping.system_id)
         success, message = agent_client.modify_time_left(mapping.linux_username, operation, seconds)
         if not success:
-            failures.append(f"{mapping.linux_username}@{mapping.system_id}: {message}")
+            failures.append(f"{_mapping_display_label(mapping, device_labels)}: {message}")
 
     if failures:
         user.pending_time_adjustment = seconds
@@ -1186,6 +1323,17 @@ def modify_time():
 
 def run_schema_migrations():
     """Run lightweight SQLite migrations and backfill mapping table."""
+    agent_device_columns = {
+        row[1]
+        for row in db.session.execute(text("PRAGMA table_info(agent_device)")).fetchall()
+    }
+    if agent_device_columns and 'system_hostname' not in agent_device_columns:
+        db.session.execute(text("""
+            ALTER TABLE agent_device
+            ADD COLUMN system_hostname VARCHAR(255) NULL
+        """))
+        db.session.commit()
+
     db.session.execute(text("""
         CREATE TABLE IF NOT EXISTS managed_user_device_map (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1238,6 +1386,64 @@ def run_schema_migrations():
         )
         db.session.add(mapping)
     db.session.commit()
+
+    interval_columns = {
+        row[1]
+        for row in db.session.execute(text("PRAGMA table_info(user_daily_time_interval)")).fetchall()
+    }
+    if interval_columns and 'sort_order' not in interval_columns:
+        db.session.execute(text("""
+            CREATE TABLE user_daily_time_interval_new (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                day_of_week INTEGER NOT NULL,
+                sort_order INTEGER NOT NULL DEFAULT 0,
+                start_hour INTEGER NOT NULL,
+                start_minute INTEGER DEFAULT 0,
+                end_hour INTEGER NOT NULL,
+                end_minute INTEGER DEFAULT 0,
+                is_enabled BOOLEAN DEFAULT 1,
+                is_synced BOOLEAN DEFAULT 0,
+                last_synced DATETIME NULL,
+                last_modified DATETIME NULL,
+                FOREIGN KEY(user_id) REFERENCES managed_user(id),
+                UNIQUE(user_id, day_of_week, sort_order)
+            )
+        """))
+        db.session.execute(text("""
+            INSERT INTO user_daily_time_interval_new (
+                id,
+                user_id,
+                day_of_week,
+                sort_order,
+                start_hour,
+                start_minute,
+                end_hour,
+                end_minute,
+                is_enabled,
+                is_synced,
+                last_synced,
+                last_modified
+            )
+            SELECT
+                id,
+                user_id,
+                day_of_week,
+                0,
+                start_hour,
+                start_minute,
+                end_hour,
+                end_minute,
+                1,
+                is_synced,
+                last_synced,
+                last_modified
+            FROM user_daily_time_interval
+            WHERE COALESCE(is_enabled, 1) = 1
+        """))
+        db.session.execute(text("DROP TABLE user_daily_time_interval"))
+        db.session.execute(text("ALTER TABLE user_daily_time_interval_new RENAME TO user_daily_time_interval"))
+        db.session.commit()
 
 
 if not os.environ.get('TESTING'):

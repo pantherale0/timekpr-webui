@@ -46,6 +46,7 @@ enum ClientMessage {
     #[serde(rename = "hello")]
     Hello {
         system_id: String,
+        system_hostname: Option<String>,
         registration_token: Option<String>,
     },
     #[serde(rename = "register")]
@@ -122,6 +123,34 @@ fn load_or_create_config() -> Config {
     }
 
     config
+}
+
+fn get_system_hostname() -> Option<String> {
+    if let Ok(hostname) = std::env::var("HOSTNAME") {
+        let trimmed = hostname.trim();
+        if !trimmed.is_empty() {
+            return Some(trimmed.to_string());
+        }
+    }
+
+    if let Ok(hostname_file) = fs::read_to_string("/etc/hostname") {
+        let trimmed = hostname_file.trim();
+        if !trimmed.is_empty() {
+            return Some(trimmed.to_string());
+        }
+    }
+
+    if let Ok(output) = Command::new("hostname").output() {
+        if output.status.success() {
+            let hostname = String::from_utf8_lossy(&output.stdout);
+            let trimmed = hostname.trim();
+            if !trimmed.is_empty() {
+                return Some(trimmed.to_string());
+            }
+        }
+    }
+
+    None
 }
 
 fn execute_command(cmd_args: &[&str]) -> (i32, String, String) {
@@ -267,11 +296,16 @@ fn handle_command(action: &str, username: &str, args: &serde_json::Value) -> (bo
                 None => return (false, "Missing 'intervals' argument".to_string(), serde_json::json!({})),
             };
 
+            let day_order = ["1", "2", "3", "4", "5", "6", "7"];
             let mut success_count = 0;
             let mut total_count = 0;
             let mut errors = Vec::new();
 
-            for (day_str, hours_val) in intervals {
+            for day_str in day_order {
+                let hours_val = match intervals.get(day_str) {
+                    Some(val) => val,
+                    None => continue,
+                };
                 let hour_str = match hours_val.as_str() {
                     Some(s) => s,
                     None => continue,
@@ -307,6 +341,7 @@ async fn main() {
         let system_id = config.system_id.clone().unwrap();
         let agent_token = config.agent_token.clone();
         let registration_token = config.registration_token.clone();
+        let system_hostname = get_system_hostname();
 
         println!("Connecting to server: {}", server_url);
         
@@ -317,6 +352,7 @@ async fn main() {
                 // 1. Send initial hello message
                 let hello_msg = ClientMessage::Hello {
                     system_id: system_id.clone(),
+                    system_hostname: system_hostname.clone(),
                     registration_token,
                 };
                 let hello_json = serde_json::to_string(&hello_msg).unwrap();

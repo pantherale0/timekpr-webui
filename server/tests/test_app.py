@@ -4,7 +4,8 @@ import hmac
 import hashlib
 from datetime import datetime
 from unittest.mock import patch, MagicMock
-from app import ws_agent_handler
+from sqlalchemy import text
+from app import ws_agent_handler, run_schema_migrations
 from src.database import (
     AgentDevice,
     ManagedUser,
@@ -106,9 +107,29 @@ def test_admin_panel(client, db_session):
     Settings.set_admin_password("admin")
     client.post('/', data={'username': 'admin', 'password': 'admin'})
 
+    pending_device = AgentDevice(system_id="family-alpha-aa", system_hostname="family-pc", status="pending")
+    approved_device = AgentDevice(
+        system_id="family-beta-bb",
+        system_hostname="family-pc",
+        status="approved",
+        secure_token="token",
+    )
+    user = ManagedUser(username="alice", system_ip="Unassigned", is_valid=False)
+    db_session.add_all([pending_device, approved_device, user])
+    db_session.flush()
+    db_session.add(ManagedUserDeviceMap(
+        managed_user_id=user.id,
+        system_id=approved_device.system_id,
+        linux_username="alice",
+        is_valid=False,
+    ))
+    db_session.commit()
+
     res = client.get('/admin')
     assert res.status_code == 200
     assert b"Admin Panel" in res.data
+    assert b"family-pc (aa)" in res.data
+    assert b"family-pc (bb)" in res.data
 
 def test_settings_page(client, db_session):
     Settings.set_admin_password("admin")
@@ -143,13 +164,13 @@ def test_user_operations(client, db_session):
     client.post('/', data={'username': 'admin', 'password': 'admin'})
 
     # Approve a device so we can register a user to it
-    device = AgentDevice(system_id="device-abc", status="approved", secure_token="tkn")
+    device = AgentDevice(system_id="device-abc", system_hostname="laptop", status="approved", secure_token="tkn")
     db_session.add(device)
     db_session.commit()
 
     # 1. Add new user - missing username/system_id
     res = client.post('/users/add', data={'username': '', 'system_id': ''}, follow_redirects=True)
-    assert b"Both username and system ID are required" in res.data
+    assert b"Both username and device are required" in res.data
 
     # 2. Add new user - device not approved
     res = client.post('/users/add', data={'username': 'bob', 'system_id': 'device-unapproved'}, follow_redirects=True)
@@ -179,7 +200,7 @@ def test_user_operations(client, db_session):
         data={'system_id': 'device-abc', 'linux_username': 'alice', 'linux_uid': '1001'},
         follow_redirects=True
     )
-    assert b"Mapping added" in res.data
+    assert b"Mapping added: alice -&gt; alice@laptop" in res.data
     alice_mapping = ManagedUserDeviceMap.query.filter_by(managed_user_id=alice.id, system_id='device-abc').first()
     assert alice_mapping is not None
 
@@ -198,8 +219,13 @@ def test_rest_apis(client, db_session):
     client.post('/', data={'username': 'admin', 'password': 'admin'})
 
     # Setup devices
-    device_pending = AgentDevice(system_id="sys-pending", status="pending")
-    device_approved = AgentDevice(system_id="sys-approved", status="approved", secure_token="some-tkn")
+    device_pending = AgentDevice(system_id="sys-pending-aa", system_hostname="family-pc", status="pending")
+    device_approved = AgentDevice(
+        system_id="sys-approved-bb",
+        system_hostname="family-pc",
+        status="approved",
+        secure_token="some-tkn",
+    )
     db_session.add_all([device_pending, device_approved])
     db_session.commit()
 
@@ -208,14 +234,15 @@ def test_rest_apis(client, db_session):
     assert res.status_code == 404
 
     # Approve Device API - Device not pending
-    res = client.post('/api/device/approve/sys-approved')
+    res = client.post('/api/device/approve/sys-approved-bb')
     assert res.status_code == 400
 
     # Approve Device API - Success
-    res = client.post('/api/device/approve/sys-pending')
+    res = client.post('/api/device/approve/sys-pending-aa')
     assert res.status_code == 200
     data = json.loads(res.data)
     assert data['success']
+    assert data['message'] == 'Device family-pc (aa) approved successfully.'
     assert device_pending.status == "approved"
     assert device_pending.secure_token is not None
 
@@ -224,10 +251,11 @@ def test_rest_apis(client, db_session):
     assert res.status_code == 404
 
     # Reject Device API - Success
-    res = client.post('/api/device/reject/sys-approved')
+    res = client.post('/api/device/reject/sys-approved-bb')
     assert res.status_code == 200
     data = json.loads(res.data)
     assert data['success']
+    assert data['message'] == 'Device family-pc (bb) rejected successfully.'
     assert device_approved.status == "rejected"
     assert device_approved.secure_token is None
 
@@ -292,13 +320,16 @@ def test_websocket_handler(app, db_session):
     # 5. New Pending Device pair registration
     ws_pending_new = MockWS([json.dumps({
         "type": "hello",
-        "system_id": "sys-new-pending"
+        "system_id": "sys-new-pending",
+        "system_hostname": "kids-pc",
     })])
     with app.test_request_context('/ws', environ_base={'REMOTE_ADDR': '127.0.0.1'}):
         ws_agent_handler(ws_pending_new)
     # Check that it gets marked pending and pairing_status sent
     assert json.loads(ws_pending_new.sent_messages[0])['type'] == "pairing_status"
     assert json.loads(ws_pending_new.sent_messages[0])['status'] == "pending"
+    pending_device = AgentDevice.query.get("sys-new-pending")
+    assert pending_device.system_hostname == "kids-pc"
 
     # 6. Approved Device authentication flow (HMAC challenge-response)
     system_id = "approved-system-id"
@@ -401,16 +432,28 @@ def test_new_endpoints(client, db_session):
     data = json.loads(res.data)
     assert data['success']
     assert data['username'] == "jack"
+    assert data['step_minutes'] == 15
+    assert data['intervals']['1'] == []
 
     interval_data = {
         'intervals': {
-            '1': {
-                'start_hour': 9,
-                'start_minute': 0,
-                'end_hour': 17,
-                'end_minute': 0,
-                'is_enabled': True
-            }
+            '1': [
+                {
+                    'start_hour': 9,
+                    'start_minute': 0,
+                    'end_hour': 11,
+                    'end_minute': 0,
+                    'is_enabled': True
+                },
+                {
+                    'start_hour': 15,
+                    'start_minute': 0,
+                    'end_hour': 17,
+                    'end_minute': 30,
+                    'is_enabled': True
+                }
+            ],
+            '2': []
         }
     }
     res = client.post(
@@ -422,25 +465,68 @@ def test_new_endpoints(client, db_session):
     data = json.loads(res.data)
     assert data['success']
 
-    interval = UserDailyTimeInterval.query.filter_by(user_id=user.id, day_of_week=1).first()
-    assert interval is not None
-    assert interval.start_hour == 9
-    assert not interval.is_synced
+    day_one_intervals = UserDailyTimeInterval.query.filter_by(
+        user_id=user.id,
+        day_of_week=1
+    ).order_by(UserDailyTimeInterval.sort_order).all()
+    assert len(day_one_intervals) == 2
+    assert day_one_intervals[0].start_hour == 9
+    assert day_one_intervals[1].end_minute == 30
+    assert not day_one_intervals[0].is_synced
+    hidden_day_two = UserDailyTimeInterval.query.filter_by(user_id=user.id, day_of_week=2).all()
+    assert len(hidden_day_two) == 1
+    assert hidden_day_two[0].is_enabled is False
+
+    res = client.get(f'/api/user/{user.id}/intervals')
+    assert res.status_code == 200
+    data = json.loads(res.data)
+    assert len(data['intervals']['1']) == 2
+    assert data['intervals']['1'][0]['sort_order'] == 0
+    assert data['intervals']['1'][1]['time_range'] == "15:00-17:30"
 
     invalid_interval_data = {
         'intervals': {
-            '1': {
-                'start_hour': 18,
-                'start_minute': 0,
-                'end_hour': 17,
-                'end_minute': 0,
-                'is_enabled': True
-            }
+            '1': [
+                {
+                    'start_hour': 10,
+                    'start_minute': 0,
+                    'end_hour': 12,
+                    'end_minute': 0,
+                    'is_enabled': True
+                },
+                {
+                    'start_hour': 11,
+                    'start_minute': 45,
+                    'end_hour': 13,
+                    'end_minute': 0,
+                    'is_enabled': True
+                }
+            ]
         }
     }
     res = client.post(
         f'/api/user/{user.id}/intervals/update',
         data=json.dumps(invalid_interval_data),
+        content_type='application/json'
+    )
+    assert res.status_code == 400
+
+    invalid_step_data = {
+        'intervals': {
+            '1': [
+                {
+                    'start_hour': 18,
+                    'start_minute': 10,
+                    'end_hour': 19,
+                    'end_minute': 0,
+                    'is_enabled': True
+                }
+            ]
+        }
+    }
+    res = client.post(
+        f'/api/user/{user.id}/intervals/update',
+        data=json.dumps(invalid_step_data),
         content_type='application/json'
     )
     assert res.status_code == 400
@@ -510,3 +596,104 @@ def test_new_endpoints(client, db_session):
         'seconds': '300'
     })
     assert res.status_code == 400
+
+def test_run_schema_migrations_upgrades_time_intervals(app, db_session):
+    user = ManagedUser(username="legacy-user", system_ip="Unassigned")
+    db_session.add(user)
+    db_session.commit()
+
+    db_session.execute(text("DROP TABLE user_daily_time_interval"))
+    db_session.execute(text("""
+        CREATE TABLE user_daily_time_interval (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            day_of_week INTEGER NOT NULL,
+            start_hour INTEGER NOT NULL,
+            start_minute INTEGER DEFAULT 0,
+            end_hour INTEGER NOT NULL,
+            end_minute INTEGER DEFAULT 0,
+            is_enabled BOOLEAN DEFAULT 1,
+            is_synced BOOLEAN DEFAULT 0,
+            last_synced DATETIME NULL,
+            last_modified DATETIME NULL,
+            FOREIGN KEY(user_id) REFERENCES managed_user(id),
+            UNIQUE(user_id, day_of_week)
+        )
+    """))
+    db_session.execute(text("""
+        INSERT INTO user_daily_time_interval (
+            user_id,
+            day_of_week,
+            start_hour,
+            start_minute,
+            end_hour,
+            end_minute,
+            is_enabled,
+            is_synced
+        ) VALUES (
+            :user_id,
+            1,
+            9,
+            0,
+            17,
+            0,
+            1,
+            0
+        )
+    """), {"user_id": user.id})
+    db_session.commit()
+
+    with app.app_context():
+        run_schema_migrations()
+
+    columns = {
+        row[1]
+        for row in db_session.execute(text("PRAGMA table_info(user_daily_time_interval)")).fetchall()
+    }
+    assert 'sort_order' in columns
+
+    migrated_intervals = UserDailyTimeInterval.query.filter_by(user_id=user.id).all()
+    assert len(migrated_intervals) == 1
+    assert migrated_intervals[0].sort_order == 0
+
+
+def test_run_schema_migrations_adds_device_hostname_column(app, db_session):
+    db_session.execute(text("DROP TABLE IF EXISTS managed_user_device_map"))
+    db_session.execute(text("DROP TABLE agent_device"))
+    db_session.execute(text("""
+        CREATE TABLE agent_device (
+            system_id VARCHAR(50) PRIMARY KEY,
+            system_ip VARCHAR(50) NULL,
+            status VARCHAR(20) DEFAULT 'pending',
+            secure_token VARCHAR(64) NULL,
+            date_added DATETIME NULL,
+            last_seen DATETIME NULL
+        )
+    """))
+    db_session.execute(text("""
+        INSERT INTO agent_device (
+            system_id,
+            system_ip,
+            status,
+            secure_token
+        ) VALUES (
+            'legacy-device-aa',
+            '127.0.0.1',
+            'pending',
+            NULL
+        )
+    """))
+    db_session.commit()
+
+    with app.app_context():
+        run_schema_migrations()
+
+    columns = {
+        row[1]
+        for row in db_session.execute(text("PRAGMA table_info(agent_device)")).fetchall()
+    }
+    assert 'system_hostname' in columns
+
+    legacy_device = AgentDevice.query.get('legacy-device-aa')
+    assert legacy_device is not None
+    assert legacy_device.system_hostname is None

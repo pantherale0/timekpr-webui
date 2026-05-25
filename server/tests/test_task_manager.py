@@ -151,19 +151,39 @@ def test_task_manager_update_user_data(app, db_session):
     interval = UserDailyTimeInterval(
         user_id=user_online.id,
         day_of_week=1,
+        sort_order=0,
         start_hour=9,
         start_minute=0,
         end_hour=17,
         end_minute=0,
         is_synced=False
     )
-    db_session.add(interval)
+    second_interval = UserDailyTimeInterval(
+        user_id=user_online.id,
+        day_of_week=1,
+        sort_order=1,
+        start_hour=18,
+        start_minute=30,
+        end_hour=20,
+        end_minute=0,
+        is_synced=False
+    )
+    db_session.add_all([interval, second_interval])
     db_session.commit()
 
     with app.app_context():
         manager._update_user_data()
 
     assert interval.is_synced
+    assert second_interval.is_synced
+
+    allowed_hours_calls = [
+        json.loads(message)
+        for message in ws.sent_messages
+        if json.loads(message).get("action") == "set_allowed_hours"
+    ]
+    assert allowed_hours_calls
+    assert allowed_hours_calls[-1]["args"]["intervals"]["1"] == "9;10;11;12;13;14;15;16;18[30-59];19"
 
     # 5. User validation failure handling
     # If validate_user fails or connection throws error

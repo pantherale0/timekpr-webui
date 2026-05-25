@@ -151,7 +151,11 @@ def test_agent_client(db_session):
     stdout_output = "TIME_SPENT_DAY: 1200\nLIMIT: 3600\nENABLED: true\nLIST: a;b;c\nLINUX_UID: 1000\n"
     # Customize DummyWS for this test
     class CustomWS:
+        def __init__(self):
+            self.payloads = []
+
         def send(self, message):
+            self.payloads.append(json.loads(message))
             payload = json.loads(message)
             correlation_id = payload.get("correlation_id")
             AgentConnectionManager.route_response(correlation_id, {
@@ -160,7 +164,8 @@ def test_agent_client(db_session):
                 "data": {"stdout": stdout_output}
             })
     
-    AgentConnectionManager.register(system_id, CustomWS(), "127.0.0.1")
+    capture_ws = CustomWS()
+    AgentConnectionManager.register(system_id, capture_ws, "127.0.0.1")
     is_valid, msg, config = client.validate_user("john")
     assert is_valid
     assert config["TIME_SPENT_DAY"] == 1200
@@ -179,10 +184,15 @@ def test_agent_client(db_session):
 
     # Test set_allowed_hours
     class MockInterval:
-        def __init__(self, is_enabled, is_valid, format_val):
+        def __init__(self, is_enabled, is_valid, format_val, start_minutes=0, end_minutes=0, sort_order=0):
             self.is_enabled = is_enabled
             self.is_valid = is_valid
             self.format_val = format_val
+            self.start_hour = start_minutes // 60
+            self.start_minute = start_minutes % 60
+            self.end_hour = end_minutes // 60
+            self.end_minute = end_minutes % 60
+            self.sort_order = sort_order
             
         def is_valid_interval(self):
             return self.is_valid
@@ -191,12 +201,24 @@ def test_agent_client(db_session):
             return self.format_val
 
     intervals = {
-        1: MockInterval(True, True, ["9", "10"]),
-        2: MockInterval(True, False, None),
-        3: MockInterval(False, True, None)
+        1: [
+            MockInterval(True, True, ["9", "10"], start_minutes=540, end_minutes=660, sort_order=0),
+            MockInterval(True, True, ["15", "16", "17[0-30]"], start_minutes=900, end_minutes=1050, sort_order=1),
+        ],
+        2: [MockInterval(True, False, None)],
+        3: [MockInterval(False, True, None)]
     }
     success, msg = client.set_allowed_hours("john", intervals)
     assert success
+
+    allowed_hours_payload = next(
+        payload for payload in capture_ws.payloads
+        if payload.get("action") == "set_allowed_hours"
+    )
+    unrestricted = ';'.join(str(hour) for hour in range(24))
+    assert allowed_hours_payload["args"]["intervals"]["1"] == "9;10;15;16;17[0-30]"
+    assert allowed_hours_payload["args"]["intervals"]["2"] == unrestricted
+    assert allowed_hours_payload["args"]["intervals"]["3"] == unrestricted
 
     AgentConnectionManager.unregister(system_id)
 
@@ -236,10 +258,15 @@ def test_agent_client_parser_missing_lines():
     assert config["BOOL_F"] is False
 
     class MockInterval:
-        def __init__(self, is_enabled, is_valid, format_val):
+        def __init__(self, is_enabled, is_valid, format_val, start_minutes=0, end_minutes=0, sort_order=0):
             self.is_enabled = is_enabled
             self.is_valid = is_valid
             self.format_val = format_val
+            self.start_hour = start_minutes // 60
+            self.start_minute = start_minutes % 60
+            self.end_hour = end_minutes // 60
+            self.end_minute = end_minutes % 60
+            self.sort_order = sort_order
             
         def is_valid_interval(self):
             return self.is_valid

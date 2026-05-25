@@ -64,7 +64,8 @@ def test_settings_model(db_session):
 
 def test_agent_device_model(db_session):
     device = AgentDevice(
-        system_id="dev-123",
+        system_id="dev-123ab",
+        system_hostname="family-pc",
         system_ip="192.168.1.100",
         status="pending",
         secure_token="token-xyz"
@@ -72,8 +73,17 @@ def test_agent_device_model(db_session):
     db_session.add(device)
     db_session.commit()
 
-    assert repr(device) == "<AgentDevice dev-123 [pending]>"
-    assert device.system_id == "dev-123"
+    fallback_device = AgentDevice(system_id="dev-456", status="approved")
+    db_session.add(fallback_device)
+    db_session.commit()
+
+    assert repr(device) == "<AgentDevice dev-123ab [pending]>"
+    assert device.system_id == "dev-123ab"
+    assert device.display_name == "family-pc"
+    assert device.system_id_suffix == "ab"
+    assert device.format_display_name(include_suffix=True) == "family-pc (ab)"
+    assert fallback_device.display_name == "dev-456"
+    assert fallback_device.format_display_name(include_suffix=True) == "dev-456"
 
 def test_managed_user_and_usage(db_session):
     device = AgentDevice(system_id="dev-123", status="approved", secure_token="token")
@@ -214,9 +224,13 @@ def test_user_daily_time_interval(db_session):
     interval.day_of_week = 1
 
     assert interval.is_valid_interval()
+    assert interval.is_valid_interval(step_minutes=15)
     interval.start_hour = 18
     assert not interval.is_valid_interval()
     interval.start_hour = 9
+    interval.start_minute = 10
+    assert not interval.is_valid_interval(step_minutes=15)
+    interval.start_minute = 30
 
     # Sync helpers
     interval.mark_synced()
@@ -246,6 +260,48 @@ def test_user_daily_time_interval(db_session):
     interval.start_minute = 15
     interval.end_minute = 45
     assert interval.to_timekpr_format() == ["9[15-45]"]
+
+def test_user_daily_time_interval_collection_validation(db_session):
+    user = ManagedUser(username="collection_user", system_ip="Unassigned")
+    db_session.add(user)
+    db_session.commit()
+
+    morning = UserDailyTimeInterval(
+        user_id=user.id,
+        day_of_week=1,
+        sort_order=0,
+        start_hour=8,
+        start_minute=0,
+        end_hour=11,
+        end_minute=0,
+    )
+    afternoon = UserDailyTimeInterval(
+        user_id=user.id,
+        day_of_week=1,
+        sort_order=1,
+        start_hour=15,
+        start_minute=0,
+        end_hour=17,
+        end_minute=30,
+    )
+    overlap = UserDailyTimeInterval(
+        user_id=user.id,
+        day_of_week=1,
+        sort_order=2,
+        start_hour=10,
+        start_minute=45,
+        end_hour=12,
+        end_minute=0,
+    )
+
+    assert UserDailyTimeInterval.validate_interval_collection(
+        [morning, afternoon],
+        step_minutes=15,
+    )
+    assert not UserDailyTimeInterval.validate_interval_collection(
+        [morning, overlap],
+        step_minutes=15,
+    )
 
 def test_database_model_missing_lines(db_session):
     user = ManagedUser(username="jack", system_ip="Unassigned")

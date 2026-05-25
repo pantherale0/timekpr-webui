@@ -12,7 +12,7 @@ This project uses a server-agent architecture: the Flask server hosts the Web UI
 
 - **Outbound agent connections**: Client agents connect outbound to the server WebSocket endpoint (`/ws`), so managed devices do not need an inbound management daemon or open admin port.
 - **Challenge-response device authentication**: Approved agents authenticate by signing a server challenge with HMAC-SHA256 using a per-device secret. The shared bootstrap token is not sent over the wire.
-- **Persistent host identity**: Each client stores a generated UUID (`system_id`), so DHCP and other IP changes do not break mappings.
+- **Persistent host identity**: Each client stores a generated UUID (`system_id`), so DHCP and other IP changes do not break mappings, while the UI prefers the current hostname for readability.
 - **Pending-device approval flow**: New devices can remain in a pending state until an administrator approves them in the Web UI.
 - **Offline-safe command queueing**: The server can queue changes for offline systems and apply them when the agent reconnects.
 - **Command whitelist on clients**: The agent only accepts a fixed set of TimeKpr-related actions rather than arbitrary shell commands.
@@ -153,7 +153,7 @@ Notes:
    sudo /usr/local/bin/timekpr-agent
    ```
 
-   On first launch, the agent generates and persists a unique `system_id`:
+   On first launch, the agent generates and persists a unique `system_id`. It also reports the machine hostname to the server so the admin UI can show a readable device name:
 
    ```text
    ------------------------------------------------------------
@@ -203,8 +203,8 @@ Notes:
 ## 3. Approve Devices and Map Users
 
 1. Start the agent and open the Web UI.
-2. In the admin panel, approve the pending device for that `system_id`.
-3. Add or map users to the approved `system_id`.
+2. In the admin panel, approve the pending device. The UI shows the hostname when available, and appends the final two UUID characters if multiple devices share the same hostname.
+3. Add or map users to the approved device entry. Internally, mappings still use the stable `system_id`.
 4. Once the device is approved, the next successful challenge-response handshake marks it online and ready for remote actions.
 
 ---

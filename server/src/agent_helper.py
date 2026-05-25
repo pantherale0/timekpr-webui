@@ -239,17 +239,32 @@ class AgentClient:
         """
         intervals_serial = {}
         day_order = [1, 2, 3, 4, 5, 6, 7]  # Monday to Sunday
+        unrestricted_hours = ';'.join([str(h) for h in range(24)])
         
         for day_num in day_order:
-            interval = intervals_dict.get(day_num)
-            if interval and interval.is_enabled and interval.is_valid_interval():
-                hour_specs = interval.to_timekpr_format()
-                if hour_specs:
-                    intervals_serial[str(day_num)] = ';'.join(hour_specs)
-                else:
-                    intervals_serial[str(day_num)] = ';'.join([str(h) for h in range(24)])
-            else:
-                intervals_serial[str(day_num)] = ';'.join([str(h) for h in range(24)])
+            day_intervals = intervals_dict.get(day_num) or []
+            if not isinstance(day_intervals, list):
+                day_intervals = [day_intervals]
+
+            ordered_intervals = sorted(
+                [
+                    interval for interval in day_intervals
+                    if interval and interval.is_enabled and interval.is_valid_interval()
+                ],
+                key=lambda interval: (
+                    interval.start_hour * 60 + interval.start_minute,
+                    interval.end_hour * 60 + interval.end_minute,
+                    getattr(interval, 'sort_order', 0),
+                ),
+            )
+
+            hour_specs = []
+            for interval in ordered_intervals:
+                interval_specs = interval.to_timekpr_format()
+                if interval_specs:
+                    hour_specs.extend(interval_specs)
+
+            intervals_serial[str(day_num)] = ';'.join(hour_specs) if hour_specs else unrestricted_hours
 
         success, message, _ = AgentConnectionManager.send_command_sync(
             self.system_id, "set_allowed_hours", username, {

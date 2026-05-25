@@ -12,7 +12,7 @@
             margin: 0 auto;
             padding: var(--space-6);
         }
-        
+
         .schedule-overview {
             background: var(--bg-elevated);
             border: 1px solid var(--border-primary);
@@ -20,31 +20,32 @@
             padding: var(--space-6);
             margin-bottom: var(--space-6);
         }
-        
+
         .schedule-controls {
             display: flex;
             gap: var(--space-4);
             margin-bottom: var(--space-6);
             flex-wrap: wrap;
         }
-        
+
         .quick-control {
             display: flex;
             align-items: center;
             gap: var(--space-2);
+            flex-wrap: wrap;
             background: var(--bg-secondary);
             padding: var(--space-3) var(--space-4);
             border-radius: var(--radius-md);
             border: 1px solid var(--border-primary);
         }
-        
+
         .quick-control label {
             font-size: var(--font-size-sm);
             font-weight: 500;
             color: var(--text-secondary);
             white-space: nowrap;
         }
-        
+
         .quick-input {
             width: 80px;
             padding: var(--space-2);
@@ -55,14 +56,14 @@
             font-size: var(--font-size-sm);
             text-align: center;
         }
-        
+
         .schedule-table {
             background: var(--bg-elevated);
             border: 1px solid var(--border-primary);
             border-radius: var(--radius-xl);
             overflow: hidden;
         }
-        
+
         .schedule-header-row {
             background: var(--bg-secondary);
             border-bottom: 2px solid var(--border-primary);
@@ -74,7 +75,7 @@
             font-weight: 600;
             color: var(--text-primary);
         }
-        
+
         .schedule-row {
             padding: var(--space-4) var(--space-6);
             display: grid;
@@ -84,37 +85,41 @@
             border-bottom: 1px solid var(--border-primary);
             transition: background-color var(--transition-fast);
         }
-        
+
         .schedule-row:hover {
             background: var(--bg-secondary);
         }
-        
+
         .schedule-row:last-child {
             border-bottom: none;
         }
-        
+
         .day-name {
             font-weight: 600;
             color: var(--text-primary);
             font-size: var(--font-size-base);
         }
-        
+
         .weekend .day-name {
             color: var(--warning);
         }
-        
+
         .time-section {
             display: flex;
             align-items: center;
             gap: var(--space-3);
         }
-        
+
+        .interval-section {
+            align-items: stretch;
+        }
+
         .time-controls {
             display: flex;
             align-items: center;
             gap: var(--space-2);
         }
-        
+
         .time-input {
             width: 80px;
             padding: var(--space-2) var(--space-3);
@@ -126,13 +131,14 @@
             font-size: var(--font-size-base);
             font-weight: 500;
         }
-        
-        .time-input:focus {
+
+        .time-input:focus,
+        .interval-time-input:focus {
             outline: none;
             border-color: var(--border-focus);
             box-shadow: 0 0 0 3px rgb(59 130 246 / 0.1);
         }
-        
+
         .time-btn {
             width: 32px;
             height: 32px;
@@ -148,56 +154,87 @@
             font-size: var(--font-size-base);
             transition: all var(--transition-fast);
         }
-        
+
         .time-btn:hover {
             background: var(--bg-tertiary);
             border-color: var(--border-secondary);
         }
-        
+
         .time-unit {
             font-size: var(--font-size-sm);
             color: var(--text-tertiary);
             min-width: 40px;
         }
-        
-        .interval-controls {
+
+        .interval-editor {
+            width: 100%;
             display: flex;
-            align-items: center;
+            flex-direction: column;
             gap: var(--space-3);
         }
-        
-        .interval-toggle {
+
+        .interval-list {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-2);
+        }
+
+        .interval-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: var(--space-3);
+            padding: var(--space-3);
+            border: 1px solid var(--border-primary);
+            border-radius: var(--radius-md);
+            background: var(--bg-primary);
+        }
+
+        .interval-row-controls {
             display: flex;
             align-items: center;
             gap: var(--space-2);
+            flex-wrap: wrap;
         }
-        
-        .interval-toggle input[type="checkbox"] {
-            width: 18px;
-            height: 18px;
-            accent-color: var(--accent-primary);
+
+        .interval-row-index {
+            font-size: var(--font-size-sm);
+            font-weight: 600;
+            color: var(--text-secondary);
+            min-width: 56px;
         }
-        
-        .interval-time {
-            display: flex;
-            align-items: center;
-            gap: var(--space-2);
-        }
-        
-        .time-select {
-            padding: var(--space-1) var(--space-2);
+
+        .interval-time-input {
+            padding: var(--space-2);
             border: 1px solid var(--border-primary);
             border-radius: var(--radius-sm);
             background: var(--bg-elevated);
             color: var(--text-primary);
             font-size: var(--font-size-sm);
         }
-        
-        .time-select:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
+
+        .interval-empty {
+            padding: var(--space-3);
+            border: 1px dashed var(--border-primary);
+            border-radius: var(--radius-md);
+            color: var(--text-secondary);
+            font-size: var(--font-size-sm);
+            background: var(--bg-primary);
         }
-        
+
+        .interval-actions {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: var(--space-3);
+            flex-wrap: wrap;
+        }
+
+        .interval-summary {
+            color: var(--text-tertiary);
+            font-size: var(--font-size-sm);
+        }
+
         .actions-section {
             padding: var(--space-6);
             background: var(--bg-elevated);
@@ -208,37 +245,41 @@
             justify-content: center;
             gap: var(--space-4);
         }
-        
+
         .status-info {
             display: flex;
             align-items: center;
             gap: var(--space-2);
             font-size: var(--font-size-sm);
         }
-        
+
         @media (max-width: 968px) {
             .schedule-header-row,
             .schedule-row {
                 grid-template-columns: 1fr;
                 gap: var(--space-3);
             }
-            
+
             .time-section {
                 justify-content: space-between;
                 padding: var(--space-3);
                 background: var(--bg-secondary);
                 border-radius: var(--radius-md);
             }
-            
-            .interval-controls {
-                flex-wrap: wrap;
-                justify-content: space-between;
+
+            .interval-actions,
+            .interval-row {
+                align-items: flex-start;
             }
-            
+
+            .interval-row {
+                flex-direction: column;
+            }
+
             .schedule-controls {
                 flex-direction: column;
             }
-            
+
             .quick-control {
                 justify-content: space-between;
             }
@@ -350,17 +391,9 @@
                 </div>
                 <div class="quick-control">
                     <label>Quick set interval:</label>
-                    <select id="bulk-start" class="time-select">
-                        {% for h in range(24) %}
-                        <option value="{{ h }}" {% if h == 9 %}selected{% endif %}>{{ '%02d:00'|format(h) }}</option>
-                        {% endfor %}
-                    </select>
+                    <input type="time" id="bulk-start" class="interval-time-input" step="900" value="09:00">
                     <span>to</span>
-                    <select id="bulk-end" class="time-select">
-                        {% for h in range(24) %}
-                        <option value="{{ h }}" {% if h == 17 %}selected{% endif %}>{{ '%02d:00'|format(h) }}</option>
-                        {% endfor %}
-                    </select>
+                    <input type="time" id="bulk-end" class="interval-time-input" step="900" value="17:00">
                     <button type="button" class="btn btn-sm btn-secondary" onclick="setWeekdayIntervals()">Weekdays</button>
                     <button type="button" class="btn btn-sm btn-secondary" onclick="setWeekendIntervals()">Weekends</button>
                     <button type="button" class="btn btn-sm btn-secondary" onclick="setAllIntervals()">All Days</button>
@@ -410,24 +443,12 @@
                         </div>
                         
                         <!-- Time Intervals -->
-                        <div class="time-section">
-                            <div class="interval-controls">
-                                <div class="interval-toggle">
-                                    <input type="checkbox" id="interval-{{ day_num }}" onchange="toggleInterval({{ day_num }})">
-                                    <label for="interval-{{ day_num }}">Enable</label>
-                                </div>
-                                <div class="interval-time">
-                                    <select id="start-{{ day_num }}" class="time-select" disabled>
-                                        {% for h in range(24) %}
-                                        <option value="{{ h }}">{{ '%02d:00'|format(h) }}</option>
-                                        {% endfor %}
-                                    </select>
-                                    <span>to</span>
-                                    <select id="end-{{ day_num }}" class="time-select" disabled>
-                                        {% for h in range(24) %}
-                                        <option value="{{ h }}">{{ '%02d:00'|format(h) }}</option>
-                                        {% endfor %}
-                                    </select>
+                        <div class="time-section interval-section">
+                            <div class="interval-editor">
+                                <div id="interval-list-{{ day_num }}" class="interval-list"></div>
+                                <div class="interval-actions">
+                                    <button type="button" class="btn btn-sm btn-secondary" onclick="addInterval({{ day_num }})">Add Interval</button>
+                                    <span id="interval-summary-{{ day_num }}" class="interval-summary">No restrictions configured</span>
                                 </div>
                             </div>
                         </div>
@@ -519,49 +540,290 @@
     </style>
     
     <script>
-        // Notification functions
+        const DAY_NUMBERS = [1, 2, 3, 4, 5, 6, 7];
+        const WEEKDAY_NUMBERS = [1, 2, 3, 4, 5];
+        const WEEKEND_NUMBERS = [6, 7];
+        const INTERVAL_STEP_MINUTES = 15;
+        const INTERVAL_STEP_SECONDS = INTERVAL_STEP_MINUTES * 60;
+        const MAX_TIME_VALUE = '23:45';
+        const DEFAULT_INTERVAL = Object.freeze({ start_time: '09:00', end_time: '17:00' });
+        const DAY_LABELS = {
+            1: 'Monday',
+            2: 'Tuesday',
+            3: 'Wednesday',
+            4: 'Thursday',
+            5: 'Friday',
+            6: 'Saturday',
+            7: 'Sunday',
+        };
+
+        let intervals = initializeIntervals();
+
         function showNotification(message, type = 'success') {
             const toast = document.getElementById('notification-toast');
             const messageEl = toast.querySelector('.toast-message');
             const iconEl = toast.querySelector('.toast-icon path');
-            
-            // Set message
+
             messageEl.textContent = message;
-            
-            // Set type and icon
             toast.className = `notification-toast ${type}`;
+
             if (type === 'success') {
                 iconEl.setAttribute('d', 'M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zm-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.061L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z');
             } else if (type === 'error') {
                 iconEl.setAttribute('d', 'M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zM5.354 4.646a.5.5 0 1 0-.708.708L7.293 8l-2.647 2.646a.5.5 0 0 0 .708.708L8 8.707l2.646 2.647a.5.5 0 0 0 .708-.708L8.707 8l2.647-2.646a.5.5 0 0 0-.708-.708L8 7.293 5.354 4.646z');
             }
-            
-            // Show toast
+
             toast.classList.add('show');
-            
-            // Hide after 2 seconds
             setTimeout(() => {
                 toast.classList.remove('show');
             }, 2000);
         }
-        
-        // Intervals data
-        let intervals = {};
-        
-        // Load intervals on page load
-        document.addEventListener('DOMContentLoaded', function() {
-            loadIntervals();
-        });
-        
-        // Time adjustment functions
+
+        function initializeIntervals() {
+            return DAY_NUMBERS.reduce((map, day) => {
+                map[day] = [];
+                return map;
+            }, {});
+        }
+
+        function cloneInterval(interval) {
+            return {
+                start_time: interval.start_time,
+                end_time: interval.end_time,
+            };
+        }
+
+        function pad(value) {
+            return String(value).padStart(2, '0');
+        }
+
+        function partsToTimeValue(hour, minute) {
+            return `${pad(hour)}:${pad(minute)}`;
+        }
+
+        function timeValueToMinutes(value) {
+            if (typeof value !== 'string' || !value.includes(':')) {
+                return NaN;
+            }
+
+            const [hours, minutes] = value.split(':').map(part => Number(part));
+            if (!Number.isInteger(hours) || !Number.isInteger(minutes)) {
+                return NaN;
+            }
+
+            return (hours * 60) + minutes;
+        }
+
+        function timeValueToParts(value) {
+            const totalMinutes = timeValueToMinutes(value);
+            return {
+                start_hour: Math.floor(totalMinutes / 60),
+                start_minute: totalMinutes % 60,
+            };
+        }
+
+        function createDefaultInterval(day) {
+            const dayIntervals = intervals[day] || [];
+            if (!dayIntervals.length) {
+                return cloneInterval(DEFAULT_INTERVAL);
+            }
+
+            const lastInterval = dayIntervals[dayIntervals.length - 1];
+            const nextStartMinutes = timeValueToMinutes(lastInterval.end_time);
+            if (!Number.isFinite(nextStartMinutes)) {
+                return cloneInterval(DEFAULT_INTERVAL);
+            }
+
+            const boundedStart = Math.min(nextStartMinutes, timeValueToMinutes(MAX_TIME_VALUE));
+            const boundedEnd = Math.min(boundedStart + 60, timeValueToMinutes(MAX_TIME_VALUE));
+            if (boundedEnd <= boundedStart) {
+                return cloneInterval(DEFAULT_INTERVAL);
+            }
+
+            return {
+                start_time: partsToTimeValue(Math.floor(boundedStart / 60), boundedStart % 60),
+                end_time: partsToTimeValue(Math.floor(boundedEnd / 60), boundedEnd % 60),
+            };
+        }
+
+        function getDayIntervals(day) {
+            if (!intervals[day]) {
+                intervals[day] = [];
+            }
+            return intervals[day];
+        }
+
+        function renderAllIntervals() {
+            DAY_NUMBERS.forEach(day => renderIntervalsForDay(day));
+        }
+
+        function renderIntervalsForDay(day) {
+            const listEl = document.getElementById(`interval-list-${day}`);
+            const summaryEl = document.getElementById(`interval-summary-${day}`);
+            const dayIntervals = getDayIntervals(day);
+
+            listEl.innerHTML = '';
+
+            if (!dayIntervals.length) {
+                const emptyState = document.createElement('div');
+                emptyState.className = 'interval-empty';
+                emptyState.textContent = 'No restrictions configured. This day stays unrestricted until you add an interval.';
+                listEl.appendChild(emptyState);
+            } else {
+                dayIntervals.forEach((interval, index) => {
+                    const row = document.createElement('div');
+                    row.className = 'interval-row';
+
+                    const controls = document.createElement('div');
+                    controls.className = 'interval-row-controls';
+                    controls.innerHTML = `
+                        <span class="interval-row-index">#${index + 1}</span>
+                        <input type="time" class="interval-time-input" step="${INTERVAL_STEP_SECONDS}" value="${interval.start_time}">
+                        <span>to</span>
+                        <input type="time" class="interval-time-input" step="${INTERVAL_STEP_SECONDS}" value="${interval.end_time}">
+                    `;
+
+                    const [startInput, endInput] = controls.querySelectorAll('input');
+                    startInput.addEventListener('input', event => {
+                        dayIntervals[index].start_time = event.target.value;
+                    });
+                    endInput.addEventListener('input', event => {
+                        dayIntervals[index].end_time = event.target.value;
+                    });
+
+                    const removeButton = document.createElement('button');
+                    removeButton.type = 'button';
+                    removeButton.className = 'btn btn-sm btn-danger';
+                    removeButton.textContent = 'Remove';
+                    removeButton.addEventListener('click', () => removeInterval(day, index));
+
+                    row.appendChild(controls);
+                    row.appendChild(removeButton);
+                    listEl.appendChild(row);
+                });
+            }
+
+            summaryEl.textContent = dayIntervals.length
+                ? `${dayIntervals.length} interval${dayIntervals.length === 1 ? '' : 's'} configured`
+                : 'No restrictions configured';
+        }
+
+        function addInterval(day) {
+            getDayIntervals(day).push(createDefaultInterval(day));
+            renderIntervalsForDay(day);
+        }
+
+        function removeInterval(day, index) {
+            getDayIntervals(day).splice(index, 1);
+            renderIntervalsForDay(day);
+        }
+
+        function validateDayIntervals(day, dayIntervals) {
+            let previousEnd = null;
+
+            for (const interval of dayIntervals) {
+                const startMinutes = timeValueToMinutes(interval.start_time);
+                const endMinutes = timeValueToMinutes(interval.end_time);
+
+                if (!Number.isFinite(startMinutes) || !Number.isFinite(endMinutes)) {
+                    return `Invalid time value for ${DAY_LABELS[day]}.`;
+                }
+
+                if ((startMinutes % INTERVAL_STEP_MINUTES) !== 0 || (endMinutes % INTERVAL_STEP_MINUTES) !== 0) {
+                    return `${DAY_LABELS[day]} intervals must use ${INTERVAL_STEP_MINUTES}-minute increments.`;
+                }
+
+                if (startMinutes >= endMinutes) {
+                    return `${DAY_LABELS[day]} has an interval where the start time is not before the end time.`;
+                }
+
+                if (previousEnd !== null && startMinutes < previousEnd) {
+                    return `${DAY_LABELS[day]} intervals cannot overlap.`;
+                }
+
+                previousEnd = endMinutes;
+            }
+
+            return null;
+        }
+
+        function buildIntervalsPayload() {
+            const intervalData = {};
+
+            for (const day of DAY_NUMBERS) {
+                const dayIntervals = getDayIntervals(day).map(cloneInterval);
+                const validationError = validateDayIntervals(day, dayIntervals);
+                if (validationError) {
+                    throw new Error(validationError);
+                }
+
+                intervalData[day] = dayIntervals.map((interval, index) => {
+                    const startMinutes = timeValueToMinutes(interval.start_time);
+                    const endMinutes = timeValueToMinutes(interval.end_time);
+
+                    return {
+                        sort_order: index,
+                        start_hour: Math.floor(startMinutes / 60),
+                        start_minute: startMinutes % 60,
+                        end_hour: Math.floor(endMinutes / 60),
+                        end_minute: endMinutes % 60,
+                        is_enabled: true,
+                    };
+                });
+            }
+
+            return intervalData;
+        }
+
+        function normalizeServerIntervals(serverIntervals) {
+            const normalized = initializeIntervals();
+
+            for (const day of DAY_NUMBERS) {
+                const rawIntervals = serverIntervals?.[day] ?? serverIntervals?.[String(day)] ?? [];
+                const intervalList = Array.isArray(rawIntervals)
+                    ? rawIntervals
+                    : (rawIntervals ? [rawIntervals] : []);
+
+                normalized[day] = intervalList.map(interval => ({
+                    start_time: partsToTimeValue(interval.start_hour, interval.start_minute),
+                    end_time: partsToTimeValue(interval.end_hour, interval.end_minute),
+                }));
+            }
+
+            return normalized;
+        }
+
+        function applyBulkIntervals(dayNumbers) {
+            const startValue = document.getElementById('bulk-start').value;
+            const endValue = document.getElementById('bulk-end').value;
+            const bulkIntervals = [{ start_time: startValue, end_time: endValue }];
+
+            const validationError = validateDayIntervals(dayNumbers[0], bulkIntervals);
+            if (validationError) {
+                showNotification(validationError, 'error');
+                return;
+            }
+
+            dayNumbers.forEach(day => {
+                intervals[day] = bulkIntervals.map(cloneInterval);
+                renderIntervalsForDay(day);
+            });
+        }
+
         function adjustTime(dayId, change) {
             const input = document.getElementById(dayId);
-            let currentValue = parseFloat(input.value) || 0;
-            let newValue = Math.max(0, Math.min(24, currentValue + change));
-            input.value = newValue;
+            const currentValue = parseFloat(input.value) || 0;
+            const nextValue = Math.max(0, Math.min(24, currentValue + change));
+            input.value = (Math.round(nextValue * 100) / 100).toString();
         }
-        
-        // Bulk time setting functions
+
+        function adjustBulkTime(change) {
+            const input = document.getElementById('bulk-hours');
+            const currentValue = parseFloat(input.value) || 0;
+            const nextValue = Math.max(0, Math.min(24, currentValue + change));
+            input.value = (Math.round(nextValue * 100) / 100).toString();
+        }
+
         function setWeekdays() {
             const hours = document.getElementById('bulk-hours').value;
             if (!hours) return;
@@ -569,7 +831,7 @@
                 document.getElementById(day).value = hours;
             });
         }
-        
+
         function setWeekends() {
             const hours = document.getElementById('bulk-hours').value;
             if (!hours) return;
@@ -577,7 +839,7 @@
                 document.getElementById(day).value = hours;
             });
         }
-        
+
         function setAllDays() {
             const hours = document.getElementById('bulk-hours').value;
             if (!hours) return;
@@ -585,206 +847,151 @@
                 document.getElementById(day).value = hours;
             });
         }
-        
-        // Interval functions
-        function toggleInterval(day) {
-            const checkbox = document.getElementById(`interval-${day}`);
-            const startSelect = document.getElementById(`start-${day}`);
-            const endSelect = document.getElementById(`end-${day}`);
-            
-            startSelect.disabled = !checkbox.checked;
-            endSelect.disabled = !checkbox.checked;
-        }
-        
+
         function setWeekdayIntervals() {
-            const startHour = document.getElementById('bulk-start').value;
-            const endHour = document.getElementById('bulk-end').value;
-            
-            for (let day = 1; day <= 5; day++) {
-                document.getElementById(`interval-${day}`).checked = true;
-                document.getElementById(`start-${day}`).value = startHour;
-                document.getElementById(`end-${day}`).value = endHour;
-                toggleInterval(day);
-            }
+            applyBulkIntervals(WEEKDAY_NUMBERS);
         }
-        
+
         function setWeekendIntervals() {
-            const startHour = document.getElementById('bulk-start').value;
-            const endHour = document.getElementById('bulk-end').value;
-            
-            // Apply to weekends (Saturday = 6, Sunday = 7)
-            for (let day = 6; day <= 7; day++) {
-                document.getElementById(`interval-${day}`).checked = true;
-                document.getElementById(`start-${day}`).value = startHour;
-                document.getElementById(`end-${day}`).value = endHour;
-                toggleInterval(day);
-            }
+            applyBulkIntervals(WEEKEND_NUMBERS);
         }
-        
+
         function setAllIntervals() {
-            const startHour = document.getElementById('bulk-start').value;
-            const endHour = document.getElementById('bulk-end').value;
-            
-            for (let day = 1; day <= 7; day++) {
-                document.getElementById(`interval-${day}`).checked = true;
-                document.getElementById(`start-${day}`).value = startHour;
-                document.getElementById(`end-${day}`).value = endHour;
-                toggleInterval(day);
-            }
+            applyBulkIntervals(DAY_NUMBERS);
         }
-        
+
         function loadIntervals() {
-            fetch(`/api/user/{{ user.id }}/intervals`)
+            return fetch(`/api/user/{{ user.id }}/intervals`)
                 .then(response => response.json())
                 .then(data => {
-                    if (data.success) {
-                        intervals = data.intervals;
-                        for (let day = 1; day <= 7; day++) {
-                            const interval = intervals[day];
-                            if (interval) {
-                                document.getElementById(`interval-${day}`).checked = interval.is_enabled;
-                                document.getElementById(`start-${day}`).value = interval.start_hour;
-                                document.getElementById(`end-${day}`).value = interval.end_hour;
-                                toggleInterval(day);
-                            }
-                        }
+                    if (!data.success) {
+                        throw new Error(data.message || 'Failed to load time intervals');
                     }
+
+                    intervals = normalizeServerIntervals(data.intervals);
+                    renderAllIntervals();
+                })
+                .catch(error => {
+                    showNotification(`Error loading intervals: ${error.message}`, 'error');
+                    throw error;
                 });
         }
-        
-        // Add bulk time adjustment function
-        function adjustBulkTime(change) {
-            const input = document.getElementById('bulk-hours');
-            let currentValue = parseFloat(input.value) || 0;
-            let newValue = Math.max(0, Math.min(24, currentValue + change));
-            input.value = newValue;
-        }
-        
-        // Combined save function for both schedule and intervals
+
         function saveAll() {
-            // First, save the schedule by submitting the form
             const form = document.getElementById('schedule-form');
             const formData = new FormData(form);
-            
-            // Save schedule
+
             fetch(form.action, {
                 method: 'POST',
                 body: formData
             })
             .then(response => {
-                if (response.ok) {
-                    // If schedule save successful, now save intervals
-                    return saveIntervals(false); // false means don't show alert yet
-                } else {
+                if (!response.ok) {
                     throw new Error('Failed to save schedule');
                 }
+                return saveIntervals(false);
             })
             .then(() => {
                 showNotification('All changes saved successfully!');
-                // Update status immediately instead of reloading
                 setTimeout(() => {
                     updateSyncStatus();
                 }, 1000);
             })
             .catch(error => {
-                showNotification('Error saving changes: ' + error.message, 'error');
+                showNotification(`Error saving changes: ${error.message}`, 'error');
             });
         }
-        
+
         function saveIntervals(showAlert = true) {
             return new Promise((resolve, reject) => {
-                const intervalData = {};
-                
-                for (let day = 1; day <= 7; day++) {
-                    const enabled = document.getElementById(`interval-${day}`).checked;
-                    const startHour = parseInt(document.getElementById(`start-${day}`).value);
-                    const endHour = parseInt(document.getElementById(`end-${day}`).value);
-                    
-                    if (enabled && startHour >= endHour) {
-                        const error = `Invalid time range for day ${day}: start time must be before end time`;
-                        if (showAlert) showNotification(error, 'error');
-                        reject(new Error(error));
-                        return;
+                let intervalData;
+                try {
+                    intervalData = buildIntervalsPayload();
+                } catch (error) {
+                    if (showAlert) {
+                        showNotification(error.message, 'error');
                     }
-                    
-                    intervalData[day] = {
-                        is_enabled: enabled,
-                        start_hour: startHour,
-                        start_minute: 0,
-                        end_hour: endHour,
-                        end_minute: 0
-                    };
+                    reject(error);
+                    return;
                 }
-                
+
                 fetch(`/api/user/{{ user.id }}/intervals/update`, {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({ intervals: intervalData })
                 })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        if (showAlert) {
-                            showNotification('Time intervals saved successfully!');
-                            loadIntervals();
-                        }
-                        resolve();
-                    } else {
-                        const error = 'Error: ' + data.message;
-                        if (showAlert) showNotification(error, 'error');
-                        reject(new Error(data.message));
+                .then(async response => {
+                    const data = await response.json();
+                    if (!response.ok || !data.success) {
+                        throw new Error(data.message || 'Failed to save intervals');
                     }
+
+                    if (showAlert) {
+                        showNotification('Time intervals saved successfully!');
+                    }
+                    return loadIntervals();
                 })
+                .then(() => resolve())
                 .catch(error => {
-                    const errorMsg = 'Network error: ' + error.message;
-                    if (showAlert) showNotification(errorMsg, 'error');
+                    if (showAlert) {
+                        showNotification(`Error: ${error.message}`, 'error');
+                    }
                     reject(error);
                 });
             });
         }
-        
+
         function resetForm() {
             if (confirm('Reset to last saved values?')) {
                 location.reload();
             }
         }
-        
-        // Function to update sync status
+
         function updateSyncStatus() {
-            fetch('/api/schedule-sync-status/{{ user.id }}')
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        const statusBadge = document.getElementById('sync-status-badge');
-                        const statusIcon = document.getElementById('sync-status-icon');
-                        const statusText = document.getElementById('sync-status-text');
-                        
-                        if (!data.is_synced && data.schedule) {
-                            // Show "Changes Pending Sync" badge
-                            statusBadge.className = 'badge badge-warning';
-                            statusBadge.style.display = 'block';
-                            statusIcon.setAttribute('d', 'M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767L8.982 1.566zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5zm.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2z');
-                            statusText.textContent = 'Changes Pending Sync';
-                        } else if (data.is_synced && data.schedule) {
-                            // Show "Synchronized" badge
-                            statusBadge.className = 'badge badge-success';
-                            statusBadge.style.display = 'block';
-                            statusIcon.setAttribute('d', 'M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zm-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.061L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z');
-                            statusText.textContent = 'Synchronized';
-                        } else {
-                            // Hide badge when no schedule
-                            statusBadge.style.display = 'none';
-                        }
-                    }
-                })
-                .catch(error => {
-                    console.error('Error fetching sync status:', error);
-                });
+            const statusBadge = document.getElementById('sync-status-badge');
+            const statusIcon = document.getElementById('sync-status-icon');
+            const statusText = document.getElementById('sync-status-text');
+
+            Promise.all([
+                fetch('/api/schedule-sync-status/{{ user.id }}').then(response => response.json()),
+                fetch('/api/user/{{ user.id }}/intervals/sync-status').then(response => response.json()),
+            ])
+            .then(([scheduleData, intervalData]) => {
+                const hasSchedule = Boolean(scheduleData?.schedule);
+                const hasIntervals = (intervalData?.total_intervals || 0) > 0;
+                const hasConfig = hasSchedule || hasIntervals;
+                const needsSync = (
+                    (hasSchedule && scheduleData.success && !scheduleData.is_synced) ||
+                    (intervalData.success && intervalData.needs_sync)
+                );
+
+                if (!hasConfig) {
+                    statusBadge.style.display = 'none';
+                    return;
+                }
+
+                statusBadge.style.display = 'block';
+                if (needsSync) {
+                    statusBadge.className = 'badge badge-warning';
+                    statusIcon.setAttribute('d', 'M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767L8.982 1.566zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5zm.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2z');
+                    statusText.textContent = 'Changes Pending Sync';
+                } else {
+                    statusBadge.className = 'badge badge-success';
+                    statusIcon.setAttribute('d', 'M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zm-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.061L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z');
+                    statusText.textContent = 'Synchronized';
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching sync status:', error);
+            });
         }
-        
-        // Update sync status immediately and then every 5 seconds
-        updateSyncStatus();
-        setInterval(updateSyncStatus, 5000);
+
+        document.addEventListener('DOMContentLoaded', function() {
+            renderAllIntervals();
+            loadIntervals().catch(() => {});
+            updateSyncStatus();
+            setInterval(updateSyncStatus, 5000);
+        });
     </script>
 </body>
 </html>

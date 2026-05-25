@@ -89,6 +89,7 @@ class Settings(db.Model):
 class AgentDevice(db.Model):
     __tablename__ = 'agent_device'
     system_id = db.Column(db.String(50), primary_key=True)  # Unique Host UUID
+    system_hostname = db.Column(db.String(255), nullable=True)  # Hostname used for human-readable labels
     system_ip = db.Column(db.String(50), nullable=True)     # Snapshotted connection IP
     status = db.Column(db.String(20), default='pending')    # pending, approved, rejected
     secure_token = db.Column(db.String(64), nullable=True)  # Dynamically generated token
@@ -102,6 +103,21 @@ class AgentDevice(db.Model):
         lazy=True,
         cascade="all, delete-orphan",
     )
+
+    @property
+    def display_name(self):
+        hostname = (self.system_hostname or '').strip()
+        return hostname or self.system_id
+
+    @property
+    def system_id_suffix(self):
+        system_id = (self.system_id or '').strip()
+        return system_id[-2:] if len(system_id) >= 2 else system_id
+
+    def format_display_name(self, include_suffix=False):
+        if include_suffix and (self.system_hostname or '').strip():
+            return f'{self.display_name} ({self.system_id_suffix})'
+        return self.display_name
 
     def __repr__(self):
         return f'<AgentDevice {self.system_id} [{self.status}]>'
@@ -371,6 +387,7 @@ class UserDailyTimeInterval(db.Model):
     
     # Day of week (1=Monday, 7=Sunday, matching ISO 8601)
     day_of_week = db.Column(db.Integer, nullable=False)  # 1-7
+    sort_order = db.Column(db.Integer, nullable=False, default=0)
     
     # Time interval (24-hour format)
     start_hour = db.Column(db.Integer, nullable=False)   # 0-23
@@ -389,9 +406,9 @@ class UserDailyTimeInterval(db.Model):
     # Relationship back to user
     user = db.relationship('ManagedUser', backref=db.backref('time_intervals', cascade='all, delete-orphan'))
     
-    # Constraint to ensure only one interval per user per day
+    # Constraint to keep a stable per-day ordering for multiple intervals.
     __table_args__ = (
-        db.UniqueConstraint('user_id', 'day_of_week', name='user_day_interval_uc'),
+        db.UniqueConstraint('user_id', 'day_of_week', 'sort_order', name='user_day_interval_sort_order_uc'),
     )
     
     def __repr__(self):
@@ -405,12 +422,63 @@ class UserDailyTimeInterval(db.Model):
         """Get day name from day_of_week number"""
         days = ['', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
         return days[self.day_of_week] if 1 <= self.day_of_week <= 7 else 'Unknown'
+
+    @property
+    def start_total_minutes(self):
+        return self.start_hour * 60 + self.start_minute
+
+    @property
+    def end_total_minutes(self):
+        return self.end_hour * 60 + self.end_minute
+
+    def has_valid_time_components(self):
+        return (
+            0 <= self.start_hour <= 23 and
+            0 <= self.end_hour <= 23 and
+            0 <= self.start_minute <= 59 and
+            0 <= self.end_minute <= 59
+        )
     
-    def is_valid_interval(self):
-        """Check if the time interval is valid (start < end, within 24h)"""
-        start_minutes = self.start_hour * 60 + self.start_minute
-        end_minutes = self.end_hour * 60 + self.end_minute
-        return start_minutes < end_minutes and 0 <= start_minutes < 1440 and 0 <= end_minutes < 1440
+    def is_valid_interval(self, step_minutes=None):
+        """Check if the time interval is valid and optionally aligned to a time step."""
+        if not self.has_valid_time_components():
+            return False
+
+        start_minutes = self.start_total_minutes
+        end_minutes = self.end_total_minutes
+        if not (start_minutes < end_minutes and 0 <= start_minutes < 1440 and 0 < end_minutes <= 1440):
+            return False
+
+        if step_minutes:
+            return start_minutes % step_minutes == 0 and end_minutes % step_minutes == 0
+        return True
+
+    @staticmethod
+    def sort_intervals(intervals):
+        return sorted(
+            intervals,
+            key=lambda interval: (
+                interval.start_total_minutes,
+                interval.end_total_minutes,
+                interval.sort_order,
+                interval.id or 0,
+            ),
+        )
+
+    @classmethod
+    def validate_interval_collection(cls, intervals, step_minutes=None):
+        """Validate a day's interval list for ordering, bounds, and overlap."""
+        ordered_intervals = cls.sort_intervals(intervals)
+        previous_end = None
+
+        for interval in ordered_intervals:
+            if not interval.is_valid_interval(step_minutes=step_minutes):
+                return False
+            if previous_end is not None and interval.start_total_minutes < previous_end:
+                return False
+            previous_end = interval.end_total_minutes
+
+        return True
     
     def mark_synced(self):
         """Mark the interval as synced with the remote system"""
