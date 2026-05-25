@@ -147,9 +147,13 @@ def test_agent_client(db_session):
     # Re-register
     AgentConnectionManager.register(system_id, ws, "127.0.0.1")
 
-    # Mock full timekpr output format
-    # DummyWS send will trigger immediate routing of this stdout output
-    stdout_output = "TIME_SPENT_DAY: 1200\nLIMIT: 3600\nENABLED: true\nLIST: a;b;c\nLINUX_UID: 1000\n"
+    config_output = {
+        "TIME_SPENT_DAY": 1200,
+        "LIMIT": 3600,
+        "ENABLED": True,
+        "LIST": ["a", "b", "c"],
+        "LINUX_UID": 1000,
+    }
     # Customize DummyWS for this test
     class CustomWS:
         def __init__(self):
@@ -162,7 +166,7 @@ def test_agent_client(db_session):
             AgentConnectionManager.route_response(correlation_id, {
                 "success": True,
                 "message": "Success",
-                "data": {"stdout": stdout_output}
+                "data": {"config": config_output}
             })
     
     capture_ws = CustomWS()
@@ -216,10 +220,16 @@ def test_agent_client(db_session):
         payload for payload in capture_ws.payloads
         if payload.get("action") == "set_allowed_hours"
     )
-    unrestricted = ';'.join(str(hour) for hour in range(24))
-    assert allowed_hours_payload["args"]["intervals"]["1"] == "9;10;15;16;17[0-30]"
-    assert allowed_hours_payload["args"]["intervals"]["2"] == unrestricted
-    assert allowed_hours_payload["args"]["intervals"]["3"] == unrestricted
+    day_one = allowed_hours_payload["args"]["intervals"]["1"]
+    day_two = allowed_hours_payload["args"]["intervals"]["2"]
+    assert day_one["9"] == {"STARTMIN": 0, "ENDMIN": 60, "UACC": 0}
+    assert day_one["10"] == {"STARTMIN": 0, "ENDMIN": 60, "UACC": 0}
+    assert day_one["15"] == {"STARTMIN": 0, "ENDMIN": 60, "UACC": 0}
+    assert day_one["16"] == {"STARTMIN": 0, "ENDMIN": 60, "UACC": 0}
+    assert day_one["17"] == {"STARTMIN": 0, "ENDMIN": 30, "UACC": 0}
+    assert len(day_two) == 24
+    assert day_two["0"] == {"STARTMIN": 0, "ENDMIN": 60, "UACC": 0}
+    assert day_two["23"] == {"STARTMIN": 0, "ENDMIN": 60, "UACC": 0}
 
     AgentConnectionManager.unregister(system_id)
 
@@ -280,6 +290,33 @@ def test_agent_client_parser_missing_lines():
     }
     success, msg = client.set_allowed_hours("john", intervals)
     assert success
+
+
+def test_agent_client_rejects_disjoint_same_hour_intervals():
+    client = AgentClient(system_id="unused")
+
+    class MockInterval:
+        def __init__(self, start_hour, start_minute, end_hour, end_minute):
+            self.is_enabled = True
+            self.start_hour = start_hour
+            self.start_minute = start_minute
+            self.end_hour = end_hour
+            self.end_minute = end_minute
+            self.sort_order = 0
+
+        def is_valid_interval(self):
+            return True
+
+    intervals = {
+        1: [
+            MockInterval(9, 0, 9, 15),
+            MockInterval(9, 30, 9, 45),
+        ]
+    }
+
+    success, msg = client.set_allowed_hours("john", intervals)
+    assert not success
+    assert "cannot represent" in msg
 
 
 def test_parse_agent_alert_timestamp():

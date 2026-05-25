@@ -15,7 +15,7 @@ This project uses a server-agent architecture: the Flask server hosts the Web UI
 - **Persistent host identity**: Each client stores a generated UUID (`system_id`), so DHCP and other IP changes do not break mappings, while the UI prefers the current hostname for readability.
 - **Pending-device approval flow**: New devices can remain in a pending state until an administrator approves them in the Web UI.
 - **Offline-safe command queueing**: The server can queue changes for offline systems and apply them when the agent reconnects.
-- **Command whitelist on clients**: The agent only accepts a fixed set of TimeKpr-related actions rather than arbitrary shell commands.
+- **D-Bus-backed client control**: The agent maps a fixed set of TimeKpr-related actions onto the upstream TimeKpr D-Bus API instead of executing `timekpra` commands.
 
 ---
 
@@ -39,7 +39,7 @@ graph TD
 ### Prerequisites
 
 - **Docker and Docker Compose** on the server machine, unless you are doing a manual server install
-- **TimeKpr-nExT** installed on each client machine you want to manage
+- **TimeKpr-nExT** installed on each client machine you want to manage, with its system D-Bus service available to privileged callers
 - **Rust toolchain** only if you plan to build the agent from source instead of downloading a release
 
 ---
@@ -257,8 +257,8 @@ Notes:
 
 - **Commands are not applied**:
   - Ensure the agent service is running as `root`, because TimeKpr administrative changes require elevated privileges.
-  - Confirm that TimeKpr-nExT is installed and `timekpra` is available on the client.
-  - Review recent agent logs for command failures or sudo errors.
+  - Confirm that TimeKpr-nExT is installed and the `com.timekpr.server` system-bus service is reachable on the client.
+  - Review recent agent logs for D-Bus or permission errors.
 
 ---
 

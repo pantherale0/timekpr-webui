@@ -1,3 +1,5 @@
+mod timekpr_dbus;
+
 use chrono::{SecondsFormat, Utc};
 use futures_util::{SinkExt, StreamExt};
 use hmac::{Hmac, Mac};
@@ -5,10 +7,12 @@ use logind_zbus::manager::ManagerProxy;
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;
 use std::collections::HashMap;
+use std::convert::TryFrom;
 use std::fs;
 use std::path::Path;
 use std::process::Command;
 use std::time::Duration;
+use timekpr_dbus::{AllowedHoursDay, TimekprDbusClient};
 use tokio::sync::{mpsc, watch};
 use tokio::task::JoinHandle;
 use tokio::time::sleep;
@@ -169,87 +173,146 @@ fn get_system_hostname() -> Option<String> {
     None
 }
 
-fn execute_command(cmd_args: &[&str]) -> (i32, String, String) {
-    println!("Executing command: {:?}", cmd_args);
-    let output = Command::new(cmd_args[0]).args(&cmd_args[1..]).output();
+fn build_full_access_day() -> AllowedHoursDay {
+    let mut day_map = AllowedHoursDay::new();
+    for hour in 0..24 {
+        day_map.insert(
+            hour.to_string(),
+            HashMap::from([
+                ("STARTMIN".to_string(), 0),
+                ("ENDMIN".to_string(), 60),
+                ("UACC".to_string(), 0),
+            ]),
+        );
+    }
+    day_map
+}
 
-    match output {
-        Ok(out) => {
-            let exit_code = out.status.code().unwrap_or(-1);
-            let stdout = String::from_utf8_lossy(&out.stdout).into_owned();
-            let stderr = String::from_utf8_lossy(&out.stderr).into_owned();
-            (exit_code, stdout, stderr)
+fn parse_day_hours(value: &serde_json::Value, day_str: &str) -> Result<AllowedHoursDay, String> {
+    let day_object = value
+        .as_object()
+        .ok_or_else(|| format!("Allowed-hours payload for day {day_str} must be an object"))?;
+
+    let mut parsed = AllowedHoursDay::new();
+    for (hour_key, spec_value) in day_object {
+        let spec_object = spec_value.as_object().ok_or_else(|| {
+            format!("Allowed-hours spec for day {day_str}, hour {hour_key} must be an object")
+        })?;
+
+        let mut spec = HashMap::new();
+        for field in ["STARTMIN", "ENDMIN", "UACC"] {
+            let raw = spec_object
+                .get(field)
+                .and_then(|value| value.as_i64())
+                .ok_or_else(|| {
+                    format!(
+                        "Allowed-hours spec for day {day_str}, hour {hour_key} is missing integer field {field}"
+                    )
+                })?;
+            let parsed_value = i32::try_from(raw).map_err(|_| {
+                format!(
+                    "Allowed-hours spec for day {day_str}, hour {hour_key} has out-of-range field {field}"
+                )
+            })?;
+            spec.insert(field.to_string(), parsed_value);
         }
-        Err(e) => (-1, "".to_string(), format!("Command execution failed: {}", e)),
+
+        parsed.insert(hour_key.clone(), spec);
     }
+
+    Ok(parsed)
 }
 
-fn execute_command_with_sudo(cmd_args: &[&str]) -> (i32, String, String) {
-    let (code, stdout, stderr) = execute_command(cmd_args);
-    if code != 0 {
-        println!("Command failed (code {}), trying with sudo...", code);
-        let mut sudo_args = vec!["sudo"];
-        sudo_args.extend_from_slice(cmd_args);
-        execute_command(&sudo_args)
-    } else {
-        (code, stdout, stderr)
+fn schedule_to_day_limits(
+    schedule: &serde_json::Map<String, serde_json::Value>,
+) -> Result<(Vec<String>, Vec<i32>), String> {
+    let day_order = [
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday",
+        "saturday",
+        "sunday",
+    ];
+
+    let mut allowed_days = Vec::new();
+    let mut day_limits = Vec::new();
+
+    for (index, day_name) in day_order.iter().enumerate() {
+        let hours = schedule
+            .get(*day_name)
+            .and_then(|value| value.as_f64())
+            .unwrap_or(0.0);
+
+        if hours.is_sign_negative() {
+            return Err(format!("Schedule value for {day_name} must not be negative"));
+        }
+
+        if hours > 0.0 {
+            allowed_days.push((index + 1).to_string());
+        }
+
+        let seconds = (hours * 3600.0).round();
+        if !(0.0..=(24.0 * 3600.0)).contains(&seconds) {
+            return Err(format!("Schedule value for {day_name} is out of range"));
+        }
+        day_limits.push(seconds as i32);
     }
+
+    Ok((allowed_days, day_limits))
 }
 
-fn handle_command(action: &str, username: &str, args: &serde_json::Value) -> (bool, String, serde_json::Value) {
+async fn handle_command(action: &str, username: &str, args: &serde_json::Value) -> (bool, String, serde_json::Value) {
+    let client = match TimekprDbusClient::connect().await {
+        Ok(client) => client,
+        Err(message) => return (false, message, serde_json::json!({})),
+    };
+
     match action {
         "validate_user" => {
-            let cmd = ["timekpra", "--userinfo", username];
-            let (code, stdout, stderr) = execute_command(&cmd);
-
-            let (code, stdout, stderr) = if code != 0 {
-                let cmd_sudo = ["sudo", "timekpra", "--userinfo", username];
-                execute_command(&cmd_sudo)
-            } else {
-                (code, stdout, stderr)
-            };
-
-            let mut enriched_stdout = stdout.clone();
-            if code == 0 && !stdout.contains("LINUX_UID:") {
-                let uid_cmd = ["id", "-u", username];
-                let (uid_code, uid_stdout, _) = execute_command_with_sudo(&uid_cmd);
-                if uid_code == 0 {
-                    let uid_clean = uid_stdout.trim();
-                    if !uid_clean.is_empty() {
-                        if !enriched_stdout.ends_with('\n') {
-                            enriched_stdout.push('\n');
-                        }
-                        enriched_stdout.push_str(&format!("LINUX_UID: {}\n", uid_clean));
-                    }
-                }
-            }
-
-            let data = serde_json::json!({
-                "exit_code": code,
-                "stdout": enriched_stdout,
-                "stderr": stderr
-            });
-
-            if stdout.contains("configuration is not found") || stderr.contains("configuration is not found") {
-                (false, format!("User '{}' configuration not found", username), data)
-            } else if code == 0 {
-                (true, "User validated successfully".to_string(), data)
-            } else {
-                (false, format!("Validation command failed: {}", stderr), data)
+            match client.get_user_information(username).await {
+                Ok((result, _message, config)) if result == 0 => (
+                    true,
+                    "User validated successfully".to_string(),
+                    serde_json::json!({ "config": config }),
+                ),
+                Ok((_result, message, _config)) => (
+                    false,
+                    if message.trim().is_empty() {
+                        format!("User '{}' configuration not found", username)
+                    } else {
+                        message
+                    },
+                    serde_json::json!({}),
+                ),
+                Err(message) => (false, message, serde_json::json!({})),
             }
         }
         "modify_time_left" => {
             let op = args.get("operation").and_then(|v| v.as_str()).unwrap_or("+");
-            let secs = args.get("seconds").and_then(|v| v.as_u64()).unwrap_or(0);
+            let secs = args.get("seconds").and_then(|v| v.as_i64()).unwrap_or(0);
+            let secs = match i32::try_from(secs) {
+                Ok(value) if value >= 0 => value,
+                _ => return (false, "seconds must be a non-negative integer".to_string(), serde_json::json!({})),
+            };
 
-            let secs_str = secs.to_string();
-            let cmd = ["timekpra", "--settimeleft", username, op, &secs_str];
-            let (code, _stdout, stderr) = execute_command_with_sudo(&cmd);
-
-            if code == 0 {
-                (true, format!("Successfully modified time: {}{} seconds", op, secs), serde_json::json!({}))
-            } else {
-                (false, format!("Failed to modify time: {}", stderr), serde_json::json!({}))
+            match client.set_time_left(username, op, secs).await {
+                Ok((result, _message)) if result == 0 => (
+                    true,
+                    format!("Successfully modified time: {}{} seconds", op, secs),
+                    serde_json::json!({}),
+                ),
+                Ok((_result, message)) => (
+                    false,
+                    if message.trim().is_empty() {
+                        "Failed to modify time".to_string()
+                    } else {
+                        message
+                    },
+                    serde_json::json!({}),
+                ),
+                Err(message) => (false, message, serde_json::json!({})),
             }
         }
         "set_weekly_time_limits" => {
@@ -258,41 +321,45 @@ fn handle_command(action: &str, username: &str, args: &serde_json::Value) -> (bo
                 None => return (false, "Missing 'schedule' argument".to_string(), serde_json::json!({})),
             };
 
-            let day_order = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
-
-            let mut allowed_days = Vec::new();
-            for (i, day) in day_order.iter().enumerate() {
-                let hours = schedule.get(*day).and_then(|v| v.as_f64()).unwrap_or(0.0);
-                if hours > 0.0 {
-                    allowed_days.push((i + 1).to_string());
-                }
-            }
+            let (allowed_days, day_limits) = match schedule_to_day_limits(schedule) {
+                Ok(value) => value,
+                Err(message) => return (false, message, serde_json::json!({})),
+            };
 
             if allowed_days.is_empty() {
                 return (false, "No allowed days with time limits configured".to_string(), serde_json::json!({}));
             }
 
-            let allowed_days_str = allowed_days.join(";");
-            let cmd_days = ["timekpra", "--setalloweddays", username, &allowed_days_str];
-            let (code_days, _, err_days) = execute_command_with_sudo(&cmd_days);
-            if code_days != 0 {
-                return (false, format!("Failed to set allowed days: {}", err_days), serde_json::json!({}));
+            let (days_result, days_message) = match client.set_allowed_days(username, &allowed_days).await {
+                Ok(result) => result,
+                Err(message) => return (false, message, serde_json::json!({})),
+            };
+            if days_result != 0 {
+                return (
+                    false,
+                    if days_message.trim().is_empty() {
+                        "Failed to set allowed days".to_string()
+                    } else {
+                        days_message
+                    },
+                    serde_json::json!({}),
+                );
             }
 
-            let mut time_limits = Vec::new();
-            for day in day_order.iter() {
-                let hours = schedule.get(*day).and_then(|v| v.as_f64()).unwrap_or(0.0);
-                if hours > 0.0 {
-                    let seconds = (hours * 3600.0) as u64;
-                    time_limits.push(seconds.to_string());
-                }
-            }
-
-            let limits_str = time_limits.join(";");
-            let cmd_limits = ["timekpra", "--settimelimits", username, &limits_str];
-            let (code_limits, _, err_limits) = execute_command_with_sudo(&cmd_limits);
-            if code_limits != 0 {
-                return (false, format!("Failed to set time limits: {}", err_limits), serde_json::json!({}));
+            let (limits_result, limits_message) = match client.set_time_limit_for_days(username, &day_limits).await {
+                Ok(result) => result,
+                Err(message) => return (false, message, serde_json::json!({})),
+            };
+            if limits_result != 0 {
+                return (
+                    false,
+                    if limits_message.trim().is_empty() {
+                        "Failed to set time limits".to_string()
+                    } else {
+                        limits_message
+                    },
+                    serde_json::json!({}),
+                );
             }
 
             (true, "Weekly time limits configured successfully".to_string(), serde_json::json!({}))
@@ -309,22 +376,39 @@ fn handle_command(action: &str, username: &str, args: &serde_json::Value) -> (bo
             let mut errors = Vec::new();
 
             for day_str in day_order {
-                let hours_val = match intervals.get(day_str) {
-                    Some(val) => val,
-                    None => continue,
+                let day_hours = if let Some(hours_val) = intervals.get(day_str) {
+                    match parse_day_hours(hours_val, day_str) {
+                        Ok(parsed) => parsed,
+                        Err(message) => {
+                            errors.push(format!("Day {}: {}", day_str, message));
+                            total_count += 1;
+                            continue;
+                        }
+                    }
+                } else {
+                    build_full_access_day()
                 };
-                let hour_str = match hours_val.as_str() {
-                    Some(s) => s,
-                    None => continue,
-                };
+
                 total_count += 1;
 
-                let cmd = ["timekpra", "--setallowedhours", username, day_str, hour_str];
-                let (code, _, err) = execute_command_with_sudo(&cmd);
-                if code == 0 {
-                    success_count += 1;
-                } else {
-                    errors.push(format!("Day {}: {}", day_str, err));
+                match client.set_allowed_hours(username, day_str, &day_hours).await {
+                    Ok((result, _message)) if result == 0 => {
+                        success_count += 1;
+                    }
+                    Ok((_result, message)) => {
+                        errors.push(format!(
+                            "Day {}: {}",
+                            day_str,
+                            if message.trim().is_empty() {
+                                "Failed to update allowed hours".to_string()
+                            } else {
+                                message
+                            }
+                        ));
+                    }
+                    Err(message) => {
+                        errors.push(format!("Day {}: {}", day_str, message));
+                    }
                 }
             }
 
@@ -784,7 +868,7 @@ async fn main() {
                                     correlation_id
                                 );
 
-                                let (success, message, data) = handle_command(&action, &username, &args);
+                                let (success, message, data) = handle_command(&action, &username, &args).await;
                                 let response = ClientMessage::CommandResponse {
                                     correlation_id,
                                     success,
@@ -836,7 +920,10 @@ async fn main() {
 
 #[cfg(test)]
 mod tests {
-    use super::{build_alert_message, is_user_session_class, ClientMessage};
+    use super::{
+        build_alert_message, is_user_session_class, parse_day_hours, schedule_to_day_limits,
+        ClientMessage,
+    };
 
     #[test]
     fn alert_messages_use_expected_shape() {
@@ -868,5 +955,35 @@ mod tests {
         assert!(is_user_session_class(Some("user-light")));
         assert!(!is_user_session_class(Some("greeter")));
         assert!(!is_user_session_class(None));
+    }
+
+    #[test]
+    fn schedule_conversion_preserves_all_days() {
+        let schedule = serde_json::json!({
+            "monday": 2.0,
+            "tuesday": 0.0,
+            "wednesday": 1.5,
+            "thursday": 0.0,
+            "friday": 0.0,
+            "saturday": 0.0,
+            "sunday": 0.25
+        });
+
+        let (allowed_days, day_limits) = schedule_to_day_limits(schedule.as_object().unwrap()).unwrap();
+        assert_eq!(allowed_days, vec!["1", "3", "7"]);
+        assert_eq!(day_limits, vec![7200, 0, 5400, 0, 0, 0, 900]);
+    }
+
+    #[test]
+    fn day_hours_parser_requires_expected_integer_fields() {
+        let payload = serde_json::json!({
+            "9": {"STARTMIN": 30, "ENDMIN": 60, "UACC": 0},
+            "10": {"STARTMIN": 0, "ENDMIN": 60, "UACC": 0}
+        });
+
+        let parsed = parse_day_hours(&payload, "1").unwrap();
+        assert_eq!(parsed["9"]["STARTMIN"], 30);
+        assert_eq!(parsed["9"]["ENDMIN"], 60);
+        assert_eq!(parsed["10"]["UACC"], 0);
     }
 }

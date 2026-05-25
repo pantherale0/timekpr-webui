@@ -29,7 +29,7 @@ class DummyWS:
                 AgentConnectionManager.route_response(correlation_id, {
                     "success": True,
                     "message": "Success",
-                    "data": {"stdout": "TIME_SPENT_DAY: 450\n"}
+                    "data": {"config": {"TIME_SPENT_DAY": 450, "TIME_LEFT_DAY": 1000}}
                 })
         except Exception:
             pass
@@ -185,7 +185,11 @@ def test_task_manager_update_user_data(app, db_session):
         if json.loads(message).get("action") == "set_allowed_hours"
     ]
     assert allowed_hours_calls
-    assert allowed_hours_calls[-1]["args"]["intervals"]["1"] == "9;10;11;12;13;14;15;16;18[30-59];19"
+    day_one = allowed_hours_calls[-1]["args"]["intervals"]["1"]
+    assert day_one["9"] == {"STARTMIN": 0, "ENDMIN": 60, "UACC": 0}
+    assert day_one["16"] == {"STARTMIN": 0, "ENDMIN": 60, "UACC": 0}
+    assert day_one["18"] == {"STARTMIN": 30, "ENDMIN": 60, "UACC": 0}
+    assert day_one["19"] == {"STARTMIN": 0, "ENDMIN": 60, "UACC": 0}
 
     # 5. User validation failure handling
     # If validate_user fails or connection throws error

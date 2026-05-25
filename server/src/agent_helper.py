@@ -245,7 +245,7 @@ class AgentClient:
         self.system_id = system_id
 
     def _parse_timekpr_output(self, output):
-        """Parse the output of timekpra --userinfo command into a dictionary"""
+        """Parse the legacy CLI output format into a dictionary"""
         config_dict = {}
         
         # Regular expression to match key-value pairs
@@ -275,9 +275,96 @@ class AgentClient:
                 
         return config_dict
 
+    def _full_access_day_hours(self):
+        return {
+            str(hour): {
+                "STARTMIN": 0,
+                "ENDMIN": 60,
+                "UACC": 0,
+            }
+            for hour in range(24)
+        }
+
+    def _interval_to_dbus_hours(self, interval):
+        if not interval or not interval.is_enabled or not interval.is_valid_interval():
+            return {}
+
+        if interval.start_minute == 0 and interval.end_minute == 0:
+            return {
+                str(hour): {"STARTMIN": 0, "ENDMIN": 60, "UACC": 0}
+                for hour in range(interval.start_hour, interval.end_hour)
+            }
+
+        result = {}
+        current_hour = interval.start_hour
+
+        if current_hour == interval.end_hour:
+            result[str(current_hour)] = {
+                "STARTMIN": interval.start_minute,
+                "ENDMIN": interval.end_minute,
+                "UACC": 0,
+            }
+            return result
+
+        result[str(current_hour)] = {
+            "STARTMIN": interval.start_minute,
+            "ENDMIN": 60,
+            "UACC": 0,
+        }
+        current_hour += 1
+
+        while current_hour < interval.end_hour:
+            result[str(current_hour)] = {
+                "STARTMIN": 0,
+                "ENDMIN": 60,
+                "UACC": 0,
+            }
+            current_hour += 1
+
+        if interval.end_minute > 0:
+            result[str(interval.end_hour)] = {
+                "STARTMIN": 0,
+                "ENDMIN": interval.end_minute,
+                "UACC": 0,
+            }
+
+        return result
+
+    def _build_dbus_day_hours(self, day_num, day_intervals):
+        if not isinstance(day_intervals, list):
+            day_intervals = [day_intervals]
+
+        ordered_intervals = sorted(
+            [
+                interval for interval in day_intervals
+                if interval and interval.is_enabled and interval.is_valid_interval()
+            ],
+            key=lambda interval: (
+                interval.start_hour * 60 + interval.start_minute,
+                interval.end_hour * 60 + interval.end_minute,
+                getattr(interval, 'sort_order', 0),
+            ),
+        )
+
+        if not ordered_intervals:
+            return self._full_access_day_hours()
+
+        day_hours = {}
+        for interval in ordered_intervals:
+            for hour_key, hour_spec in self._interval_to_dbus_hours(interval).items():
+                existing = day_hours.get(hour_key)
+                if existing is not None and existing != hour_spec:
+                    raise ValueError(
+                        f"Day {day_num} contains multiple disjoint intervals within hour {hour_key}, "
+                        "which the TimeKpr D-Bus API cannot represent"
+                    )
+                day_hours[hour_key] = hour_spec
+
+        return day_hours
+
     def validate_user(self, username):
         """
-        Check if a user exists by running the timekpra --userinfo command via Agent
+        Check if a user exists by querying the agent for normalized user config
         Returns: (is_valid, message, config_dict)
         """
         success, message, data = AgentConnectionManager.send_command_sync(
@@ -285,17 +372,22 @@ class AgentClient:
         )
         if not success:
             return False, message, None
-        
-        stdout = ""
+
+        config_dict = None
         if isinstance(data, dict):
-            stdout = data.get("stdout", "")
-            
-        config_dict = self._parse_timekpr_output(stdout)
+            config_payload = data.get("config")
+            if isinstance(config_payload, dict):
+                config_dict = config_payload
+
+        if config_dict is None:
+            stdout = data.get("stdout", "") if isinstance(data, dict) else ""
+            config_dict = self._parse_timekpr_output(stdout)
+
         return True, message, config_dict
 
     def modify_time_left(self, username, operation, seconds):
         """
-        Modify time left for a user using timekpra --settimeleft command via Agent
+        Modify time left for a user through the agent
         Returns: (success, message)
         """
         success, message, _ = AgentConnectionManager.send_command_sync(
@@ -308,7 +400,7 @@ class AgentClient:
 
     def set_weekly_time_limits(self, username, schedule_dict):
         """
-        Set daily time limits for a user using timekpra commands via Agent
+        Set daily time limits for a user through the agent
         Returns: (success, message)
         """
         success, message, _ = AgentConnectionManager.send_command_sync(
@@ -320,37 +412,18 @@ class AgentClient:
 
     def set_allowed_hours(self, username, intervals_dict):
         """
-        Set allowed hours for a user using timekpra --setallowedhours command via Agent
+        Set allowed hours for a user through the agent
         Returns: (success, message)
         """
-        intervals_serial = {}
         day_order = [1, 2, 3, 4, 5, 6, 7]  # Monday to Sunday
-        unrestricted_hours = ';'.join([str(h) for h in range(24)])
-        
+
+        intervals_serial = {}
         for day_num in day_order:
             day_intervals = intervals_dict.get(day_num) or []
-            if not isinstance(day_intervals, list):
-                day_intervals = [day_intervals]
-
-            ordered_intervals = sorted(
-                [
-                    interval for interval in day_intervals
-                    if interval and interval.is_enabled and interval.is_valid_interval()
-                ],
-                key=lambda interval: (
-                    interval.start_hour * 60 + interval.start_minute,
-                    interval.end_hour * 60 + interval.end_minute,
-                    getattr(interval, 'sort_order', 0),
-                ),
-            )
-
-            hour_specs = []
-            for interval in ordered_intervals:
-                interval_specs = interval.to_timekpr_format()
-                if interval_specs:
-                    hour_specs.extend(interval_specs)
-
-            intervals_serial[str(day_num)] = ';'.join(hour_specs) if hour_specs else unrestricted_hours
+            try:
+                intervals_serial[str(day_num)] = self._build_dbus_day_hours(day_num, day_intervals)
+            except ValueError as exc:
+                return False, str(exc)
 
         success, message, _ = AgentConnectionManager.send_command_sync(
             self.system_id, "set_allowed_hours", username, {
