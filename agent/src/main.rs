@@ -16,12 +16,17 @@ type HmacSha256 = Hmac<Sha256>;
 struct Config {
     server_url: String,
     system_id: Option<String>,
-    agent_token: String,
+    registration_token: Option<String>,
+    agent_token: Option<String>,
 }
 
 #[derive(Deserialize, Debug)]
 #[serde(tag = "type")]
 enum ServerMessage {
+    #[serde(rename = "pairing_status")]
+    PairingStatus { status: String },
+    #[serde(rename = "pairing_approved")]
+    PairingApproved { token: String },
     #[serde(rename = "challenge")]
     Challenge { challenge: String },
     #[serde(rename = "auth_result")]
@@ -38,6 +43,11 @@ enum ServerMessage {
 #[derive(Serialize, Debug)]
 #[serde(tag = "type")]
 enum ClientMessage {
+    #[serde(rename = "hello")]
+    Hello {
+        system_id: String,
+        registration_token: Option<String>,
+    },
     #[serde(rename = "register")]
     Register {
         system_id: String,
@@ -52,42 +62,45 @@ enum ClientMessage {
     },
 }
 
-fn load_or_create_config() -> Config {
-    // Try primary path (/etc/timekpr-agent/config.json), then fallback to local config.json
+fn get_config_path() -> String {
     let primary_dir = "/etc/timekpr-agent";
     let primary_path = format!("{}/config.json", primary_dir);
     let fallback_path = "config.json";
 
-    let config_path = if Path::new(&primary_path).exists() {
-        &primary_path
+    if Path::new(&primary_path).exists() {
+        primary_path
     } else if Path::new(fallback_path).exists() {
-        fallback_path
+        fallback_path.to_string()
     } else {
-        // Create primary directory if writeable, else local path
         if fs::create_dir_all(primary_dir).is_ok() {
-            &primary_path
+            primary_path
         } else {
-            fallback_path
+            fallback_path.to_string()
         }
-    };
+    }
+}
 
+fn load_or_create_config() -> Config {
+    let config_path = get_config_path();
     println!("Loading config from: {}", config_path);
 
-    let mut config = if let Ok(data) = fs::read_to_string(config_path) {
+    let mut config = if let Ok(data) = fs::read_to_string(&config_path) {
         if let Ok(c) = serde_json::from_str::<Config>(&data) {
             c
         } else {
             Config {
                 server_url: "ws://localhost:5000/ws".to_string(),
                 system_id: None,
-                agent_token: "super-secure-pre-shared-agent-token".to_string(),
+                registration_token: None,
+                agent_token: None,
             }
         }
     } else {
         Config {
             server_url: "ws://localhost:5000/ws".to_string(),
             system_id: None,
-            agent_token: "super-secure-pre-shared-agent-token".to_string(),
+            registration_token: None,
+            agent_token: None,
         }
     };
 
@@ -102,7 +115,7 @@ fn load_or_create_config() -> Config {
 
         // Try to save updated config back
         if let Ok(serialized) = serde_json::to_string_pretty(&config) {
-            if let Err(e) = fs::write(config_path, serialized) {
+            if let Err(e) = fs::write(&config_path, serialized) {
                 eprintln!("Warning: Failed to save updated config to {}: {}", config_path, e);
             }
         }
@@ -277,7 +290,8 @@ async fn main() {
         let config = load_or_create_config();
         let server_url = &config.server_url;
         let system_id = config.system_id.clone().unwrap();
-        let agent_token = &config.agent_token;
+        let agent_token = config.agent_token.clone();
+        let registration_token = config.registration_token.clone();
 
         println!("Connecting to server: {}", server_url);
         
@@ -285,17 +299,58 @@ async fn main() {
             Ok((mut ws_stream, _)) => {
                 println!("WebSocket connected! Starting handshake...");
                 
+                // 1. Send initial hello message
+                let hello_msg = ClientMessage::Hello {
+                    system_id: system_id.clone(),
+                    registration_token,
+                };
+                let hello_json = serde_json::to_string(&hello_msg).unwrap();
+                if let Err(e) = ws_stream.send(Message::Text(hello_json)).await {
+                    eprintln!("Failed to send hello message: {}", e);
+                    sleep(Duration::from_secs(5)).await;
+                    continue;
+                }
+                println!("Sent hello message to server.");
+
                 let mut authenticated = false;
 
                 while let Some(msg_result) = ws_stream.next().await {
                     match msg_result {
                         Ok(Message::Text(text)) => {
                             match serde_json::from_str::<ServerMessage>(&text) {
+                                Ok(ServerMessage::PairingStatus { status }) => {
+                                    println!("Received pairing status: {}", status);
+                                    if status == "pending" {
+                                        println!("Device pairing status is PENDING approval. Please approve this device in the server's admin panel.");
+                                    }
+                                }
+                                Ok(ServerMessage::PairingApproved { token }) => {
+                                    println!("Pairing approved! Received secure token.");
+                                    let mut updated_config = config.clone();
+                                    updated_config.agent_token = Some(token);
+                                    let config_path = get_config_path();
+                                    if let Ok(serialized) = serde_json::to_string_pretty(&updated_config) {
+                                        if let Err(e) = fs::write(&config_path, serialized) {
+                                            eprintln!("Error saving agent token to config: {}", e);
+                                        } else {
+                                            println!("Successfully saved agent token to config! Reconnecting in 2 seconds...");
+                                        }
+                                    }
+                                    break;
+                                }
                                 Ok(ServerMessage::Challenge { challenge }) => {
                                     println!("Received authentication challenge: {}", challenge);
                                     
-                                    // Sign the challenge: HMAC-SHA256(AGENT_TOKEN, challenge + system_id)
-                                    let mut mac = HmacSha256::new_from_slice(agent_token.as_bytes())
+                                    let token_str = match &agent_token {
+                                        Some(t) => t,
+                                        None => {
+                                            eprintln!("Received authentication challenge but no agent token is configured!");
+                                            break;
+                                        }
+                                    };
+
+                                    // Sign the challenge: HMAC-SHA256(agent_token, challenge + system_id)
+                                    let mut mac = HmacSha256::new_from_slice(token_str.as_bytes())
                                         .expect("HMAC key setup failed");
                                     mac.update(format!("{}{}", challenge, system_id).as_bytes());
                                     let signature_bytes = mac.finalize().into_bytes();

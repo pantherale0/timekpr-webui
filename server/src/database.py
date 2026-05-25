@@ -86,11 +86,26 @@ class Settings(db.Model):
                 return password == 'admin'
         return cls.check_password(password, hashed_password)
 
+class AgentDevice(db.Model):
+    __tablename__ = 'agent_device'
+    system_id = db.Column(db.String(50), primary_key=True)  # Unique Host UUID
+    system_ip = db.Column(db.String(50), nullable=True)     # Snapshotted connection IP
+    status = db.Column(db.String(20), default='pending')    # pending, approved, rejected
+    secure_token = db.Column(db.String(64), nullable=True)  # Dynamically generated token
+    date_added = db.Column(db.DateTime, default=datetime.utcnow)
+    last_seen = db.Column(db.DateTime, nullable=True)
+    
+    # Relationship back to managed users on this device
+    managed_users = db.relationship('ManagedUser', backref='device', lazy=True)
+
+    def __repr__(self):
+        return f'<AgentDevice {self.system_id} [{self.status}]>'
+
 class ManagedUser(db.Model):
     __tablename__ = 'managed_user'
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(50), nullable=False)
-    system_id = db.Column(db.String(50), nullable=True)
+    system_id = db.Column(db.String(50), db.ForeignKey('agent_device.system_id'), nullable=True)
     system_ip = db.Column(db.String(50), nullable=False)
     is_valid = db.Column(db.Boolean, default=False)
     date_added = db.Column(db.DateTime, default=datetime.utcnow)

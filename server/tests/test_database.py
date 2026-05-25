@@ -1,0 +1,257 @@
+from datetime import datetime, date, timedelta
+from src.database import (
+    coerce_time_spent_day,
+    Settings,
+    AgentDevice,
+    ManagedUser,
+    UserTimeUsage,
+    UserWeeklySchedule,
+    UserDailyTimeInterval,
+    db
+)
+
+def test_coerce_time_spent_day():
+    assert coerce_time_spent_day(None) == 0
+    assert coerce_time_spent_day(True) == 0
+    assert coerce_time_spent_day(False) == 0
+    assert coerce_time_spent_day(42) == 42
+    assert coerce_time_spent_day([10, 20]) == 10
+    assert coerce_time_spent_day([]) == 0
+    assert coerce_time_spent_day(" 123 \n") == 123
+    assert coerce_time_spent_day("invalid") == 0
+
+def test_settings_model(db_session):
+    # Test setting and getting values
+    Settings.set_value("test_key", "test_value")
+    assert Settings.get_value("test_key") == "test_value"
+    assert Settings.get_value("nonexistent", "default") == "default"
+
+    # Test update existing
+    Settings.set_value("test_key", "new_value")
+    assert Settings.get_value("test_key") == "new_value"
+
+    # Test password hashing and verification
+    pw = "mysecretpassword"
+    hashed = Settings.hash_password(pw)
+    assert Settings.check_password(pw, hashed)
+    assert not Settings.check_password("wrong", hashed)
+
+    # Test set/check admin password
+    Settings.set_admin_password("admin123")
+    assert Settings.check_admin_password("admin123")
+    assert not Settings.check_admin_password("wrong")
+
+    # Test password migration (from plain text to hashed)
+    # Simulate old plain text password in DB
+    plain_password_setting = Settings(key="admin_password", value="oldplain")
+    db_session.add(plain_password_setting)
+    # Remove hashed password setting to trigger migration fallback
+    h = Settings.query.filter_by(key="admin_password_hash").first()
+    if h:
+        db_session.delete(h)
+    db_session.commit()
+
+    assert Settings.check_admin_password("oldplain")
+    # Verify migration occurred
+    assert Settings.get_value("admin_password") is None
+    assert Settings.get_value("admin_password_hash") is not None
+
+    # Test fallback to default when no password is set at all
+    db_session.delete(Settings.query.filter_by(key="admin_password_hash").first())
+    db_session.commit()
+    assert Settings.check_admin_password("admin")
+
+def test_agent_device_model(db_session):
+    device = AgentDevice(
+        system_id="dev-123",
+        system_ip="192.168.1.100",
+        status="pending",
+        secure_token="token-xyz"
+    )
+    db_session.add(device)
+    db_session.commit()
+
+    assert repr(device) == "<AgentDevice dev-123 [pending]>"
+    assert device.system_id == "dev-123"
+
+def test_managed_user_and_usage(db_session):
+    device = AgentDevice(system_id="dev-123", status="approved", secure_token="token")
+    db_session.add(device)
+    db_session.commit()
+
+    user = ManagedUser(
+        username="john",
+        system_id="dev-123",
+        system_ip="192.168.1.100",
+        is_valid=True,
+        last_config='{"TIME_SPENT_DAY": 1800, "LIMIT": 3600}'
+    )
+    db_session.add(user)
+    db_session.commit()
+
+    assert repr(user) == "<ManagedUser john@192.168.1.100>"
+    assert user.device == device
+    assert user.get_config_value("TIME_SPENT_DAY") == 1800
+    assert user.get_config_value("nonexistent") is None
+    
+    # Test invalid config JSON
+    user.last_config = "{invalid_json}"
+    db_session.commit()
+    assert user.get_config_value("ANY") is None
+    user.last_config = None
+    assert user.get_config_value("ANY") is None
+
+    # Test usage data
+    today = datetime.utcnow().date()
+    usage1 = UserTimeUsage(user_id=user.id, date=today, time_spent=1200)
+    usage2 = UserTimeUsage(user_id=user.id, date=today - timedelta(days=1), time_spent=2400)
+    db_session.add_all([usage1, usage2])
+    db_session.commit()
+
+    assert repr(usage1) == f"<UserTimeUsage john {today}: 1200>"
+
+    # Test get_recent_usage
+    recent = user.get_recent_usage(days=3)
+    today_str = today.strftime("%Y-%m-%d")
+    yesterday_str = (today - timedelta(days=1)).strftime("%Y-%m-%d")
+    assert recent[today_str] == 1200
+    assert recent[yesterday_str] == 2400
+    assert recent[(today - timedelta(days=2)).strftime("%Y-%m-%d")] == 0
+
+    # Test get_usage_weekly_grouped
+    weekly = user.get_usage_weekly_grouped(weeks=2)
+    assert len(weekly) == 2
+    assert sum(w["total"] for w in weekly) == 3600
+
+    # Test get_usage_monthly_grouped
+    monthly = user.get_usage_monthly_grouped(months=2)
+    assert len(monthly) == 2
+    assert sum(m["total"] for m in monthly) == 3600
+
+    # Test get_all_usage_monthly
+    all_monthly = user.get_all_usage_monthly()
+    assert len(all_monthly) in (1, 2)
+    assert sum(m["total"] for m in all_monthly) == 3600
+
+    # Test empty usages for grouped helpers
+    db_session.delete(usage1)
+    db_session.delete(usage2)
+    db_session.commit()
+    assert user.get_all_usage_monthly() == []
+
+def test_user_weekly_schedule(db_session):
+    user = ManagedUser(username="test_user", system_ip="127.0.0.1")
+    db_session.add(user)
+    db_session.commit()
+
+    schedule = UserWeeklySchedule(user_id=user.id)
+    db_session.add(schedule)
+    db_session.commit()
+
+    assert repr(schedule) == "<UserWeeklySchedule test_user>"
+
+    # test get_schedule_dict
+    s_dict = schedule.get_schedule_dict()
+    assert s_dict["monday"] == 0.0
+
+    # test set_schedule_from_dict
+    schedule.set_schedule_from_dict({
+        "monday": 2.5,
+        "tuesday": 3.0
+    })
+    assert schedule.monday_hours == 2.5
+    assert schedule.tuesday_hours == 3.0
+    assert schedule.wednesday_hours == 0.0
+    assert not schedule.is_synced
+
+    # test set_weekdays_hours
+    schedule.set_weekdays_hours(4.0)
+    assert schedule.monday_hours == 4.0
+    assert schedule.friday_hours == 4.0
+    assert schedule.saturday_hours == 0.0
+
+    # test has_pending_changes & mark_synced
+    assert schedule.has_pending_changes()
+    schedule.mark_synced()
+    assert not schedule.has_pending_changes()
+    assert schedule.last_synced is not None
+
+def test_user_daily_time_interval(db_session):
+    user = ManagedUser(username="test_user", system_ip="127.0.0.1")
+    db_session.add(user)
+    db_session.commit()
+
+    interval = UserDailyTimeInterval(
+        user_id=user.id,
+        day_of_week=1,
+        start_hour=9,
+        start_minute=30,
+        end_hour=17,
+        end_minute=0
+    )
+    db_session.add(interval)
+    db_session.commit()
+
+    assert repr(interval) == "<UserDailyTimeInterval test_user Day1 09:30-17:00>"
+    assert interval.get_time_range_string() == "09:30-17:00"
+    assert interval.get_day_name() == "Monday"
+
+    # test get_day_name bounds
+    interval.day_of_week = 8
+    assert interval.get_day_name() == "Unknown"
+    interval.day_of_week = 1
+
+    assert interval.is_valid_interval()
+    interval.start_hour = 18
+    assert not interval.is_valid_interval()
+    interval.start_hour = 9
+
+    # Sync helpers
+    interval.mark_synced()
+    assert interval.is_synced
+    interval.mark_modified()
+    assert not interval.is_synced
+
+    # to_timekpr_format
+    # Case: is_enabled = False
+    interval.is_enabled = False
+    assert interval.to_timekpr_format() is None
+    interval.is_enabled = True
+
+    # Case: full hour range (minutes are 0)
+    interval.start_minute = 0
+    interval.end_minute = 0
+    assert interval.to_timekpr_format() == ["9", "10", "11", "12", "13", "14", "15", "16"]
+
+    # Case: partial hours in multiple hours range
+    interval.start_minute = 30
+    interval.end_minute = 15
+    assert interval.to_timekpr_format() == ["9[30-59]", "10", "11", "12", "13", "14", "15", "16", "17[0-15]"]
+
+    # Case: same hour partial range
+    interval.start_hour = 9
+    interval.end_hour = 9
+    interval.start_minute = 15
+    interval.end_minute = 45
+    assert interval.to_timekpr_format() == ["9[15-45]"]
+
+def test_database_model_missing_lines(db_session):
+    user = ManagedUser(username="jack", system_ip="127.0.0.1")
+    db_session.add(user)
+    db_session.commit()
+
+    interval = UserDailyTimeInterval(
+        user_id=user.id,
+        day_of_week=1,
+        start_hour=9,
+        start_minute=0,
+        end_hour=17,
+        end_minute=15
+    )
+    db_session.add(interval)
+    db_session.commit()
+    res = interval.to_timekpr_format()
+    assert res == ["9", "10", "11", "12", "13", "14", "15", "16", "17[0-15]"]
+
+    monthly = user.get_usage_monthly_grouped(months=24)
+    assert len(monthly) == 24

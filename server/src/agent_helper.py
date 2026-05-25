@@ -9,12 +9,20 @@ from queue import Queue, Empty
 
 logger = logging.getLogger(__name__)
 
-# Pre-shared token retrieved from environment or a secure default
-AGENT_TOKEN = os.environ.get('AGENT_TOKEN', 'super-secure-pre-shared-agent-token').encode('utf-8')
+# Optional registration token firewall for new dynamic pairings
+REGISTRATION_TOKEN = os.environ.get('REGISTRATION_TOKEN')
 
-class AgentConnectionManager:
-    # Active connections: system_id -> ws_object
+class AgentConnectionManagerMeta(type):
+    @property
+    def REGISTRATION_TOKEN(cls):
+        return REGISTRATION_TOKEN
+
+class AgentConnectionManager(metaclass=AgentConnectionManagerMeta):
+    # Active connections (fully approved & authenticated): system_id -> ws_object
     active_connections = {}
+    
+    # Pending connections (unapproved devices): system_id -> ws_object
+    pending_connections = {}
     
     # Dynamic IP mapping: system_id -> remote_ip
     active_ips = {}
@@ -41,7 +49,25 @@ class AgentConnectionManager:
                 del cls.active_connections[system_id + "_ip"]
             del cls.active_connections[system_id]
             logger.info(f"Agent unregistered: {system_id}")
-            
+
+    @classmethod
+    def register_pending(cls, system_id, ws):
+        """Register an active connection in a pending state"""
+        cls.pending_connections[system_id] = ws
+        logger.info(f"Agent registered in PENDING state: {system_id}")
+
+    @classmethod
+    def unregister_pending(cls, system_id):
+        """Unregister a pending connection"""
+        if system_id in cls.pending_connections:
+            del cls.pending_connections[system_id]
+            logger.info(f"Agent PENDING connection removed: {system_id}")
+
+    @classmethod
+    def get_pending_connection(cls, system_id):
+        """Get the active pending connection for a system_id"""
+        return cls.pending_connections.get(system_id)
+        
     @classmethod
     def get_connection(cls, system_id):
         """Get the active WebSocket connection for a system_id"""
@@ -51,12 +77,12 @@ class AgentConnectionManager:
     def is_online(cls, system_id):
         """Check if a system_id is currently online"""
         return system_id in cls.active_connections
-
+ 
     @classmethod
     def get_ip(cls, system_id):
         """Get the last snapshotted IP address for a system_id"""
         return cls.active_connections.get(system_id + "_ip", "Offline")
-
+ 
     @classmethod
     def route_response(cls, correlation_id, response_data):
         """Route a response message from client back to the waiting thread"""
@@ -112,10 +138,17 @@ class AgentConnectionManager:
 
     @classmethod
     def verify_signature(cls, challenge, system_id, signature_hex):
-        """Verify the HMAC-SHA256 signature of challenge + system_id"""
+        """Verify the HMAC-SHA256 signature of challenge + system_id using the device-specific token"""
         try:
+            from src.database import AgentDevice
+            device = AgentDevice.query.get(system_id)
+            if not device or not device.secure_token or device.status != 'approved':
+                logger.warning(f"Signature verification rejected: Device {system_id} not approved or missing token")
+                return False
+                
+            token_bytes = device.secure_token.encode('utf-8')
             msg = (challenge + system_id).encode('utf-8')
-            expected = hmac.new(AGENT_TOKEN, msg, hashlib.sha256).hexdigest()
+            expected = hmac.new(token_bytes, msg, hashlib.sha256).hexdigest()
             return hmac.compare_digest(expected, signature_hex)
         except Exception as e:
             logger.error(f"Error during signature verification: {e}")

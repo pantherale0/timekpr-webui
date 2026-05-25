@@ -25,7 +25,7 @@ class OIDCHelper:
 
     def _fetch_discovery(self):
         """Fetches OIDC discovery document and caches it."""
-        if self._endpoints:
+        if self._endpoints is not None:
             return self._endpoints
 
         if not self.issuer_url:

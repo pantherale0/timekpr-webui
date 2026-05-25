@@ -13,6 +13,7 @@ from src.database import (
     UserWeeklySchedule,
     UserDailyTimeInterval,
     coerce_time_spent_day,
+    AgentDevice,
 )
 from src.agent_helper import AgentClient, AgentConnectionManager
 from flask_sock import Sock
@@ -88,75 +89,132 @@ def inject_timezone():
 
 import secrets
 
-@sock.route('/ws')
 def ws_agent_handler(ws):
     """
     WebSocket endpoint for client agents.
-    Handles HMAC challenge-response handshake and routes incoming messages.
+    Handles dynamic pairing, manual approval review, and HMAC challenge-response handshake.
     """
     remote_ip = request.remote_addr or "127.0.0.1"
-    # To handle proxy environments (like Docker or Nginx), check X-Forwarded-For
     if request.headers.get("X-Forwarded-For"):
         remote_ip = request.headers.get("X-Forwarded-For").split(",")[0].strip()
         
     logging.info(f"WebSocket connection attempt from {remote_ip}")
     
-    # 1. Generate challenge
-    challenge = secrets.token_hex(32)
-    try:
-        ws.send(json.dumps({
-            "type": "challenge",
-            "challenge": challenge
-        }))
-    except Exception as e:
-        logging.error(f"Failed to send challenge: {e}")
-        return
-
-    # 2. Await authentication / registration response
+    # 1. Await initial "hello" registration message
     system_id = None
     try:
-        auth_msg_raw = ws.receive(timeout=10)
-        if not auth_msg_raw:
-            logging.warning("Handshake timeout or empty message")
-            return
-        
-        auth_msg = json.loads(auth_msg_raw)
-        if auth_msg.get("type") != "register":
-            logging.warning(f"Unexpected message type during handshake: {auth_msg.get('type')}")
-            ws.send(json.dumps({"type": "auth_result", "success": False, "message": "Expected 'register' type"}))
+        hello_msg_raw = ws.receive(timeout=10)
+        if not hello_msg_raw:
+            logging.warning("Handshake timeout: empty hello message")
             return
             
-        system_id = auth_msg.get("system_id")
-        signature = auth_msg.get("signature")
-        
-        if not system_id or not signature:
-            logging.warning("Handshake missing system_id or signature")
-            ws.send(json.dumps({"type": "auth_result", "success": False, "message": "Missing system_id or signature"}))
+        hello_msg = json.loads(hello_msg_raw)
+        if hello_msg.get("type") != "hello":
+            logging.warning(f"Unexpected initial message type: {hello_msg.get('type')}")
+            ws.send(json.dumps({"type": "auth_result", "success": False, "message": "Expected 'hello' type"}))
             return
             
-        # Verify the signature
-        if not AgentConnectionManager.verify_signature(challenge, system_id, signature):
-            logging.warning(f"Authentication failed for system {system_id} (invalid signature)")
-            ws.send(json.dumps({"type": "auth_result", "success": False, "message": "Invalid authentication signature"}))
-            return
-            
-        # Authentication successful!
-        AgentConnectionManager.register(system_id, ws, remote_ip)
-        ws.send(json.dumps({"type": "auth_result", "success": True, "message": "Authenticated successfully"}))
+        system_id = hello_msg.get("system_id")
+        reg_token = hello_msg.get("registration_token")
         
-        # Dynamically update the system_ip snapshot for all managed users on this host!
+        if not system_id:
+            logging.warning("Initial hello missing system_id")
+            ws.send(json.dumps({"type": "auth_result", "success": False, "message": "Missing system_id"}))
+            return
+
+        # 2. Check and enforce Registration Token firewall
+        expected_reg_token = AgentConnectionManager.REGISTRATION_TOKEN
+        
         with app.app_context():
-            users = ManagedUser.query.filter_by(system_id=system_id).all()
-            for u in users:
-                u.system_ip = remote_ip
-            db.session.commit()
-            logging.info(f"Updated dynamic IP snapshots to {remote_ip} for {len(users)} users on host {system_id}")
+            # Lookup device in database
+            device = AgentDevice.query.get(system_id)
             
+            if not device:
+                # If a registration token is required, verify it
+                if expected_reg_token and reg_token != expected_reg_token:
+                    logging.warning(f"Registration rejected: Invalid registration token from {system_id}")
+                    ws.send(json.dumps({"type": "auth_result", "success": False, "message": "Invalid registration token"}))
+                    return
+                
+                # Register a new device in 'pending' state
+                device = AgentDevice(system_id=system_id, system_ip=remote_ip, status='pending')
+                db.session.add(device)
+                db.session.commit()
+                logging.info(f"New pending device registered: {system_id} from {remote_ip}")
+            else:
+                # Existing device, update IP snapshot
+                device.system_ip = remote_ip
+                db.session.commit()
+
+            # 3. Handle device pairing states
+            if device.status == 'pending':
+                logging.info(f"Device {system_id} is PENDING approval. Waiting...")
+                AgentConnectionManager.register_pending(system_id, ws)
+                ws.send(json.dumps({"type": "pairing_status", "status": "pending"}))
+                
+                # Keep the socket open in pending state, waiting for admin approval trigger
+                try:
+                    while True:
+                        msg = ws.receive()
+                        if not msg:
+                            break
+                except Exception:
+                    pass
+                return
+                
+            elif device.status == 'rejected':
+                logging.warning(f"Connection rejected: Device {system_id} is banned/rejected")
+                ws.send(json.dumps({"type": "auth_result", "success": False, "message": "Device rejected/banned"}))
+                return
+                
+            elif device.status == 'approved':
+                # Device is approved! Perform secure challenge-response
+                challenge = secrets.token_hex(32)
+                ws.send(json.dumps({
+                    "type": "challenge",
+                    "challenge": challenge
+                }))
+                
+                # Wait for authentication signature response
+                auth_msg_raw = ws.receive(timeout=10)
+                if not auth_msg_raw:
+                    logging.warning(f"Handshake timeout for approved device {system_id}")
+                    return
+                    
+                auth_msg = json.loads(auth_msg_raw)
+                if auth_msg.get("type") != "register":
+                    logging.warning(f"Unexpected response type from {system_id}: {auth_msg.get('type')}")
+                    return
+                    
+                signature = auth_msg.get("signature")
+                if not signature:
+                    logging.warning(f"Handshake from {system_id} missing signature")
+                    return
+                    
+                # Verify using device-specific secure token
+                if not AgentConnectionManager.verify_signature(challenge, system_id, signature):
+                    logging.warning(f"Authentication signature verification failed for device {system_id}")
+                    ws.send(json.dumps({"type": "auth_result", "success": False, "message": "Invalid authentication signature"}))
+                    return
+                    
+                # Authentication succeeded! Register active connection
+                AgentConnectionManager.register(system_id, ws, remote_ip)
+                ws.send(json.dumps({"type": "auth_result", "success": True, "message": "Authenticated successfully"}))
+                
+                # Dynamically update the system_ip snapshot for all managed users on this host!
+                users = ManagedUser.query.filter_by(system_id=system_id).all()
+                for u in users:
+                    u.system_ip = remote_ip
+                
+                device.last_seen = datetime.utcnow()
+                db.session.commit()
+                logging.info(f"Device {system_id} authenticated successfully. Snapshotted IP {remote_ip} for {len(users)} users.")
+                
     except Exception as e:
-        logging.error(f"Error during agent handshake: {e}")
+        logging.error(f"Error during WebSocket handshake / loop for {system_id}: {e}")
         return
 
-    # 3. Enter message listening loop
+    # 4. Main message listening loop for approved connections
     try:
         while True:
             msg_raw = ws.receive()
@@ -176,7 +234,10 @@ def ws_agent_handler(ws):
         logging.info(f"WebSocket connection closed for agent {system_id}: {e}")
     finally:
         if system_id:
+            AgentConnectionManager.unregister_pending(system_id)
             AgentConnectionManager.unregister(system_id)
+
+sock.route('/ws')(ws_agent_handler)
 
 @app.route('/', methods=['GET', 'POST'])
 def login():
@@ -319,7 +380,76 @@ def admin():
     
     # Get all managed users
     users = ManagedUser.query.all()
-    return render_template('admin.html', users=users)
+    approved_devices = AgentDevice.query.filter_by(status='approved').all()
+    pending_devices = AgentDevice.query.filter_by(status='pending').all()
+    return render_template('admin.html', users=users, approved_devices=approved_devices, pending_devices=pending_devices)
+
+@app.route('/api/device/approve/<system_id>', methods=['POST'])
+def approve_device(system_id):
+    if not session.get('logged_in'):
+        return jsonify({'success': False, 'message': 'Not authenticated'}), 401
+    
+    device = AgentDevice.query.get(system_id)
+    if not device:
+        return jsonify({'success': False, 'message': 'Device not found'}), 404
+        
+    if device.status != 'pending':
+        return jsonify({'success': False, 'message': f'Device is not pending (status: {device.status})'}), 400
+        
+    # Generate 64-character token (secrets.token_hex(32))
+    secure_token = secrets.token_hex(32)
+    device.secure_token = secure_token
+    device.status = 'approved'
+    db.session.commit()
+    
+    # Check if there is an active pending connection
+    ws = AgentConnectionManager.get_pending_connection(system_id)
+    if ws:
+        try:
+            ws.send(json.dumps({
+                "type": "pairing_approved",
+                "token": secure_token
+            }))
+            # Clean up pending connections
+            AgentConnectionManager.unregister_pending(system_id)
+        except Exception as e:
+            logging.error(f"Failed to send pairing_approved to device {system_id}: {e}")
+            
+    logging.info(f"Approved device {system_id} and generated secure token.")
+    return jsonify({'success': True, 'message': f'Device {system_id} approved successfully.'})
+
+@app.route('/api/device/reject/<system_id>', methods=['POST'])
+def reject_device(system_id):
+    if not session.get('logged_in'):
+        return jsonify({'success': False, 'message': 'Not authenticated'}), 401
+        
+    device = AgentDevice.query.get(system_id)
+    if not device:
+        return jsonify({'success': False, 'message': 'Device not found'}), 404
+        
+    device.status = 'rejected'
+    device.secure_token = None
+    db.session.commit()
+    
+    # Close any active or pending connection
+    ws_pending = AgentConnectionManager.get_pending_connection(system_id)
+    if ws_pending:
+        try:
+            ws_pending.close()
+        except Exception:
+            pass
+        AgentConnectionManager.unregister_pending(system_id)
+        
+    ws_active = AgentConnectionManager.get_connection(system_id)
+    if ws_active:
+        try:
+            ws_active.close()
+        except Exception:
+            pass
+        AgentConnectionManager.unregister(system_id)
+        
+    logging.info(f"Rejected device {system_id} and closed connections.")
+    return jsonify({'success': True, 'message': f'Device {system_id} rejected successfully.'})
 
 @app.route('/settings', methods=['GET', 'POST'])
 def settings():
@@ -409,6 +539,12 @@ def add_user():
         flash('Both username and system ID are required', 'danger')
         return redirect(url_for('admin'))
     
+    # Validate the submitted system_id exists and has status == 'approved'
+    device = AgentDevice.query.get(system_id)
+    if not device or device.status != 'approved':
+        flash(f'System ID {system_id} is not registered or approved', 'danger')
+        return redirect(url_for('admin'))
+        
     # Check if user already exists
     existing_user = ManagedUser.query.filter_by(username=username, system_id=system_id).first()
     
@@ -566,13 +702,13 @@ def update_weekly_schedule():
     
     if not user_id:
         flash('User ID is required', 'danger')
-        return redirect(url_for('weekly_schedule'))
+        return redirect(url_for('admin'))
     
     try:
         user_id = int(user_id)
     except ValueError:
         flash('Invalid user ID', 'danger')
-        return redirect(url_for('weekly_schedule'))
+        return redirect(url_for('admin'))
     
     user = ManagedUser.query.get_or_404(user_id)
     
@@ -872,30 +1008,31 @@ def modify_time():
         })
 
 # With app context
-with app.app_context():
-    db.create_all()
-    print("Database tables verified")
-    
-    # Auto-migration: check if system_id column exists, if not add it
-    try:
-        from sqlalchemy import text
-        result = db.session.execute(text("PRAGMA table_info(managed_user)")).fetchall()
-        column_names = [row[1] for row in result]
-        if 'system_id' not in column_names:
-            db.session.execute(text("ALTER TABLE managed_user ADD COLUMN system_id VARCHAR(50)"))
-            db.session.commit()
-            print("Successfully migrated database: added system_id column to managed_user")
-    except Exception as e:
-        print(f"Database migration error: {e}")
-    
-    # Initialize admin password if it doesn't exist
-    if not Settings.get_value('admin_password_hash', None) and not Settings.get_value('admin_password', None):
-        Settings.set_admin_password('admin')
-        print("Admin password initialized")
-    
-    # Start background tasks automatically
-    task_manager.start()
-    print("Background tasks started automatically")
+if not os.environ.get('TESTING'):
+    with app.app_context():
+        db.create_all()
+        print("Database tables verified")
+        
+        # Auto-migration: check if system_id column exists, if not add it
+        try:
+            from sqlalchemy import text
+            result = db.session.execute(text("PRAGMA table_info(managed_user)")).fetchall()
+            column_names = [row[1] for row in result]
+            if 'system_id' not in column_names:
+                db.session.execute(text("ALTER TABLE managed_user ADD COLUMN system_id VARCHAR(50)"))
+                db.session.commit()
+                print("Successfully migrated database: added system_id column to managed_user")
+        except Exception as e:
+            print(f"Database migration error: {e}")
+        
+        # Initialize admin password if it doesn't exist
+        if not Settings.get_value('admin_password_hash', None) and not Settings.get_value('admin_password', None):
+            Settings.set_admin_password('admin')
+            print("Admin password initialized")
+        
+        # Start background tasks automatically
+        task_manager.start()
+        print("Background tasks started automatically")
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=False, use_reloader=False)
