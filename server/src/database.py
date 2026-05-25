@@ -103,6 +103,12 @@ class AgentDevice(db.Model):
         lazy=True,
         cascade="all, delete-orphan",
     )
+    alerts = db.relationship(
+        'AgentAlert',
+        backref='device',
+        lazy=True,
+        cascade="all, delete-orphan",
+    )
 
     @property
     def display_name(self):
@@ -121,6 +127,65 @@ class AgentDevice(db.Model):
 
     def __repr__(self):
         return f'<AgentDevice {self.system_id} [{self.status}]>'
+
+
+class AgentAlert(db.Model):
+    __tablename__ = 'agent_alert'
+
+    DELIVERY_PENDING = 'pending'
+    DELIVERY_RETRYING = 'retrying'
+    DELIVERY_DELIVERED = 'delivered'
+    DELIVERY_DISABLED = 'disabled'
+
+    id = db.Column(db.Integer, primary_key=True)
+    system_id = db.Column(db.String(50), db.ForeignKey('agent_device.system_id'), nullable=False)
+    event_type = db.Column(db.String(64), nullable=False)
+    linux_username = db.Column(db.String(80), nullable=True)
+    occurred_at = db.Column(db.DateTime, nullable=False)
+    payload_json = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    webhook_enabled_snapshot = db.Column(db.Boolean, default=False, nullable=False)
+    delivery_status = db.Column(db.String(20), default=DELIVERY_PENDING, nullable=False)
+    delivery_attempts = db.Column(db.Integer, default=0, nullable=False)
+    last_delivery_attempt_at = db.Column(db.DateTime, nullable=True)
+    delivered_at = db.Column(db.DateTime, nullable=True)
+    last_delivery_error = db.Column(db.Text, nullable=True)
+
+    def __repr__(self):
+        return f'<AgentAlert {self.event_type} on {self.system_id}>'
+
+    @property
+    def payload(self):
+        try:
+            return json.loads(self.payload_json)
+        except (TypeError, ValueError, json.JSONDecodeError):
+            return {}
+
+    @property
+    def should_attempt_delivery(self):
+        return (
+            self.webhook_enabled_snapshot and
+            self.delivery_status in {self.DELIVERY_PENDING, self.DELIVERY_RETRYING}
+        )
+
+    def mark_delivery_attempt(self):
+        self.delivery_attempts += 1
+        self.last_delivery_attempt_at = datetime.utcnow()
+
+    def mark_delivered(self):
+        self.delivery_status = self.DELIVERY_DELIVERED
+        self.delivered_at = datetime.utcnow()
+        self.last_delivery_error = None
+
+    def mark_retry(self, error_message):
+        self.delivery_status = self.DELIVERY_RETRYING
+        self.last_delivery_error = error_message
+        self.delivered_at = None
+
+    def mark_delivery_disabled(self):
+        self.delivery_status = self.DELIVERY_DISABLED
+        self.delivered_at = None
+        self.last_delivery_error = None
 
 class ManagedUser(db.Model):
     __tablename__ = 'managed_user'

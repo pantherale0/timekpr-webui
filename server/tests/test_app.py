@@ -7,6 +7,7 @@ from unittest.mock import patch, MagicMock
 from sqlalchemy import text
 from app import ws_agent_handler, run_schema_migrations
 from src.database import (
+    AgentAlert,
     AgentDevice,
     ManagedUser,
     ManagedUserDeviceMap,
@@ -158,6 +159,27 @@ def test_settings_page(client, db_session):
     # POST Change Password - Success
     res = client.post('/settings', data={'current_password': 'admin', 'new_password': 'newadmin', 'confirm_password': 'newadmin'}, follow_redirects=True)
     assert b"updated successfully" in res.data
+
+    # POST alert webhook settings
+    res = client.post('/settings', data={
+        'form_name': 'alert_webhook',
+        'alert_webhook_enabled': 'on',
+        'alert_webhook_url': 'https://hooks.example.test/timekpr',
+        'alert_webhook_secret': 'secret-value',
+    }, follow_redirects=True)
+    assert b"Alert webhook settings updated successfully" in res.data
+    assert Settings.get_value('alert_webhook_enabled') == '1'
+    assert Settings.get_value('alert_webhook_url') == 'https://hooks.example.test/timekpr'
+    assert Settings.get_value('alert_webhook_secret') == 'secret-value'
+
+    # Enabled without URL should fail validation
+    res = client.post('/settings', data={
+        'form_name': 'alert_webhook',
+        'alert_webhook_enabled': 'on',
+        'alert_webhook_url': '',
+        'alert_webhook_secret': '',
+    }, follow_redirects=True)
+    assert b'Webhook URL is required when alert delivery is enabled' in res.data
 
 def test_user_operations(client, db_session):
     Settings.set_admin_password("admin")
@@ -358,6 +380,12 @@ def test_websocket_handler(app, db_session):
                     "type": "register",
                     "signature": signature
                 }))
+                self.messages.append(json.dumps({
+                    "type": "alert_event",
+                    "event_type": "system_startup",
+                    "occurred_at": "2026-05-25T21:05:00Z",
+                    "details": {"source": "test-suite"}
+                }))
 
     ws_flow = FlowWS([hello_msg])
     with app.test_request_context('/ws', environ_base={'REMOTE_ADDR': '127.0.0.1'}):
@@ -368,6 +396,42 @@ def test_websocket_handler(app, db_session):
     assert json.loads(ws_flow.sent_messages[0])['type'] == "challenge"
     assert json.loads(ws_flow.sent_messages[1])['type'] == "auth_result"
     assert json.loads(ws_flow.sent_messages[1])['success'] is True
+
+    stored_alert = AgentAlert.query.filter_by(system_id=system_id, event_type='system_startup').first()
+    assert stored_alert is not None
+    assert stored_alert.delivery_status == AgentAlert.DELIVERY_DISABLED
+    assert stored_alert.payload["details"]["source"] == "test-suite"
+
+    class InvalidAlertWS(MockWS):
+        def send(self, data):
+            super().send(data)
+            payload = json.loads(data)
+            if payload.get("type") == "challenge":
+                challenge = payload.get("challenge")
+                token_bytes = token.encode('utf-8')
+                msg = (challenge + invalid_system_id).encode('utf-8')
+                signature = hmac.new(token_bytes, msg, hashlib.sha256).hexdigest()
+                self.messages.append(json.dumps({
+                    "type": "register",
+                    "signature": signature
+                }))
+                self.messages.append(json.dumps({
+                    "type": "alert_event",
+                    "event_type": "invalid_type",
+                    "occurred_at": "2026-05-25T21:05:00Z",
+                    "details": {"source": "bad-payload"}
+                }))
+
+    invalid_system_id = "approved-system-invalid"
+    invalid_device = AgentDevice(system_id=invalid_system_id, status="approved", secure_token=token)
+    db_session.add(invalid_device)
+    db_session.commit()
+
+    invalid_ws = InvalidAlertWS([json.dumps({"type": "hello", "system_id": invalid_system_id})])
+    with app.test_request_context('/ws', environ_base={'REMOTE_ADDR': '127.0.0.1'}):
+        ws_agent_handler(invalid_ws)
+
+    assert AgentAlert.query.filter_by(system_id=invalid_system_id).count() == 0
 
 def test_new_endpoints(client, db_session):
     Settings.set_admin_password("admin")
@@ -697,3 +761,19 @@ def test_run_schema_migrations_adds_device_hostname_column(app, db_session):
     legacy_device = AgentDevice.query.get('legacy-device-aa')
     assert legacy_device is not None
     assert legacy_device.system_hostname is None
+
+
+def test_run_schema_migrations_creates_agent_alert_table(app, db_session):
+    db_session.execute(text("DROP TABLE IF EXISTS agent_alert"))
+    db_session.commit()
+
+    with app.app_context():
+        run_schema_migrations()
+
+    columns = {
+        row[1]
+        for row in db_session.execute(text("PRAGMA table_info(agent_alert)")).fetchall()
+    }
+    assert 'event_type' in columns
+    assert 'payload_json' in columns
+    assert 'delivery_status' in columns

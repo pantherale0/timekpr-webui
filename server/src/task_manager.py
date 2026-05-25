@@ -4,10 +4,16 @@ from datetime import datetime, date
 import logging
 import json
 import traceback
+import hashlib
+import hmac
+
+import requests
 
 from src.database import (
+    AgentAlert,
     db,
     ManagedUser,
+    Settings,
     UserTimeUsage,
     UserDailyTimeInterval,
     coerce_time_spent_day,
@@ -22,6 +28,60 @@ def _safe_int(value, default=0):
         return int(value)
     except (TypeError, ValueError):
         return default
+
+
+def _setting_enabled(key):
+    raw_value = Settings.get_value(key, '0')
+    if raw_value is None:
+        return False
+    return str(raw_value).strip().lower() in {'1', 'true', 'yes', 'on'}
+
+
+def _get_alert_webhook_settings():
+    url = (Settings.get_value('alert_webhook_url', '') or '').strip()
+    secret = (Settings.get_value('alert_webhook_secret', '') or '').strip()
+    enabled = _setting_enabled('alert_webhook_enabled')
+    return {
+        'enabled': enabled,
+        'url': url,
+        'secret': secret,
+        'is_active': enabled and bool(url),
+    }
+
+
+def _format_timestamp(value):
+    return value.isoformat() + 'Z' if value else None
+
+
+def _serialize_alert_for_webhook(alert):
+    payload = alert.payload
+    details = payload.get('details', {}) if isinstance(payload, dict) else {}
+    return {
+        'id': alert.id,
+        'system_id': alert.system_id,
+        'system_hostname': alert.device.system_hostname if alert.device else None,
+        'event_type': alert.event_type,
+        'linux_username': alert.linux_username,
+        'occurred_at': _format_timestamp(alert.occurred_at),
+        'received_at': _format_timestamp(alert.created_at),
+        'details': details if isinstance(details, dict) else {},
+    }
+
+
+def _build_webhook_headers(alert, payload_body, secret):
+    headers = {
+        'Content-Type': 'application/json',
+        'User-Agent': 'timekpr-webui/alert-webhook',
+        'X-Timekpr-Alert-Id': str(alert.id),
+    }
+    if secret:
+        signature = hmac.new(
+            secret.encode('utf-8'),
+            payload_body.encode('utf-8'),
+            hashlib.sha256,
+        ).hexdigest()
+        headers['X-Timekpr-Signature'] = f'sha256={signature}'
+    return headers
 
 class BackgroundTaskManager:
     def __init__(self, app=None):
@@ -90,6 +150,8 @@ class BackgroundTaskManager:
                             with self.app.app_context():
                                 logger.info("Updating user data")
                                 self._update_user_data()
+                                logger.info("Delivering alert webhooks")
+                                self._deliver_pending_alerts()
                                 logger.info("User data update cycle complete")
                         else:
                             logger.error("App is not initialized in task manager")
@@ -307,3 +369,63 @@ class BackgroundTaskManager:
                 traceback.format_exc(),
             )
             db.session.rollback()
+
+    def _deliver_pending_alerts(self):
+        webhook_settings = _get_alert_webhook_settings()
+        if not webhook_settings['is_active']:
+            logger.info("Alert webhook delivery disabled or missing URL")
+            return
+
+        pending_alerts = AgentAlert.query.filter(
+            AgentAlert.webhook_enabled_snapshot.is_(True),
+            AgentAlert.delivery_status.in_([
+                AgentAlert.DELIVERY_PENDING,
+                AgentAlert.DELIVERY_RETRYING,
+            ]),
+        ).order_by(AgentAlert.created_at.asc(), AgentAlert.id.asc()).all()
+
+        logger.info("Found %d pending alert(s) for webhook delivery", len(pending_alerts))
+        for alert in pending_alerts:
+            try:
+                payload = _serialize_alert_for_webhook(alert)
+                payload_body = json.dumps(payload, sort_keys=True)
+                headers = _build_webhook_headers(
+                    alert,
+                    payload_body,
+                    webhook_settings['secret'],
+                )
+
+                alert.mark_delivery_attempt()
+                response = requests.post(
+                    webhook_settings['url'],
+                    data=payload_body,
+                    headers=headers,
+                    timeout=5,
+                )
+
+                if 200 <= response.status_code < 300:
+                    alert.mark_delivered()
+                else:
+                    response_text = (response.text or '').strip()
+                    truncated_text = response_text[:500]
+                    alert.mark_retry(
+                        f'Webhook returned HTTP {response.status_code}'
+                        + (f': {truncated_text}' if truncated_text else '')
+                    )
+
+                db.session.commit()
+            except Exception as exc:
+                logger.warning(
+                    "Alert webhook delivery failed for alert %s: %s",
+                    alert.id,
+                    exc,
+                )
+                db.session.rollback()
+
+                refreshed_alert = AgentAlert.query.get(alert.id)
+                if not refreshed_alert:
+                    continue
+
+                refreshed_alert.mark_delivery_attempt()
+                refreshed_alert.mark_retry(str(exc))
+                db.session.commit()

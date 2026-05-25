@@ -13,3 +13,6 @@ sha2 = "0.10.8"
 hex = "0.4.3"
 uuid = { version = "1.6", features = ["v4", "serde"] }
 futures-util = { version = "0.3", default-features = false, features = ["sink", "std"] }
+chrono = "0.4.44"
+zbus = { version = "5.15.0", default-features = false, features = ["tokio"] }
+logind-zbus = "5.3.2"

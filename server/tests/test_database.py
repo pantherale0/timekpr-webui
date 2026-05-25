@@ -2,6 +2,7 @@ from datetime import datetime, date, timedelta
 from src.database import (
     coerce_time_spent_day,
     Settings,
+    AgentAlert,
     AgentDevice,
     ManagedUser,
     ManagedUserDeviceMap,
@@ -84,6 +85,47 @@ def test_agent_device_model(db_session):
     assert device.format_display_name(include_suffix=True) == "family-pc (ab)"
     assert fallback_device.display_name == "dev-456"
     assert fallback_device.format_display_name(include_suffix=True) == "dev-456"
+
+
+def test_agent_alert_model(db_session):
+    device = AgentDevice(system_id="dev-alert", status="approved", secure_token="token")
+    db_session.add(device)
+    db_session.commit()
+
+    alert = AgentAlert(
+        system_id=device.system_id,
+        event_type="system_startup",
+        linux_username="alice",
+        occurred_at=datetime.utcnow(),
+        payload_json='{"system_id":"dev-alert","event_type":"system_startup","details":{"source":"test"}}',
+        webhook_enabled_snapshot=True,
+        delivery_status=AgentAlert.DELIVERY_PENDING,
+    )
+    db_session.add(alert)
+    db_session.commit()
+
+    assert repr(alert) == "<AgentAlert system_startup on dev-alert>"
+    assert alert.payload["details"]["source"] == "test"
+    assert alert.should_attempt_delivery
+
+    alert.mark_delivery_attempt()
+    assert alert.delivery_attempts == 1
+    assert alert.last_delivery_attempt_at is not None
+
+    alert.mark_retry("timeout")
+    assert alert.delivery_status == AgentAlert.DELIVERY_RETRYING
+    assert alert.last_delivery_error == "timeout"
+    assert alert.should_attempt_delivery
+
+    alert.mark_delivered()
+    assert alert.delivery_status == AgentAlert.DELIVERY_DELIVERED
+    assert alert.delivered_at is not None
+    assert alert.last_delivery_error is None
+    assert not alert.should_attempt_delivery
+
+    alert.mark_delivery_disabled()
+    assert alert.delivery_status == AgentAlert.DELIVERY_DISABLED
+    assert alert.delivered_at is None
 
 def test_managed_user_and_usage(db_session):
     device = AgentDevice(system_id="dev-123", status="approved", secure_token="token")

@@ -3,6 +3,7 @@ import pytest
 import hmac
 import hashlib
 from src.agent_helper import AgentConnectionManager, AgentClient
+from src.agent_helper import normalize_agent_alert_payload, parse_agent_alert_timestamp
 from src.database import AgentDevice, db
 
 class DummyWS:
@@ -280,4 +281,34 @@ def test_agent_client_parser_missing_lines():
     success, msg = client.set_allowed_hours("john", intervals)
     assert success
 
-    AgentConnectionManager.unregister(system_id)
+
+def test_parse_agent_alert_timestamp():
+    parsed = parse_agent_alert_timestamp("2026-05-25T21:05:00Z")
+    assert parsed.year == 2026
+    assert parsed.month == 5
+    assert parsed.day == 25
+
+    with pytest.raises(ValueError):
+        parse_agent_alert_timestamp("not-a-timestamp")
+
+
+def test_normalize_agent_alert_payload():
+    payload = normalize_agent_alert_payload("sys-1", {
+        "type": "alert_event",
+        "event_type": "user_signed_in",
+        "occurred_at": "2026-05-25T21:05:00Z",
+        "linux_username": "alice",
+        "details": {"session_id": "c3"},
+    })
+
+    assert payload["system_id"] == "sys-1"
+    assert payload["event_type"] == "user_signed_in"
+    assert payload["linux_username"] == "alice"
+    assert payload["details"]["session_id"] == "c3"
+    assert '"event_type": "user_signed_in"' in payload["payload_json"]
+
+    with pytest.raises(ValueError):
+        normalize_agent_alert_payload("sys-1", {"event_type": "nope", "occurred_at": "2026-05-25T21:05:00Z"})
+
+    with pytest.raises(ValueError):
+        normalize_agent_alert_payload("sys-1", {"event_type": "system_startup", "occurred_at": "2026-05-25T21:05:00Z", "details": []})

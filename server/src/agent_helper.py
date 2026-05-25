@@ -5,12 +5,98 @@ import hmac
 import hashlib
 import os
 import re
+from datetime import datetime, timezone
 from queue import Queue, Empty
 
 logger = logging.getLogger(__name__)
 
 # Optional registration token firewall for new dynamic pairings
 REGISTRATION_TOKEN = os.environ.get('REGISTRATION_TOKEN')
+
+ALLOWED_AGENT_ALERT_TYPES = {
+    'system_startup',
+    'system_sleep',
+    'system_resume',
+    'system_restart',
+    'system_shutdown',
+    'user_signed_in',
+    'user_signed_out',
+}
+
+
+def _coerce_alert_string(value, field_name, max_length, allow_empty=False):
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise ValueError(f'{field_name} must be a string')
+
+    normalized = value.strip()
+    if not normalized and not allow_empty:
+        raise ValueError(f'{field_name} must not be empty')
+    if len(normalized) > max_length:
+        raise ValueError(f'{field_name} exceeds maximum length of {max_length}')
+    return normalized
+
+
+def parse_agent_alert_timestamp(value):
+    if not isinstance(value, str):
+        raise ValueError('occurred_at must be an ISO-8601 string')
+
+    normalized = value.strip()
+    if not normalized:
+        raise ValueError('occurred_at must not be empty')
+
+    if normalized.endswith('Z'):
+        normalized = normalized[:-1] + '+00:00'
+
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except ValueError as exc:
+        raise ValueError('occurred_at must be a valid ISO-8601 timestamp') from exc
+
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    else:
+        parsed = parsed.astimezone(timezone.utc)
+
+    return parsed.replace(tzinfo=None)
+
+
+def normalize_agent_alert_payload(system_id, payload):
+    if not isinstance(payload, dict):
+        raise ValueError('alert payload must be an object')
+
+    event_type = _coerce_alert_string(payload.get('event_type'), 'event_type', 64)
+    if event_type not in ALLOWED_AGENT_ALERT_TYPES:
+        raise ValueError(f'Unsupported event_type: {event_type}')
+
+    linux_username = _coerce_alert_string(
+        payload.get('linux_username'),
+        'linux_username',
+        80,
+    )
+    details = payload.get('details', {})
+    if details is None:
+        details = {}
+    if not isinstance(details, dict):
+        raise ValueError('details must be an object')
+
+    occurred_at = parse_agent_alert_timestamp(payload.get('occurred_at'))
+    normalized_payload = {
+        'system_id': system_id,
+        'event_type': event_type,
+        'occurred_at': occurred_at.isoformat() + 'Z',
+        'linux_username': linux_username,
+        'details': details,
+    }
+    return {
+        'system_id': system_id,
+        'event_type': event_type,
+        'occurred_at': occurred_at,
+        'linux_username': linux_username,
+        'details': details,
+        'payload_json': json.dumps(normalized_payload, sort_keys=True),
+    }
 
 class AgentConnectionManagerMeta(type):
     @property

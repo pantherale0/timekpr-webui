@@ -7,6 +7,7 @@ import pytz
 
 from src.database import (
     db,
+    AgentAlert,
     ManagedUser,
     ManagedUserDeviceMap,
     UserTimeUsage,
@@ -16,7 +17,11 @@ from src.database import (
     coerce_time_spent_day,
     AgentDevice,
 )
-from src.agent_helper import AgentClient, AgentConnectionManager
+from src.agent_helper import (
+    AgentClient,
+    AgentConnectionManager,
+    normalize_agent_alert_payload,
+)
 from flask_sock import Sock
 from src.task_manager import BackgroundTaskManager
 from src.oidc_helper import OIDCHelper
@@ -278,6 +283,51 @@ def _build_disabled_interval_placeholder(day_of_week):
         is_enabled=False,
     )
 
+
+def _setting_enabled(key):
+    raw_value = Settings.get_value(key, '0')
+    if raw_value is None:
+        return False
+    return str(raw_value).strip().lower() in {'1', 'true', 'yes', 'on'}
+
+
+def _get_alert_webhook_settings():
+    url = (Settings.get_value('alert_webhook_url', '') or '').strip()
+    secret = (Settings.get_value('alert_webhook_secret', '') or '').strip()
+    enabled = _setting_enabled('alert_webhook_enabled')
+    return {
+        'enabled': enabled,
+        'url': url,
+        'secret': secret,
+        'is_active': enabled and bool(url),
+    }
+
+
+def _store_agent_alert(system_id, payload):
+    webhook_config = _get_alert_webhook_settings()
+    delivery_status = (
+        AgentAlert.DELIVERY_PENDING
+        if webhook_config['is_active']
+        else AgentAlert.DELIVERY_DISABLED
+    )
+    alert = AgentAlert(
+        system_id=system_id,
+        event_type=payload['event_type'],
+        linux_username=payload['linux_username'],
+        occurred_at=payload['occurred_at'],
+        payload_json=payload['payload_json'],
+        webhook_enabled_snapshot=webhook_config['is_active'],
+        delivery_status=delivery_status,
+    )
+    db.session.add(alert)
+
+    device = AgentDevice.query.get(system_id)
+    if device:
+        device.last_seen = datetime.utcnow()
+
+    db.session.commit()
+    return alert
+
 def ws_agent_handler(ws):
     """
     WebSocket endpoint for client agents.
@@ -425,6 +475,29 @@ def ws_agent_handler(ws):
             if msg_type == "command_response":
                 correlation_id = msg.get("correlation_id")
                 AgentConnectionManager.route_response(correlation_id, msg)
+            elif msg_type == "alert_event":
+                try:
+                    normalized_alert = normalize_agent_alert_payload(system_id, msg)
+                    alert = _store_agent_alert(system_id, normalized_alert)
+                    logging.info(
+                        "Stored alert %s from agent %s as row %s",
+                        alert.event_type,
+                        system_id,
+                        alert.id,
+                    )
+                except ValueError as exc:
+                    logging.warning(
+                        "Rejected invalid alert payload from %s: %s",
+                        system_id,
+                        exc,
+                    )
+                except Exception as exc:
+                    db.session.rollback()
+                    logging.error(
+                        "Failed to store alert payload from %s: %s",
+                        system_id,
+                        exc,
+                    )
             else:
                 logging.warning(f"Received unexpected message type from client {system_id}: {msg_type}")
                 
@@ -659,31 +732,51 @@ def settings():
     if not session.get('logged_in'):
         flash('Please login first', 'warning')
         return redirect(url_for('login'))
-    
-    # Handle password change
+
+    alert_webhook_settings = _get_alert_webhook_settings()
+
     if request.method == 'POST':
-        current_password = request.form.get('current_password')
-        new_password = request.form.get('new_password')
-        confirm_password = request.form.get('confirm_password')
-        
-        # Validate inputs
-        if not current_password or not new_password or not confirm_password:
-            flash('All fields are required', 'danger')
-        elif not Settings.check_admin_password(current_password):
-            flash('Current password is incorrect', 'danger')
-        elif new_password != confirm_password:
-            flash('New passwords do not match', 'danger')
-        elif len(new_password) < 4:
-            flash('New password must be at least 4 characters long', 'danger')
+        form_name = (request.form.get('form_name') or 'password').strip()
+
+        if form_name == 'alert_webhook':
+            webhook_enabled = request.form.get('alert_webhook_enabled') == 'on'
+            webhook_url = (request.form.get('alert_webhook_url') or '').strip()
+            webhook_secret = (request.form.get('alert_webhook_secret') or '').strip()
+
+            if webhook_enabled and not webhook_url:
+                flash('Webhook URL is required when alert delivery is enabled', 'danger')
+            else:
+                Settings.set_value('alert_webhook_enabled', '1' if webhook_enabled else '0')
+                Settings.set_value('alert_webhook_url', webhook_url)
+                Settings.set_value('alert_webhook_secret', webhook_secret)
+                flash('Alert webhook settings updated successfully', 'success')
+                return redirect(url_for('settings'))
+
+            alert_webhook_settings = {
+                'enabled': webhook_enabled,
+                'url': webhook_url,
+                'secret': webhook_secret,
+                'is_active': webhook_enabled and bool(webhook_url),
+            }
         else:
-            # Update the password with hashing
-            Settings.set_admin_password(new_password)
-            flash('Password updated successfully', 'success')
-            
-            # Redirect to avoid form resubmission
-            return redirect(url_for('settings'))
-    
-    return render_template('settings.html')
+            current_password = request.form.get('current_password')
+            new_password = request.form.get('new_password')
+            confirm_password = request.form.get('confirm_password')
+
+            if not current_password or not new_password or not confirm_password:
+                flash('All fields are required', 'danger')
+            elif not Settings.check_admin_password(current_password):
+                flash('Current password is incorrect', 'danger')
+            elif new_password != confirm_password:
+                flash('New passwords do not match', 'danger')
+            elif len(new_password) < 4:
+                flash('New password must be at least 4 characters long', 'danger')
+            else:
+                Settings.set_admin_password(new_password)
+                flash('Password updated successfully', 'success')
+                return redirect(url_for('settings'))
+
+    return render_template('settings.html', alert_webhook_settings=alert_webhook_settings)
 
 @app.route('/api/task-status')
 def get_task_status():
@@ -1444,6 +1537,26 @@ def run_schema_migrations():
         db.session.execute(text("DROP TABLE user_daily_time_interval"))
         db.session.execute(text("ALTER TABLE user_daily_time_interval_new RENAME TO user_daily_time_interval"))
         db.session.commit()
+
+    db.session.execute(text("""
+        CREATE TABLE IF NOT EXISTS agent_alert (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            system_id VARCHAR(50) NOT NULL,
+            event_type VARCHAR(64) NOT NULL,
+            linux_username VARCHAR(80) NULL,
+            occurred_at DATETIME NOT NULL,
+            payload_json TEXT NOT NULL,
+            created_at DATETIME NOT NULL,
+            webhook_enabled_snapshot BOOLEAN NOT NULL DEFAULT 0,
+            delivery_status VARCHAR(20) NOT NULL DEFAULT 'pending',
+            delivery_attempts INTEGER NOT NULL DEFAULT 0,
+            last_delivery_attempt_at DATETIME NULL,
+            delivered_at DATETIME NULL,
+            last_delivery_error TEXT NULL,
+            FOREIGN KEY(system_id) REFERENCES agent_device(system_id)
+        )
+    """))
+    db.session.commit()
 
 
 if not os.environ.get('TESTING'):

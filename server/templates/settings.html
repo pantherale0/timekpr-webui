@@ -69,29 +69,32 @@
             setInterval(updateTaskStatus, 30000);
             
             // Password confirmation validation
-            document.getElementById('confirm_password').addEventListener('input', function() {
-                const newPassword = document.getElementById('new_password').value;
-                const confirmPassword = this.value;
+            const confirmPasswordField = document.getElementById('confirm_password');
+            const newPasswordField = document.getElementById('new_password');
+            if (confirmPasswordField && newPasswordField) {
+                confirmPasswordField.addEventListener('input', function() {
+                    const newPassword = newPasswordField.value;
+                    const confirmPassword = this.value;
+                    
+                    if (confirmPassword && newPassword !== confirmPassword) {
+                        this.setCustomValidity('Passwords do not match');
+                        this.style.borderColor = 'var(--danger)';
+                    } else {
+                        this.setCustomValidity('');
+                        this.style.borderColor = '';
+                    }
+                });
                 
-                if (confirmPassword && newPassword !== confirmPassword) {
-                    this.setCustomValidity('Passwords do not match');
-                    this.style.borderColor = 'var(--danger)';
-                } else {
-                    this.setCustomValidity('');
-                    this.style.borderColor = '';
-                }
-            });
-            
-            document.getElementById('new_password').addEventListener('input', function() {
-                const confirmPassword = document.getElementById('confirm_password');
-                if (confirmPassword.value && this.value !== confirmPassword.value) {
-                    confirmPassword.setCustomValidity('Passwords do not match');
-                    confirmPassword.style.borderColor = 'var(--danger)';
-                } else {
-                    confirmPassword.setCustomValidity('');
-                    confirmPassword.style.borderColor = '';
-                }
-            });
+                newPasswordField.addEventListener('input', function() {
+                    if (confirmPasswordField.value && this.value !== confirmPasswordField.value) {
+                        confirmPasswordField.setCustomValidity('Passwords do not match');
+                        confirmPasswordField.style.borderColor = 'var(--danger)';
+                    } else {
+                        confirmPasswordField.setCustomValidity('');
+                        confirmPasswordField.style.borderColor = '';
+                    }
+                });
+            }
         </script>
         
         {% with messages = get_flashed_messages(with_categories=true) %}
@@ -164,6 +167,7 @@
                     </div>
                     
                     <form action="{{ url_for('settings') }}" method="POST">
+                        <input type="hidden" name="form_name" value="password">
                         <div class="form-group">
                             <label for="current_password" class="form-label">
                                 <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16" style="margin-right: var(--space-2);">
@@ -206,6 +210,72 @@
                     </form>
                     {% endif %}
                     
+                    <div style="margin-top: var(--space-6); padding-top: var(--space-6); border-top: 1px solid var(--border-primary);">
+                        <h4 style="color: var(--text-secondary); font-size: var(--font-size-sm); margin-bottom: var(--space-3);">Alert Webhook</h4>
+                        <form action="{{ url_for('settings') }}" method="POST">
+                            <input type="hidden" name="form_name" value="alert_webhook">
+                            <div class="form-group" style="display:flex; align-items:center; gap: var(--space-3);">
+                                <input
+                                    type="checkbox"
+                                    id="alert_webhook_enabled"
+                                    name="alert_webhook_enabled"
+                                    {% if alert_webhook_settings.enabled %}checked{% endif %}
+                                >
+                                <label for="alert_webhook_enabled" class="form-label" style="margin:0;">
+                                    Enable webhook delivery for new agent alerts
+                                </label>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="alert_webhook_url" class="form-label">Webhook URL</label>
+                                <input
+                                    type="url"
+                                    id="alert_webhook_url"
+                                    name="alert_webhook_url"
+                                    class="form-control"
+                                    placeholder="https://example.com/timekpr-alerts"
+                                    value="{{ alert_webhook_settings.url }}"
+                                >
+                            </div>
+
+                            <div class="form-group">
+                                <label for="alert_webhook_secret" class="form-label">Webhook Secret (optional)</label>
+                                <input
+                                    type="password"
+                                    id="alert_webhook_secret"
+                                    name="alert_webhook_secret"
+                                    class="form-control"
+                                    placeholder="Used to sign outbound alert payloads"
+                                    value="{{ alert_webhook_settings.secret }}"
+                                >
+                            </div>
+
+                            <div class="alert alert-info" style="margin-bottom: var(--space-4);">
+                                <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                                    <path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16zm.93-9.412-1 4.705c-.07.34.029.533.304.533.194 0 .487-.07.686-.246l-.088.416c-.287.346-.92.598-1.465.598-.703 0-1.002-.422-.808-1.319l.738-3.468c.064-.293.006-.399-.287-.47l-.451-.081.082-.381 2.29-.287zM8 5.5a1 1 0 1 1 0-2 1 1 0 0 1 0 2z"/>
+                                </svg>
+                                Alerts are always stored locally. Webhook delivery is optional and only applies to new alerts while this setting is active.
+                            </div>
+
+                            <div style="font-size: var(--font-size-sm); color: var(--text-tertiary); margin-bottom: var(--space-4);">
+                                Current status:
+                                <strong style="color: var(--text-secondary);">
+                                    {% if alert_webhook_settings.is_active %}
+                                    Active
+                                    {% elif alert_webhook_settings.enabled %}
+                                    Enabled but missing URL
+                                    {% else %}
+                                    Disabled
+                                    {% endif %}
+                                </strong>
+                            </div>
+
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <button type="submit" class="btn btn-secondary btn-lg" style="width: 100%;">Save Webhook Settings</button>
+                            </div>
+                        </form>
+                    </div>
+
                     <div style="margin-top: var(--space-6); padding-top: var(--space-6); border-top: 1px solid var(--border-primary);">
                         <h4 style="color: var(--text-secondary); font-size: var(--font-size-sm); margin-bottom: var(--space-3);">Security Tips</h4>
                         <ul style="margin: 0; padding-left: var(--space-4); font-size: var(--font-size-sm); color: var(--text-tertiary);">

@@ -3,12 +3,14 @@ import json
 from datetime import datetime, date, timedelta
 from src.task_manager import BackgroundTaskManager
 from src.database import (
+    AgentAlert,
     ManagedUser,
     ManagedUserDeviceMap,
     UserTimeUsage,
     UserWeeklySchedule,
     UserDailyTimeInterval,
     AgentDevice,
+    Settings,
     db,
 )
 from src.agent_helper import AgentConnectionManager
@@ -284,3 +286,97 @@ def test_task_manager_failures_and_threads(app, db_session):
     # 3. Thread graceful exit and timeout logs
     manager.start()
     manager.stop()
+
+
+def test_task_manager_delivers_pending_alerts(app, db_session):
+    manager = BackgroundTaskManager(app)
+    device = AgentDevice(
+        system_id="alert-device",
+        system_hostname="family-pc",
+        status="approved",
+        secure_token="tok",
+    )
+    db_session.add(device)
+    db_session.flush()
+
+    alert = AgentAlert(
+        system_id=device.system_id,
+        event_type="system_startup",
+        linux_username="alice",
+        occurred_at=datetime.utcnow(),
+        payload_json='{"system_id":"alert-device","event_type":"system_startup","details":{"source":"test"}}',
+        webhook_enabled_snapshot=True,
+        delivery_status=AgentAlert.DELIVERY_PENDING,
+    )
+    db_session.add(alert)
+    db_session.commit()
+
+    Settings.set_value('alert_webhook_enabled', '1')
+    Settings.set_value('alert_webhook_url', 'https://hooks.example.test/timekpr')
+    Settings.set_value('alert_webhook_secret', 'shared-secret')
+
+    class DummyResponse:
+        status_code = 204
+        text = ''
+
+    from unittest.mock import patch
+
+    with app.app_context(), patch('src.task_manager.requests.post', return_value=DummyResponse()) as mock_post:
+        manager._deliver_pending_alerts()
+
+    delivered_alert = AgentAlert.query.get(alert.id)
+    assert delivered_alert.delivery_status == AgentAlert.DELIVERY_DELIVERED
+    assert delivered_alert.delivery_attempts == 1
+    assert delivered_alert.delivered_at is not None
+    assert mock_post.called
+    _, kwargs = mock_post.call_args
+    assert kwargs['headers']['X-Timekpr-Alert-Id'] == str(alert.id)
+    assert kwargs['headers']['X-Timekpr-Signature'].startswith('sha256=')
+    assert '"system_hostname": "family-pc"' in kwargs['data']
+
+
+def test_task_manager_retries_failed_alert_deliveries(app, db_session):
+    manager = BackgroundTaskManager(app)
+    device = AgentDevice(system_id="alert-retry-device", status="approved", secure_token="tok")
+    db_session.add(device)
+    db_session.flush()
+
+    retry_alert = AgentAlert(
+        system_id=device.system_id,
+        event_type="system_restart",
+        occurred_at=datetime.utcnow(),
+        payload_json='{"system_id":"alert-retry-device","event_type":"system_restart","details":{}}',
+        webhook_enabled_snapshot=True,
+        delivery_status=AgentAlert.DELIVERY_PENDING,
+    )
+    disabled_alert = AgentAlert(
+        system_id=device.system_id,
+        event_type="system_sleep",
+        occurred_at=datetime.utcnow(),
+        payload_json='{"system_id":"alert-retry-device","event_type":"system_sleep","details":{}}',
+        webhook_enabled_snapshot=False,
+        delivery_status=AgentAlert.DELIVERY_DISABLED,
+    )
+    db_session.add_all([retry_alert, disabled_alert])
+    db_session.commit()
+
+    Settings.set_value('alert_webhook_enabled', '1')
+    Settings.set_value('alert_webhook_url', 'https://hooks.example.test/timekpr')
+
+    from unittest.mock import patch
+
+    with app.app_context(), patch('src.task_manager.requests.post', side_effect=RuntimeError('boom')):
+        manager._deliver_pending_alerts()
+
+    refreshed_retry = AgentAlert.query.get(retry_alert.id)
+    assert refreshed_retry.delivery_status == AgentAlert.DELIVERY_RETRYING
+    assert refreshed_retry.delivery_attempts == 1
+    assert 'boom' in refreshed_retry.last_delivery_error
+
+    Settings.set_value('alert_webhook_enabled', '0')
+    with app.app_context(), patch('src.task_manager.requests.post') as mock_post:
+        manager._deliver_pending_alerts()
+    assert not mock_post.called
+
+    refreshed_disabled = AgentAlert.query.get(disabled_alert.id)
+    assert refreshed_disabled.delivery_status == AgentAlert.DELIVERY_DISABLED
