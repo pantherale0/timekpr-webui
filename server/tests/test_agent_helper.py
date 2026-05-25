@@ -231,6 +231,20 @@ def test_agent_client(db_session):
     assert day_two["0"] == {"STARTMIN": 0, "ENDMIN": 60, "UACC": 0}
     assert day_two["23"] == {"STARTMIN": 0, "ENDMIN": 60, "UACC": 0}
 
+    success, msg = client.sync_domain_policy({
+        "sources": {"1": ["example.com", "dns.google"]},
+        "policies": {"1000": {"linux_username": "john", "source_ids": ["1"]}},
+    })
+    assert success
+
+    domain_policy_payload = next(
+        payload for payload in capture_ws.payloads
+        if payload.get("action") == "sync_domain_policy"
+    )
+    assert domain_policy_payload["args"]["sources"]["1"] == ["example.com", "dns.google"]
+    assert domain_policy_payload["args"]["policies"]["1000"]["linux_username"] == "john"
+    assert domain_policy_payload["username"] == ""
+
     AgentConnectionManager.unregister(system_id)
 
 def test_send_command_sync_timeout():

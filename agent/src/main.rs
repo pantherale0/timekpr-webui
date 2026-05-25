@@ -1,3 +1,6 @@
+mod domain_policy;
+mod firewall;
+mod local_dns;
 mod timekpr_dbus;
 
 use chrono::{SecondsFormat, Utc};
@@ -264,13 +267,16 @@ fn schedule_to_day_limits(
 }
 
 async fn handle_command(action: &str, username: &str, args: &serde_json::Value) -> (bool, String, serde_json::Value) {
-    let client = match TimekprDbusClient::connect().await {
-        Ok(client) => client,
-        Err(message) => return (false, message, serde_json::json!({})),
-    };
-
     match action {
+        "sync_domain_policy" => match domain_policy::sync_from_args(args).await {
+            Ok(message) => (true, message, serde_json::json!({})),
+            Err(message) => (false, message, serde_json::json!({})),
+        },
         "validate_user" => {
+            let client = match TimekprDbusClient::connect().await {
+                Ok(client) => client,
+                Err(message) => return (false, message, serde_json::json!({})),
+            };
             match client.get_user_information(username).await {
                 Ok((result, _message, config)) if result == 0 => (
                     true,
@@ -290,6 +296,10 @@ async fn handle_command(action: &str, username: &str, args: &serde_json::Value) 
             }
         }
         "modify_time_left" => {
+            let client = match TimekprDbusClient::connect().await {
+                Ok(client) => client,
+                Err(message) => return (false, message, serde_json::json!({})),
+            };
             let op = args.get("operation").and_then(|v| v.as_str()).unwrap_or("+");
             let secs = args.get("seconds").and_then(|v| v.as_i64()).unwrap_or(0);
             let secs = match i32::try_from(secs) {
@@ -316,6 +326,10 @@ async fn handle_command(action: &str, username: &str, args: &serde_json::Value) 
             }
         }
         "set_weekly_time_limits" => {
+            let client = match TimekprDbusClient::connect().await {
+                Ok(client) => client,
+                Err(message) => return (false, message, serde_json::json!({})),
+            };
             let schedule = match args.get("schedule").and_then(|v| v.as_object()) {
                 Some(s) => s,
                 None => return (false, "Missing 'schedule' argument".to_string(), serde_json::json!({})),
@@ -365,6 +379,10 @@ async fn handle_command(action: &str, username: &str, args: &serde_json::Value) 
             (true, "Weekly time limits configured successfully".to_string(), serde_json::json!({}))
         }
         "set_allowed_hours" => {
+            let client = match TimekprDbusClient::connect().await {
+                Ok(client) => client,
+                Err(message) => return (false, message, serde_json::json!({})),
+            };
             let intervals = match args.get("intervals").and_then(|v| v.as_object()) {
                 Some(i) => i,
                 None => return (false, "Missing 'intervals' argument".to_string(), serde_json::json!({})),
@@ -714,6 +732,9 @@ fn spawn_logind_listeners(
 #[tokio::main]
 async fn main() {
     println!("Starting Timekpr Client Agent...");
+    if let Err(message) = domain_policy::initialize_runtime().await {
+        eprintln!("Failed to restore persisted domain policy: {}", message);
+    }
 
     loop {
         let config = load_or_create_config();

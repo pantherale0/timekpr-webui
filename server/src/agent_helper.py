@@ -431,3 +431,16 @@ class AgentClient:
             }
         )
         return success, message
+
+    def sync_domain_policy(self, payload):
+        """
+        Synchronize the effective per-device domain policy through the agent.
+        Returns: (success, message)
+        """
+        success, message, _ = AgentConnectionManager.send_command_sync(
+            self.system_id,
+            "sync_domain_policy",
+            "",
+            payload,
+        )
+        return success, message

@@ -253,6 +253,48 @@
             font-size: var(--font-size-sm);
         }
 
+        .policy-card {
+            background: var(--bg-elevated);
+            border: 1px solid var(--border-primary);
+            border-radius: var(--radius-xl);
+            padding: var(--space-6);
+            margin-bottom: var(--space-6);
+        }
+
+        .policy-source-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: var(--space-3);
+            margin: var(--space-4) 0;
+        }
+
+        .policy-source-option {
+            border: 1px solid var(--border-primary);
+            border-radius: var(--radius-md);
+            background: var(--bg-primary);
+            padding: var(--space-3);
+        }
+
+        .policy-source-option label {
+            display: flex;
+            align-items: flex-start;
+            gap: var(--space-2);
+            cursor: pointer;
+        }
+
+        .policy-mapping-list {
+            display: grid;
+            gap: var(--space-3);
+            margin-top: var(--space-4);
+        }
+
+        .policy-mapping-item {
+            border: 1px solid var(--border-primary);
+            border-radius: var(--radius-md);
+            background: var(--bg-primary);
+            padding: var(--space-3);
+        }
+
         @media (max-width: 968px) {
             .schedule-header-row,
             .schedule-row {
@@ -375,6 +417,108 @@
                             <div style="font-size: var(--font-size-sm); color: var(--text-tertiary);">Weekend (Sat-Sun)</div>
                         </div>
                     </div>
+                {% endif %}
+            </div>
+
+            <div class="policy-card">
+                <div style="display:flex; justify-content:space-between; gap: var(--space-4); align-items:flex-start; flex-wrap: wrap;">
+                    <div>
+                        <h2 style="margin: 0;">Internet Blocklists</h2>
+                        <p style="margin: var(--space-1) 0 0 0; color: var(--text-secondary);">
+                            Assign shared blocklists to {{ user.username }} across all mapped devices.
+                        </p>
+                    </div>
+                    <div class="status-info">
+                        <div id="blocklist-sync-badge" class="badge {% if blocklist_sync_status.needs_sync %}badge-warning{% elif blocklist_sync_status.assigned_source_count %}badge-success{% else %}badge-secondary{% endif %}">
+                            <span id="blocklist-sync-text">
+                                {% if blocklist_sync_status.assigned_source_count == 0 %}
+                                No blocklists assigned
+                                {% elif blocklist_sync_status.needs_sync %}
+                                Blocklist changes pending sync
+                                {% else %}
+                                Blocklists synchronized
+                                {% endif %}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: var(--space-4); margin-top: var(--space-4);">
+                    <div style="text-align:center; padding: var(--space-3); background: var(--bg-secondary); border-radius: var(--radius-md);">
+                        <div style="font-size: var(--font-size-xl); font-weight: 700;">{{ blocklist_sync_status.assigned_source_count }}</div>
+                        <div style="font-size: var(--font-size-sm); color: var(--text-tertiary);">Assigned lists</div>
+                    </div>
+                    <div style="text-align:center; padding: var(--space-3); background: var(--bg-secondary); border-radius: var(--radius-md);">
+                        <div style="font-size: var(--font-size-xl); font-weight: 700;">{{ blocklist_sync_status.effective_domain_count }}</div>
+                        <div style="font-size: var(--font-size-sm); color: var(--text-tertiary);">Effective domains</div>
+                    </div>
+                    <div style="text-align:center; padding: var(--space-3); background: var(--bg-secondary); border-radius: var(--radius-md);">
+                        <div style="font-size: var(--font-size-xl); font-weight: 700;"><span id="blocklist-synced-count">{{ blocklist_sync_status.synced_mapping_count }}</span>/{{ blocklist_sync_status.mapping_count }}</div>
+                        <div style="font-size: var(--font-size-sm); color: var(--text-tertiary);">Mapped accounts synced</div>
+                    </div>
+                </div>
+
+                <form action="{{ url_for('update_user_blocklists', user_id=user.id) }}" method="POST" style="margin-top: var(--space-5);">
+                    <div class="policy-source-grid">
+                        {% for source in blocklist_sources %}
+                        <div class="policy-source-option">
+                            <label>
+                                <input
+                                    type="checkbox"
+                                    name="source_ids"
+                                    value="{{ source.id }}"
+                                    {% if source.id in blocklist_sync_status.assigned_source_ids %}checked{% endif %}
+                                >
+                                <span>
+                                    <strong>{{ source.name }}</strong><br>
+                                    <span style="font-size: var(--font-size-sm); color: var(--text-tertiary);">
+                                        {{ source.domain_count }} domain(s), {{ source.source_type|replace('_', ' ')|title }}
+                                    </span>
+                                </span>
+                            </label>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% if not blocklist_sources %}
+                    <div class="alert alert-info" style="margin-top: var(--space-4);">
+                        <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                            <path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16zm.93-9.412-1 4.705c-.07.34.029.533.304.533.194 0 .487-.07.686-.246l-.088.416c-.287.346-.92.598-1.465.598-.703 0-1.002-.422-.808-1.319l.738-3.468c.064-.293.006-.399-.287-.47l-.451-.081.082-.381 2.29-.287zM8 5.5a1 1 0 1 1 0-2 1 1 0 0 1 0 2z"/>
+                        </svg>
+                        Create blocklists on the Settings page before assigning them here.
+                    </div>
+                    {% endif %}
+                    <div style="margin-top: var(--space-4); display:flex; gap: var(--space-3); flex-wrap: wrap;">
+                        <button type="submit" class="btn btn-secondary">Save Blocklist Assignments</button>
+                        <a href="{{ url_for('settings') }}" class="btn btn-ghost">Manage Catalog</a>
+                    </div>
+                </form>
+
+                {% if blocklist_sync_status.mappings %}
+                <div class="policy-mapping-list">
+                    {% for mapping in blocklist_sync_status.mappings %}
+                    <div class="policy-mapping-item">
+                        <div style="display:flex; justify-content:space-between; gap: var(--space-3); flex-wrap: wrap;">
+                            <div>
+                                <strong>{{ mapping.linux_username }}@{{ mapping.device_label }}</strong>
+                                <div style="font-size: var(--font-size-sm); color: var(--text-tertiary);">
+                                    UID: {{ mapping.linux_uid if mapping.linux_uid is not none else 'unknown' }}
+                                    {% if mapping.last_synced %}
+                                    , last synced {{ mapping.last_synced }}
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <span class="badge {% if mapping.status == 'synced' %}badge-success{% elif mapping.status == 'awaiting_uid' %}badge-warning{% elif mapping.status == 'not_configured' %}badge-secondary{% else %}badge-warning{% endif %}">
+                                {{ mapping.status|replace('_', ' ')|title }}
+                            </span>
+                        </div>
+                        {% if mapping.last_error %}
+                        <div style="font-size: var(--font-size-sm); color: var(--danger); margin-top: var(--space-2);">
+                            {{ mapping.last_error }}
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
                 {% endif %}
             </div>
             
@@ -955,30 +1099,56 @@
             Promise.all([
                 fetch('/api/schedule-sync-status/{{ user.id }}').then(response => response.json()),
                 fetch('/api/user/{{ user.id }}/intervals/sync-status').then(response => response.json()),
+                fetch('/api/user/{{ user.id }}/blocklists/sync-status').then(response => response.json()),
             ])
-            .then(([scheduleData, intervalData]) => {
+            .then(([scheduleData, intervalData, blocklistData]) => {
                 const hasSchedule = Boolean(scheduleData?.schedule);
                 const hasIntervals = (intervalData?.total_intervals || 0) > 0;
-                const hasConfig = hasSchedule || hasIntervals;
+                const hasBlocklists = (blocklistData?.assigned_source_count || 0) > 0;
+                const hasConfig = hasSchedule || hasIntervals || hasBlocklists;
                 const needsSync = (
                     (hasSchedule && scheduleData.success && !scheduleData.is_synced) ||
-                    (intervalData.success && intervalData.needs_sync)
+                    (intervalData.success && intervalData.needs_sync) ||
+                    (blocklistData.success && blocklistData.needs_sync)
                 );
 
                 if (!hasConfig) {
                     statusBadge.style.display = 'none';
-                    return;
+                } else {
+                    statusBadge.style.display = 'block';
+                    if (needsSync) {
+                        statusBadge.className = 'badge badge-warning';
+                        statusIcon.setAttribute('d', 'M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767L8.982 1.566zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5zm.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2z');
+                        statusText.textContent = 'Changes Pending Sync';
+                    } else {
+                        statusBadge.className = 'badge badge-success';
+                        statusIcon.setAttribute('d', 'M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zm-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.061L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z');
+                        statusText.textContent = 'Synchronized';
+                    }
                 }
 
-                statusBadge.style.display = 'block';
-                if (needsSync) {
-                    statusBadge.className = 'badge badge-warning';
-                    statusIcon.setAttribute('d', 'M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767L8.982 1.566zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5zm.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2z');
-                    statusText.textContent = 'Changes Pending Sync';
+                const blocklistBadge = document.getElementById('blocklist-sync-badge');
+                const blocklistText = document.getElementById('blocklist-sync-text');
+                const blocklistSyncedCount = document.getElementById('blocklist-synced-count');
+                if (blocklistData?.success) {
+                    blocklistSyncedCount.textContent = blocklistData.synced_mapping_count;
+                    if ((blocklistData.assigned_source_count || 0) === 0) {
+                        blocklistBadge.className = 'badge badge-secondary';
+                        blocklistText.textContent = 'No blocklists assigned';
+                    } else if (blocklistData.needs_sync) {
+                        blocklistBadge.className = 'badge badge-warning';
+                        if ((blocklistData.awaiting_uid_count || 0) > 0) {
+                            blocklistText.textContent = 'Awaiting Linux UID validation';
+                        } else {
+                            blocklistText.textContent = 'Blocklist changes pending sync';
+                        }
+                    } else {
+                        blocklistBadge.className = 'badge badge-success';
+                        blocklistText.textContent = 'Blocklists synchronized';
+                    }
                 } else {
-                    statusBadge.className = 'badge badge-success';
-                    statusIcon.setAttribute('d', 'M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zm-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.061L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z');
-                    statusText.textContent = 'Synchronized';
+                    blocklistBadge.className = 'badge badge-warning';
+                    blocklistText.textContent = 'Unable to fetch blocklist status';
                 }
             })
             .catch(error => {

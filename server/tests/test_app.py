@@ -9,7 +9,10 @@ from app import ws_agent_handler, run_schema_migrations
 from src.database import (
     AgentAlert,
     AgentDevice,
+    BlocklistDomain,
+    BlocklistSource,
     ManagedUser,
+    ManagedUserBlocklistAssignment,
     ManagedUserDeviceMap,
     Settings,
     UserDailyTimeInterval,
@@ -180,6 +183,70 @@ def test_settings_page(client, db_session):
         'alert_webhook_secret': '',
     }, follow_redirects=True)
     assert b'Webhook URL is required when alert delivery is enabled' in res.data
+
+
+def test_blocklist_catalog_and_assignment_routes(client, db_session):
+    Settings.set_admin_password("admin")
+    client.post('/', data={'username': 'admin', 'password': 'admin'})
+
+    device = AgentDevice(system_id="policy-device", system_hostname="study-pc", status="approved", secure_token="tok")
+    user = ManagedUser(username="alice", system_ip="Unassigned", is_valid=True)
+    db_session.add_all([device, user])
+    db_session.flush()
+    mapping = ManagedUserDeviceMap(
+        managed_user_id=user.id,
+        system_id=device.system_id,
+        linux_username="alice",
+        linux_uid=1001,
+        is_valid=True,
+    )
+    db_session.add(mapping)
+    db_session.commit()
+
+    res = client.post('/blocklists/sources/add', data={
+        'name': 'School Hours',
+        'source_type': 'manual',
+        'manual_domains': 'dns.google\ncloudflare-dns.com\n',
+    }, follow_redirects=True)
+    assert b'created with 2 domain(s)' in res.data
+
+    source = BlocklistSource.query.filter_by(name='School Hours').first()
+    assert source is not None
+    assert source.domain_count == 2
+
+    res = client.post(
+        f'/blocklists/sources/{source.id}/domains/add',
+        data={'domain': 'example.com'},
+        follow_redirects=True,
+    )
+    assert b'Added example.com' in res.data
+    assert BlocklistDomain.query.filter_by(source_id=source.id, domain='example.com').first() is not None
+
+    res = client.post(
+        f'/managed-users/{user.id}/blocklists/update',
+        data={'source_ids': [str(source.id)]},
+        follow_redirects=True,
+    )
+    assert b'Updated blocklist assignments for alice' in res.data
+    assert ManagedUserBlocklistAssignment.query.filter_by(managed_user_id=user.id, source_id=source.id).first() is not None
+
+    sync_status = client.get(f'/api/user/{user.id}/blocklists/sync-status')
+    assert sync_status.status_code == 200
+    status_payload = json.loads(sync_status.data)
+    assert status_payload['success']
+    assert status_payload['assigned_source_count'] == 1
+    assert status_payload['effective_domain_count'] == 3
+    assert status_payload['mapping_count'] == 1
+
+    weekly_page = client.get(f'/weekly-schedule/{user.id}')
+    assert weekly_page.status_code == 200
+    assert b'Internet Blocklists' in weekly_page.data
+    assert b'School Hours' in weekly_page.data
+
+    device_page = client.get(f'/devices/{device.system_id}')
+    assert device_page.status_code == 200
+    assert b'Domain Policy Contributors' in device_page.data
+    assert b'Lists: 1' in device_page.data
 
 def test_user_operations(client, db_session):
     Settings.set_admin_password("admin")
@@ -871,3 +938,39 @@ def test_run_schema_migrations_creates_agent_alert_table(app, db_session):
     assert 'event_type' in columns
     assert 'payload_json' in columns
     assert 'delivery_status' in columns
+
+
+def test_run_schema_migrations_creates_blocklist_tables_and_mapping_sync_columns(app, db_session):
+    with app.app_context():
+        run_schema_migrations()
+
+    mapping_columns = {
+        row[1]
+        for row in db_session.execute(text("PRAGMA table_info(managed_user_device_map)")).fetchall()
+    }
+    assert 'blocklist_policy_hash' in mapping_columns
+    assert 'blocklist_is_synced' in mapping_columns
+    assert 'blocklist_last_synced' in mapping_columns
+    assert 'blocklist_last_error' in mapping_columns
+
+    source_columns = {
+        row[1]
+        for row in db_session.execute(text("PRAGMA table_info(blocklist_source)")).fetchall()
+    }
+    assert 'name' in source_columns
+    assert 'source_type' in source_columns
+    assert 'etag' in source_columns
+
+    domain_columns = {
+        row[1]
+        for row in db_session.execute(text("PRAGMA table_info(blocklist_domain)")).fetchall()
+    }
+    assert 'source_id' in domain_columns
+    assert 'domain' in domain_columns
+
+    assignment_columns = {
+        row[1]
+        for row in db_session.execute(text("PRAGMA table_info(managed_user_blocklist_assignment)")).fetchall()
+    }
+    assert 'managed_user_id' in assignment_columns
+    assert 'source_id' in assignment_columns

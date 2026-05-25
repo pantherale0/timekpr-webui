@@ -118,7 +118,7 @@
             {% endif %}
         {% endwith %}
         
-        <div class="users-grid" style="grid-template-columns: 1fr; max-width: 600px; margin: 0 auto;">
+        <div class="users-grid" style="grid-template-columns: 1fr; max-width: 1200px; margin: 0 auto;">
             <div class="card">
                 <div class="card-header">
                     <div style="display: flex; align-items: center; gap: var(--space-3);">
@@ -297,6 +297,136 @@
                             </div>
                         </div>
                     </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <div style="display: flex; align-items: center; gap: var(--space-3);">
+                        <svg width="24" height="24" fill="var(--text-secondary)" viewBox="0 0 16 16">
+                            <path d="M13 6V4a1 1 0 0 0-1-1H9.5V2a1.5 1.5 0 0 0-3 0v1H4a1 1 0 0 0-1 1v2h10zM4 7v5a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V7H4zm2 1h4v1H6V8zm0 2h4v1H6v-1z"/>
+                        </svg>
+                        <div>
+                            <h2>Blocklist Catalog</h2>
+                            <p style="margin: 0; color: var(--text-tertiary); font-size: var(--font-size-sm);">Create manual lists, register external URLs, and manage domains.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <form action="{{ url_for('create_blocklist_source') }}" method="POST" style="display: grid; gap: var(--space-4); margin-bottom: var(--space-6);">
+                        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: var(--space-4);">
+                            <div class="form-group">
+                                <label for="blocklist_name" class="form-label">List Name</label>
+                                <input type="text" id="blocklist_name" name="name" class="form-control" placeholder="School Hours" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="blocklist_source_type" class="form-label">Source Type</label>
+                                <select id="blocklist_source_type" name="source_type" class="form-control">
+                                    <option value="manual">Manual domains</option>
+                                    <option value="external_url">External URL</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: var(--space-4);">
+                            <div class="form-group">
+                                <label for="blocklist_source_url" class="form-label">External URL</label>
+                                <input type="url" id="blocklist_source_url" name="source_url" class="form-control" placeholder="https://example.com/blocklist.txt">
+                            </div>
+                            <div class="form-group">
+                                <label for="manual_domains" class="form-label">Manual Domains</label>
+                                <textarea id="manual_domains" name="manual_domains" class="form-control" rows="4" placeholder="one domain per line"></textarea>
+                            </div>
+                        </div>
+                        <div>
+                            <button type="submit" class="btn btn-primary">Create Blocklist</button>
+                        </div>
+                    </form>
+
+                    {% if blocklist_sources %}
+                    <div style="display:grid; gap: var(--space-4);">
+                        {% for source in blocklist_sources %}
+                        <div style="border: 1px solid var(--border-primary); border-radius: var(--radius-lg); padding: var(--space-4); background: var(--bg-primary);">
+                            <div style="display:flex; justify-content:space-between; gap: var(--space-4); flex-wrap: wrap; margin-bottom: var(--space-4);">
+                                <div>
+                                    <div style="display:flex; gap: var(--space-2); align-items:center; flex-wrap: wrap;">
+                                        <strong>{{ source.name }}</strong>
+                                        <span class="badge badge-secondary">{{ source.source_type|replace('_', ' ')|title }}</span>
+                                        {% if source.is_enabled %}
+                                        <span class="badge badge-success">Enabled</span>
+                                        {% else %}
+                                        <span class="badge badge-warning">Disabled</span>
+                                        {% endif %}
+                                    </div>
+                                    <div style="font-size: var(--font-size-sm); color: var(--text-tertiary); margin-top: var(--space-1);">
+                                        {{ source.domain_count }} domain(s), assigned to {{ source.assigned_user_count }} user(s)
+                                        {% if source.source_url %}
+                                        <br>{{ source.source_url }}
+                                        {% endif %}
+                                        {% if source.last_sync_at %}
+                                        <br>Last refresh: {{ source.last_sync_at }} ({{ source.last_sync_status }})
+                                        {% endif %}
+                                        {% if source.last_sync_error %}
+                                        <br>Error: {{ source.last_sync_error }}
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div style="display:flex; gap: var(--space-2); flex-wrap: wrap;">
+                                    <form action="{{ url_for('toggle_blocklist_source', source_id=source.id) }}" method="POST">
+                                        <label style="display:flex; align-items:center; gap: var(--space-2); font-size: var(--font-size-sm);">
+                                            <input type="checkbox" name="is_enabled" onchange="this.form.submit()" {% if source.is_enabled %}checked{% endif %}>
+                                            Enabled
+                                        </label>
+                                    </form>
+                                    {% if source.source_type == 'external_url' %}
+                                    <form action="{{ url_for('refresh_blocklist_source', source_id=source.id) }}" method="POST">
+                                        <button type="submit" class="btn btn-secondary btn-sm">Refresh</button>
+                                    </form>
+                                    {% endif %}
+                                    <form action="{{ url_for('delete_blocklist_source', source_id=source.id) }}" method="POST" onsubmit="return confirm('Delete blocklist {{ source.name }}?');">
+                                        <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+                                    </form>
+                                </div>
+                            </div>
+
+                            {% if source.source_type == 'manual' %}
+                            <div style="display:grid; gap: var(--space-4);">
+                                <form action="{{ url_for('add_blocklist_domain', source_id=source.id) }}" method="POST" style="display:flex; gap: var(--space-3); flex-wrap: wrap;">
+                                    <input type="text" name="domain" class="form-control" style="flex: 1 1 260px;" placeholder="example.com">
+                                    <button type="submit" class="btn btn-secondary">Add Domain</button>
+                                </form>
+
+                                {% if source.domains %}
+                                <div style="display:grid; gap: var(--space-2);">
+                                    {% for domain in source.domains[:25] %}
+                                    <div style="display:flex; justify-content:space-between; gap: var(--space-3); align-items:center; padding: var(--space-2) var(--space-3); border: 1px solid var(--border-primary); border-radius: var(--radius-md);">
+                                        <code>{{ domain.domain }}</code>
+                                        <form action="{{ url_for('delete_blocklist_domain', source_id=source.id, domain_id=domain.id) }}" method="POST">
+                                            <button type="submit" class="btn btn-danger btn-sm">Remove</button>
+                                        </form>
+                                    </div>
+                                    {% endfor %}
+                                    {% if source.domain_count > 25 %}
+                                    <div style="font-size: var(--font-size-sm); color: var(--text-tertiary);">
+                                        Showing the first 25 domains. The full list still syncs to agents.
+                                    </div>
+                                    {% endif %}
+                                </div>
+                                {% else %}
+                                <div style="font-size: var(--font-size-sm); color: var(--text-tertiary);">No manual domains added yet.</div>
+                                {% endif %}
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="alert alert-info">
+                        <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                            <path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16zm.93-9.412-1 4.705c-.07.34.029.533.304.533.194 0 .487-.07.686-.246l-.088.416c-.287.346-.92.598-1.465.598-.703 0-1.002-.422-.808-1.319l.738-3.468c.064-.293.006-.399-.287-.47l-.451-.081.082-.381 2.29-.287zM8 5.5a1 1 0 1 1 0-2 1 1 0 0 1 0 2z"/>
+                        </svg>
+                        No blocklists created yet.
+                    </div>
+                    {% endif %}
                 </div>
             </div>
         </div>

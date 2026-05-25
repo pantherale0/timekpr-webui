@@ -174,6 +174,27 @@
             {% endif %}
         </div>
 
+        <div class="device-card" style="margin-bottom: var(--space-6);">
+            <h2>Domain Policy Contributors</h2>
+            {% if blocklist_contributors %}
+            <div class="mapped-accounts-list">
+                {% for contributor in blocklist_contributors %}
+                <div class="mapped-account-item">
+                    <div style="font-weight: 600;">{{ contributor.managed_user }} -> {{ contributor.linux_username }}</div>
+                    <div style="font-size: var(--font-size-sm); color: var(--text-tertiary); margin-top: var(--space-1);">
+                        UID: {{ contributor.linux_uid if contributor.linux_uid is not none else '-' }}
+                        <span style="margin-left: var(--space-3);">Lists: {{ contributor.assigned_source_count }}</span>
+                        <span style="margin-left: var(--space-3);">Domains: {{ contributor.effective_domain_count }}</span>
+                        <span style="margin-left: var(--space-3);">Sync: {{ contributor.sync_status|replace('_', ' ')|title }}</span>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p style="margin: 0; color: var(--text-tertiary);">No mapped accounts on this device currently contribute any blocklist policy.</p>
+            {% endif %}
+        </div>
+
         <div class="device-card">
             <div style="display:flex; justify-content:space-between; align-items:flex-start; gap: var(--space-4); flex-wrap: wrap; margin-bottom: var(--space-5);">
                 <div>

@@ -4,7 +4,10 @@ from datetime import datetime, date, timedelta
 from src.task_manager import BackgroundTaskManager
 from src.database import (
     AgentAlert,
+    BlocklistDomain,
+    BlocklistSource,
     ManagedUser,
+    ManagedUserBlocklistAssignment,
     ManagedUserDeviceMap,
     UserTimeUsage,
     UserWeeklySchedule,
@@ -290,6 +293,53 @@ def test_task_manager_failures_and_threads(app, db_session):
     # 3. Thread graceful exit and timeout logs
     manager.start()
     manager.stop()
+
+
+def test_task_manager_syncs_domain_policy_payloads(app, db_session):
+    manager = BackgroundTaskManager(app)
+
+    user = ManagedUser(username="policy-user", system_ip="Unassigned", is_valid=True)
+    device = AgentDevice(system_id="sys-policy", status="approved", secure_token="tok")
+    source = BlocklistSource(name="DoH", source_type=BlocklistSource.TYPE_MANUAL, is_enabled=True)
+    db_session.add_all([user, device, source])
+    db_session.flush()
+    db_session.add_all([
+        ManagedUserDeviceMap(
+            managed_user_id=user.id,
+            system_id=device.system_id,
+            linux_username="policy-user",
+            linux_uid=1005,
+            is_valid=True,
+        ),
+        ManagedUserBlocklistAssignment(managed_user_id=user.id, source_id=source.id),
+        BlocklistDomain(source_id=source.id, domain="dns.google"),
+        BlocklistDomain(source_id=source.id, domain="cloudflare-dns.com"),
+    ])
+    db_session.commit()
+
+    ws = DummyWS()
+    AgentConnectionManager.register(device.system_id, ws, "10.0.0.20")
+
+    with app.app_context():
+        manager._sync_domain_policies()
+
+    sent_payloads = [
+        json.loads(message)
+        for message in ws.sent_messages
+        if json.loads(message).get("action") == "sync_domain_policy"
+    ]
+    assert sent_payloads
+    policy_payload = sent_payloads[-1]["args"]
+    assert policy_payload["sources"]["1"] == ["cloudflare-dns.com", "dns.google"]
+    assert policy_payload["policies"]["1005"]["linux_username"] == "policy-user"
+    assert policy_payload["policies"]["1005"]["source_ids"] == ["1"]
+
+    mapping = ManagedUserDeviceMap.query.filter_by(system_id=device.system_id).first()
+    assert mapping.blocklist_is_synced
+    assert mapping.blocklist_policy_hash
+    assert mapping.blocklist_last_synced is not None
+
+    AgentConnectionManager.unregister(device.system_id)
 
 
 def test_task_manager_delivers_pending_alerts(app, db_session):

@@ -211,6 +211,12 @@ class ManagedUser(db.Model):
         lazy=True,
         cascade="all, delete-orphan",
     )
+    blocklist_assignments = db.relationship(
+        'ManagedUserBlocklistAssignment',
+        backref='managed_user',
+        lazy=True,
+        cascade="all, delete-orphan",
+    )
     
     def __repr__(self):
         return f'<ManagedUser {self.username}>'
@@ -346,6 +352,10 @@ class ManagedUserDeviceMap(db.Model):
     last_config = db.Column(db.Text, nullable=True)
     date_added = db.Column(db.DateTime, default=datetime.utcnow)
     last_modified = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    blocklist_policy_hash = db.Column(db.String(64), nullable=True)
+    blocklist_is_synced = db.Column(db.Boolean, default=False, nullable=False)
+    blocklist_last_synced = db.Column(db.DateTime, nullable=True)
+    blocklist_last_error = db.Column(db.Text, nullable=True)
 
     __table_args__ = (
         db.UniqueConstraint('managed_user_id', 'system_id', name='managed_user_system_uc'),
@@ -365,6 +375,110 @@ class ManagedUserDeviceMap(db.Model):
             return config.get(key)
         except (TypeError, ValueError, json.JSONDecodeError):
             return None
+
+    def mark_blocklist_synced(self, policy_hash):
+        self.blocklist_policy_hash = policy_hash
+        self.blocklist_is_synced = True
+        self.blocklist_last_synced = datetime.utcnow()
+        self.blocklist_last_error = None
+
+    def mark_blocklist_sync_failed(self, error_message):
+        self.blocklist_is_synced = False
+        self.blocklist_last_error = error_message
+
+
+class BlocklistSource(db.Model):
+    __tablename__ = 'blocklist_source'
+
+    TYPE_MANUAL = 'manual'
+    TYPE_EXTERNAL_URL = 'external_url'
+
+    SYNC_NEVER = 'never'
+    SYNC_OK = 'ok'
+    SYNC_ERROR = 'error'
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(120), unique=True, nullable=False)
+    source_type = db.Column(db.String(32), nullable=False, default=TYPE_MANUAL)
+    source_url = db.Column(db.Text, nullable=True)
+    is_enabled = db.Column(db.Boolean, default=True, nullable=False)
+    last_sync_at = db.Column(db.DateTime, nullable=True)
+    last_sync_status = db.Column(db.String(32), default=SYNC_NEVER, nullable=False)
+    last_sync_error = db.Column(db.Text, nullable=True)
+    etag = db.Column(db.String(255), nullable=True)
+    source_last_modified = db.Column(db.String(255), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(
+        db.DateTime,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow,
+        nullable=False,
+    )
+
+    domains = db.relationship(
+        'BlocklistDomain',
+        backref='source',
+        lazy=True,
+        cascade="all, delete-orphan",
+        order_by='BlocklistDomain.domain.asc()',
+    )
+    assignments = db.relationship(
+        'ManagedUserBlocklistAssignment',
+        backref='source',
+        lazy=True,
+        cascade="all, delete-orphan",
+    )
+
+    def __repr__(self):
+        return f'<BlocklistSource {self.name} [{self.source_type}]>'
+
+    @property
+    def domain_count(self):
+        return len(self.domains)
+
+    def mark_sync_ok(self):
+        self.last_sync_at = datetime.utcnow()
+        self.last_sync_status = self.SYNC_OK
+        self.last_sync_error = None
+        self.updated_at = datetime.utcnow()
+
+    def mark_sync_error(self, error_message):
+        self.last_sync_at = datetime.utcnow()
+        self.last_sync_status = self.SYNC_ERROR
+        self.last_sync_error = error_message
+        self.updated_at = datetime.utcnow()
+
+
+class BlocklistDomain(db.Model):
+    __tablename__ = 'blocklist_domain'
+
+    id = db.Column(db.Integer, primary_key=True)
+    source_id = db.Column(db.Integer, db.ForeignKey('blocklist_source.id'), nullable=False)
+    domain = db.Column(db.String(255), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    __table_args__ = (
+        db.UniqueConstraint('source_id', 'domain', name='blocklist_source_domain_uc'),
+    )
+
+    def __repr__(self):
+        return f'<BlocklistDomain {self.domain}>'
+
+
+class ManagedUserBlocklistAssignment(db.Model):
+    __tablename__ = 'managed_user_blocklist_assignment'
+
+    id = db.Column(db.Integer, primary_key=True)
+    managed_user_id = db.Column(db.Integer, db.ForeignKey('managed_user.id'), nullable=False)
+    source_id = db.Column(db.Integer, db.ForeignKey('blocklist_source.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    __table_args__ = (
+        db.UniqueConstraint('managed_user_id', 'source_id', name='managed_user_blocklist_uc'),
+    )
+
+    def __repr__(self):
+        return f'<ManagedUserBlocklistAssignment user={self.managed_user_id} source={self.source_id}>'
 
 class UserTimeUsage(db.Model):
     __tablename__ = 'user_time_usage'

@@ -10,17 +10,27 @@ from src.database import (
     AgentAlert,
     ManagedUser,
     ManagedUserDeviceMap,
+    ManagedUserBlocklistAssignment,
     UserTimeUsage,
     Settings,
     UserWeeklySchedule,
     UserDailyTimeInterval,
     coerce_time_spent_day,
     AgentDevice,
+    BlocklistSource,
+    BlocklistDomain,
 )
 from src.agent_helper import (
     AgentClient,
     AgentConnectionManager,
     normalize_agent_alert_payload,
+)
+from src.blocklist_helper import (
+    normalize_domain,
+    parse_blocklist_text,
+    validate_external_source_url,
+    build_source_domain_map,
+    summarize_mapping_blocklist_sync,
 )
 from flask_sock import Sock
 from src.task_manager import BackgroundTaskManager
@@ -344,6 +354,92 @@ def _refresh_managed_user_summary(user):
         usage.time_spent = shared_spent
     else:
         db.session.add(UserTimeUsage(user_id=user.id, date=today, time_spent=shared_spent))
+
+
+def _serialize_blocklist_source(source, include_domains=False):
+    sorted_domains = sorted({domain.domain for domain in source.domains})
+    payload = {
+        'id': source.id,
+        'name': source.name,
+        'source_type': source.source_type,
+        'source_url': source.source_url,
+        'is_enabled': source.is_enabled,
+        'domain_count': len(sorted_domains),
+        'assigned_user_count': len(source.assignments),
+        'last_sync_at': source.last_sync_at.strftime('%Y-%m-%d %H:%M') if source.last_sync_at else None,
+        'last_sync_status': source.last_sync_status,
+        'last_sync_error': source.last_sync_error,
+    }
+    if include_domains:
+        payload['domains'] = [
+            {'id': domain.id, 'domain': domain.domain}
+            for domain in source.domains
+        ]
+    return payload
+
+
+def _get_blocklist_sources(include_domains=False, enabled_only=False):
+    query = BlocklistSource.query
+    if enabled_only:
+        query = query.filter_by(is_enabled=True)
+    sources = query.order_by(BlocklistSource.name.asc()).all()
+    return [_serialize_blocklist_source(source, include_domains=include_domains) for source in sources]
+
+
+def _get_user_assigned_blocklist_source_ids(user):
+    return {
+        assignment.source_id
+        for assignment in user.blocklist_assignments
+        if assignment.source and assignment.source.is_enabled
+    }
+
+
+def _build_user_blocklist_sync_status(user):
+    assigned_source_ids = _get_user_assigned_blocklist_source_ids(user)
+    active_sources = []
+    if assigned_source_ids:
+        active_sources = BlocklistSource.query.filter(
+            BlocklistSource.id.in_(assigned_source_ids)
+        ).all()
+    source_domain_map = build_source_domain_map(active_sources)
+
+    mappings = []
+    for mapping in sorted(
+        user.device_mappings,
+        key=lambda item: (
+            _device_display_label(item.system_id).lower(),
+            item.linux_username.lower(),
+            item.id,
+        ),
+    ):
+        summary = summarize_mapping_blocklist_sync(mapping, source_domain_map, assigned_source_ids)
+        mappings.append({
+            'mapping_id': mapping.id,
+            'system_id': mapping.system_id,
+            'device_label': _device_display_label(mapping.system_id),
+            'linux_username': mapping.linux_username,
+            'linux_uid': mapping.linux_uid,
+            'status': summary['status'],
+            'needs_sync': summary['needs_sync'],
+            'effective_domain_count': summary['effective_domain_count'],
+            'last_synced': mapping.blocklist_last_synced.strftime('%Y-%m-%d %H:%M') if mapping.blocklist_last_synced else None,
+            'last_error': mapping.blocklist_last_error,
+        })
+
+    needs_sync = any(mapping['needs_sync'] for mapping in mappings)
+    synced_count = sum(1 for mapping in mappings if mapping['status'] == 'synced')
+    awaiting_uid_count = sum(1 for mapping in mappings if mapping['status'] == 'awaiting_uid')
+
+    return {
+        'assigned_source_ids': sorted(assigned_source_ids),
+        'assigned_source_count': len(assigned_source_ids),
+        'effective_domain_count': sum(len(domains) for domains in source_domain_map.values()),
+        'mapping_count': len(mappings),
+        'synced_mapping_count': synced_count,
+        'awaiting_uid_count': awaiting_uid_count,
+        'needs_sync': needs_sync,
+        'mappings': mappings,
+    }
 
 
 INTERVAL_STEP_MINUTES = 15
@@ -885,6 +981,7 @@ def settings():
         return redirect(url_for('login'))
 
     alert_webhook_settings = _get_alert_webhook_settings()
+    blocklist_sources = _get_blocklist_sources(include_domains=True)
 
     if request.method == 'POST':
         form_name = (request.form.get('form_name') or 'password').strip()
@@ -927,7 +1024,185 @@ def settings():
                 flash('Password updated successfully', 'success')
                 return redirect(url_for('settings'))
 
-    return render_template('settings.html', alert_webhook_settings=alert_webhook_settings)
+    return render_template(
+        'settings.html',
+        alert_webhook_settings=alert_webhook_settings,
+        blocklist_sources=blocklist_sources,
+    )
+
+
+@app.route('/blocklists/sources/add', methods=['POST'])
+def create_blocklist_source():
+    if not session.get('logged_in'):
+        return jsonify({'success': False, 'message': 'Not authenticated'}), 401
+
+    name = (request.form.get('name') or '').strip()
+    source_type = (request.form.get('source_type') or BlocklistSource.TYPE_MANUAL).strip()
+    source_url = (request.form.get('source_url') or '').strip()
+    manual_domains_raw = request.form.get('manual_domains') or ''
+
+    if not name:
+        flash('Blocklist name is required', 'danger')
+        return redirect(url_for('settings'))
+
+    existing = BlocklistSource.query.filter_by(name=name).first()
+    if existing:
+        flash(f'Blocklist "{name}" already exists', 'warning')
+        return redirect(url_for('settings'))
+
+    if source_type not in {BlocklistSource.TYPE_MANUAL, BlocklistSource.TYPE_EXTERNAL_URL}:
+        flash('Unsupported blocklist source type', 'danger')
+        return redirect(url_for('settings'))
+
+    validated_url = None
+    domains = []
+    try:
+        if source_type == BlocklistSource.TYPE_EXTERNAL_URL:
+            validated_url = validate_external_source_url(source_url)
+        else:
+            domains, _ = parse_blocklist_text(manual_domains_raw, strict=True)
+    except ValueError as exc:
+        flash(str(exc), 'danger')
+        return redirect(url_for('settings'))
+
+    source = BlocklistSource(
+        name=name,
+        source_type=source_type,
+        source_url=validated_url,
+        is_enabled=True,
+    )
+    db.session.add(source)
+    db.session.flush()
+
+    for domain in domains:
+        db.session.add(BlocklistDomain(source_id=source.id, domain=domain))
+
+    db.session.commit()
+
+    if source.source_type == BlocklistSource.TYPE_EXTERNAL_URL:
+        success, message = task_manager.refresh_external_blocklist_source(source.id)
+        flash(message, 'success' if success else 'warning')
+    else:
+        flash(f'Blocklist "{source.name}" created with {len(domains)} domain(s)', 'success')
+
+    return redirect(url_for('settings'))
+
+
+@app.route('/blocklists/sources/<int:source_id>/delete', methods=['POST'])
+def delete_blocklist_source(source_id):
+    if not session.get('logged_in'):
+        return jsonify({'success': False, 'message': 'Not authenticated'}), 401
+
+    source = BlocklistSource.query.get_or_404(source_id)
+    source_name = source.name
+    db.session.delete(source)
+    db.session.commit()
+    flash(f'Blocklist "{source_name}" deleted', 'success')
+    return redirect(url_for('settings'))
+
+
+@app.route('/blocklists/sources/<int:source_id>/refresh', methods=['POST'])
+def refresh_blocklist_source(source_id):
+    if not session.get('logged_in'):
+        return jsonify({'success': False, 'message': 'Not authenticated'}), 401
+
+    success, message = task_manager.refresh_external_blocklist_source(source_id, force=True)
+    flash(message, 'success' if success else 'warning')
+    return redirect(url_for('settings'))
+
+
+@app.route('/blocklists/sources/<int:source_id>/toggle', methods=['POST'])
+def toggle_blocklist_source(source_id):
+    if not session.get('logged_in'):
+        return jsonify({'success': False, 'message': 'Not authenticated'}), 401
+
+    source = BlocklistSource.query.get_or_404(source_id)
+    source.is_enabled = request.form.get('is_enabled') == 'on'
+    source.updated_at = datetime.utcnow()
+    db.session.commit()
+    flash(f'Blocklist "{source.name}" {"enabled" if source.is_enabled else "disabled"}', 'success')
+    return redirect(url_for('settings'))
+
+
+@app.route('/blocklists/sources/<int:source_id>/domains/add', methods=['POST'])
+def add_blocklist_domain(source_id):
+    if not session.get('logged_in'):
+        return jsonify({'success': False, 'message': 'Not authenticated'}), 401
+
+    source = BlocklistSource.query.get_or_404(source_id)
+    if source.source_type != BlocklistSource.TYPE_MANUAL:
+        flash('Only manual blocklists support direct domain editing', 'warning')
+        return redirect(url_for('settings'))
+
+    raw_domain = request.form.get('domain')
+    try:
+        domain = normalize_domain(raw_domain)
+    except ValueError as exc:
+        flash(str(exc), 'danger')
+        return redirect(url_for('settings'))
+
+    existing = BlocklistDomain.query.filter_by(source_id=source.id, domain=domain).first()
+    if existing:
+        flash(f'{domain} is already present in "{source.name}"', 'warning')
+        return redirect(url_for('settings'))
+
+    db.session.add(BlocklistDomain(source_id=source.id, domain=domain))
+    source.updated_at = datetime.utcnow()
+    db.session.commit()
+    flash(f'Added {domain} to "{source.name}"', 'success')
+    return redirect(url_for('settings'))
+
+
+@app.route('/blocklists/sources/<int:source_id>/domains/<int:domain_id>/delete', methods=['POST'])
+def delete_blocklist_domain(source_id, domain_id):
+    if not session.get('logged_in'):
+        return jsonify({'success': False, 'message': 'Not authenticated'}), 401
+
+    source = BlocklistSource.query.get_or_404(source_id)
+    domain = BlocklistDomain.query.filter_by(id=domain_id, source_id=source.id).first_or_404()
+    domain_text = domain.domain
+    db.session.delete(domain)
+    source.updated_at = datetime.utcnow()
+    db.session.commit()
+    flash(f'Removed {domain_text} from "{source.name}"', 'success')
+    return redirect(url_for('settings'))
+
+
+@app.route('/managed-users/<int:user_id>/blocklists/update', methods=['POST'])
+def update_user_blocklists(user_id):
+    if not session.get('logged_in'):
+        return jsonify({'success': False, 'message': 'Not authenticated'}), 401
+
+    user = ManagedUser.query.get_or_404(user_id)
+    selected_ids = {
+        int(raw_id)
+        for raw_id in request.form.getlist('source_ids')
+        if str(raw_id).strip().isdigit()
+    }
+
+    valid_sources = {
+        source.id: source
+        for source in BlocklistSource.query.filter(
+            BlocklistSource.id.in_(selected_ids),
+            BlocklistSource.is_enabled.is_(True),
+        ).all()
+    } if selected_ids else {}
+
+    if selected_ids and len(valid_sources) != len(selected_ids):
+        flash('One or more selected blocklists no longer exist', 'danger')
+        return redirect(url_for('weekly_schedule_user', user_id=user.id))
+
+    current_ids = {assignment.source_id for assignment in user.blocklist_assignments}
+    for assignment in list(user.blocklist_assignments):
+        if assignment.source_id not in selected_ids:
+            db.session.delete(assignment)
+
+    for source_id in sorted(selected_ids - current_ids):
+        db.session.add(ManagedUserBlocklistAssignment(managed_user_id=user.id, source_id=source_id))
+
+    db.session.commit()
+    flash(f'Updated blocklist assignments for {user.username}', 'success')
+    return redirect(url_for('weekly_schedule_user', user_id=user.id))
 
 @app.route('/api/task-status')
 def get_task_status():
@@ -1250,7 +1525,13 @@ def weekly_schedule_user(user_id):
         db.session.add(schedule)
         db.session.commit()
     
-    return render_template('weekly_schedule_single.html', user=user)
+    blocklist_sync_status = _build_user_blocklist_sync_status(user)
+    return render_template(
+        'weekly_schedule_single.html',
+        user=user,
+        blocklist_sources=_get_blocklist_sources(include_domains=False, enabled_only=True),
+        blocklist_sync_status=blocklist_sync_status,
+    )
 
 @app.route('/weekly-schedule/update', methods=['POST'])
 def update_weekly_schedule():
@@ -1437,6 +1718,25 @@ def get_intervals_sync_status(user_id):
         'username': user.username
     })
 
+
+@app.route('/api/user/<int:user_id>/blocklists/sync-status')
+def get_blocklist_sync_status(user_id):
+    if not session.get('logged_in'):
+        return jsonify({'success': False, 'message': 'Not authenticated'}), 401
+
+    user = ManagedUser.query.get_or_404(user_id)
+    status = _build_user_blocklist_sync_status(user)
+    return jsonify({
+        'success': True,
+        'needs_sync': status['needs_sync'],
+        'assigned_source_count': status['assigned_source_count'],
+        'effective_domain_count': status['effective_domain_count'],
+        'mapping_count': status['mapping_count'],
+        'synced_mapping_count': status['synced_mapping_count'],
+        'awaiting_uid_count': status['awaiting_uid_count'],
+        'mappings': status['mappings'],
+    })
+
 @app.route('/api/schedule-sync-status/<int:user_id>')
 def get_schedule_sync_status(user_id):
     """Get the sync status of a user's weekly schedule"""
@@ -1516,12 +1816,35 @@ def device_detail(system_id):
             mapping.id,
         ),
     )
+    blocklist_contributors = []
+    for mapping in mapped_accounts:
+        user = mapping.managed_user
+        assigned_source_ids = _get_user_assigned_blocklist_source_ids(user)
+        if not assigned_source_ids:
+            continue
+        status = _build_user_blocklist_sync_status(user)
+        blocklist_contributors.append({
+            'managed_user': user.username,
+            'linux_username': mapping.linux_username,
+            'linux_uid': mapping.linux_uid,
+            'assigned_source_count': status['assigned_source_count'],
+            'effective_domain_count': status['effective_domain_count'],
+            'sync_status': next(
+                (
+                    item['status']
+                    for item in status['mappings']
+                    if item['mapping_id'] == mapping.id
+                ),
+                'pending',
+            ),
+        })
 
     return render_template(
         'device_detail.html',
         device=device,
         device_label=device_labels.get(system_id, device.display_name),
         mapped_accounts=mapped_accounts,
+        blocklist_contributors=blocklist_contributors,
         alert_search=alert_search,
         alert_entries=alert_entries,
         alert_summary=alert_summary,
@@ -1628,11 +1951,80 @@ def run_schema_migrations():
             last_config TEXT NULL,
             date_added DATETIME NULL,
             last_modified DATETIME NULL,
+            blocklist_policy_hash VARCHAR(64) NULL,
+            blocklist_is_synced BOOLEAN NOT NULL DEFAULT 0,
+            blocklist_last_synced DATETIME NULL,
+            blocklist_last_error TEXT NULL,
             FOREIGN KEY(managed_user_id) REFERENCES managed_user(id),
             FOREIGN KEY(system_id) REFERENCES agent_device(system_id),
             UNIQUE(managed_user_id, system_id),
             UNIQUE(system_id, linux_username),
             UNIQUE(system_id, linux_uid)
+        )
+    """))
+    db.session.commit()
+
+    mapping_columns = {
+        row[1]
+        for row in db.session.execute(text("PRAGMA table_info(managed_user_device_map)")).fetchall()
+    }
+    if mapping_columns and 'blocklist_policy_hash' not in mapping_columns:
+        db.session.execute(text("""
+            ALTER TABLE managed_user_device_map
+            ADD COLUMN blocklist_policy_hash VARCHAR(64) NULL
+        """))
+    if mapping_columns and 'blocklist_is_synced' not in mapping_columns:
+        db.session.execute(text("""
+            ALTER TABLE managed_user_device_map
+            ADD COLUMN blocklist_is_synced BOOLEAN NOT NULL DEFAULT 0
+        """))
+    if mapping_columns and 'blocklist_last_synced' not in mapping_columns:
+        db.session.execute(text("""
+            ALTER TABLE managed_user_device_map
+            ADD COLUMN blocklist_last_synced DATETIME NULL
+        """))
+    if mapping_columns and 'blocklist_last_error' not in mapping_columns:
+        db.session.execute(text("""
+            ALTER TABLE managed_user_device_map
+            ADD COLUMN blocklist_last_error TEXT NULL
+        """))
+    db.session.commit()
+
+    db.session.execute(text("""
+        CREATE TABLE IF NOT EXISTS blocklist_source (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name VARCHAR(120) NOT NULL UNIQUE,
+            source_type VARCHAR(32) NOT NULL,
+            source_url TEXT NULL,
+            is_enabled BOOLEAN NOT NULL DEFAULT 1,
+            last_sync_at DATETIME NULL,
+            last_sync_status VARCHAR(32) NOT NULL DEFAULT 'never',
+            last_sync_error TEXT NULL,
+            etag VARCHAR(255) NULL,
+            source_last_modified VARCHAR(255) NULL,
+            created_at DATETIME NOT NULL,
+            updated_at DATETIME NOT NULL
+        )
+    """))
+    db.session.execute(text("""
+        CREATE TABLE IF NOT EXISTS blocklist_domain (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            source_id INTEGER NOT NULL,
+            domain VARCHAR(255) NOT NULL,
+            created_at DATETIME NOT NULL,
+            FOREIGN KEY(source_id) REFERENCES blocklist_source(id),
+            UNIQUE(source_id, domain)
+        )
+    """))
+    db.session.execute(text("""
+        CREATE TABLE IF NOT EXISTS managed_user_blocklist_assignment (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            managed_user_id INTEGER NOT NULL,
+            source_id INTEGER NOT NULL,
+            created_at DATETIME NOT NULL,
+            FOREIGN KEY(managed_user_id) REFERENCES managed_user(id),
+            FOREIGN KEY(source_id) REFERENCES blocklist_source(id),
+            UNIQUE(managed_user_id, source_id)
         )
     """))
     db.session.commit()

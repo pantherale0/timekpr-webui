@@ -11,14 +11,23 @@ import requests
 
 from src.database import (
     AgentAlert,
+    BlocklistDomain,
+    BlocklistSource,
     db,
     ManagedUser,
     Settings,
+    ManagedUserDeviceMap,
     UserTimeUsage,
     UserDailyTimeInterval,
     coerce_time_spent_day,
 )
 from src.agent_helper import AgentClient, AgentConnectionManager
+from src.blocklist_helper import (
+    parse_blocklist_text,
+    build_source_domain_map,
+    summarize_mapping_blocklist_sync,
+    should_refresh_external_source,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -82,6 +91,32 @@ def _build_webhook_headers(alert, payload_body, secret):
         ).hexdigest()
         headers['X-Timekpr-Signature'] = f'sha256={signature}'
     return headers
+
+
+def _replace_source_domains(source, normalized_domains):
+    existing_by_domain = {domain.domain: domain for domain in source.domains}
+    desired_domains = set(normalized_domains)
+
+    for domain_text, domain_row in list(existing_by_domain.items()):
+        if domain_text not in desired_domains:
+            db.session.delete(domain_row)
+
+    for domain_text in normalized_domains:
+        if domain_text not in existing_by_domain:
+            db.session.add(BlocklistDomain(source_id=source.id, domain=domain_text))
+
+    source.updated_at = datetime.utcnow()
+
+
+def _assigned_source_ids_for_user(user, active_source_ids=None):
+    source_ids = {
+        assignment.source_id
+        for assignment in getattr(user, 'blocklist_assignments', [])
+        if assignment.source and assignment.source.is_enabled
+    }
+    if active_source_ids is not None:
+        source_ids &= set(active_source_ids)
+    return sorted(source_ids)
 
 class BackgroundTaskManager:
     def __init__(self, app=None):
@@ -148,8 +183,12 @@ class BackgroundTaskManager:
                         # Use a fresh app context
                         if self.app:
                             with self.app.app_context():
+                                logger.info("Refreshing external blocklists")
+                                self._refresh_external_blocklists()
                                 logger.info("Updating user data")
                                 self._update_user_data()
+                                logger.info("Synchronizing domain policies")
+                                self._sync_domain_policies()
                                 logger.info("Delivering alert webhooks")
                                 self._deliver_pending_alerts()
                                 logger.info("User data update cycle complete")
@@ -366,6 +405,142 @@ class BackgroundTaskManager:
             logger.error(
                 "Error in user data update: %s\n%s",
                 str(e),
+                traceback.format_exc(),
+            )
+            db.session.rollback()
+
+    def refresh_external_blocklist_source(self, source_id, force=False):
+        source = BlocklistSource.query.get(source_id)
+        if not source:
+            return False, 'Blocklist source not found'
+        if source.source_type != BlocklistSource.TYPE_EXTERNAL_URL:
+            return False, f'Blocklist "{source.name}" is not an external URL source'
+        if not force and not should_refresh_external_source(source):
+            return True, f'Blocklist "{source.name}" is already up to date'
+
+        headers = {}
+        if source.etag:
+            headers['If-None-Match'] = source.etag
+        if source.source_last_modified:
+            headers['If-Modified-Since'] = source.source_last_modified
+
+        try:
+            response = requests.get(source.source_url, headers=headers, timeout=10)
+        except Exception as exc:
+            source.mark_sync_error(str(exc))
+            db.session.commit()
+            return False, f'Failed to refresh "{source.name}": {exc}'
+
+        if response.status_code == 304:
+            source.mark_sync_ok()
+            db.session.commit()
+            return True, f'External blocklist "{source.name}" was unchanged'
+
+        if not (200 <= response.status_code < 300):
+            source.mark_sync_error(f'HTTP {response.status_code}')
+            db.session.commit()
+            return False, f'Failed to refresh "{source.name}": HTTP {response.status_code}'
+
+        domains, errors = parse_blocklist_text(response.text)
+        _replace_source_domains(source, domains)
+        source.etag = response.headers.get('ETag')
+        source.source_last_modified = response.headers.get('Last-Modified')
+        source.mark_sync_ok()
+        if errors:
+            source.last_sync_error = '; '.join(errors[:5])
+        db.session.commit()
+        return True, f'Refreshed "{source.name}" with {len(domains)} domain(s)'
+
+    def _refresh_external_blocklists(self):
+        external_sources = BlocklistSource.query.filter_by(
+            source_type=BlocklistSource.TYPE_EXTERNAL_URL
+        ).all()
+        for source in external_sources:
+            if not should_refresh_external_source(source):
+                continue
+
+            success, message = self.refresh_external_blocklist_source(source.id)
+            if success:
+                logger.info(message)
+            else:
+                logger.warning(message)
+
+    def _sync_domain_policies(self):
+        try:
+            active_sources = BlocklistSource.query.filter_by(is_enabled=True).all()
+            active_source_ids = {source.id for source in active_sources}
+            source_domain_map = build_source_domain_map(active_sources)
+            mappings_by_device = {}
+
+            all_mappings = ManagedUserDeviceMap.query.order_by(
+                ManagedUserDeviceMap.system_id.asc(),
+                ManagedUserDeviceMap.id.asc(),
+            ).all()
+            for mapping in all_mappings:
+                mappings_by_device.setdefault(mapping.system_id, []).append(mapping)
+
+            for system_id, mappings in mappings_by_device.items():
+                device_sources = {}
+                device_policies = {}
+                mapping_state = []
+
+                for mapping in mappings:
+                    assigned_source_ids = _assigned_source_ids_for_user(
+                        mapping.managed_user,
+                        active_source_ids=active_source_ids,
+                    )
+                    summary = summarize_mapping_blocklist_sync(mapping, source_domain_map, assigned_source_ids)
+                    mapping_state.append((mapping, assigned_source_ids, summary))
+
+                    if assigned_source_ids and mapping.linux_uid is not None:
+                        for source_id in assigned_source_ids:
+                            source_domains = source_domain_map.get(str(source_id), [])
+                            if source_domains:
+                                device_sources[str(source_id)] = source_domains
+                        device_policies[str(mapping.linux_uid)] = {
+                            'linux_username': mapping.linux_username,
+                            'source_ids': [str(source_id) for source_id in assigned_source_ids],
+                        }
+
+                needs_sync = any(summary['needs_sync'] for _, _, summary in mapping_state)
+                if not needs_sync:
+                    continue
+
+                if not AgentConnectionManager.is_online(system_id):
+                    logger.info("Skipping domain policy sync for offline device %s", system_id)
+                    continue
+
+                payload = {
+                    'sources': device_sources,
+                    'policies': device_policies,
+                }
+
+                agent_client = AgentClient(system_id=system_id)
+                success, message = agent_client.sync_domain_policy(payload)
+                if success:
+                    for mapping, assigned_source_ids, summary in mapping_state:
+                        if assigned_source_ids and mapping.linux_uid is None:
+                            mapping.mark_blocklist_sync_failed('Linux UID is required before domain policy can sync')
+                            continue
+
+                        if assigned_source_ids:
+                            mapping.mark_blocklist_synced(summary['policy_hash'])
+                        else:
+                            mapping.mark_blocklist_synced(None)
+                    db.session.commit()
+                else:
+                    for mapping, _, _ in mapping_state:
+                        mapping.mark_blocklist_sync_failed(message)
+                    db.session.commit()
+                    logger.warning(
+                        "Domain policy sync failed for device %s: %s",
+                        system_id,
+                        message,
+                    )
+        except Exception as exc:
+            logger.error(
+                "Error synchronizing domain policies: %s\n%s",
+                exc,
                 traceback.format_exc(),
             )
             db.session.rollback()
