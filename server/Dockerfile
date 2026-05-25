@@ -2,11 +2,6 @@ FROM python:3.14-slim
 
 WORKDIR /app
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    openssh-client \
-    && rm -rf /var/lib/apt/lists/*
-
 # Create instance directory for Flask app data (database)
 RUN mkdir -p /app/instance && chmod 777 /app/instance
 
@@ -25,4 +20,4 @@ ENV FLASK_ENV=production
 EXPOSE 5000
 
 # Command to run the application
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "app:app"]
+CMD ["gunicorn", "--worker-class", "gevent", "--workers", "1", "--bind", "0.0.0.0:5000", "app:app"]

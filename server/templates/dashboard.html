@@ -140,8 +140,12 @@
                     <div class="user-card">
                         <div class="user-card-header">
                             <div class="user-info">
-                                <h2 class="user-name">{{ user.username }}</h2>
-                                <p class="user-location">{{ user.system_ip }}</p>
+                                <div style="display: flex; align-items: center; gap: var(--space-2); margin-bottom: var(--space-1);">
+                                    <span class="status-dot" style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background-color: {{ 'var(--success)' if user.is_online else 'var(--text-muted)' }};" title="{{ 'Agent Online' if user.is_online else 'Agent Offline' }}"></span>
+                                    <h2 class="user-name" style="margin: 0; font-size: var(--font-size-lg);">{{ user.username }}</h2>
+                                </div>
+                                <p class="user-location" style="font-size: var(--font-size-xs); font-family: monospace; color: var(--text-muted); margin: 0;">UUID: {{ user.system_id if user.system_id else 'None' }}</p>
+                                <p class="user-location" style="font-size: var(--font-size-xs); color: var(--text-secondary); margin: var(--space-1) 0 0 0;">IP Snapshot: {{ user.system_ip }}</p>
                             </div>
                         </div>
                         <div class="user-card-body">

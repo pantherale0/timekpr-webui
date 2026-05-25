@@ -14,7 +14,8 @@ from src.database import (
     UserDailyTimeInterval,
     coerce_time_spent_day,
 )
-from src.ssh_helper import SSHClient
+from src.agent_helper import AgentClient, AgentConnectionManager
+from flask_sock import Sock
 from src.task_manager import BackgroundTaskManager
 from src.oidc_helper import OIDCHelper
 
@@ -41,6 +42,9 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # Initialize the database
 db.init_app(app)
+
+# Initialize WebSocket support
+sock = Sock(app)
 
 # Initialize background task manager
 task_manager = BackgroundTaskManager()
@@ -81,6 +85,98 @@ def localtime_filter(dt):
 def inject_timezone():
     """Inject timezone info into all templates"""
     return {'timezone': TIMEZONE_STR}
+
+import secrets
+
+@sock.route('/ws')
+def ws_agent_handler(ws):
+    """
+    WebSocket endpoint for client agents.
+    Handles HMAC challenge-response handshake and routes incoming messages.
+    """
+    remote_ip = request.remote_addr or "127.0.0.1"
+    # To handle proxy environments (like Docker or Nginx), check X-Forwarded-For
+    if request.headers.get("X-Forwarded-For"):
+        remote_ip = request.headers.get("X-Forwarded-For").split(",")[0].strip()
+        
+    logging.info(f"WebSocket connection attempt from {remote_ip}")
+    
+    # 1. Generate challenge
+    challenge = secrets.token_hex(32)
+    try:
+        ws.send(json.dumps({
+            "type": "challenge",
+            "challenge": challenge
+        }))
+    except Exception as e:
+        logging.error(f"Failed to send challenge: {e}")
+        return
+
+    # 2. Await authentication / registration response
+    system_id = None
+    try:
+        auth_msg_raw = ws.receive(timeout=10)
+        if not auth_msg_raw:
+            logging.warning("Handshake timeout or empty message")
+            return
+        
+        auth_msg = json.loads(auth_msg_raw)
+        if auth_msg.get("type") != "register":
+            logging.warning(f"Unexpected message type during handshake: {auth_msg.get('type')}")
+            ws.send(json.dumps({"type": "auth_result", "success": False, "message": "Expected 'register' type"}))
+            return
+            
+        system_id = auth_msg.get("system_id")
+        signature = auth_msg.get("signature")
+        
+        if not system_id or not signature:
+            logging.warning("Handshake missing system_id or signature")
+            ws.send(json.dumps({"type": "auth_result", "success": False, "message": "Missing system_id or signature"}))
+            return
+            
+        # Verify the signature
+        if not AgentConnectionManager.verify_signature(challenge, system_id, signature):
+            logging.warning(f"Authentication failed for system {system_id} (invalid signature)")
+            ws.send(json.dumps({"type": "auth_result", "success": False, "message": "Invalid authentication signature"}))
+            return
+            
+        # Authentication successful!
+        AgentConnectionManager.register(system_id, ws, remote_ip)
+        ws.send(json.dumps({"type": "auth_result", "success": True, "message": "Authenticated successfully"}))
+        
+        # Dynamically update the system_ip snapshot for all managed users on this host!
+        with app.app_context():
+            users = ManagedUser.query.filter_by(system_id=system_id).all()
+            for u in users:
+                u.system_ip = remote_ip
+            db.session.commit()
+            logging.info(f"Updated dynamic IP snapshots to {remote_ip} for {len(users)} users on host {system_id}")
+            
+    except Exception as e:
+        logging.error(f"Error during agent handshake: {e}")
+        return
+
+    # 3. Enter message listening loop
+    try:
+        while True:
+            msg_raw = ws.receive()
+            if not msg_raw:
+                break
+                
+            msg = json.loads(msg_raw)
+            msg_type = msg.get("type")
+            
+            if msg_type == "command_response":
+                correlation_id = msg.get("correlation_id")
+                AgentConnectionManager.route_response(correlation_id, msg)
+            else:
+                logging.warning(f"Received unexpected message type from client {system_id}: {msg_type}")
+                
+    except Exception as e:
+        logging.info(f"WebSocket connection closed for agent {system_id}: {e}")
+    finally:
+        if system_id:
+            AgentConnectionManager.unregister(system_id)
 
 @app.route('/', methods=['GET', 'POST'])
 def login():
@@ -204,7 +300,9 @@ def dashboard():
         user_data.append({
             'id': user.id,
             'username': user.username,
+            'system_id': user.system_id,
             'system_ip': user.system_ip,
+            'is_online': AgentConnectionManager.is_online(user.system_id),
             'last_checked': user.last_checked,  # Keep as datetime object
             'usage_data': usage_data,
             'time_left': time_left_formatted,
@@ -305,25 +403,25 @@ def add_user():
         return redirect(url_for('admin'))
     
     username = request.form.get('username')
-    system_ip = request.form.get('system_ip')
+    system_id = request.form.get('system_id')
     
-    if not username or not system_ip:
-        flash('Both username and system IP are required', 'danger')
+    if not username or not system_id:
+        flash('Both username and system ID are required', 'danger')
         return redirect(url_for('admin'))
     
     # Check if user already exists
-    existing_user = ManagedUser.query.filter_by(username=username, system_ip=system_ip).first()
+    existing_user = ManagedUser.query.filter_by(username=username, system_id=system_id).first()
     
     if existing_user:
-        flash(f'User {username} on {system_ip} already exists', 'warning')
+        flash(f'User {username} on {system_id} already exists', 'warning')
         return redirect(url_for('admin'))
     
     # Create new user
-    new_user = ManagedUser(username=username, system_ip=system_ip)
+    new_user = ManagedUser(username=username, system_id=system_id, system_ip="Offline")
     
-    # Validate with timekpr
-    ssh_client = SSHClient(hostname=system_ip)
-    is_valid, message, config_dict = ssh_client.validate_user(username)
+    # Validate with agent
+    agent_client = AgentClient(system_id=system_id)
+    is_valid, message, config_dict = agent_client.validate_user(username)
     
     new_user.is_valid = is_valid
     new_user.last_checked = datetime.utcnow()
@@ -362,9 +460,9 @@ def validate_user(user_id):
     
     user = ManagedUser.query.get_or_404(user_id)
     
-    # Validate with timekpr
-    ssh_client = SSHClient(hostname=user.system_ip)
-    is_valid, message, config_dict = ssh_client.validate_user(user.username)
+    # Validate with agent
+    agent_client = AgentClient(system_id=user.system_id)
+    is_valid, message, config_dict = agent_client.validate_user(user.username)
     
     user.is_valid = is_valid
     user.last_checked = datetime.utcnow()
@@ -735,15 +833,15 @@ def modify_time():
     # Get user from database
     user = ManagedUser.query.get_or_404(user_id)
     
-    # Create SSH client
-    ssh_client = SSHClient(hostname=user.system_ip)
+    # Create Agent client
+    agent_client = AgentClient(system_id=user.system_id)
     
     # Execute the command
-    success, message = ssh_client.modify_time_left(user.username, operation, seconds)
+    success, message = agent_client.modify_time_left(user.username, operation, seconds)
     
     if success:
         # Update user info to reflect changes
-        is_valid, _, config_dict = ssh_client.validate_user(user.username)
+        is_valid, _, config_dict = agent_client.validate_user(user.username)
         if is_valid and config_dict:
             user.last_checked = datetime.utcnow()
             user.last_config = json.dumps(config_dict)
@@ -777,6 +875,18 @@ def modify_time():
 with app.app_context():
     db.create_all()
     print("Database tables verified")
+    
+    # Auto-migration: check if system_id column exists, if not add it
+    try:
+        from sqlalchemy import text
+        result = db.session.execute(text("PRAGMA table_info(managed_user)")).fetchall()
+        column_names = [row[1] for row in result]
+        if 'system_id' not in column_names:
+            db.session.execute(text("ALTER TABLE managed_user ADD COLUMN system_id VARCHAR(50)"))
+            db.session.commit()
+            print("Successfully migrated database: added system_id column to managed_user")
+    except Exception as e:
+        print(f"Database migration error: {e}")
     
     # Initialize admin password if it doesn't exist
     if not Settings.get_value('admin_password_hash', None) and not Settings.get_value('admin_password', None):

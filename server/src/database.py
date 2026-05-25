@@ -90,6 +90,7 @@ class ManagedUser(db.Model):
     __tablename__ = 'managed_user'
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(50), nullable=False)
+    system_id = db.Column(db.String(50), nullable=True)
     system_ip = db.Column(db.String(50), nullable=False)
     is_valid = db.Column(db.Boolean, default=False)
     date_added = db.Column(db.DateTime, default=datetime.utcnow)

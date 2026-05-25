@@ -15,7 +15,7 @@ from src.database import (
     UserDailyTimeInterval,
     coerce_time_spent_day,
 )
-from src.ssh_helper import SSHClient
+from src.agent_helper import AgentClient, AgentConnectionManager
 
 logger = logging.getLogger(__name__)
 
@@ -126,14 +126,21 @@ class BackgroundTaskManager:
                 try:
                     logger.info("Processing user: %s @ %s", user.username, user.system_ip)
                     
-                    # Connect to the system and get user info - use SSH key authentication
-                    ssh_client = SSHClient(hostname=user.system_ip)
+                    # Check if the agent is online before doing any commands
+                    if not AgentConnectionManager.is_online(user.system_id):
+                        logger.info(f"Agent for {user.username} (system_id: {user.system_id}) is offline. Skipping sync.")
+                        user.last_checked = datetime.utcnow()
+                        db.session.commit()
+                        continue
+                        
+                    # Instantiate AgentClient
+                    agent_client = AgentClient(system_id=user.system_id)
                     
                     # Check if there's a pending time adjustment
                     if user.pending_time_adjustment is not None and user.pending_time_operation is not None:
                         logger.info(f"Attempting to apply pending time adjustment for {user.username}: {user.pending_time_operation}{user.pending_time_adjustment} seconds")
                         
-                        success, message = ssh_client.modify_time_left(
+                        success, message = agent_client.modify_time_left(
                             user.username, 
                             user.pending_time_operation, 
                             user.pending_time_adjustment
@@ -172,7 +179,7 @@ class BackgroundTaskManager:
                             db.session.commit()
                         else:
                             logger.info(f"Attempting to sync weekly schedule for {user.username}")
-                            success, message = ssh_client.set_weekly_time_limits(
+                            success, message = agent_client.set_weekly_time_limits(
                                 user.username, schedule_dict
                             )
                             if success:
@@ -199,12 +206,12 @@ class BackgroundTaskManager:
                     if unsynced_intervals:
                         logger.info(f"Attempting to sync {len(unsynced_intervals)} time intervals for {user.username}")
                         
-                        # Build intervals dict for SSH command
+                        # Build intervals dict for agent command
                         intervals_dict = {}
                         for interval in user.time_intervals:
                             intervals_dict[interval.day_of_week] = interval
                         
-                        success, message = ssh_client.set_allowed_hours(user.username, intervals_dict)
+                        success, message = agent_client.set_allowed_hours(user.username, intervals_dict)
                         
                         if success:
                             logger.info(f"Successfully synced time intervals for {user.username}")
@@ -221,7 +228,7 @@ class BackgroundTaskManager:
                     # Then update user info
                     logger.info("Validating user %s", user.username)
                     try:
-                        is_valid, result_message, config_dict = ssh_client.validate_user(user.username)
+                        is_valid, result_message, config_dict = agent_client.validate_user(user.username)
                         logger.info("Validation result for %s: %s", user.username, is_valid)
                         
                         if is_valid and config_dict:

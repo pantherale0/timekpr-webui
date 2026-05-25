@@ -1,0 +1,15 @@
+[package]
+name = "timekpr-agent"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+tokio = { version = "1.35", features = ["full"] }
+tokio-tungstenite = { version = "0.21", features = ["connect", "handshake"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+hmac = "0.12.1"
+sha2 = "0.10.8"
+hex = "0.4.3"
+uuid = { version = "1.6", features = ["v4", "serde"] }
+futures-util = { version = "0.3", default-features = false, features = ["sink", "std"] }

@@ -20,5 +20,5 @@ instance/
 *.egg-info/
 *.db
 
-# Claude Code project instructions (local development only)
-CLAUDE.md
+agent/target
+agent/Cargo.lock

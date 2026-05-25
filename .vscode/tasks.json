@@ -5,6 +5,9 @@
             "label": "Run TimeKpr WebUI (Local)",
             "type": "shell",
             "command": "python app.py",
+            "options": {
+                "cwd": "${workspaceFolder}/server"
+            },
             "group": {
                 "kind": "build",
                 "isDefault": true
@@ -18,7 +21,7 @@
         {
             "label": "Compile / Check Python Syntax",
             "type": "shell",
-            "command": "python -m py_compile app.py src/*.py",
+            "command": "python -m py_compile server/app.py server/src/*.py",
             "group": "test",
             "presentation": {
                 "reveal": "silent",

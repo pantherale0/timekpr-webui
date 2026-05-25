@@ -113,8 +113,8 @@
                                 <input type="text" id="username" name="username" class="form-control" placeholder="Enter username" required>
                             </div>
                             <div class="form-group">
-                                <label for="system_ip" class="form-label">System IP Address</label>
-                                <input type="text" id="system_ip" name="system_ip" class="form-control" placeholder="192.168.1.100" required>
+                                <label for="system_id" class="form-label">System ID (Host UUID)</label>
+                                <input type="text" id="system_id" name="system_id" class="form-control" placeholder="e.g. 8f88c3a1-7ab3-4b68-b7eb-116b47cbf2fb" required>
                             </div>
                             <div class="form-group">
                                 <button type="submit" class="btn btn-primary">
@@ -141,7 +141,8 @@
                                 <thead>
                                     <tr style="border-bottom: 2px solid var(--border-primary);">
                                         <th style="padding: var(--space-4); text-align: left; font-weight: 600; color: var(--text-primary);">Username</th>
-                                        <th style="padding: var(--space-4); text-align: left; font-weight: 600; color: var(--text-primary);">System IP</th>
+                                        <th style="padding: var(--space-4); text-align: left; font-weight: 600; color: var(--text-primary);">System ID</th>
+                                        <th style="padding: var(--space-4); text-align: left; font-weight: 600; color: var(--text-primary);">IP Snapshot</th>
                                         <th style="padding: var(--space-4); text-align: left; font-weight: 600; color: var(--text-primary);">Status</th>
                                         <th style="padding: var(--space-4); text-align: left; font-weight: 600; color: var(--text-primary);">Added On</th>
                                         <th style="padding: var(--space-4); text-align: left; font-weight: 600; color: var(--text-primary);">Last Checked</th>
@@ -152,6 +153,7 @@
                                     {% for user in users %}
                                         <tr style="border-bottom: 1px solid var(--border-primary); transition: background-color var(--transition-fast);" onmouseover="this.style.backgroundColor='var(--bg-tertiary)'" onmouseout="this.style.backgroundColor='transparent'">
                                             <td style="padding: var(--space-4); font-weight: 500;">{{ user.username }}</td>
+                                            <td style="padding: var(--space-4); color: var(--text-secondary); font-family: monospace; font-size: var(--font-size-xs);">{{ user.system_id if user.system_id else 'None' }}</td>
                                             <td style="padding: var(--space-4); color: var(--text-secondary); font-family: monospace;">{{ user.system_ip }}</td>
                                             <td style="padding: var(--space-4);">
                                                 {% if user.is_valid %}
