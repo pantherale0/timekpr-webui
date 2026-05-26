@@ -365,7 +365,7 @@
                 <h2>Application Controls</h2>
                 <p class="aa-card-subtitle">
                     Choose how each application behaves when {{ user.username }} is logged in.
-                    Rules are enforced via AppArmor profiles loaded on session start.
+                    Rules are enforced via AppArmor profiles or agent-side activity logging.
                 </p>
 
                 <div class="aa-app-grid">
@@ -413,7 +413,7 @@
                             {% elif app.preset == 'blocked' %}
                                 Execution is completely prevented
                             {% elif app.preset == 'complain' %}
-                                Runs unrestricted but logs blocks/network access attempts (report-only)
+                                Runs unrestricted but logs application activity through the agent
                             {% endif %}
                         </div>
                     </div>
@@ -548,7 +548,7 @@
             allowed: 'Unrestricted access — no AppArmor sandbox applied',
             no_internet: 'Runs normally but all network access is denied',
             blocked: 'Execution is completely prevented',
-            complain: 'Runs unrestricted and audits selected network activity in a low-noise report-only mode',
+            complain: 'Runs unrestricted and logs activity through the agent without AppArmor enforcement',
         };
 
         function updateCustomRuleType() {

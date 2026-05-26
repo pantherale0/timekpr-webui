@@ -261,7 +261,9 @@ impl AppArmorRuntime {
             .unwrap_or_default();
         let exact_policies: Vec<AppArmorPolicy> = policies
             .into_iter()
-            .filter(|policy| policy.match_type == MATCH_TYPE_EXECUTABLE)
+            .filter(|policy| {
+                policy.match_type == MATCH_TYPE_EXECUTABLE && policy.preset != "complain"
+            })
             .collect();
         if exact_policies.is_empty() {
             return Ok(());
@@ -358,9 +360,6 @@ impl AppArmorRuntime {
         cwd: Option<&str>,
     ) -> Option<ExecDecision> {
         let mut path_rules = self.collect_path_rules_for_user(username);
-        if path_rules.is_empty() {
-            return None;
-        }
         path_rules.sort_by(|left, right| right.expanded_pattern.len().cmp(&left.expanded_pattern.len()));
 
         let normalized_exe_path = normalize_runtime_path(exe_path);
@@ -374,6 +373,28 @@ impl AppArmorRuntime {
                 rule_target: rule.pattern.clone(),
                 matched_path: normalized_exe_path,
                 matched_via: "direct_exec".to_string(),
+            });
+        }
+
+        let normalized_policy_exe = normalized_executable_match_path(exe_path);
+        if let Some(policy) = self
+            .current_state
+            .users
+            .get(username)
+            .into_iter()
+            .flatten()
+            .find(|policy| {
+                policy.match_type == MATCH_TYPE_EXECUTABLE
+                    && policy.preset == "complain"
+                    && normalized_executable_match_path(&policy.executable_path) == normalized_policy_exe
+            })
+        {
+            return Some(ExecDecision {
+                preset: policy.preset.clone(),
+                rule_name: policy.application_name.clone(),
+                rule_target: policy.executable_path.clone(),
+                matched_path: normalized_exe_path,
+                matched_via: "exact_exec_rule".to_string(),
             });
         }
 
@@ -560,6 +581,10 @@ fn normalize_runtime_path(path: &str) -> String {
         .to_string()
 }
 
+fn normalized_executable_match_path(path: &str) -> String {
+    normalize_runtime_path(path)
+}
+
 fn normalize_candidate_path(candidate: &str, cwd: Option<&str>) -> Option<String> {
     let candidate_path = PathBuf::from(candidate);
     let resolved = if candidate_path.is_absolute() {
@@ -687,21 +712,7 @@ fn generate_profile(
     blocked_path_rule_lines: &str,
 ) -> String {
     match preset {
-        "complain" => format!(
-            r#"# Timekpr managed profile – REPORT ONLY
-profile {profile_name} {executable_path} flags=(default_allow) {{
-  # Browsers generate far too much log traffic under sparse complain-mode
-  # profiles. Use default_allow and audit only selected activity so the app
-  # remains unrestricted without overwhelming the desktop with audit spam.
-{blocked_path_rule_lines}  audit network inet,
-  audit network inet6,
-  audit network netlink,
-}}
-"#,
-            profile_name = profile_name,
-            executable_path = executable_path,
-            blocked_path_rule_lines = blocked_path_rule_lines,
-        ),
+        "complain" => String::new(),
         "blocked" => format!(
             r#"# Timekpr managed profile – BLOCK execution
 profile {profile_name} {executable_path} {{
@@ -777,14 +788,9 @@ mod tests {
     }
 
     #[test]
-    fn complain_profile_denies_everything_with_complain_flag() {
+    fn complain_profile_generates_no_apparmor_profile() {
         let profile = generate_profile("timekpr-alice-steam", "/usr/bin/steam", "complain", "");
-        assert!(profile.contains("flags=(default_allow)"));
-        assert!(profile.contains("audit network inet,"));
-        assert!(profile.contains("audit network inet6,"));
-        assert!(profile.contains("audit network netlink,"));
-        assert!(!profile.contains("deny /** rwlkx,"));
-        assert!(!profile.contains("deny network,"));
+        assert!(profile.is_empty());
     }
 
     #[test]
@@ -840,5 +846,26 @@ mod tests {
         let json = serde_json::to_string_pretty(&state).unwrap();
         let restored: PersistedAppArmorState = serde_json::from_str(&json).unwrap();
         assert_eq!(state, restored);
+    }
+
+    #[test]
+    fn exact_exec_report_only_is_decided_by_exec_monitor() {
+        let mut runtime = AppArmorRuntime::new();
+        runtime.current_state.users.insert(
+            "alice".to_string(),
+            vec![AppArmorPolicy {
+                application_name: "Steam".to_string(),
+                executable_path: "/usr/bin/steam".to_string(),
+                match_type: MATCH_TYPE_EXECUTABLE.to_string(),
+                preset: "complain".to_string(),
+            }],
+        );
+
+        let decision = runtime.evaluate_exec_event("alice", "/usr/bin/steam", &[], None);
+        assert!(decision.is_some());
+        let decision = decision.unwrap();
+        assert_eq!(decision.preset, "complain");
+        assert_eq!(decision.matched_via, "exact_exec_rule");
+        assert_eq!(decision.rule_target, "/usr/bin/steam");
     }
 }

@@ -14,9 +14,10 @@ const ALERT_DEDUP_RETENTION: Duration = Duration::from_secs(5 * 60);
 /// Tail the system journal for AppArmor policy-violation messages and forward
 /// them as `app_blocked`-compatible alert events through the provided channel.
 ///
-/// This spawns `journalctl --follow` filtering for AppArmor messages. Each
-/// DENIED or complain-mode ALLOWED line is parsed to extract the executable and
-/// the profile involved in the policy violation.
+/// This spawns `journalctl --follow` on kernel logs and filters for AppArmor
+/// messages in-process. Each
+/// DENIED, complain-mode ALLOWED, or explicit AUDIT line is parsed to extract
+/// the executable and the profile involved in the policy violation.
 pub async fn run_audit_monitor(
     uid_map: HashMap<u32, String>,
     alert_tx: mpsc::UnboundedSender<AppAlert>,
@@ -48,8 +49,7 @@ async fn run_monitor_inner(
         .args([
             "--follow",
             "--no-pager",
-            "-t",
-            "audit",
+            "-k",
             "--output=short",
             "--since=now",
         ])
@@ -75,7 +75,7 @@ async fn run_monitor_inner(
             None => continue,
         };
 
-        if disposition != "DENIED" && disposition != "ALLOWED" {
+        if disposition != "DENIED" && disposition != "ALLOWED" && disposition != "AUDIT" {
             continue;
         }
 
@@ -163,6 +163,8 @@ fn extract_apparmor_disposition(line: &str) -> Option<&'static str> {
         Some("DENIED")
     } else if line.contains("apparmor=\"ALLOWED\"") || line.contains("apparmor=ALLOWED") {
         Some("ALLOWED")
+    } else if line.contains("apparmor=\"AUDIT\"") || line.contains("apparmor=AUDIT") {
+        Some("AUDIT")
     } else {
         None
     }
@@ -235,7 +237,7 @@ mod tests {
     }
 
     #[test]
-    fn extract_apparmor_disposition_matches_allowed_and_denied() {
+    fn extract_apparmor_disposition_matches_allowed_denied_and_audit() {
         assert_eq!(
             extract_apparmor_disposition(r#"audit: apparmor="DENIED" operation="open""#),
             Some("DENIED")
@@ -243,6 +245,10 @@ mod tests {
         assert_eq!(
             extract_apparmor_disposition(r#"audit: apparmor="ALLOWED" operation="connect""#),
             Some("ALLOWED")
+        );
+        assert_eq!(
+            extract_apparmor_disposition(r#"audit: apparmor="AUDIT" operation="create""#),
+            Some("AUDIT")
         );
         assert_eq!(extract_apparmor_disposition("audit: operation=open"), None);
     }
