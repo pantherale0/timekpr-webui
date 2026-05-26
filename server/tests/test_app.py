@@ -5,7 +5,7 @@ import hashlib
 from datetime import datetime
 from unittest.mock import patch, MagicMock
 from sqlalchemy import text
-from app import ws_agent_handler, run_schema_migrations
+from app import ws_agent_handler, run_schema_migrations, _get_blocklist_sources
 from src.database import (
     AgentAlert,
     AgentDevice,
@@ -247,6 +247,54 @@ def test_blocklist_catalog_and_assignment_routes(client, db_session):
     assert device_page.status_code == 200
     assert b'Domain Policy Contributors' in device_page.data
     assert b'Lists: 1' in device_page.data
+
+
+def test_blocklist_source_catalog_uses_capped_preview(client, db_session):
+    Settings.set_admin_password("admin")
+    client.post('/', data={'username': 'admin', 'password': 'admin'})
+
+    manual_source = BlocklistSource(
+        name='Manual Preview',
+        source_type=BlocklistSource.TYPE_MANUAL,
+        is_enabled=True,
+    )
+    external_source = BlocklistSource(
+        name='External Huge',
+        source_type=BlocklistSource.TYPE_EXTERNAL_URL,
+        source_url='https://example.test/huge.txt',
+        is_enabled=True,
+    )
+    db_session.add_all([manual_source, external_source])
+    db_session.flush()
+
+    for index in range(30):
+        db_session.add(BlocklistDomain(
+            source_id=manual_source.id,
+            domain=f'manual-{index:03d}.example.com',
+        ))
+        db_session.add(BlocklistDomain(
+            source_id=external_source.id,
+            domain=f'external-{index:03d}.example.com',
+        ))
+    db_session.commit()
+
+    catalog = _get_blocklist_sources(include_domains=True)
+    manual_payload = next(item for item in catalog if item['id'] == manual_source.id)
+    external_payload = next(item for item in catalog if item['id'] == external_source.id)
+
+    assert manual_payload['domain_count'] == 30
+    assert len(manual_payload['domains']) == 25
+    assert manual_payload['domains'][0]['domain'] == 'manual-000.example.com'
+    assert manual_payload['domains'][-1]['domain'] == 'manual-024.example.com'
+    assert external_payload['domain_count'] == 30
+    assert external_payload.get('domains') is None
+
+    page = client.get('/settings')
+    assert page.status_code == 200
+    assert b'manual-000.example.com' in page.data
+    assert b'manual-024.example.com' in page.data
+    assert b'manual-025.example.com' not in page.data
+    assert b'external-000.example.com' not in page.data
 
 def test_user_operations(client, db_session):
     Settings.set_admin_password("admin")

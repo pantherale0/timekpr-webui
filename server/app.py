@@ -64,8 +64,21 @@ db.init_app(app)
 # Initialize WebSocket support
 sock = Sock(app)
 
+# Task role flags must be evaluated before creating the task manager.
+def _env_flag_enabled(key, default=False):
+    raw_value = os.environ.get(key)
+    if raw_value is None:
+        return default
+    return raw_value.strip().lower() in {'1', 'true', 'yes', 'on'}
+
+
 # Initialize background task manager
-task_manager = BackgroundTaskManager()
+task_manager = BackgroundTaskManager(
+    refresh_external_blocklists=_env_flag_enabled('TIMEKPR_TASKS_REFRESH_EXTERNAL', True),
+    update_user_data=_env_flag_enabled('TIMEKPR_TASKS_UPDATE_USER_DATA', True),
+    sync_domain_policies=_env_flag_enabled('TIMEKPR_TASKS_SYNC_DOMAIN_POLICIES', True),
+    deliver_pending_alerts=_env_flag_enabled('TIMEKPR_TASKS_DELIVER_ALERTS', True),
+)
 task_manager.init_app(app)
 _runtime_init_lock = threading.Lock()
 _runtime_initialized = False
@@ -107,7 +120,7 @@ def inject_timezone():
     return {'timezone': TIMEZONE_STR}
 
 import secrets
-from sqlalchemy import text
+from sqlalchemy import text, func
 
 
 def _format_seconds(seconds):
@@ -359,34 +372,82 @@ def _refresh_managed_user_summary(user):
         db.session.add(UserTimeUsage(user_id=user.id, date=today, time_spent=shared_spent))
 
 
-def _serialize_blocklist_source(source, include_domains=False):
-    sorted_domains = sorted({domain.domain for domain in source.domains})
+def _serialize_blocklist_source(
+    source,
+    *,
+    domain_count=0,
+    assigned_user_count=0,
+    preview_domains=None,
+):
     payload = {
         'id': source.id,
         'name': source.name,
         'source_type': source.source_type,
         'source_url': source.source_url,
         'is_enabled': source.is_enabled,
-        'domain_count': len(sorted_domains),
-        'assigned_user_count': len(source.assignments),
+        'domain_count': int(domain_count or 0),
+        'assigned_user_count': int(assigned_user_count or 0),
         'last_sync_at': source.last_sync_at.strftime('%Y-%m-%d %H:%M') if source.last_sync_at else None,
         'last_sync_status': source.last_sync_status,
         'last_sync_error': source.last_sync_error,
     }
-    if include_domains:
-        payload['domains'] = [
-            {'id': domain.id, 'domain': domain.domain}
-            for domain in source.domains
-        ]
+    if preview_domains is not None:
+        payload['domains'] = preview_domains
     return payload
 
 
-def _get_blocklist_sources(include_domains=False, enabled_only=False):
-    query = BlocklistSource.query
+def _get_blocklist_sources(include_domains=False, enabled_only=False, preview_limit=25):
+    domain_count_subquery = db.session.query(
+        BlocklistDomain.source_id.label('source_id'),
+        func.count(BlocklistDomain.id).label('domain_count'),
+    ).group_by(BlocklistDomain.source_id).subquery()
+
+    assignment_count_subquery = db.session.query(
+        ManagedUserBlocklistAssignment.source_id.label('source_id'),
+        func.count(ManagedUserBlocklistAssignment.id).label('assignment_count'),
+    ).group_by(ManagedUserBlocklistAssignment.source_id).subquery()
+
+    query = db.session.query(
+        BlocklistSource,
+        func.coalesce(domain_count_subquery.c.domain_count, 0).label('domain_count'),
+        func.coalesce(assignment_count_subquery.c.assignment_count, 0).label('assignment_count'),
+    ).outerjoin(
+        domain_count_subquery,
+        domain_count_subquery.c.source_id == BlocklistSource.id,
+    ).outerjoin(
+        assignment_count_subquery,
+        assignment_count_subquery.c.source_id == BlocklistSource.id,
+    )
     if enabled_only:
-        query = query.filter_by(is_enabled=True)
-    sources = query.order_by(BlocklistSource.name.asc()).all()
-    return [_serialize_blocklist_source(source, include_domains=include_domains) for source in sources]
+        query = query.filter(BlocklistSource.is_enabled.is_(True))
+
+    source_rows = query.order_by(BlocklistSource.name.asc()).all()
+
+    preview_map = {}
+    if include_domains:
+        manual_source_ids = [
+            source.id
+            for source, _, _ in source_rows
+            if source.source_type == BlocklistSource.TYPE_MANUAL
+        ]
+        for source_id in manual_source_ids:
+            preview_rows = BlocklistDomain.query.filter_by(source_id=source_id).order_by(
+                BlocklistDomain.domain.asc()
+            ).limit(preview_limit).all()
+            preview_map[source_id] = [
+                {'id': domain.id, 'domain': domain.domain}
+                for domain in preview_rows
+            ]
+
+    return [
+        _serialize_blocklist_source(
+            source,
+            domain_count=domain_count,
+            assigned_user_count=assignment_count,
+            preview_domains=preview_map.get(source.id) if include_domains else None,
+        )
+        for source, domain_count, assignment_count in source_rows
+    ]
 
 
 def _get_user_assigned_blocklist_source_ids(user):
@@ -2141,13 +2202,6 @@ def run_schema_migrations():
         )
     """))
     db.session.commit()
-
-
-def _env_flag_enabled(key, default=False):
-    raw_value = os.environ.get(key)
-    if raw_value is None:
-        return default
-    return raw_value.strip().lower() in {'1', 'true', 'yes', 'on'}
 
 
 def initialize_runtime(start_background_tasks=False):

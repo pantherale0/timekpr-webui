@@ -17,7 +17,11 @@ services:
       # - OIDC_CLIENT_SECRET=your-client-secret
       # - OIDC_REDIRECT_URI=http://localhost:5000/callback
       # - OIDC_VERIFY_SSL=True
-      - TIMEKPR_ENABLE_BACKGROUND_TASKS=0
+      - TIMEKPR_ENABLE_BACKGROUND_TASKS=1
+      - TIMEKPR_TASKS_REFRESH_EXTERNAL=0
+      - TIMEKPR_TASKS_UPDATE_USER_DATA=1
+      - TIMEKPR_TASKS_SYNC_DOMAIN_POLICIES=1
+      - TIMEKPR_TASKS_DELIVER_ALERTS=0
     restart: unless-stopped
 
   tasks:
@@ -33,6 +37,11 @@ services:
       # - OIDC_CLIENT_SECRET=your-client-secret
       # - OIDC_REDIRECT_URI=http://localhost:5000/callback
       # - OIDC_VERIFY_SSL=True
+      - TIMEKPR_ENABLE_BACKGROUND_TASKS=1
+      - TIMEKPR_TASKS_REFRESH_EXTERNAL=1
+      - TIMEKPR_TASKS_UPDATE_USER_DATA=0
+      - TIMEKPR_TASKS_SYNC_DOMAIN_POLICIES=0
+      - TIMEKPR_TASKS_DELIVER_ALERTS=1
     restart: unless-stopped
 
 volumes:

@@ -69,6 +69,28 @@ def test_task_manager_basic_ops(app, db_session):
     assert manager.running
     manager.stop()
 
+
+def test_task_manager_runs_only_enabled_task_roles(app, db_session):
+    manager = BackgroundTaskManager(
+        app,
+        refresh_external_blocklists=False,
+        update_user_data=True,
+        sync_domain_policies=False,
+        deliver_pending_alerts=True,
+    )
+    manager._update_user_data = MagicMock()
+    manager._sync_domain_policies = MagicMock()
+    manager._refresh_external_blocklists = MagicMock()
+    manager._deliver_pending_alerts = MagicMock()
+
+    with app.app_context():
+        manager._run_task_cycle()
+
+    manager._update_user_data.assert_called_once()
+    manager._deliver_pending_alerts.assert_called_once()
+    manager._sync_domain_policies.assert_not_called()
+    manager._refresh_external_blocklists.assert_not_called()
+
 def test_task_manager_update_user_data(app, db_session):
     manager = BackgroundTaskManager(app)
 

@@ -121,12 +121,24 @@ def _assigned_source_ids_for_user(user, active_source_ids=None):
     return sorted(source_ids)
 
 class BackgroundTaskManager:
-    def __init__(self, app=None):
+    def __init__(
+        self,
+        app=None,
+        *,
+        refresh_external_blocklists=True,
+        update_user_data=True,
+        sync_domain_policies=True,
+        deliver_pending_alerts=True,
+    ):
         self.app = app
         self.running = False
         self.thread = None
         self.last_error = None
         self._task_lock = threading.Lock()  # Add a lock to prevent concurrent executions
+        self.refresh_external_blocklists_enabled = refresh_external_blocklists
+        self.update_user_data_enabled = update_user_data
+        self.sync_domain_policies_enabled = sync_domain_policies
+        self.deliver_pending_alerts_enabled = deliver_pending_alerts
     
     def init_app(self, app):
         self.app = app
@@ -185,14 +197,7 @@ class BackgroundTaskManager:
                         # Use a fresh app context
                         if self.app:
                             with self.app.app_context():
-                                logger.info("Refreshing external blocklists")
-                                self._refresh_external_blocklists()
-                                logger.info("Updating user data")
-                                self._update_user_data()
-                                logger.info("Synchronizing domain policies")
-                                self._sync_domain_policies()
-                                logger.info("Delivering alert webhooks")
-                                self._deliver_pending_alerts()
+                                self._run_task_cycle()
                                 logger.info("User data update cycle complete")
                         else:
                             logger.error("App is not initialized in task manager")
@@ -221,6 +226,23 @@ class BackgroundTaskManager:
                     logger.info("Task loop stopping during sleep")
                     break
                 time.sleep(1)
+
+    def _run_task_cycle(self):
+        if self.refresh_external_blocklists_enabled:
+            logger.info("Refreshing external blocklists")
+            self._refresh_external_blocklists()
+
+        if self.update_user_data_enabled:
+            logger.info("Updating user data")
+            self._update_user_data()
+
+        if self.sync_domain_policies_enabled:
+            logger.info("Synchronizing domain policies")
+            self._sync_domain_policies()
+
+        if self.deliver_pending_alerts_enabled:
+            logger.info("Delivering alert webhooks")
+            self._deliver_pending_alerts()
     
     def _update_user_data(self):
         """Update data for all managed users and their device mappings."""
