@@ -6,7 +6,7 @@ import logging
 import os
 import secrets
 import threading
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 import pytz
 from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify, abort
@@ -29,6 +29,8 @@ from src.database import (
     AgentDevice,
     BlocklistSource,
     BlocklistDomain,
+    AppArmorRule,
+    AppUsageHistory,
 )
 from src.agent_helper import (
     AgentClient,
@@ -690,206 +692,209 @@ def ws_agent_handler(ws):
     # 1. Await initial "hello" registration message
     system_id = None
     try:
-        hello_msg_raw = ws.receive(timeout=10)
-        if not hello_msg_raw:
-            logging.warning("Handshake timeout: empty hello message")
-            return
-            
-        hello_msg = json.loads(hello_msg_raw)
-        if hello_msg.get("type") != "hello":
-            logging.warning(
-                "Unexpected initial message type: %s",
-                hello_msg.get('type'),
-            )
-            ws.send(json.dumps({"type": "auth_result", "success": False, "message": "Expected 'hello' type"}))
-            return
-            
-        system_id = hello_msg.get("system_id")
-        system_hostname = hello_msg.get("system_hostname")
-        if isinstance(system_hostname, str):
-            system_hostname = system_hostname.strip() or None
-        reg_token = hello_msg.get("registration_token")
-        
-        if not system_id:
-            logging.warning("Initial hello missing system_id")
-            ws.send(json.dumps({"type": "auth_result", "success": False, "message": "Missing system_id"}))
-            return
-
-        # 2. Check and enforce Registration Token firewall
-        expected_reg_token = AgentConnectionManager.registration_token
-        
-        with app.app_context():
-            # Lookup device in database
-            device = AgentDevice.query.get(system_id)
-            
-            if not device:
-                # If a registration token is required, verify it
-                if expected_reg_token and reg_token != expected_reg_token:
-                    logging.warning(
-                        "Registration rejected: Invalid registration token from %s",
-                        system_id,
-                    )
-                    ws.send(json.dumps({"type": "auth_result", "success": False, "message": "Invalid registration token"}))
-                    return
-                
-                # Register a new device in 'pending' state
-                device = AgentDevice(
-                    system_id=system_id,
-                    system_hostname=system_hostname,
-                    system_ip=remote_ip,
-                    status='pending',
-                )
-                db.session.add(device)
-                db.session.commit()
-                logging.info(
-                    "New pending device registered: %s from %s",
-                    system_id,
-                    remote_ip,
-                )
-            else:
-                # Existing device, update latest hostname and IP snapshot
-                if "system_hostname" in hello_msg:
-                    device.system_hostname = system_hostname
-                device.system_ip = remote_ip
-                db.session.commit()
-
-            # 3. Handle device pairing states
-            if device.status == 'pending':
-                logging.info("Device %s is PENDING approval. Waiting...", system_id)
-                AgentConnectionManager.register_pending(system_id, ws)
-                ws.send(json.dumps({"type": "pairing_status", "status": "pending"}))
-                
-                # Keep the socket open in pending state, waiting for admin approval trigger
-                try:
-                    while True:
-                        msg = ws.receive()
-                        if not msg:
-                            break
-                except (OSError, RuntimeError, ValueError):
-                    logging.debug("Pending websocket closed for %s", system_id)
+        try:
+            hello_msg_raw = ws.receive(timeout=10)
+            if not hello_msg_raw:
+                logging.warning("Handshake timeout: empty hello message")
                 return
-
-            if device.status == 'rejected':
+                
+            hello_msg = json.loads(hello_msg_raw)
+            if hello_msg.get("type") != "hello":
                 logging.warning(
-                    "Connection rejected: Device %s is banned/rejected",
-                    system_id,
+                    "Unexpected initial message type: %s",
+                    hello_msg.get('type'),
                 )
-                ws.send(json.dumps({"type": "auth_result", "success": False, "message": "Device rejected/banned"}))
+                ws.send(json.dumps({"type": "auth_result", "success": False, "message": "Expected 'hello' type"}))
                 return
-
-            if device.status == 'approved':
-                # Device is approved! Perform secure challenge-response
-                challenge = secrets.token_hex(32)
-                ws.send(json.dumps({
-                    "type": "challenge",
-                    "challenge": challenge
-                }))
                 
-                # Wait for authentication signature response
-                auth_msg_raw = ws.receive(timeout=10)
-                if not auth_msg_raw:
-                    logging.warning("Handshake timeout for approved device %s", system_id)
-                    return
-                    
-                auth_msg = json.loads(auth_msg_raw)
-                if auth_msg.get("type") != "register":
-                    logging.warning(
-                        "Unexpected response type from %s: %s",
-                        system_id,
-                        auth_msg.get('type'),
-                    )
-                    return
-                    
-                signature = auth_msg.get("signature")
-                if not signature:
-                    logging.warning("Handshake from %s missing signature", system_id)
-                    return
-                    
-                # Verify using device-specific secure token
-                if not AgentConnectionManager.verify_signature(challenge, system_id, signature):
-                    logging.warning(
-                        "Authentication signature verification failed for device %s",
-                        system_id,
-                    )
-                    ws.send(json.dumps({"type": "auth_result", "success": False, "message": "Invalid authentication signature"}))
-                    return
-                    
-                # Authentication succeeded! Register active connection
-                AgentConnectionManager.register(system_id, ws, remote_ip)
-                ws.send(json.dumps({"type": "auth_result", "success": True, "message": "Authenticated successfully"}))
-                
-                device.last_seen = datetime.utcnow()
-                db.session.commit()
-                logging.info(
-                    "Device %s authenticated successfully. Updated device IP snapshot to %s.",
-                    system_id,
-                    remote_ip,
-                )
-
-    except (
-        OSError,
-        RuntimeError,
-        TypeError,
-        ValueError,
-        SQLAlchemyError,
-    ):
-        logging.exception("Error during WebSocket handshake / loop for %s", system_id)
-        return
-
-    # 4. Main message listening loop for approved connections
-    try:
-        while True:
-            msg_raw = ws.receive()
-            if not msg_raw:
-                break
-                
-            msg = json.loads(msg_raw)
-            msg_type = msg.get("type")
+            system_id = hello_msg.get("system_id")
+            system_hostname = hello_msg.get("system_hostname")
+            if isinstance(system_hostname, str):
+                system_hostname = system_hostname.strip() or None
+            reg_token = hello_msg.get("registration_token")
             
-            if msg_type == "command_response":
-                correlation_id = msg.get("correlation_id")
-                AgentConnectionManager.route_response(correlation_id, msg)
-            elif msg_type == "policy_sync_check":
-                source_revisions = msg.get("source_revisions") or {}
-                if not isinstance(source_revisions, dict):
-                    source_revisions = {}
-                task_manager.request_domain_policy_sync(
-                    system_id,
-                    source_revisions=source_revisions,
-                    reason='agent_timer',
-                )
-            elif msg_type == "alert_event":
-                try:
-                    normalized_alert = normalize_agent_alert_payload(system_id, msg)
-                    alert = _store_agent_alert(system_id, normalized_alert)
+            if not system_id:
+                logging.warning("Initial hello missing system_id")
+                ws.send(json.dumps({"type": "auth_result", "success": False, "message": "Missing system_id"}))
+                return
+    
+            # 2. Check and enforce Registration Token firewall
+            expected_reg_token = AgentConnectionManager.registration_token
+            
+            with app.app_context():
+                # Lookup device in database
+                device = AgentDevice.query.get(system_id)
+                
+                if not device:
+                    # If a registration token is required, verify it
+                    if expected_reg_token and reg_token != expected_reg_token:
+                        logging.warning(
+                            "Registration rejected: Invalid registration token from %s",
+                            system_id,
+                        )
+                        ws.send(json.dumps({"type": "auth_result", "success": False, "message": "Invalid registration token"}))
+                        return
+                    
+                    # Register a new device in 'pending' state
+                    device = AgentDevice(
+                        system_id=system_id,
+                        system_hostname=system_hostname,
+                        system_ip=remote_ip,
+                        status='pending',
+                    )
+                    db.session.add(device)
+                    db.session.commit()
                     logging.info(
-                        "Stored alert %s from agent %s as row %s",
-                        alert.event_type,
+                        "New pending device registered: %s from %s",
                         system_id,
-                        alert.id,
+                        remote_ip,
                     )
-                except ValueError as exc:
+                else:
+                    # Existing device, update latest hostname and IP snapshot
+                    if "system_hostname" in hello_msg:
+                        device.system_hostname = system_hostname
+                    device.system_ip = remote_ip
+                    db.session.commit()
+    
+                # 3. Handle device pairing states
+                if device.status == 'pending':
+                    logging.info("Device %s is PENDING approval. Waiting...", system_id)
+                    AgentConnectionManager.register_pending(system_id, ws)
+                    ws.send(json.dumps({"type": "pairing_status", "status": "pending"}))
+                    
+                    # Keep the socket open in pending state, waiting for admin approval trigger
+                    try:
+                        while True:
+                            msg = ws.receive()
+                            if not msg:
+                                break
+                    except (OSError, RuntimeError, ValueError):
+                        logging.debug("Pending websocket closed for %s", system_id)
+                    return
+    
+                if device.status == 'rejected':
                     logging.warning(
-                        "Rejected invalid alert payload from %s: %s",
+                        "Connection rejected: Device %s is banned/rejected",
                         system_id,
-                        exc,
                     )
-                except SQLAlchemyError as exc:
-                    db.session.rollback()
-                    logging.error(
-                        "Failed to store alert payload from %s: %s",
+                    ws.send(json.dumps({"type": "auth_result", "success": False, "message": "Device rejected/banned"}))
+                    return
+    
+                if device.status == 'approved':
+                    # Device is approved! Perform secure challenge-response
+                    challenge = secrets.token_hex(32)
+                    ws.send(json.dumps({
+                        "type": "challenge",
+                        "challenge": challenge
+                    }))
+                    
+                    # Wait for authentication signature response
+                    auth_msg_raw = ws.receive(timeout=10)
+                    if not auth_msg_raw:
+                        logging.warning("Handshake timeout for approved device %s", system_id)
+                        return
+                        
+                    auth_msg = json.loads(auth_msg_raw)
+                    if auth_msg.get("type") != "register":
+                        logging.warning(
+                            "Unexpected response type from %s: %s",
+                            system_id,
+                            auth_msg.get('type'),
+                        )
+                        return
+                        
+                    signature = auth_msg.get("signature")
+                    if not signature:
+                        logging.warning("Handshake from %s missing signature", system_id)
+                        return
+                        
+                    # Verify using device-specific secure token
+                    if not AgentConnectionManager.verify_signature(challenge, system_id, signature):
+                        logging.warning(
+                            "Authentication signature verification failed for device %s",
+                            system_id,
+                        )
+                        ws.send(json.dumps({"type": "auth_result", "success": False, "message": "Invalid authentication signature"}))
+                        return
+                        
+                    # Authentication succeeded! Register active connection
+                    AgentConnectionManager.register(system_id, ws, remote_ip)
+                    ws.send(json.dumps({"type": "auth_result", "success": True, "message": "Authenticated successfully"}))
+                    
+                    device.last_seen = datetime.utcnow()
+                    db.session.commit()
+                    logging.info(
+                        "Device %s authenticated successfully. Updated device IP snapshot to %s.",
                         system_id,
-                        exc,
+                        remote_ip,
                     )
-            else:
-                logging.warning(
-                    "Received unexpected message type from client %s: %s",
-                    system_id,
-                    msg_type,
-                )
-
-    except (OSError, RuntimeError, ValueError) as exc:
-        logging.info("WebSocket connection closed for agent %s: %s", system_id, exc)
+    
+        except (
+            OSError,
+            RuntimeError,
+            TypeError,
+            ValueError,
+            SQLAlchemyError,
+        ):
+            logging.exception("Error during WebSocket handshake / loop for %s", system_id)
+            return
+    
+        # 4. Main message listening loop for approved connections
+        try:
+            while True:
+                msg_raw = ws.receive()
+                if not msg_raw:
+                    break
+                    
+                msg = json.loads(msg_raw)
+                msg_type = msg.get("type")
+                
+                if msg_type == "command_response":
+                    correlation_id = msg.get("correlation_id")
+                    AgentConnectionManager.route_response(correlation_id, msg)
+                elif msg_type == "policy_sync_check":
+                    source_revisions = msg.get("source_revisions") or {}
+                    if not isinstance(source_revisions, dict):
+                        source_revisions = {}
+                    task_manager.request_domain_policy_sync(
+                        system_id,
+                        source_revisions=source_revisions,
+                        reason='agent_timer',
+                    )
+                elif msg_type == "alert_event":
+                    try:
+                        normalized_alert = normalize_agent_alert_payload(system_id, msg)
+                        alert = _store_agent_alert(system_id, normalized_alert)
+                        logging.info(
+                            "Stored alert %s from agent %s as row %s",
+                            alert.event_type,
+                            system_id,
+                            alert.id,
+                        )
+                        if alert.event_type == 'app_usage':
+                            _store_app_usage_from_alert(system_id, normalized_alert)
+                    except ValueError as exc:
+                        logging.warning(
+                            "Rejected invalid alert payload from %s: %s",
+                            system_id,
+                            exc,
+                        )
+                    except SQLAlchemyError as exc:
+                        db.session.rollback()
+                        logging.error(
+                            "Failed to store alert payload from %s: %s",
+                            system_id,
+                            exc,
+                        )
+                else:
+                    logging.warning(
+                        "Received unexpected message type from client %s: %s",
+                        system_id,
+                        msg_type,
+                    )
+    
+        except (OSError, RuntimeError, ValueError) as exc:
+            logging.info("WebSocket connection closed for agent %s: %s", system_id, exc)
     finally:
         if system_id:
             AgentConnectionManager.unregister_pending(system_id)
@@ -2025,6 +2030,10 @@ def device_detail(system_id):
             ),
         })
 
+    usage_summaries = {}
+    for mapping in mapped_accounts:
+        usage_summaries[mapping.id] = _get_apparmor_usage_summary(mapping.id)
+
     return render_template(
         'device_detail.html',
         device=device,
@@ -2034,6 +2043,7 @@ def device_detail(system_id):
         alert_search=alert_search,
         alert_entries=alert_entries,
         alert_summary=alert_summary,
+        usage_summaries=usage_summaries,
     )
 
 @app.route('/api/modify-time', methods=['POST'])
@@ -2163,6 +2173,255 @@ def modify_time():
         'username': user.username,
         'refresh': True
     })
+
+
+# ── AppArmor Policy Management ──────────────────────────────────────────
+
+CURATED_APPARMOR_APPS = [
+    {'name': 'Firefox',            'path': '/usr/bin/firefox',            'icon': '🦊'},
+    {'name': 'Google Chrome',      'path': '/usr/bin/google-chrome',      'icon': '🌐'},
+    {'name': 'Steam',              'path': '/usr/bin/steam',              'icon': '🎮'},
+    {'name': 'Discord',            'path': '/usr/bin/discord',            'icon': '💬'},
+    {'name': 'Minecraft',          'path': '/usr/bin/minecraft-launcher', 'icon': '⛏️'},
+    {'name': 'Spotify',            'path': '/usr/bin/spotify',            'icon': '🎵'},
+    {'name': 'VLC',                'path': '/usr/bin/vlc',                'icon': '🎬'},
+]
+
+CURATED_APPARMOR_PATHS = {app['path'] for app in CURATED_APPARMOR_APPS}
+
+
+def _store_app_usage_from_alert(system_id, normalized_alert):
+    """Persist a structured AppUsageHistory row from an app_usage alert event."""
+    details = normalized_alert.get('details', {})
+    if not isinstance(details, dict):
+        return
+
+    linux_username = normalized_alert.get('linux_username')
+    executable_path = (details.get('executable_path') or '').strip()
+    application_name = (details.get('application_name') or '').strip() or executable_path
+    duration_seconds = details.get('duration_seconds')
+
+    if not linux_username or not executable_path or not isinstance(duration_seconds, (int, float)):
+        return
+
+    duration_seconds = max(0, int(duration_seconds))
+    mapping = ManagedUserDeviceMap.query.filter_by(
+        system_id=system_id,
+        linux_username=linux_username,
+    ).first()
+    if not mapping:
+        return
+
+    start_iso = (details.get('start_time') or '').strip()
+    end_iso = (details.get('end_time') or '').strip()
+    try:
+        start_time = datetime.fromisoformat(start_iso.replace('Z', '+00:00')).replace(tzinfo=None)
+        end_time = datetime.fromisoformat(end_iso.replace('Z', '+00:00')).replace(tzinfo=None)
+    except (TypeError, ValueError):
+        end_time = datetime.utcnow()
+        from datetime import timedelta as td
+        start_time = end_time - td(seconds=duration_seconds)
+
+    record = AppUsageHistory(
+        device_map_id=mapping.id,
+        application_name=application_name,
+        executable_path=executable_path,
+        start_time=start_time,
+        end_time=end_time,
+        duration_seconds=duration_seconds,
+    )
+    db.session.add(record)
+    db.session.commit()
+    logging.info(
+        "Stored app_usage record for %s@%s: %s (%ds)",
+        linux_username, system_id, application_name, duration_seconds,
+    )
+
+
+def _get_apparmor_usage_summary(mapping_id, days=7):
+    """Build an aggregate app-usage summary for a mapping over the last N days."""
+    cutoff = datetime.utcnow() - timedelta(days=days)
+    records = AppUsageHistory.query.filter(
+        AppUsageHistory.device_map_id == mapping_id,
+        AppUsageHistory.start_time >= cutoff,
+    ).all()
+
+    aggregate = {}
+    for record in records:
+        key = record.executable_path
+        entry = aggregate.setdefault(key, {
+            'application_name': record.application_name,
+            'executable_path': record.executable_path,
+            'total_seconds': 0,
+            'session_count': 0,
+        })
+        entry['total_seconds'] += record.duration_seconds
+        entry['session_count'] += 1
+
+    result = sorted(aggregate.values(), key=lambda item: -item['total_seconds'])
+    for item in result:
+        secs = item['total_seconds']
+        hours = secs // 3600
+        minutes = (secs % 3600) // 60
+        if hours > 0:
+            item['formatted'] = f"{hours}h {minutes}m"
+        else:
+            item['formatted'] = f"{minutes}m"
+    return result
+
+
+@app.route('/apparmor/policy/<int:mapping_id>', methods=['GET', 'POST'])
+def apparmor_policy(mapping_id):
+    """Visual AppArmor policy management for a single device mapping."""
+    if not session.get('logged_in'):
+        flash('Please login first', 'warning')
+        return redirect(url_for('login'))
+
+    mapping = ManagedUserDeviceMap.query.get_or_404(mapping_id)
+    user = mapping.managed_user
+    device_labels = _get_device_label_map()
+    device_label = device_labels.get(mapping.system_id, mapping.system_id)
+
+    if request.method == 'POST':
+        # Process preset changes for curated apps
+        for app_template in CURATED_APPARMOR_APPS:
+            preset = request.form.get(f"preset_{app_template['path']}", 'allowed').strip()
+            if preset not in AppArmorRule.VALID_PRESETS:
+                preset = AppArmorRule.PRESET_ALLOWED
+
+            existing = AppArmorRule.query.filter_by(
+                device_map_id=mapping.id,
+                executable_path=app_template['path'],
+            ).first()
+            if existing:
+                existing.preset = preset
+                existing.application_name = app_template['name']
+                existing.is_custom = False
+            else:
+                db.session.add(AppArmorRule(
+                    device_map_id=mapping.id,
+                    application_name=app_template['name'],
+                    executable_path=app_template['path'],
+                    preset=preset,
+                    is_custom=False,
+                ))
+
+        # Process custom app additions
+        custom_name = (request.form.get('custom_app_name') or '').strip()
+        custom_path = (request.form.get('custom_app_path') or '').strip()
+        custom_preset = (request.form.get('custom_app_preset') or 'allowed').strip()
+        if custom_name and custom_path:
+            if custom_preset not in AppArmorRule.VALID_PRESETS:
+                custom_preset = AppArmorRule.PRESET_ALLOWED
+            existing = AppArmorRule.query.filter_by(
+                device_map_id=mapping.id,
+                executable_path=custom_path,
+            ).first()
+            if existing:
+                existing.preset = custom_preset
+                existing.application_name = custom_name
+            else:
+                db.session.add(AppArmorRule(
+                    device_map_id=mapping.id,
+                    application_name=custom_name,
+                    executable_path=custom_path,
+                    preset=custom_preset,
+                    is_custom=True,
+                ))
+
+        # Process custom rule presets from the existing list
+        custom_rules = AppArmorRule.query.filter_by(
+            device_map_id=mapping.id,
+            is_custom=True,
+        ).all()
+        for rule in custom_rules:
+            form_key = f"preset_{rule.executable_path}"
+            if form_key in request.form:
+                new_preset = request.form[form_key].strip()
+                if new_preset in AppArmorRule.VALID_PRESETS:
+                    rule.preset = new_preset
+
+        db.session.commit()
+
+        # Push the policy to the agent if it is online
+        all_rules = AppArmorRule.query.filter_by(device_map_id=mapping.id).all()
+        policies_list = [rule.to_sync_dict() for rule in all_rules if rule.is_restrictive]
+        if AgentConnectionManager.is_online(mapping.system_id):
+            agent = AgentClient(system_id=mapping.system_id)
+            success, sync_msg = agent.sync_apparmor_policy(
+                mapping.linux_username,
+                policies_list,
+            )
+            if success:
+                flash(f'AppArmor policy saved and synced to {device_label}', 'success')
+            else:
+                flash(f'Policy saved but sync failed: {sync_msg}', 'warning')
+        else:
+            flash('Policy saved. Will sync when the device reconnects.', 'success')
+
+        return redirect(url_for('apparmor_policy', mapping_id=mapping.id))
+
+    # GET: Build template data
+    existing_rules = {
+        rule.executable_path: rule
+        for rule in AppArmorRule.query.filter_by(device_map_id=mapping.id).all()
+    }
+
+    curated_apps = []
+    for app_template in CURATED_APPARMOR_APPS:
+        rule = existing_rules.get(app_template['path'])
+        curated_apps.append({
+            'name': app_template['name'],
+            'path': app_template['path'],
+            'icon': app_template['icon'],
+            'preset': rule.preset if rule else AppArmorRule.PRESET_ALLOWED,
+        })
+
+    custom_rules = [
+        {
+            'name': rule.application_name,
+            'path': rule.executable_path,
+            'preset': rule.preset,
+            'id': rule.id,
+        }
+        for rule in sorted(
+            existing_rules.values(),
+            key=lambda r: (r.application_name.lower(), r.id),
+        )
+        if rule.executable_path not in CURATED_APPARMOR_PATHS
+    ]
+
+    usage_summary = _get_apparmor_usage_summary(mapping.id)
+    is_online = AgentConnectionManager.is_online(mapping.system_id)
+    restrictive_count = sum(1 for app in curated_apps if app['preset'] != 'allowed') + \
+        sum(1 for rule in custom_rules if rule['preset'] != 'allowed')
+
+    return render_template(
+        'apparmor_policy.html',
+        mapping=mapping,
+        user=user,
+        device_label=device_label,
+        curated_apps=curated_apps,
+        custom_rules=custom_rules,
+        usage_summary=usage_summary,
+        is_online=is_online,
+        restrictive_count=restrictive_count,
+    )
+
+
+@app.route('/apparmor/rule/<int:rule_id>/delete', methods=['POST'])
+def delete_apparmor_rule(rule_id):
+    """Delete a custom AppArmor rule."""
+    if not session.get('logged_in'):
+        return jsonify({'success': False, 'message': 'Not authenticated'}), 401
+
+    rule = AppArmorRule.query.get_or_404(rule_id)
+    mapping_id = rule.device_map_id
+    db.session.delete(rule)
+    db.session.commit()
+    flash(f'Removed AppArmor rule for {rule.application_name}', 'success')
+    return redirect(url_for('apparmor_policy', mapping_id=mapping_id))
+
 
 def run_schema_migrations():
     """Run lightweight SQLite migrations and backfill mapping table."""

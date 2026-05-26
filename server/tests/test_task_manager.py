@@ -543,8 +543,9 @@ def test_task_manager_failures_and_threads(app, db_session):
         manager._run_tasks()
 
     # 3. Thread graceful exit and timeout logs
-    manager.start()
-    manager.stop()
+    with patch.object(manager, '_run_task_cycle'):
+        manager.start()
+        manager.stop()
 
 
 def test_task_manager_syncs_domain_policy_payloads(app, db_session):

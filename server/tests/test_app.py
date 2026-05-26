@@ -940,7 +940,7 @@ def test_alert_pages_for_user_and_device(client, db_session):
     device_page = client.get(f'/devices/{device.system_id}')
     assert device_page.status_code == 200
     assert b'Device details, linked accounts, and alert history' in device_page.data
-    assert b'jack -> jack' in device_page.data
+    assert b'jack &rarr; jack' in device_page.data
     assert b'other-user' in device_page.data
 
     device_filtered = client.get(f'/devices/{device.system_id}?alert_search=other-user')

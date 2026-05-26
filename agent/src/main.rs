@@ -1,6 +1,9 @@
+mod apparmor;
+mod audit_monitor;
 mod domain_policy;
 mod firewall;
 mod local_dns;
+mod netlink;
 mod timekpr_dbus;
 
 use chrono::{SecondsFormat, Utc};
@@ -14,11 +17,31 @@ use std::convert::TryFrom;
 use std::fs;
 use std::path::Path;
 use std::process::Command;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use timekpr_dbus::{AllowedHoursDay, TimekprDbusClient};
 use tokio::sync::{mpsc, watch};
 use tokio::task::JoinHandle;
 use tokio::time::sleep;
+
+fn get_system_users_map() -> HashMap<u32, String> {
+    let mut map = HashMap::new();
+    if let Ok(content) = fs::read_to_string("/etc/passwd") {
+        for line in content.lines() {
+            let parts: Vec<&str> = line.split(':').collect();
+            if parts.len() >= 3 {
+                let username = parts[0].to_string();
+                if let Ok(uid) = parts[2].parse::<u32>() {
+                    // Filter regular users (typically 1000 to 60000)
+                    if uid >= 1000 && uid < 60000 && username != "nobody" {
+                        map.insert(uid, username);
+                    }
+                }
+            }
+        }
+    }
+    map
+}
 use tokio_tungstenite::{connect_async, tungstenite::protocol::Message};
 use uuid::Uuid;
 use zbus::{Connection, Proxy};
@@ -473,6 +496,22 @@ async fn handle_command(action: &str, username: &str, args: &serde_json::Value) 
                 (false, format!("Errors setting allowed hours: {}", errors.join("; ")), serde_json::json!({}))
             }
         }
+        "sync_apparmor_policy" => {
+            let policies_val = match args.get("policies") {
+                Some(p) => p,
+                None => return (false, "Missing 'policies' argument".to_string(), serde_json::json!({})),
+            };
+
+            let policies: Vec<apparmor::AppArmorPolicy> = match serde_json::from_value(policies_val.clone()) {
+                Ok(p) => p,
+                Err(e) => return (false, format!("Failed to parse policies: {}", e), serde_json::json!({})),
+            };
+
+            match apparmor::sync_user_policy(username, policies).await {
+                Ok(msg) => (true, msg, serde_json::json!({})),
+                Err(e) => (false, e, serde_json::json!({})),
+            }
+        }
         _ => (false, format!("Unknown action '{}'", action), serde_json::json!({})),
     }
 }
@@ -636,6 +675,11 @@ async fn run_session_listener(
                         let object_path = args.object_path.to_string();
                         if let Some(snapshot) = resolve_session_snapshot(&connection, &object_path).await {
                             if is_user_session_class(snapshot.session_class.as_deref()) {
+                                if let Some(ref uname) = snapshot.username {
+                                    if let Err(e) = apparmor::load_profiles_for_user(uname).await {
+                                        eprintln!("Failed to load AppArmor profiles for {}: {}", uname, e);
+                                    }
+                                }
                                 let details = serde_json::json!({
                                     "session_id": session_id,
                                     "session_class": snapshot.session_class.clone(),
@@ -663,6 +707,11 @@ async fn run_session_listener(
                     Ok(args) => {
                         let session_id = args.session_id.to_string();
                         let snapshot = session_cache.remove(&session_id).unwrap_or_default();
+                        if let Some(ref uname) = snapshot.username {
+                            if let Err(e) = apparmor::unload_profiles_for_user(uname).await {
+                                eprintln!("Failed to unload AppArmor profiles for {}: {}", uname, e);
+                            }
+                        }
                         let details = serde_json::json!({
                             "session_id": session_id,
                             "session_class": snapshot.session_class.clone(),
@@ -822,6 +871,42 @@ async fn main() {
     if let Err(message) = domain_policy::initialize_runtime().await {
         eprintln!("Failed to restore persisted domain policy: {}", message);
     }
+    if let Err(message) = apparmor::initialize_runtime().await {
+        eprintln!("Failed to restore persisted AppArmor policy: {}", message);
+    }
+
+    // Set up global AppAlert channel for process monitor & denial log tailer
+    let (alert_tx, mut alert_rx) = mpsc::unbounded_channel::<netlink::AppAlert>();
+    
+    // Get regular system users and start background tasks
+    let users_map = get_system_users_map();
+    println!("Found regular system users: {:?}", users_map);
+    
+    let netlink_config = netlink::MonitorConfig {
+        monitored_uids: users_map.clone(),
+    };
+    tokio::spawn(netlink::run_process_monitor(netlink_config, alert_tx.clone()));
+    tokio::spawn(audit_monitor::run_audit_monitor(users_map, alert_tx));
+
+    // Channel forwarder that forwards background AppAlerts to current websocket sender
+    let active_client_tx = Arc::new(Mutex::new(None::<mpsc::UnboundedSender<ClientMessage>>));
+    let active_tx_clone = active_client_tx.clone();
+    tokio::spawn(async move {
+        while let Some(alert) = alert_rx.recv().await {
+            let msg = build_alert_message(
+                &alert.event_type,
+                Some(alert.linux_username),
+                alert.payload,
+            );
+            let opt_tx = {
+                let guard = active_tx_clone.lock().unwrap();
+                guard.clone()
+            };
+            if let Some(tx) = opt_tx {
+                let _ = tx.send(msg);
+            }
+        }
+    });
 
     loop {
         let config = load_or_create_config();
@@ -942,6 +1027,10 @@ async fn main() {
 
                 let (mut ws_write, mut ws_read) = ws_stream.split();
                 let (client_tx, mut client_rx) = mpsc::unbounded_channel::<ClientMessage>();
+                {
+                    let mut guard = active_client_tx.lock().unwrap();
+                    *guard = Some(client_tx.clone());
+                }
                 let writer_handle = tokio::spawn(async move {
                     while let Some(message) = client_rx.recv().await {
                         let serialized = match serde_json::to_string(&message) {
@@ -1025,6 +1114,11 @@ async fn main() {
                         }
                         _ => {}
                     }
+                }
+
+                {
+                    let mut guard = active_client_tx.lock().unwrap();
+                    *guard = None;
                 }
 
                 let _ = shutdown_tx.send(true);

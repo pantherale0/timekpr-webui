@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AppArmor Policy – {{ user.username }} @ {{ device_label }} – TimeKpr WebUI</title>
+    <meta name="description" content="Manage application restrictions for {{ user.username }} on {{ device_label }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
+    <style>
+        .aa-main {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: var(--space-6);
+        }
+
+        .aa-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: var(--space-4);
+            flex-wrap: wrap;
+            margin-bottom: var(--space-6);
+        }
+
+        .aa-summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: var(--space-4);
+            margin-bottom: var(--space-6);
+        }
+
+        .aa-summary-card {
+            background: var(--bg-elevated);
+            border: 1px solid var(--border-primary);
+            border-radius: var(--radius-xl);
+            padding: var(--space-5);
+        }
+
+        .aa-summary-label {
+            color: var(--text-tertiary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            font-size: var(--font-size-xs);
+            font-weight: 600;
+            margin-bottom: var(--space-1);
+        }
+
+        .aa-summary-value {
+            font-size: var(--font-size-lg);
+            font-weight: 700;
+        }
+
+        .aa-card {
+            background: var(--bg-elevated);
+            border: 1px solid var(--border-primary);
+            border-radius: var(--radius-xl);
+            padding: var(--space-6);
+            margin-bottom: var(--space-6);
+        }
+
+        .aa-card h2 {
+            margin-top: 0;
+            margin-bottom: var(--space-2);
+            font-size: var(--font-size-lg);
+        }
+
+        .aa-card-subtitle {
+            color: var(--text-tertiary);
+            font-size: var(--font-size-sm);
+            margin-bottom: var(--space-5);
+        }
+
+        /* Application Grid */
+        .aa-app-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: var(--space-4);
+        }
+
+        .aa-app-tile {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-primary);
+            border-radius: var(--radius-lg);
+            padding: var(--space-5);
+            transition: all var(--transition-fast);
+        }
+
+        .aa-app-tile:hover {
+            border-color: var(--border-secondary);
+            box-shadow: var(--shadow-md);
+            transform: translateY(-2px);
+        }
+
+        .aa-app-tile.preset-blocked {
+            border-color: var(--danger);
+            background: var(--danger-bg);
+        }
+
+        .aa-app-tile.preset-no_internet {
+            border-color: var(--warning);
+            background: var(--warning-bg);
+        }
+
+        .aa-app-header {
+            display: flex;
+            align-items: center;
+            gap: var(--space-3);
+            margin-bottom: var(--space-4);
+        }
+
+        .aa-app-icon {
+            font-size: 1.75rem;
+            line-height: 1;
+            flex-shrink: 0;
+        }
+
+        .aa-app-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .aa-app-name {
+            font-weight: 600;
+            font-size: var(--font-size-base);
+            margin: 0;
+        }
+
+        .aa-app-path {
+            font-size: var(--font-size-xs);
+            color: var(--text-tertiary);
+            font-family: monospace;
+            word-break: break-all;
+            margin: var(--space-1) 0 0 0;
+        }
+
+        /* Segmented Preset Control */
+        .aa-preset-control {
+            display: flex;
+            border: 1px solid var(--border-primary);
+            border-radius: var(--radius-md);
+            overflow: hidden;
+            background: var(--bg-elevated);
+        }
+
+        .aa-preset-control input[type="radio"] {
+            display: none;
+        }
+
+        .aa-preset-control label {
+            flex: 1;
+            text-align: center;
+            padding: var(--space-2) var(--space-3);
+            font-size: var(--font-size-xs);
+            font-weight: 500;
+            cursor: pointer;
+            transition: all var(--transition-fast);
+            color: var(--text-secondary);
+            border-right: 1px solid var(--border-primary);
+            user-select: none;
+        }
+
+        .aa-preset-control label:last-of-type {
+            border-right: none;
+        }
+
+        .aa-preset-control label:hover {
+            background: var(--bg-tertiary);
+        }
+
+        .aa-preset-control input[value="allowed"]:checked + label {
+            background: var(--success);
+            color: white;
+            font-weight: 600;
+        }
+
+        .aa-preset-control input[value="no_internet"]:checked + label {
+            background: var(--warning);
+            color: white;
+            font-weight: 600;
+        }
+
+        .aa-preset-control input[value="blocked"]:checked + label {
+            background: var(--danger);
+            color: white;
+            font-weight: 600;
+        }
+
+        /* Preset explanations */
+        .aa-preset-hint {
+            font-size: var(--font-size-xs);
+            color: var(--text-muted);
+            margin-top: var(--space-2);
+            text-align: center;
+            min-height: 2.5em;
+        }
+
+        /* Custom Apps Form */
+        .aa-custom-form {
+            display: grid;
+            grid-template-columns: 1fr 2fr 1fr auto;
+            gap: var(--space-3);
+            align-items: end;
+            margin-top: var(--space-4);
+            padding-top: var(--space-4);
+            border-top: 1px solid var(--border-primary);
+        }
+
+        @media (max-width: 768px) {
+            .aa-custom-form {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Custom Rule Item */
+        .aa-custom-item {
+            display: flex;
+            align-items: center;
+            gap: var(--space-3);
+            padding: var(--space-3) var(--space-4);
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-primary);
+            border-radius: var(--radius-md);
+            margin-bottom: var(--space-3);
+        }
+
+        .aa-custom-item .aa-app-info {
+            flex: 1;
+        }
+
+        .aa-custom-item .aa-preset-control {
+            width: 280px;
+            flex-shrink: 0;
+        }
+
+        /* Usage Summary */
+        .aa-usage-list {
+            display: grid;
+            gap: var(--space-3);
+        }
+
+        .aa-usage-row {
+            display: flex;
+            align-items: center;
+            gap: var(--space-4);
+            padding: var(--space-3) 0;
+            border-bottom: 1px solid var(--border-primary);
+        }
+
+        .aa-usage-row:last-child {
+            border-bottom: none;
+        }
+
+        .aa-usage-label {
+            min-width: 140px;
+            font-weight: 500;
+            font-size: var(--font-size-sm);
+        }
+
+        .aa-usage-bar-container {
+            flex: 1;
+            height: 24px;
+            background: var(--bg-tertiary);
+            border-radius: var(--radius-sm);
+            overflow: hidden;
+            position: relative;
+        }
+
+        .aa-usage-bar {
+            height: 100%;
+            border-radius: var(--radius-sm);
+            background: linear-gradient(90deg, hsl(210, 80%, 55%), hsl(200, 85%, 50%));
+            transition: width var(--transition-slow);
+            min-width: 2px;
+        }
+
+        .aa-usage-time {
+            min-width: 80px;
+            text-align: right;
+            font-size: var(--font-size-sm);
+            font-weight: 600;
+            color: var(--text-secondary);
+        }
+
+        .aa-usage-sessions {
+            min-width: 80px;
+            text-align: right;
+            font-size: var(--font-size-xs);
+            color: var(--text-tertiary);
+        }
+
+        /* Save actions */
+        .aa-save-bar {
+            display: flex;
+            justify-content: flex-end;
+            gap: var(--space-3);
+            padding-top: var(--space-5);
+            border-top: 1px solid var(--border-primary);
+            margin-top: var(--space-5);
+        }
+    </style>
+</head>
+<body>
+    <div class="aa-main">
+        <div class="aa-header">
+            <div>
+                <h1 style="margin: 0;">🛡️ App Restrictions</h1>
+                <p style="margin: var(--space-1) 0 0 0; color: var(--text-tertiary);">
+                    {{ user.username }} on <strong>{{ device_label }}</strong>
+                    ({{ mapping.linux_username }})
+                </p>
+            </div>
+            <div style="display:flex; gap: var(--space-3); flex-wrap: wrap;">
+                <a href="{{ url_for('admin') }}" class="btn btn-secondary">Back to Admin</a>
+                <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">Dashboard</a>
+            </div>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <div class="aa-summary-grid">
+            <div class="aa-summary-card">
+                <div class="aa-summary-label">Device Status</div>
+                <div class="aa-summary-value">
+                    {% if is_online %}
+                    <span class="status-indicator status-active">Online</span>
+                    {% else %}
+                    <span class="status-indicator status-inactive">Offline</span>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="aa-summary-card">
+                <div class="aa-summary-label">Active Restrictions</div>
+                <div class="aa-summary-value">{{ restrictive_count }}</div>
+            </div>
+            <div class="aa-summary-card">
+                <div class="aa-summary-label">Linux Account</div>
+                <div class="aa-summary-value" style="font-size: var(--font-size-base);">{{ mapping.linux_username }}</div>
+            </div>
+            <div class="aa-summary-card">
+                <div class="aa-summary-label">UID</div>
+                <div class="aa-summary-value">{{ mapping.linux_uid if mapping.linux_uid is not none else '—' }}</div>
+            </div>
+        </div>
+
+        <form method="POST" id="apparmor-form">
+            <div class="aa-card">
+                <h2>Application Controls</h2>
+                <p class="aa-card-subtitle">
+                    Choose how each application behaves when {{ user.username }} is logged in.
+                    Rules are enforced via AppArmor profiles loaded on session start.
+                </p>
+
+                <div class="aa-app-grid">
+                    {% for app in curated_apps %}
+                    <div class="aa-app-tile preset-{{ app.preset }}" id="tile-{{ loop.index }}">
+                        <div class="aa-app-header">
+                            <span class="aa-app-icon">{{ app.icon }}</span>
+                            <div class="aa-app-info">
+                                <p class="aa-app-name">{{ app.name }}</p>
+                                <p class="aa-app-path">{{ app.path }}</p>
+                            </div>
+                        </div>
+
+                        <div class="aa-preset-control">
+                            <input type="radio" name="preset_{{ app.path }}" value="allowed"
+                                   id="allowed-{{ loop.index }}"
+                                   {{ 'checked' if app.preset == 'allowed' }}
+                                   onchange="updateTile(this, {{ loop.index }})">
+                            <label for="allowed-{{ loop.index }}">✅ Allowed</label>
+
+                            <input type="radio" name="preset_{{ app.path }}" value="no_internet"
+                                   id="nointernet-{{ loop.index }}"
+                                   {{ 'checked' if app.preset == 'no_internet' }}
+                                   onchange="updateTile(this, {{ loop.index }})">
+                            <label for="nointernet-{{ loop.index }}">🚫 No Internet</label>
+
+                            <input type="radio" name="preset_{{ app.path }}" value="blocked"
+                                   id="blocked-{{ loop.index }}"
+                                   {{ 'checked' if app.preset == 'blocked' }}
+                                   onchange="updateTile(this, {{ loop.index }})">
+                            <label for="blocked-{{ loop.index }}">⛔ Blocked</label>
+                        </div>
+
+                        <div class="aa-preset-hint" id="hint-{{ loop.index }}">
+                            {% if app.preset == 'allowed' %}
+                                Unrestricted access — no AppArmor sandbox applied
+                            {% elif app.preset == 'no_internet' %}
+                                Runs normally but all network access is denied
+                            {% elif app.preset == 'blocked' %}
+                                Execution is completely prevented
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            {% if custom_rules %}
+            <div class="aa-card">
+                <h2>Custom Application Rules</h2>
+                <p class="aa-card-subtitle">Rules for manually-added executables.</p>
+
+                {% for rule in custom_rules %}
+                <div class="aa-custom-item">
+                    <div class="aa-app-info">
+                        <p class="aa-app-name">{{ rule.name }}</p>
+                        <p class="aa-app-path">{{ rule.path }}</p>
+                    </div>
+                    <div class="aa-preset-control">
+                        <input type="radio" name="preset_{{ rule.path }}" value="allowed"
+                               id="custom-allowed-{{ rule.id }}"
+                               {{ 'checked' if rule.preset == 'allowed' }}>
+                        <label for="custom-allowed-{{ rule.id }}">✅ Allowed</label>
+
+                        <input type="radio" name="preset_{{ rule.path }}" value="no_internet"
+                               id="custom-nointernet-{{ rule.id }}"
+                               {{ 'checked' if rule.preset == 'no_internet' }}>
+                        <label for="custom-nointernet-{{ rule.id }}">🚫 No Internet</label>
+
+                        <input type="radio" name="preset_{{ rule.path }}" value="blocked"
+                               id="custom-blocked-{{ rule.id }}"
+                               {{ 'checked' if rule.preset == 'blocked' }}>
+                        <label for="custom-blocked-{{ rule.id }}">⛔ Blocked</label>
+                    </div>
+                    <form action="{{ url_for('delete_apparmor_rule', rule_id=rule.id) }}"
+                          method="POST" style="margin:0;"
+                          onsubmit="return confirm('Remove this custom rule?')">
+                        <button type="submit" class="btn btn-sm btn-danger" title="Remove rule">✕</button>
+                    </form>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <div class="aa-card">
+                <h2>Add Custom Application</h2>
+                <p class="aa-card-subtitle">Add a restriction for any executable on the system.</p>
+                <div class="aa-custom-form">
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label for="custom_app_name" class="form-label">App Name</label>
+                        <input type="text" id="custom_app_name" name="custom_app_name"
+                               class="form-control" placeholder="e.g. OBS Studio">
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label for="custom_app_path" class="form-label">Executable Path</label>
+                        <input type="text" id="custom_app_path" name="custom_app_path"
+                               class="form-control" placeholder="/usr/bin/obs">
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label for="custom_app_preset" class="form-label">Preset</label>
+                        <select id="custom_app_preset" name="custom_app_preset" class="form-control form-select">
+                            <option value="allowed">Allowed</option>
+                            <option value="no_internet">No Internet</option>
+                            <option value="blocked" selected>Blocked</option>
+                        </select>
+                    </div>
+                    <div style="display:flex; align-items: end;">
+                        <button type="submit" class="btn btn-primary">Add & Save</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="aa-save-bar">
+                <a href="{{ url_for('admin') }}" class="btn btn-secondary">Cancel</a>
+                <button type="submit" class="btn btn-primary btn-lg">💾 Save All Changes</button>
+            </div>
+        </form>
+
+        {% if usage_summary %}
+        <div class="aa-card" style="margin-top: var(--space-6);">
+            <h2>📊 Application Usage (Last 7 Days)</h2>
+            <p class="aa-card-subtitle">
+                Tracked runtime for applications used by {{ user.username }} on this device.
+            </p>
+            <div class="aa-usage-list">
+                {% set max_seconds = usage_summary[0].total_seconds if usage_summary else 1 %}
+                {% for item in usage_summary %}
+                <div class="aa-usage-row">
+                    <div class="aa-usage-label">{{ item.application_name }}</div>
+                    <div class="aa-usage-bar-container">
+                        <div class="aa-usage-bar"
+                             style="width: {{ (item.total_seconds / max_seconds * 100)|round(1) }}%;">
+                        </div>
+                    </div>
+                    <div class="aa-usage-time">{{ item.formatted }}</div>
+                    <div class="aa-usage-sessions">{{ item.session_count }} session{{ 's' if item.session_count != 1 }}</div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% else %}
+        <div class="aa-card" style="margin-top: var(--space-6);">
+            <h2>📊 Application Usage</h2>
+            <p style="margin: 0; color: var(--text-tertiary);">
+                No application usage recorded yet. Usage data will appear here once the agent begins tracking.
+            </p>
+        </div>
+        {% endif %}
+    </div>
+
+    <script>
+        const HINTS = {
+            allowed: 'Unrestricted access — no AppArmor sandbox applied',
+            no_internet: 'Runs normally but all network access is denied',
+            blocked: 'Execution is completely prevented',
+        };
+
+        function updateTile(radio, index) {
+            const tile = document.getElementById('tile-' + index);
+            const hint = document.getElementById('hint-' + index);
+            // Remove existing preset classes
+            tile.classList.remove('preset-allowed', 'preset-no_internet', 'preset-blocked');
+            tile.classList.add('preset-' + radio.value);
+            hint.textContent = HINTS[radio.value] || '';
+        }
+    </script>
+</body>
+</html>

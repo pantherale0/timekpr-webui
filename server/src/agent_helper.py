@@ -25,6 +25,9 @@ ALLOWED_AGENT_ALERT_TYPES = {
     'system_shutdown',
     'user_signed_in',
     'user_signed_out',
+    'app_launched',
+    'app_blocked',
+    'app_usage',
 }
 
 
@@ -579,6 +582,18 @@ class AgentClient:
             "",
             {
                 "sync_id": sync_id,
+            },
+        )
+        return success, message
+
+    def sync_apparmor_policy(self, username, policies_list):
+        """Synchronize the effective per-user AppArmor policy through the agent."""
+        success, message, _ = AgentConnectionManager.send_command_sync(
+            self.system_id,
+            "sync_apparmor_policy",
+            username,
+            {
+                "policies": policies_list or [],
             },
         )
         return success, message

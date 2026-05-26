@@ -229,18 +229,20 @@ class BackgroundTaskManager:
                 with _try_lock(self._task_lock) as acquired:
                     if not acquired:
                         logger.info("Task already running, skipping this cycle")
-                        continue
-
-                    logger.info("Starting task execution cycle")
-                    # Use a fresh app context
-                    if self.app:
-                        with self.app.app_context():
-                            self._run_task_cycle()
-                            logger.info("User data update cycle complete")
                     else:
-                        logger.error("App is not initialized in task manager")
+                        logger.info("Starting task execution cycle")
+                        # Use a fresh app context
+                        if self.app:
+                            with self.app.app_context():
+                                try:
+                                    self._run_task_cycle()
+                                    logger.info("User data update cycle complete")
+                                finally:
+                                    db.session.remove()
+                        else:
+                            logger.error("App is not initialized in task manager")
 
-                    self.last_error = None  # Clear error on successful run
+                        self.last_error = None  # Clear error on successful run
             except (
                 requests.RequestException,
                 RuntimeError,
@@ -720,24 +722,27 @@ class BackgroundTaskManager:
     def _run_requested_domain_policy_sync(self, system_id, source_revisions, reason):
         try:
             with self.app.app_context():
-                success, message = self._sync_domain_policy_system(
-                    system_id,
-                    agent_source_revisions=source_revisions,
-                )
-                if success:
-                    logger.info(
-                        "Completed agent-initiated domain policy sync for %s (%s): %s",
+                try:
+                    success, message = self._sync_domain_policy_system(
                         system_id,
-                        reason,
-                        message,
+                        agent_source_revisions=source_revisions,
                     )
-                else:
-                    logger.warning(
-                        "Agent-initiated domain policy sync failed for %s (%s): %s",
-                        system_id,
-                        reason,
-                        message,
-                    )
+                    if success:
+                        logger.info(
+                            "Completed agent-initiated domain policy sync for %s (%s): %s",
+                            system_id,
+                            reason,
+                            message,
+                        )
+                    else:
+                        logger.warning(
+                            "Agent-initiated domain policy sync failed for %s (%s): %s",
+                            system_id,
+                            reason,
+                            message,
+                        )
+                finally:
+                    db.session.remove()
         except (RuntimeError, TypeError, ValueError, SQLAlchemyError):
             logger.error(
                 "Error running requested domain policy sync for %s\n%s",

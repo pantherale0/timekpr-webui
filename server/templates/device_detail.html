@@ -68,6 +68,62 @@
             background: var(--bg-primary);
         }
 
+        /* Usage Summary styles */
+        .aa-usage-list {
+            display: grid;
+            gap: var(--space-2);
+        }
+
+        .aa-usage-row {
+            display: flex;
+            align-items: center;
+            gap: var(--space-4);
+            padding: var(--space-2) 0;
+            border-bottom: 1px solid var(--border-primary);
+        }
+
+        .aa-usage-row:last-child {
+            border-bottom: none;
+        }
+
+        .aa-usage-label {
+            min-width: 140px;
+            font-weight: 500;
+            font-size: var(--font-size-sm);
+        }
+
+        .aa-usage-bar-container {
+            flex: 1;
+            height: 20px;
+            background: var(--bg-tertiary);
+            border-radius: var(--radius-sm);
+            overflow: hidden;
+            position: relative;
+        }
+
+        .aa-usage-bar {
+            height: 100%;
+            border-radius: var(--radius-sm);
+            background: linear-gradient(90deg, hsl(210, 80%, 55%), hsl(200, 85%, 50%));
+            transition: width var(--transition-slow);
+            min-width: 2px;
+        }
+
+        .aa-usage-time {
+            min-width: 80px;
+            text-align: right;
+            font-size: var(--font-size-sm);
+            font-weight: 600;
+            color: var(--text-secondary);
+        }
+
+        .aa-usage-sessions {
+            min-width: 80px;
+            text-align: right;
+            font-size: var(--font-size-xs);
+            color: var(--text-tertiary);
+        }
+
         .alerts-toolbar {
             display: flex;
             gap: var(--space-3);
@@ -158,19 +214,65 @@
             {% if mapped_accounts %}
             <div class="mapped-accounts-list">
                 {% for mapping in mapped_accounts %}
-                <div class="mapped-account-item">
-                    <div style="font-weight: 600;">{{ mapping.managed_user.username }} -> {{ mapping.linux_username }}</div>
-                    <div style="font-size: var(--font-size-sm); color: var(--text-tertiary); margin-top: var(--space-1);">
-                        UID: {{ mapping.linux_uid if mapping.linux_uid is not none else '-' }}
-                        <span style="margin-left: var(--space-3);">
-                            Status: {{ 'Valid' if mapping.is_valid else 'Unverified' }}
-                        </span>
+                <div class="mapped-account-item" style="display: flex; justify-content: space-between; align-items: center; gap: var(--space-4); flex-wrap: wrap;">
+                    <div>
+                        <div style="font-weight: 600; font-size: var(--font-size-base);">{{ mapping.managed_user.username }} &rarr; {{ mapping.linux_username }}</div>
+                        <div style="font-size: var(--font-size-sm); color: var(--text-tertiary); margin-top: var(--space-1);">
+                            UID: {{ mapping.linux_uid if mapping.linux_uid is not none else '-' }}
+                            <span style="margin-left: var(--space-3);">
+                                Status: {{ 'Valid' if mapping.is_valid else 'Unverified' }}
+                            </span>
+                        </div>
+                    </div>
+                    <div>
+                        <a href="{{ url_for('apparmor_policy', mapping_id=mapping.id) }}" class="btn btn-sm btn-secondary" style="font-size: var(--font-size-xs);">🛡️ Manage AppArmor</a>
                     </div>
                 </div>
                 {% endfor %}
             </div>
             {% else %}
             <p style="margin: 0; color: var(--text-tertiary);">No managed accounts are currently mapped to this device.</p>
+            {% endif %}
+        </div>
+
+        <div class="device-card" style="margin-bottom: var(--space-6);">
+            <h2>📊 Application Runtime Activity (Last 7 Days)</h2>
+            <p style="margin: 0 0 var(--space-4) 0; color: var(--text-tertiary); font-size: var(--font-size-sm);">
+                Real-time usage tracking of active applications per child user profile.
+            </p>
+            {% if mapped_accounts %}
+                {% set ns = namespace(has_any_usage=false) %}
+                {% for mapping in mapped_accounts %}
+                    {% set usage = usage_summaries.get(mapping.id) %}
+                    {% if usage %}
+                        {% set ns.has_any_usage = true %}
+                        <div style="margin-bottom: var(--space-4); border: 1px solid var(--border-primary); border-radius: var(--radius-lg); padding: var(--space-4); background: var(--bg-primary);">
+                            <h3 style="margin-top: 0; margin-bottom: var(--space-3); font-size: var(--font-size-base); font-weight: 600; color: var(--text-secondary);">
+                                👤 {{ mapping.managed_user.username }} ({{ mapping.linux_username }})
+                            </h3>
+                            <div class="aa-usage-list">
+                                {% set max_seconds = usage[0].total_seconds if usage else 1 %}
+                                {% for item in usage %}
+                                <div class="aa-usage-row">
+                                    <div class="aa-usage-label">{{ item.application_name }}</div>
+                                    <div class="aa-usage-bar-container">
+                                        <div class="aa-usage-bar"
+                                             style="width: {{ (item.total_seconds / max_seconds * 100)|round(1) }}%;">
+                                        </div>
+                                    </div>
+                                    <div class="aa-usage-time">{{ item.formatted }}</div>
+                                    <div class="aa-usage-sessions">{{ item.session_count }} session{{ 's' if item.session_count != 1 }}</div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    {% endif %}
+                {% endfor %}
+                {% if not ns.has_any_usage %}
+                    <p style="margin: 0; color: var(--text-tertiary);">No application usage recorded for any user profile yet.</p>
+                {% endif %}
+            {% else %}
+                <p style="margin: 0; color: var(--text-tertiary);">No mapped accounts available to track.</p>
             {% endif %}
         </div>
 

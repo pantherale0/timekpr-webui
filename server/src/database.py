@@ -819,3 +819,86 @@ class UserDailyTimeInterval(db.Model):
                 result.append(f"{self.end_hour}[0-{self.end_minute}]")
         
         return result
+
+
+class AppArmorRule(db.Model):
+    __tablename__ = 'apparmor_rule'
+
+    PRESET_ALLOWED = 'allowed'
+    PRESET_NO_INTERNET = 'no_internet'
+    PRESET_BLOCKED = 'blocked'
+
+    VALID_PRESETS = {PRESET_ALLOWED, PRESET_NO_INTERNET, PRESET_BLOCKED}
+
+    id = db.Column(db.Integer, primary_key=True)
+    device_map_id = db.Column(
+        db.Integer,
+        db.ForeignKey('managed_user_device_map.id'),
+        nullable=False,
+    )
+    application_name = db.Column(db.String(120), nullable=False)
+    executable_path = db.Column(db.String(255), nullable=False)
+    preset = db.Column(db.String(32), nullable=False, default=PRESET_ALLOWED)
+    is_custom = db.Column(db.Boolean, default=False, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(
+        db.DateTime,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow,
+        nullable=False,
+    )
+
+    device_map = db.relationship(
+        'ManagedUserDeviceMap',
+        backref=db.backref('apparmor_rules', cascade='all, delete-orphan'),
+    )
+
+    __table_args__ = (
+        db.UniqueConstraint(
+            'device_map_id',
+            'executable_path',
+            name='apparmor_device_map_exec_uc',
+        ),
+    )
+
+    def __repr__(self):
+        return f'<AppArmorRule {self.application_name} [{self.preset}]>'
+
+    @property
+    def is_restrictive(self):
+        return self.preset in {self.PRESET_NO_INTERNET, self.PRESET_BLOCKED}
+
+    def to_sync_dict(self):
+        return {
+            'application_name': self.application_name,
+            'executable_path': self.executable_path,
+            'preset': self.preset,
+        }
+
+
+class AppUsageHistory(db.Model):
+    __tablename__ = 'app_usage_history'
+
+    id = db.Column(db.Integer, primary_key=True)
+    device_map_id = db.Column(
+        db.Integer,
+        db.ForeignKey('managed_user_device_map.id'),
+        nullable=False,
+    )
+    application_name = db.Column(db.String(120), nullable=False)
+    executable_path = db.Column(db.String(255), nullable=False)
+    start_time = db.Column(db.DateTime, nullable=False)
+    end_time = db.Column(db.DateTime, nullable=False)
+    duration_seconds = db.Column(db.Integer, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    device_map = db.relationship(
+        'ManagedUserDeviceMap',
+        backref=db.backref('app_usage_records', cascade='all, delete-orphan'),
+    )
+
+    def __repr__(self):
+        return (
+            f'<AppUsageHistory {self.application_name} '
+            f'{self.duration_seconds}s>'
+        )

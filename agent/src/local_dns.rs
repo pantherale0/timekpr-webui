@@ -156,15 +156,16 @@ async fn handle_tcp_client(
     upstream_servers: Arc<Vec<SocketAddr>>,
 ) -> Result<(), String> {
     let mut length_bytes = [0u8; 2];
-    stream
-        .read_exact(&mut length_bytes)
+    timeout(DNS_TIMEOUT, stream.read_exact(&mut length_bytes))
         .await
+        .map_err(|_| "timeout reading TCP DNS length".to_string())?
         .map_err(|error| format!("failed to read TCP DNS length: {}", error))?;
+        
     let expected_length = u16::from_be_bytes(length_bytes) as usize;
     let mut query_bytes = vec![0u8; expected_length];
-    stream
-        .read_exact(&mut query_bytes)
+    timeout(DNS_TIMEOUT, stream.read_exact(&mut query_bytes))
         .await
+        .map_err(|_| "timeout reading TCP DNS payload".to_string())?
         .map_err(|error| format!("failed to read TCP DNS payload: {}", error))?;
 
     let blocked_domains_guard = blocked_domains.read().await;
@@ -176,14 +177,17 @@ async fn handle_tcp_client(
 
     let response_length = u16::try_from(response.len())
         .map_err(|_| "TCP DNS response exceeds 65535 bytes".to_string())?;
-    stream
-        .write_all(&response_length.to_be_bytes())
+        
+    timeout(DNS_TIMEOUT, stream.write_all(&response_length.to_be_bytes()))
         .await
+        .map_err(|_| "timeout writing TCP DNS response length".to_string())?
         .map_err(|error| format!("failed to write TCP DNS length: {}", error))?;
-    stream
-        .write_all(&response)
+        
+    timeout(DNS_TIMEOUT, stream.write_all(&response))
         .await
+        .map_err(|_| "timeout writing TCP DNS payload".to_string())?
         .map_err(|error| format!("failed to write TCP DNS payload: {}", error))?;
+        
     Ok(())
 }
 
@@ -258,35 +262,39 @@ async fn forward_tcp_query(query_bytes: &[u8], upstream_servers: &[SocketAddr]) 
     for upstream in upstream_servers {
         let mut stream = match timeout(DNS_TIMEOUT, TcpStream::connect(upstream)).await {
             Ok(Ok(stream)) => stream,
-            Ok(Err(_)) | Err(_) => continue,
+            _ => continue,
         };
 
         let query_length = u16::try_from(query_bytes.len())
             .map_err(|_| "TCP DNS query exceeds 65535 bytes".to_string())?;
-        stream
-            .write_all(&query_length.to_be_bytes())
-            .await
-            .map_err(|error| format!("failed to write upstream TCP DNS length: {}", error))?;
-        stream
-            .write_all(query_bytes)
-            .await
-            .map_err(|error| format!("failed to write upstream TCP DNS payload: {}", error))?;
+            
+        let write_res = timeout(DNS_TIMEOUT, async {
+            stream.write_all(&query_length.to_be_bytes()).await?;
+            stream.write_all(query_bytes).await?;
+            Ok::<(), std::io::Error>(())
+        }).await;
+        
+        if write_res.is_err() || write_res.unwrap().is_err() {
+            continue;
+        }
 
         let mut response_length = [0u8; 2];
-        stream
-            .read_exact(&mut response_length)
-            .await
-            .map_err(|error| format!("failed to read upstream TCP DNS length: {}", error))?;
+        let read_len_res = timeout(DNS_TIMEOUT, stream.read_exact(&mut response_length)).await;
+        if read_len_res.is_err() || read_len_res.unwrap().is_err() {
+            continue;
+        }
+        
         let expected_length = u16::from_be_bytes(response_length) as usize;
         let mut response = vec![0u8; expected_length];
-        stream
-            .read_exact(&mut response)
-            .await
-            .map_err(|error| format!("failed to read upstream TCP DNS payload: {}", error))?;
+        let read_payload_res = timeout(DNS_TIMEOUT, stream.read_exact(&mut response)).await;
+        if read_payload_res.is_err() || read_payload_res.unwrap().is_err() {
+            continue;
+        }
+        
         return Ok(response);
     }
 
-    Err("all upstream TCP resolvers timed out".to_string())
+    Err("all upstream TCP resolvers timed out or failed".to_string())
 }
 
 fn load_upstream_servers() -> Vec<SocketAddr> {
