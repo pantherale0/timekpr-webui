@@ -2196,6 +2196,26 @@ def modify_time():
 
 # ── AppArmor Policy Management ──────────────────────────────────────────
 
+APPARMOR_UNSAFE_PATH_CHARS = set('*?[]{}"')
+
+
+def _validate_apparmor_executable_path(executable_path):
+    """Allow only concrete absolute executable paths, not AppArmor globs."""
+    normalized = (executable_path or '').strip()
+    if not normalized:
+        raise ValueError('Executable path is required')
+    if not normalized.startswith('/'):
+        raise ValueError('Executable path must be an absolute path like /usr/bin/firefox')
+    if normalized.endswith('/'):
+        raise ValueError('Executable path must point to a single executable, not a directory')
+    if any(char in normalized for char in APPARMOR_UNSAFE_PATH_CHARS):
+        raise ValueError(
+            'Executable path must be a single concrete executable; glob patterns like /usr/bin/** are not allowed'
+        )
+    if any(char.isspace() for char in normalized):
+        raise ValueError('Executable paths with spaces are not supported')
+    return normalized
+
 CURATED_APPARMOR_APPS = [
     {'name': 'Firefox',            'path': '/usr/bin/firefox',            'icon': '🦊'},
     {'name': 'Google Chrome',      'path': '/usr/bin/google-chrome',      'icon': '🌐'},
@@ -2238,8 +2258,7 @@ def _store_app_usage_from_alert(system_id, normalized_alert):
         end_time = datetime.fromisoformat(end_iso.replace('Z', '+00:00')).replace(tzinfo=None)
     except (TypeError, ValueError):
         end_time = datetime.utcnow()
-        from datetime import timedelta as td
-        start_time = end_time - td(seconds=duration_seconds)
+        start_time = end_time - timedelta(seconds=duration_seconds)
 
     record = AppUsageHistory(
         device_map_id=mapping.id,
@@ -2330,6 +2349,11 @@ def apparmor_policy(mapping_id):
         custom_path = (request.form.get('custom_app_path') or '').strip()
         custom_preset = (request.form.get('custom_app_preset') or 'allowed').strip()
         if custom_name and custom_path:
+            try:
+                custom_path = _validate_apparmor_executable_path(custom_path)
+            except ValueError as exc:
+                flash(str(exc), 'danger')
+                return redirect(url_for('apparmor_policy', mapping_id=mapping.id))
             if custom_preset not in AppArmorRule.VALID_PRESETS:
                 custom_preset = AppArmorRule.PRESET_ALLOWED
             existing = AppArmorRule.query.filter_by(
@@ -2364,7 +2388,23 @@ def apparmor_policy(mapping_id):
 
         # Push the policy to the agent if it is online
         all_rules = AppArmorRule.query.filter_by(device_map_id=mapping.id).all()
-        policies_list = [rule.to_sync_dict() for rule in all_rules if rule.is_restrictive]
+        policies_list = []
+        skipped_rule_names = []
+        for rule in all_rules:
+            if not rule.is_restrictive:
+                continue
+            try:
+                _validate_apparmor_executable_path(rule.executable_path)
+            except ValueError:
+                skipped_rule_names.append(rule.application_name or rule.executable_path)
+                continue
+            policies_list.append(rule.to_sync_dict())
+
+        if skipped_rule_names:
+            flash(
+                'Skipped unsafe AppArmor rules during sync: ' + ', '.join(sorted(skipped_rule_names)),
+                'warning',
+            )
         if AgentConnectionManager.is_online(mapping.system_id):
             agent = AgentClient(system_id=mapping.system_id)
             success, sync_msg = agent.sync_apparmor_policy(

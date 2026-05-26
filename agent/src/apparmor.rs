@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::{Arc, OnceLock};
 use tokio::sync::Mutex;
@@ -107,7 +107,15 @@ impl AppArmorRuntime {
                 .map_err(|e| format!("failed to read apparmor state: {}", e))?;
             let state: PersistedAppArmorState = serde_json::from_str(&raw)
                 .map_err(|e| format!("failed to parse apparmor state: {}", e))?;
-            self.current_state = state;
+            let (sanitized_state, removed_rules) = sanitize_persisted_state(state);
+            self.current_state = sanitized_state;
+            if removed_rules > 0 {
+                eprintln!(
+                    "Removed {} unsafe AppArmor rule(s) from persisted state",
+                    removed_rules
+                );
+                self.persist()?;
+            }
         }
         Ok(())
     }
@@ -117,10 +125,19 @@ impl AppArmorRuntime {
         username: &str,
         policies: Vec<AppArmorPolicy>,
     ) -> Result<String, String> {
-        let restrictive: Vec<AppArmorPolicy> = policies
+        let mut restrictive = Vec::new();
+        for policy in policies
             .into_iter()
             .filter(|p| p.preset == "no_internet" || p.preset == "blocked" || p.preset == "complain")
-            .collect();
+        {
+            validate_executable_path(&policy.executable_path).map_err(|err| {
+                format!(
+                    "refusing unsafe AppArmor path for {}: {}",
+                    policy.application_name, err
+                )
+            })?;
+            restrictive.push(policy);
+        }
 
         if restrictive.is_empty() {
             self.current_state.users.remove(username);
@@ -167,6 +184,15 @@ impl AppArmorRuntime {
         let _ = fs::create_dir_all(&profile_dir);
 
         for policy in &policies {
+            if let Err(err) = validate_executable_path(&policy.executable_path) {
+                eprintln!(
+                    "Skipping unsafe AppArmor path for {} ({}): {}",
+                    policy.application_name,
+                    policy.executable_path,
+                    err
+                );
+                continue;
+            }
             let profile_name = make_profile_name(username, &policy.application_name);
             let profile_content = generate_profile(&profile_name, &policy.executable_path, &policy.preset);
             let profile_path = profile_dir.join(&profile_name);
@@ -254,6 +280,26 @@ impl AppArmorRuntime {
     }
 }
 
+fn sanitize_persisted_state(mut state: PersistedAppArmorState) -> (PersistedAppArmorState, usize) {
+    let mut removed_rules = 0;
+    state.users.retain(|username, policies| {
+        policies.retain(|policy| {
+            if let Err(err) = validate_executable_path(&policy.executable_path) {
+                eprintln!(
+                    "Dropping unsafe persisted AppArmor path for {} ({}): {}",
+                    username, policy.executable_path, err
+                );
+                removed_rules += 1;
+                false
+            } else {
+                true
+            }
+        });
+        !policies.is_empty()
+    });
+    (state, removed_rules)
+}
+
 fn state_path() -> PathBuf {
     let primary = PathBuf::from(STATE_DIR_PRIMARY);
     if fs::create_dir_all(&primary).is_ok() {
@@ -270,6 +316,26 @@ fn make_profile_name(username: &str, app_name: &str) -> String {
         .map(|c| if c.is_alphanumeric() || c == '-' || c == '_' { c } else { '_' })
         .collect();
     format!("timekpr-{}-{}", username, sanitized_app.to_lowercase())
+}
+
+fn validate_executable_path(executable_path: &str) -> Result<(), String> {
+    let normalized = executable_path.trim();
+    if normalized.is_empty() {
+        return Err("path is empty".to_string());
+    }
+    if !Path::new(normalized).is_absolute() {
+        return Err("path must be absolute".to_string());
+    }
+    if normalized.ends_with('/') {
+        return Err("path must reference a file, not a directory".to_string());
+    }
+    if normalized.chars().any(|c| matches!(c, '*' | '?' | '[' | ']' | '{' | '}' | '"')) {
+        return Err("path must not contain glob or attachment metacharacters".to_string());
+    }
+    if normalized.chars().any(char::is_whitespace) {
+        return Err("paths containing whitespace are not supported".to_string());
+    }
+    Ok(())
 }
 
 fn generate_profile(profile_name: &str, executable_path: &str, preset: &str) -> String {
@@ -375,6 +441,17 @@ mod tests {
     fn allowed_preset_generates_empty_profile() {
         let profile = generate_profile("timekpr-bob-vlc", "/usr/bin/vlc", "allowed");
         assert!(profile.is_empty());
+    }
+
+    #[test]
+    fn executable_path_validation_accepts_concrete_absolute_paths() {
+        assert!(validate_executable_path("/usr/bin/google-chrome").is_ok());
+    }
+
+    #[test]
+    fn executable_path_validation_rejects_glob_patterns() {
+        let error = validate_executable_path("/usr/bin/**").unwrap_err();
+        assert!(error.contains("glob"));
     }
 
     #[test]

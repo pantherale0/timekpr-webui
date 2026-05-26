@@ -10,6 +10,7 @@ from app import ws_agent_handler, run_schema_migrations, _get_blocklist_sources,
 from src.database import (
     AgentAlert,
     AgentDevice,
+    AppArmorRule,
     BlocklistDomain,
     BlocklistSource,
     ManagedUser,
@@ -1019,6 +1020,48 @@ def test_alert_pages_for_user_and_device(client, db_session):
     admin_res = client.get('/admin')
     assert admin_res.status_code == 200
     assert f'/devices/{device.system_id}'.encode() in admin_res.data
+
+
+def test_apparmor_policy_rejects_globbed_custom_paths(client, db_session):
+    Settings.set_admin_password("admin")
+    client.post('/', data={'username': 'admin', 'password': 'admin'})
+
+    device = AgentDevice(
+        system_id="device-apparmor-guard",
+        system_hostname="family-pc",
+        system_ip="10.0.0.30",
+        status="approved",
+        secure_token="tok",
+    )
+    user = ManagedUser(username="maya", system_ip="Unassigned", is_valid=True)
+    db_session.add_all([device, user])
+    db_session.flush()
+
+    mapping = ManagedUserDeviceMap(
+        managed_user_id=user.id,
+        system_id=device.system_id,
+        linux_username="maya",
+        is_valid=True,
+    )
+    db_session.add(mapping)
+    db_session.commit()
+
+    res = client.post(
+        f'/apparmor/policy/{mapping.id}',
+        data={
+            'custom_app_name': 'Everything',
+            'custom_app_path': '/usr/bin/**',
+            'custom_app_preset': 'complain',
+        },
+        follow_redirects=True,
+    )
+
+    assert res.status_code == 200
+    assert b'glob patterns like /usr/bin/** are not allowed' in res.data
+    assert AppArmorRule.query.filter_by(
+        device_map_id=mapping.id,
+        executable_path='/usr/bin/**',
+    ).count() == 0
 
 
 def test_modify_time_tracks_server_daily_adjustment_for_scheduled_users(client, db_session):
