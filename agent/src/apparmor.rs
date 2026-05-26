@@ -17,7 +17,7 @@ static APPARMOR_RUNTIME: OnceLock<Arc<Mutex<AppArmorRuntime>>> = OnceLock::new()
 pub struct AppArmorPolicy {
     pub application_name: String,
     pub executable_path: String,
-    pub preset: String, // "allowed", "no_internet", "blocked"
+    pub preset: String, // "allowed", "no_internet", "blocked", "complain"
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug, Default, PartialEq, Eq)]
@@ -119,7 +119,7 @@ impl AppArmorRuntime {
     ) -> Result<String, String> {
         let restrictive: Vec<AppArmorPolicy> = policies
             .into_iter()
-            .filter(|p| p.preset == "no_internet" || p.preset == "blocked")
+            .filter(|p| p.preset == "no_internet" || p.preset == "blocked" || p.preset == "complain")
             .collect();
 
         if restrictive.is_empty() {
@@ -274,9 +274,21 @@ fn make_profile_name(username: &str, app_name: &str) -> String {
 
 fn generate_profile(profile_name: &str, executable_path: &str, preset: &str) -> String {
     match preset {
+        "complain" => format!(
+            r#"# Timekpr managed profile – COMPLAIN (report-only)
+profile {profile_name} {executable_path} flags=(complain) {{
+  # Deny rules in complain mode only report warnings to logs
+  deny /** rwlkx,
+  deny network,
+  deny capability,
+}}
+"#,
+            profile_name = profile_name,
+            executable_path = executable_path,
+        ),
         "blocked" => format!(
             r#"# Timekpr managed profile – BLOCK execution
-profile {profile_name} {executable_path} flags=(complain) {{
+profile {profile_name} {executable_path} {{
   # Deny everything
   deny /** rwlkx,
   deny network,
@@ -288,7 +300,7 @@ profile {profile_name} {executable_path} flags=(complain) {{
         ),
         "no_internet" => format!(
             r#"# Timekpr managed profile – NO INTERNET
-profile {profile_name} {executable_path} flags=(complain) {{
+profile {profile_name} {executable_path} {{
   # Allow standard file access
   #include <abstractions/base>
   #include <abstractions/fonts>
@@ -344,6 +356,14 @@ mod tests {
         assert!(profile.contains("deny network inet,"));
         assert!(profile.contains("deny network inet6,"));
         assert!(!profile.contains("deny /** rwlkx,"));
+    }
+
+    #[test]
+    fn complain_profile_denies_everything_with_complain_flag() {
+        let profile = generate_profile("timekpr-alice-steam", "/usr/bin/steam", "complain");
+        assert!(profile.contains("flags=(complain)"));
+        assert!(profile.contains("deny /** rwlkx,"));
+        assert!(profile.contains("deny network,"));
     }
 
     #[test]

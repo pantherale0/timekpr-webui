@@ -827,8 +827,9 @@ class AppArmorRule(db.Model):
     PRESET_ALLOWED = 'allowed'
     PRESET_NO_INTERNET = 'no_internet'
     PRESET_BLOCKED = 'blocked'
+    PRESET_COMPLAIN = 'complain'
 
-    VALID_PRESETS = {PRESET_ALLOWED, PRESET_NO_INTERNET, PRESET_BLOCKED}
+    VALID_PRESETS = {PRESET_ALLOWED, PRESET_NO_INTERNET, PRESET_BLOCKED, PRESET_COMPLAIN}
 
     id = db.Column(db.Integer, primary_key=True)
     device_map_id = db.Column(
@@ -866,7 +867,7 @@ class AppArmorRule(db.Model):
 
     @property
     def is_restrictive(self):
-        return self.preset in {self.PRESET_NO_INTERNET, self.PRESET_BLOCKED}
+        return self.preset in {self.PRESET_NO_INTERNET, self.PRESET_BLOCKED, self.PRESET_COMPLAIN}
 
     def to_sync_dict(self):
         return {

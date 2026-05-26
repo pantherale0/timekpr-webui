@@ -102,6 +102,11 @@
             background: var(--warning-bg);
         }
 
+        .aa-app-tile.preset-complain {
+            border-color: var(--text-muted);
+            background: var(--bg-secondary);
+        }
+
         .aa-app-header {
             display: flex;
             align-items: center;
@@ -150,7 +155,7 @@
         .aa-preset-control label {
             flex: 1;
             text-align: center;
-            padding: var(--space-2) var(--space-3);
+            padding: var(--space-2) var(--space-2);
             font-size: var(--font-size-xs);
             font-weight: 500;
             cursor: pointer;
@@ -182,6 +187,12 @@
 
         .aa-preset-control input[value="blocked"]:checked + label {
             background: var(--danger);
+            color: white;
+            font-weight: 600;
+        }
+
+        .aa-preset-control input[value="complain"]:checked + label {
+            background: var(--text-secondary);
             color: white;
             font-weight: 600;
         }
@@ -229,7 +240,7 @@
         }
 
         .aa-custom-item .aa-preset-control {
-            width: 280px;
+            width: 360px;
             flex-shrink: 0;
         }
 
@@ -379,13 +390,19 @@
                                    id="nointernet-{{ loop.index }}"
                                    {{ 'checked' if app.preset == 'no_internet' }}
                                    onchange="updateTile(this, {{ loop.index }})">
-                            <label for="nointernet-{{ loop.index }}">🚫 No Internet</label>
+                            <label for="nointernet-{{ loop.index }}">🚫 Internet</label>
 
                             <input type="radio" name="preset_{{ app.path }}" value="blocked"
                                    id="blocked-{{ loop.index }}"
                                    {{ 'checked' if app.preset == 'blocked' }}
                                    onchange="updateTile(this, {{ loop.index }})">
                             <label for="blocked-{{ loop.index }}">⛔ Blocked</label>
+
+                            <input type="radio" name="preset_{{ app.path }}" value="complain"
+                                   id="complain-{{ loop.index }}"
+                                   {{ 'checked' if app.preset == 'complain' }}
+                                   onchange="updateTile(this, {{ loop.index }})">
+                            <label for="complain-{{ loop.index }}">⚠️ Report Only</label>
                         </div>
 
                         <div class="aa-preset-hint" id="hint-{{ loop.index }}">
@@ -395,6 +412,8 @@
                                 Runs normally but all network access is denied
                             {% elif app.preset == 'blocked' %}
                                 Execution is completely prevented
+                            {% elif app.preset == 'complain' %}
+                                Runs unrestricted but logs blocks/network access attempts (report-only)
                             {% endif %}
                         </div>
                     </div>
@@ -422,12 +441,17 @@
                         <input type="radio" name="preset_{{ rule.path }}" value="no_internet"
                                id="custom-nointernet-{{ rule.id }}"
                                {{ 'checked' if rule.preset == 'no_internet' }}>
-                        <label for="custom-nointernet-{{ rule.id }}">🚫 No Internet</label>
+                        <label for="custom-nointernet-{{ rule.id }}">🚫 Internet</label>
 
                         <input type="radio" name="preset_{{ rule.path }}" value="blocked"
                                id="custom-blocked-{{ rule.id }}"
                                {{ 'checked' if rule.preset == 'blocked' }}>
                         <label for="custom-blocked-{{ rule.id }}">⛔ Blocked</label>
+
+                        <input type="radio" name="preset_{{ rule.path }}" value="complain"
+                               id="custom-complain-{{ rule.id }}"
+                               {{ 'checked' if rule.preset == 'complain' }}>
+                        <label for="custom-complain-{{ rule.id }}">⚠️ Report Only</label>
                     </div>
                     <form action="{{ url_for('delete_apparmor_rule', rule_id=rule.id) }}"
                           method="POST" style="margin:0;"
@@ -459,6 +483,7 @@
                             <option value="allowed">Allowed</option>
                             <option value="no_internet">No Internet</option>
                             <option value="blocked" selected>Blocked</option>
+                            <option value="complain">Report Only (Complain)</option>
                         </select>
                     </div>
                     <div style="display:flex; align-items: end;">
@@ -510,13 +535,14 @@
             allowed: 'Unrestricted access — no AppArmor sandbox applied',
             no_internet: 'Runs normally but all network access is denied',
             blocked: 'Execution is completely prevented',
+            complain: 'Runs unrestricted but logs blocks/network access attempts (report-only)',
         };
 
         function updateTile(radio, index) {
             const tile = document.getElementById('tile-' + index);
             const hint = document.getElementById('hint-' + index);
             // Remove existing preset classes
-            tile.classList.remove('preset-allowed', 'preset-no_internet', 'preset-blocked');
+            tile.classList.remove('preset-allowed', 'preset-no_internet', 'preset-blocked', 'preset-complain');
             tile.classList.add('preset-' + radio.value);
             hint.textContent = HINTS[radio.value] || '';
         }
