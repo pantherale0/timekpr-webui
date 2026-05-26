@@ -1064,6 +1064,59 @@ def test_apparmor_policy_rejects_globbed_custom_paths(client, db_session):
     ).count() == 0
 
 
+def test_delete_apparmor_rule_uses_delete_route_and_resyncs_policy(client, db_session):
+    Settings.set_admin_password("admin")
+    client.post('/', data={'username': 'admin', 'password': 'admin'})
+
+    device = AgentDevice(
+        system_id="device-apparmor-delete",
+        system_hostname="family-pc",
+        system_ip="10.0.0.31",
+        status="approved",
+        secure_token="tok",
+    )
+    user = ManagedUser(username="nina", system_ip="Unassigned", is_valid=True)
+    db_session.add_all([device, user])
+    db_session.flush()
+
+    mapping = ManagedUserDeviceMap(
+        managed_user_id=user.id,
+        system_id=device.system_id,
+        linux_username="nina",
+        is_valid=True,
+    )
+    db_session.add(mapping)
+    db_session.flush()
+
+    rule = AppArmorRule(
+        device_map_id=mapping.id,
+        application_name='OBS Studio',
+        executable_path='/usr/bin/obs',
+        preset=AppArmorRule.PRESET_BLOCKED,
+        is_custom=True,
+    )
+    db_session.add(rule)
+    db_session.commit()
+
+    page = client.get(f'/apparmor/policy/{mapping.id}')
+    assert page.status_code == 200
+    assert f'formaction="/apparmor/rule/{rule.id}/delete"'.encode() in page.data
+    assert f'<form action="/apparmor/rule/{rule.id}/delete"'.encode() not in page.data
+
+    with patch.object(AgentConnectionManager, 'is_online', return_value=True), \
+         patch('src.agent_helper.AgentClient.sync_apparmor_policy') as mock_sync:
+        mock_sync.return_value = (True, 'ok')
+        res = client.post(
+            f'/apparmor/rule/{rule.id}/delete',
+            follow_redirects=True,
+        )
+
+    assert res.status_code == 200
+    assert b'Removed AppArmor rule for OBS Studio and synced family-pc' in res.data
+    assert db.session.get(AppArmorRule, rule.id) is None
+    mock_sync.assert_called_once_with('nina', [])
+
+
 def test_modify_time_tracks_server_daily_adjustment_for_scheduled_users(client, db_session):
     Settings.set_admin_password("admin")
     client.post('/', data={'username': 'admin', 'password': 'admin'})

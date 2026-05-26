@@ -2229,6 +2229,23 @@ CURATED_APPARMOR_APPS = [
 CURATED_APPARMOR_PATHS = {app['path'] for app in CURATED_APPARMOR_APPS}
 
 
+def _build_apparmor_policy_sync_payload(mapping_id):
+    """Collect restrictive AppArmor rules for a mapping and sanitize them for sync."""
+    all_rules = AppArmorRule.query.filter_by(device_map_id=mapping_id).all()
+    policies_list = []
+    skipped_rule_names = []
+    for rule in all_rules:
+        if not rule.is_restrictive:
+            continue
+        try:
+            _validate_apparmor_executable_path(rule.executable_path)
+        except ValueError:
+            skipped_rule_names.append(rule.application_name or rule.executable_path)
+            continue
+        policies_list.append(rule.to_sync_dict())
+    return policies_list, skipped_rule_names
+
+
 def _store_app_usage_from_alert(system_id, normalized_alert):
     """Persist a structured AppUsageHistory row from an app_usage alert event."""
     details = normalized_alert.get('details', {})
@@ -2387,19 +2404,7 @@ def apparmor_policy(mapping_id):
         db.session.commit()
 
         # Push the policy to the agent if it is online
-        all_rules = AppArmorRule.query.filter_by(device_map_id=mapping.id).all()
-        policies_list = []
-        skipped_rule_names = []
-        for rule in all_rules:
-            if not rule.is_restrictive:
-                continue
-            try:
-                _validate_apparmor_executable_path(rule.executable_path)
-            except ValueError:
-                skipped_rule_names.append(rule.application_name or rule.executable_path)
-                continue
-            policies_list.append(rule.to_sync_dict())
-
+        policies_list, skipped_rule_names = _build_apparmor_policy_sync_payload(mapping.id)
         if skipped_rule_names:
             flash(
                 'Skipped unsafe AppArmor rules during sync: ' + ', '.join(sorted(skipped_rule_names)),
@@ -2475,10 +2480,33 @@ def delete_apparmor_rule(rule_id):
         return jsonify({'success': False, 'message': 'Not authenticated'}), 401
 
     rule = AppArmorRule.query.get_or_404(rule_id)
+    mapping = ManagedUserDeviceMap.query.get_or_404(rule.device_map_id)
     mapping_id = rule.device_map_id
+    rule_name = rule.application_name
+    device_labels = _get_device_label_map()
+    device_label = device_labels.get(mapping.system_id, mapping.system_id)
     db.session.delete(rule)
     db.session.commit()
-    flash(f'Removed AppArmor rule for {rule.application_name}', 'success')
+
+    policies_list, skipped_rule_names = _build_apparmor_policy_sync_payload(mapping.id)
+    if skipped_rule_names:
+        flash(
+            'Skipped unsafe AppArmor rules during sync: ' + ', '.join(sorted(skipped_rule_names)),
+            'warning',
+        )
+
+    if AgentConnectionManager.is_online(mapping.system_id):
+        agent = AgentClient(system_id=mapping.system_id)
+        success, sync_msg = agent.sync_apparmor_policy(
+            mapping.linux_username,
+            policies_list,
+        )
+        if success:
+            flash(f'Removed AppArmor rule for {rule_name} and synced {device_label}', 'success')
+        else:
+            flash(f'Removed AppArmor rule for {rule_name}, but sync failed: {sync_msg}', 'warning')
+    else:
+        flash(f'Removed AppArmor rule for {rule_name}. Will sync when the device reconnects.', 'success')
     return redirect(url_for('apparmor_policy', mapping_id=mapping_id))
 
 

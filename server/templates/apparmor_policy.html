@@ -453,11 +453,12 @@
                                {{ 'checked' if rule.preset == 'complain' }}>
                         <label for="custom-complain-{{ rule.id }}">⚠️ Report Only</label>
                     </div>
-                    <form action="{{ url_for('delete_apparmor_rule', rule_id=rule.id) }}"
-                          method="POST" style="margin:0;"
-                          onsubmit="return confirm('Remove this custom rule?')">
-                        <button type="submit" class="btn btn-sm btn-danger" title="Remove rule">✕</button>
-                    </form>
+                    <button type="submit"
+                            class="btn btn-sm btn-danger"
+                            title="Remove rule"
+                            formaction="{{ url_for('delete_apparmor_rule', rule_id=rule.id) }}"
+                            formmethod="POST"
+                            onclick="return confirm('Remove this custom rule?')">✕</button>
                 </div>
                 {% endfor %}
             </div>
