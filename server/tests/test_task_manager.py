@@ -342,6 +342,62 @@ def test_task_manager_syncs_domain_policy_payloads(app, db_session):
     AgentConnectionManager.unregister(device.system_id)
 
 
+def test_task_manager_refreshes_external_blocklists_in_chunks(app, db_session):
+    manager = BackgroundTaskManager(app)
+    source = BlocklistSource(
+        name="streamed-list",
+        source_type=BlocklistSource.TYPE_EXTERNAL_URL,
+        source_url="https://example.test/blocklist.txt",
+        is_enabled=True,
+    )
+    db_session.add(source)
+    db_session.flush()
+    db_session.add(BlocklistDomain(source_id=source.id, domain="old.example"))
+    db_session.commit()
+
+    class StreamingResponse:
+        status_code = 200
+        headers = {
+            'ETag': 'etag-123',
+            'Last-Modified': 'Tue, 26 May 2026 00:00:00 GMT',
+        }
+        encoding = 'utf-8'
+
+        def __init__(self):
+            self.closed = False
+
+        def iter_content(self, chunk_size=1):
+            del chunk_size
+            yield b'dns.go'
+            yield b'ogle\n# comment\ncloud'
+            yield b'flare-dns.com\ninvalid entry\n'
+            yield b'dns.google\n'
+
+        def close(self):
+            self.closed = True
+
+    response = StreamingResponse()
+
+    from unittest.mock import patch
+
+    with app.app_context(), patch('src.task_manager.requests.get', return_value=response):
+        success, message = manager.refresh_external_blocklist_source(source.id, force=True)
+
+    assert success
+    assert 'with 2 domain(s)' in message
+    db_session.expire_all()
+    refreshed_source = BlocklistSource.query.get(source.id)
+    refreshed_domains = [
+        row.domain
+        for row in BlocklistDomain.query.filter_by(source_id=source.id).order_by(BlocklistDomain.domain.asc()).all()
+    ]
+    assert refreshed_domains == ['cloudflare-dns.com', 'dns.google']
+    assert refreshed_source.etag == 'etag-123'
+    assert refreshed_source.source_last_modified == 'Tue, 26 May 2026 00:00:00 GMT'
+    assert 'Domain must not contain whitespace' in refreshed_source.last_sync_error
+    assert response.closed
+
+
 def test_task_manager_delivers_pending_alerts(app, db_session):
     manager = BackgroundTaskManager(app)
     device = AgentDevice(

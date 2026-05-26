@@ -1,3 +1,4 @@
+import codecs
 import hashlib
 import json
 import re
@@ -7,6 +8,10 @@ from urllib.parse import urlparse
 
 DOMAIN_LABEL_RE = re.compile(r'^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$')
 EXTERNAL_SYNC_INTERVAL = timedelta(hours=24)
+BLOCKLIST_STREAM_CHUNK_SIZE = 64 * 1024
+BLOCKLIST_SYNC_BATCH_SIZE = 1000
+MAX_BLOCKLIST_LINE_LENGTH = 4096
+MAX_BLOCKLIST_ERRORS = 20
 
 
 def normalize_domain(raw_domain):
@@ -39,22 +44,30 @@ def normalize_domain(raw_domain):
     return domain
 
 
+def _parse_blocklist_line(raw_line, line_number):
+    line = str(raw_line or '').strip()
+    if not line or line.startswith('#'):
+        return None, None
+
+    try:
+        return normalize_domain(line), None
+    except ValueError as exc:
+        return None, f'Line {line_number}: {exc}'
+
+
 def parse_blocklist_text(raw_text, strict=False):
     domains = []
     errors = []
     seen = set()
 
     for line_number, raw_line in enumerate((raw_text or '').splitlines(), start=1):
-        line = raw_line.strip()
-        if not line or line.startswith('#'):
-            continue
-
-        try:
-            domain = normalize_domain(line)
-        except ValueError as exc:
+        domain, error = _parse_blocklist_line(raw_line, line_number)
+        if error:
             if strict:
-                raise ValueError(f'Line {line_number}: {exc}') from exc
-            errors.append(f'Line {line_number}: {exc}')
+                raise ValueError(error)
+            errors.append(error)
+            continue
+        if domain is None:
             continue
 
         if domain not in seen:
@@ -62,6 +75,112 @@ def parse_blocklist_text(raw_text, strict=False):
             domains.append(domain)
 
     return domains, errors
+
+
+class BlocklistStreamParser:
+    def __init__(
+        self,
+        *,
+        strict=False,
+        error_limit=MAX_BLOCKLIST_ERRORS,
+        line_length_limit=MAX_BLOCKLIST_LINE_LENGTH,
+    ):
+        self.strict = strict
+        self.error_limit = error_limit
+        self.line_length_limit = line_length_limit
+        self.errors = []
+        self.ignored_error_count = 0
+
+    def _record_error(self, message):
+        if self.strict:
+            raise ValueError(message)
+        if len(self.errors) < self.error_limit:
+            self.errors.append(message)
+        else:
+            self.ignored_error_count += 1
+
+    def _check_pending_length(self, pending_line, line_number):
+        if len(pending_line) <= self.line_length_limit:
+            return
+        raise ValueError(
+            f'Line {line_number} exceeds maximum length of {self.line_length_limit} characters'
+        )
+
+    def _handle_line(self, raw_line, line_number, batch, batch_size):
+        domain, error = _parse_blocklist_line(raw_line, line_number)
+        if error:
+            self._record_error(error)
+            return None
+        if domain is None:
+            return None
+
+        batch.append(domain)
+        if len(batch) >= batch_size:
+            flushed_batch = list(batch)
+            batch.clear()
+            return flushed_batch
+        return None
+
+    def iter_domain_batches(
+        self,
+        byte_chunks,
+        *,
+        encoding='utf-8',
+        batch_size=BLOCKLIST_SYNC_BATCH_SIZE,
+    ):
+        decoder = codecs.getincrementaldecoder(encoding or 'utf-8')(errors='replace')
+        pending = ''
+        line_number = 0
+        batch = []
+
+        def drain_pending(decoded_text, final=False):
+            nonlocal pending, line_number
+            pending += decoded_text
+
+            while True:
+                newline_index = pending.find('\n')
+                if newline_index < 0:
+                    break
+
+                raw_line = pending[:newline_index]
+                if raw_line.endswith('\r'):
+                    raw_line = raw_line[:-1]
+                pending = pending[newline_index + 1:]
+                line_number += 1
+
+                flushed_batch = self._handle_line(raw_line, line_number, batch, batch_size)
+                if flushed_batch is not None:
+                    yield flushed_batch
+
+            if pending:
+                self._check_pending_length(pending, line_number + 1)
+
+            if final and pending:
+                final_line = pending[:-1] if pending.endswith('\r') else pending
+                line_number += 1
+                flushed_batch = self._handle_line(final_line, line_number, batch, batch_size)
+                pending = ''
+                if flushed_batch is not None:
+                    yield flushed_batch
+
+        for raw_chunk in byte_chunks:
+            if not raw_chunk:
+                continue
+            decoded_chunk = decoder.decode(raw_chunk)
+            yield from drain_pending(decoded_chunk)
+
+        yield from drain_pending(decoder.decode(b'', final=True), final=True)
+
+        if batch:
+            yield list(batch)
+            batch.clear()
+
+    def collected_errors(self):
+        if self.ignored_error_count:
+            return self.errors + [
+                f'{self.ignored_error_count} additional parse error(s) omitted'
+            ]
+        return list(self.errors)
 
 
 def validate_external_source_url(raw_url):

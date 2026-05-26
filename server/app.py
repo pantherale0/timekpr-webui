@@ -1,5 +1,6 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
 import os
+import threading
 from datetime import datetime, date, timedelta
 import json
 import logging
@@ -66,6 +67,8 @@ sock = Sock(app)
 # Initialize background task manager
 task_manager = BackgroundTaskManager()
 task_manager.init_app(app)
+_runtime_init_lock = threading.Lock()
+_runtime_initialized = False
 
 # Initialize OIDC helper
 oidc_helper = OIDCHelper()
@@ -2140,20 +2143,41 @@ def run_schema_migrations():
     db.session.commit()
 
 
-if not os.environ.get('TESTING'):
-    with app.app_context():
-        db.create_all()
-        run_schema_migrations()
-        print("Database tables verified")
+def _env_flag_enabled(key, default=False):
+    raw_value = os.environ.get(key)
+    if raw_value is None:
+        return default
+    return raw_value.strip().lower() in {'1', 'true', 'yes', 'on'}
 
-        # Initialize admin password if it doesn't exist
-        if not Settings.get_value('admin_password_hash', None) and not Settings.get_value('admin_password', None):
-            Settings.set_admin_password('admin')
-            print("Admin password initialized")
 
-        # Start background tasks automatically
+def initialize_runtime(start_background_tasks=False):
+    global _runtime_initialized
+
+    if os.environ.get('TESTING'):
+        return
+
+    with _runtime_init_lock:
+        if not _runtime_initialized:
+            with app.app_context():
+                db.create_all()
+                run_schema_migrations()
+                print("Database tables verified")
+
+                # Initialize admin password if it doesn't exist
+                if not Settings.get_value('admin_password_hash', None) and not Settings.get_value('admin_password', None):
+                    Settings.set_admin_password('admin')
+                    print("Admin password initialized")
+
+            _runtime_initialized = True
+
+    if start_background_tasks:
         task_manager.start()
         print("Background tasks started automatically")
 
+
+if not os.environ.get('TESTING'):
+    initialize_runtime(start_background_tasks=_env_flag_enabled('TIMEKPR_ENABLE_BACKGROUND_TASKS'))
+
 if __name__ == '__main__':
+    initialize_runtime(start_background_tasks=True)
     app.run(host='0.0.0.0', port=5000, debug=False, use_reloader=False)

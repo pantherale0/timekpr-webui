@@ -62,11 +62,15 @@ graph TD
      # - REGISTRATION_TOKEN=replace-with-a-second-random-token
    ```
 
-3. **Start the server:**
+3. **Start the server stack:**
    ```bash
    docker-compose up -d --build
    ```
-   The Flask app listens on port `5000`.
+   The Compose file starts:
+   - `web`: the Flask/Gunicorn UI on port `5000`
+   - `tasks`: a dedicated background worker for sync, blocklist refreshes, and alert delivery
+
+   Running background work in a separate process prevents large sync jobs from stalling or timing out the Gunicorn web worker.
 
 4. **Expose the Web UI and WebSocket endpoint securely:**
    Prefer terminating TLS in a reverse proxy and pointing clients at `wss://YOUR_HOST/ws`.
@@ -225,12 +229,19 @@ Notes:
    # export REGISTRATION_TOKEN="replace-with-a-second-random-token"
    ```
 
-3. **Start the Flask application:**
+3. **Start the Flask web application:**
    ```bash
    python app.py
    ```
 
-4. **Still place it behind TLS if clients connect across anything other than a trusted local network.**
+4. **Start the background task worker in a separate process:**
+   ```bash
+   python task_worker.py
+   ```
+
+   Do not run the background task manager inside a Gunicorn worker process. Keeping it separate prevents long-running blocklist refreshes and other sync work from taking down the web worker.
+
+5. **Still place it behind TLS if clients connect across anything other than a trusted local network.**
 
 ---
 

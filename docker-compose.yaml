@@ -17,6 +17,22 @@ services:
       # - OIDC_CLIENT_SECRET=your-client-secret
       # - OIDC_REDIRECT_URI=http://localhost:5000/callback
       # - OIDC_VERIFY_SSL=True
+      - TIMEKPR_ENABLE_BACKGROUND_TASKS=0
+    restart: unless-stopped
+
+  tasks:
+    image: ghcr.io/pantherale0/timekpr-webui-server:latest
+    command: ["python", "task_worker.py"]
+    volumes:
+      - timekpr_data:/app/instance
+    environment:
+      - TZ=UTC
+      - AGENT_TOKEN=super-secure-pre-shared-agent-token
+      # - OIDC_ISSUER_URL=https://keycloak.example.com/realms/myrealm
+      # - OIDC_CLIENT_ID=timekpr-webui
+      # - OIDC_CLIENT_SECRET=your-client-secret
+      # - OIDC_REDIRECT_URI=http://localhost:5000/callback
+      # - OIDC_VERIFY_SSL=True
     restart: unless-stopped
 
 volumes:

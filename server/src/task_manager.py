@@ -8,6 +8,7 @@ import hashlib
 import hmac
 
 import requests
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
 from src.database import (
     AgentAlert,
@@ -23,7 +24,8 @@ from src.database import (
 )
 from src.agent_helper import AgentClient, AgentConnectionManager
 from src.blocklist_helper import (
-    parse_blocklist_text,
+    BLOCKLIST_STREAM_CHUNK_SIZE,
+    BlocklistStreamParser,
     build_source_domain_map,
     summarize_mapping_blocklist_sync,
     should_refresh_external_source,
@@ -425,31 +427,64 @@ class BackgroundTaskManager:
             headers['If-Modified-Since'] = source.source_last_modified
 
         try:
-            response = requests.get(source.source_url, headers=headers, timeout=10)
+            response = requests.get(
+                source.source_url,
+                headers=headers,
+                timeout=10,
+                stream=True,
+            )
         except Exception as exc:
             source.mark_sync_error(str(exc))
             db.session.commit()
             return False, f'Failed to refresh "{source.name}": {exc}'
 
-        if response.status_code == 304:
+        try:
+            if response.status_code == 304:
+                source.mark_sync_ok()
+                db.session.commit()
+                return True, f'External blocklist "{source.name}" was unchanged'
+
+            if not (200 <= response.status_code < 300):
+                source.mark_sync_error(f'HTTP {response.status_code}')
+                db.session.commit()
+                return False, f'Failed to refresh "{source.name}": HTTP {response.status_code}'
+
+            parser = BlocklistStreamParser()
+            BlocklistDomain.query.filter_by(source_id=source.id).delete(synchronize_session=False)
+
+            for batch in parser.iter_domain_batches(
+                response.iter_content(chunk_size=BLOCKLIST_STREAM_CHUNK_SIZE),
+                encoding=response.encoding or 'utf-8',
+            ):
+                db.session.execute(
+                    sqlite_insert(BlocklistDomain).prefix_with('OR IGNORE'),
+                    [
+                        {'source_id': source.id, 'domain': domain}
+                        for domain in batch
+                    ],
+                )
+
+            source.etag = response.headers.get('ETag')
+            source.source_last_modified = response.headers.get('Last-Modified')
             source.mark_sync_ok()
-            db.session.commit()
-            return True, f'External blocklist "{source.name}" was unchanged'
 
-        if not (200 <= response.status_code < 300):
-            source.mark_sync_error(f'HTTP {response.status_code}')
-            db.session.commit()
-            return False, f'Failed to refresh "{source.name}": HTTP {response.status_code}'
+            errors = parser.collected_errors()
+            if errors:
+                source.last_sync_error = '; '.join(errors)
 
-        domains, errors = parse_blocklist_text(response.text)
-        _replace_source_domains(source, domains)
-        source.etag = response.headers.get('ETag')
-        source.source_last_modified = response.headers.get('Last-Modified')
-        source.mark_sync_ok()
-        if errors:
-            source.last_sync_error = '; '.join(errors[:5])
-        db.session.commit()
-        return True, f'Refreshed "{source.name}" with {len(domains)} domain(s)'
+            db.session.flush()
+            domain_count = BlocklistDomain.query.filter_by(source_id=source.id).count()
+            db.session.commit()
+            return True, f'Refreshed "{source.name}" with {domain_count} domain(s)'
+        except Exception as exc:
+            db.session.rollback()
+            source = BlocklistSource.query.get(source_id)
+            if source:
+                source.mark_sync_error(str(exc))
+                db.session.commit()
+            return False, f'Failed to refresh "{source.name}": {exc}'
+        finally:
+            response.close()
 
     def _refresh_external_blocklists(self):
         external_sources = BlocklistSource.query.filter_by(
