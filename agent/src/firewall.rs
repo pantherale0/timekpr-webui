@@ -106,23 +106,28 @@ fn append_dns_tls_block(policy: &FirewallPolicy, protocol: &str) -> Result<(), S
 }
 
 fn append_port_guard(uid: u32, port: u16, protocol: &str) -> Result<(), String> {
-    run_iptables([
-        "-t",
-        FILTER_TABLE,
-        "-A",
-        FILTER_CHAIN,
-        "!",
-        "-m",
-        "owner",
-        "--uid-owner",
-        &uid.to_string(),
-        "-p",
-        protocol,
-        "--dport",
-        &port.to_string(),
-        "-j",
-        "REJECT",
-    ])
+    let args = build_port_guard_args(uid, port, protocol);
+    run_iptables_owned(&args)
+}
+
+fn build_port_guard_args(uid: u32, port: u16, protocol: &str) -> Vec<String> {
+    vec![
+        "-t".to_string(),
+        FILTER_TABLE.to_string(),
+        "-A".to_string(),
+        FILTER_CHAIN.to_string(),
+        "-m".to_string(),
+        "owner".to_string(),
+        "!".to_string(),
+        "--uid-owner".to_string(),
+        uid.to_string(),
+        "-p".to_string(),
+        protocol.to_string(),
+        "--dport".to_string(),
+        port.to_string(),
+        "-j".to_string(),
+        "REJECT".to_string(),
+    ]
 }
 
 fn run_iptables<const N: usize>(args: [&str; N]) -> Result<(), String> {
@@ -142,9 +147,26 @@ fn run_iptables<const N: usize>(args: [&str; N]) -> Result<(), String> {
     ))
 }
 
+fn run_iptables_owned(args: &[String]) -> Result<(), String> {
+    let output = Command::new("iptables")
+        .args(args)
+        .output()
+        .map_err(|error| format!("failed to run iptables: {}", error))?;
+
+    if output.status.success() {
+        return Ok(());
+    }
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    Err(format!(
+        "iptables command failed: {}",
+        stderr.trim()
+    ))
+}
+
 #[cfg(test)]
 mod tests {
-    use super::FirewallPolicy;
+    use super::{build_port_guard_args, FirewallPolicy};
 
     fn render_rules(policies: &[FirewallPolicy]) -> Vec<String> {
         let mut rules = Vec::new();
@@ -186,5 +208,30 @@ mod tests {
         assert!(rules.iter().any(|rule| rule.contains("redirect uid=1000 udp 53 -> 23001")));
         assert!(rules.iter().any(|rule| rule.contains("block uid=1001 tcp 853")));
         assert!(rules.iter().any(|rule| rule.contains("guard uid=1000 23002 -> 23002")));
+    }
+
+    #[test]
+    fn port_guard_negates_uid_owner_match_in_supported_position() {
+        let args = build_port_guard_args(1000, 23002, "udp");
+        assert_eq!(
+            args,
+            vec![
+                "-t",
+                "filter",
+                "-A",
+                "TIMEKPR_UID_EGRESS",
+                "-m",
+                "owner",
+                "!",
+                "--uid-owner",
+                "1000",
+                "-p",
+                "udp",
+                "--dport",
+                "23002",
+                "-j",
+                "REJECT",
+            ]
+        );
     }
 }
