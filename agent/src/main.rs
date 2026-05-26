@@ -47,6 +47,10 @@ use uuid::Uuid;
 use zbus::{Connection, Proxy};
 
 type HmacSha256 = Hmac<Sha256>;
+const AGENT_VERSION: &str = match option_env!("TIMEKPR_AGENT_VERSION") {
+    Some(v) => v,
+    None => env!("CARGO_PKG_VERSION"),
+};
 const POLICY_SYNC_INTERVAL_SECS: u64 = 4 * 60 * 60;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -1040,7 +1044,11 @@ async fn main() {
                     system_id: system_id.clone(),
                     system_hostname: system_hostname.clone(),
                     registration_token,
-                    agent_version: format!("v{}", env!("CARGO_PKG_VERSION")),
+                    agent_version: if AGENT_VERSION.starts_with('v') {
+                        AGENT_VERSION.to_string()
+                    } else {
+                        format!("v{}", AGENT_VERSION)
+                    },
                 };
                 let hello_json = serde_json::to_string(&hello_msg).unwrap();
                 if let Err(e) = ws_stream.send(Message::Text(hello_json.into())).await {

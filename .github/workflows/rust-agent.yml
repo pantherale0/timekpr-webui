@@ -87,6 +87,7 @@ jobs:
           if [ "${{ matrix.target }}" = "aarch64-unknown-linux-gnu" ]; then
             export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc
           fi
+          export TIMEKPR_AGENT_VERSION="${{ github.ref_name }}"
           cargo build --release --manifest-path agent/Cargo.toml --target "${{ matrix.target }}"
 
       - name: Package release asset
