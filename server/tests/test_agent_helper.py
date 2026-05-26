@@ -163,10 +163,14 @@ def test_agent_client(db_session):
             self.payloads.append(json.loads(message))
             payload = json.loads(message)
             correlation_id = payload.get("correlation_id")
+            action = payload.get("action")
+            data = {"config": config_output}
+            if action == "get_domain_policy_state":
+                data = {"source_revisions": {"1": "rev-1"}}
             AgentConnectionManager.route_response(correlation_id, {
                 "success": True,
                 "message": "Success",
-                "data": {"config": config_output}
+                "data": data,
             })
     
     capture_ws = CustomWS()
@@ -244,6 +248,48 @@ def test_agent_client(db_session):
     assert domain_policy_payload["args"]["sources"]["1"] == ["example.com", "dns.google"]
     assert domain_policy_payload["args"]["policies"]["1000"]["linux_username"] == "john"
     assert domain_policy_payload["username"] == ""
+
+    success, msg, state = client.get_domain_policy_state()
+    assert success
+    assert state["source_revisions"] == {"1": "rev-1"}
+
+    success, msg = client.begin_domain_policy_sync("sync-1")
+    assert success
+    success, msg = client.delete_domain_policy_sources("sync-1", ["2"])
+    assert success
+    success, msg = client.send_domain_policy_chunk("sync-1", "1", "rev-2", ["example.com"])
+    assert success
+    success, msg = client.update_domain_policy_manifest("sync-1", {
+        "1000": {"linux_username": "john", "source_ids": ["1"]},
+    })
+    assert success
+    success, msg = client.finalize_domain_policy_sync("sync-1")
+    assert success
+    success, msg = client.abort_domain_policy_sync("sync-1")
+    assert success
+
+    incremental_actions = [
+        payload["action"]
+        for payload in capture_ws.payloads
+        if payload.get("action") in {
+            "get_domain_policy_state",
+            "begin_domain_policy_sync",
+            "delete_domain_policy_sources",
+            "sync_domain_policy_chunk",
+            "update_domain_policy_manifest",
+            "finalize_domain_policy_sync",
+            "abort_domain_policy_sync",
+        }
+    ]
+    assert incremental_actions == [
+        "get_domain_policy_state",
+        "begin_domain_policy_sync",
+        "delete_domain_policy_sources",
+        "sync_domain_policy_chunk",
+        "update_domain_policy_manifest",
+        "finalize_domain_policy_sync",
+        "abort_domain_policy_sync",
+    ]
 
     AgentConnectionManager.unregister(system_id)
 

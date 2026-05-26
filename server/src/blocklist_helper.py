@@ -5,6 +5,10 @@ import re
 from datetime import datetime, timedelta
 from urllib.parse import urlparse
 
+from sqlalchemy import func
+
+from src.database import BlocklistDomain
+
 
 DOMAIN_LABEL_RE = re.compile(r'^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$')
 EXTERNAL_SYNC_INTERVAL = timedelta(hours=24)
@@ -195,6 +199,89 @@ def validate_external_source_url(raw_url):
     return normalized
 
 
+def compute_source_revision(domains):
+    digest = hashlib.sha256()
+    for domain in sorted({
+        str(domain).strip().lower().rstrip('.')
+        for domain in (domains or [])
+        if str(domain).strip()
+    }):
+        digest.update(domain.encode('utf-8'))
+        digest.update(b'\n')
+    return digest.hexdigest()
+
+
+def compute_source_revision_for_source_id(source_id):
+    digest = hashlib.sha256()
+    query = (
+        BlocklistDomain.query.with_entities(BlocklistDomain.domain)
+        .filter_by(source_id=source_id)
+        .order_by(BlocklistDomain.domain.asc())
+        .yield_per(BLOCKLIST_SYNC_BATCH_SIZE)
+    )
+    for domain, in query:
+        if not domain:
+            continue
+        digest.update(domain.encode('utf-8'))
+        digest.update(b'\n')
+    return digest.hexdigest()
+
+
+def iter_source_domain_batches(source_id, batch_size=BLOCKLIST_SYNC_BATCH_SIZE):
+    batch = []
+    query = (
+        BlocklistDomain.query.with_entities(BlocklistDomain.domain)
+        .filter_by(source_id=source_id)
+        .order_by(BlocklistDomain.domain.asc())
+        .yield_per(batch_size)
+    )
+    for domain, in query:
+        if not domain:
+            continue
+        batch.append(domain)
+        if len(batch) >= batch_size:
+            yield batch
+            batch = []
+    if batch:
+        yield batch
+
+
+def build_source_state_map(sources):
+    source_rows = [
+        source
+        for source in (sources or [])
+        if getattr(source, 'is_enabled', True)
+    ]
+    source_ids = [source.id for source in source_rows]
+    domain_count_map = {}
+
+    if source_ids:
+        count_rows = (
+            BlocklistDomain.query.with_entities(
+                BlocklistDomain.source_id,
+                func.count(BlocklistDomain.id),
+            )
+            .filter(BlocklistDomain.source_id.in_(source_ids))
+            .group_by(BlocklistDomain.source_id)
+            .all()
+        )
+        domain_count_map = {
+            int(source_id): int(domain_count)
+            for source_id, domain_count in count_rows
+        }
+
+    return {
+        str(source.id): {
+            'revision': (
+                getattr(source, 'content_revision', None)
+                or compute_source_revision_for_source_id(source.id)
+            ),
+            'domain_count': domain_count_map.get(source.id, 0),
+        }
+        for source in source_rows
+    }
+
+
 def build_source_domain_map(sources):
     domain_map = {}
     for source in sources:
@@ -211,11 +298,14 @@ def build_source_domain_map(sources):
     return domain_map
 
 
-def compute_mapping_policy_hash(linux_uid, source_domain_map, assigned_source_ids):
+def compute_mapping_policy_hash(linux_uid, source_state_map, assigned_source_ids):
     payload = {
         'linux_uid': linux_uid,
         'sources': {
-            str(source_id): source_domain_map.get(str(source_id), [])
+            str(source_id): (
+                source_state_map.get(str(source_id), {}).get('revision')
+                or ''
+            )
             for source_id in sorted({int(source_id) for source_id in assigned_source_ids})
         },
     }
@@ -223,10 +313,10 @@ def compute_mapping_policy_hash(linux_uid, source_domain_map, assigned_source_id
     return hashlib.sha256(digest_source.encode('utf-8')).hexdigest()
 
 
-def summarize_mapping_blocklist_sync(mapping, source_domain_map, assigned_source_ids):
+def summarize_mapping_blocklist_sync(mapping, source_state_map, assigned_source_ids):
     source_ids = sorted({int(source_id) for source_id in assigned_source_ids})
     effective_domain_count = sum(
-        len(source_domain_map.get(str(source_id), []))
+        int(source_state_map.get(str(source_id), {}).get('domain_count') or 0)
         for source_id in source_ids
     )
 
@@ -246,7 +336,7 @@ def summarize_mapping_blocklist_sync(mapping, source_domain_map, assigned_source
             'policy_hash': None,
         }
 
-    policy_hash = compute_mapping_policy_hash(mapping.linux_uid, source_domain_map, source_ids)
+    policy_hash = compute_mapping_policy_hash(mapping.linux_uid, source_state_map, source_ids)
     is_current = (
         bool(mapping.blocklist_is_synced)
         and mapping.blocklist_policy_hash == policy_hash

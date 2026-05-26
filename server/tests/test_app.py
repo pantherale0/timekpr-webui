@@ -249,6 +249,49 @@ def test_blocklist_catalog_and_assignment_routes(client, db_session):
     assert b'Lists: 1' in device_page.data
 
 
+def test_delete_blocklist_source_uses_bulk_delete_path(client, db_session):
+    Settings.set_admin_password("admin")
+    client.post('/', data={'username': 'admin', 'password': 'admin'})
+
+    device = AgentDevice(system_id="delete-policy-device", system_hostname="study-pc", status="approved", secure_token="tok")
+    user = ManagedUser(username="delete-alice", system_ip="Unassigned", is_valid=True)
+    db_session.add_all([device, user])
+    db_session.flush()
+    db_session.add(ManagedUserDeviceMap(
+        managed_user_id=user.id,
+        system_id=device.system_id,
+        linux_username="delete-alice",
+        linux_uid=1002,
+        is_valid=True,
+    ))
+    source = BlocklistSource(
+        name='Delete Large Source',
+        source_type=BlocklistSource.TYPE_MANUAL,
+        is_enabled=True,
+    )
+    db_session.add(source)
+    db_session.flush()
+    db_session.add_all([
+        ManagedUserBlocklistAssignment(managed_user_id=user.id, source_id=source.id),
+        BlocklistDomain(source_id=source.id, domain='one.example.com'),
+        BlocklistDomain(source_id=source.id, domain='two.example.com'),
+    ])
+    db_session.commit()
+    source_id = source.id
+
+    with patch.object(db.session, 'delete', side_effect=AssertionError('ORM delete should not be used')):
+        res = client.post(
+            f'/blocklists/sources/{source_id}/delete',
+            follow_redirects=True,
+        )
+
+    assert res.status_code == 200
+    assert b'deleted' in res.data
+    assert BlocklistSource.query.filter_by(id=source_id).first() is None
+    assert BlocklistDomain.query.filter_by(source_id=source_id).count() == 0
+    assert ManagedUserBlocklistAssignment.query.filter_by(source_id=source_id).count() == 0
+
+
 def test_blocklist_source_catalog_uses_capped_preview(client, db_session):
     Settings.set_admin_password("admin")
     client.post('/', data={'username': 'admin', 'password': 'admin'})
@@ -1008,6 +1051,7 @@ def test_run_schema_migrations_creates_blocklist_tables_and_mapping_sync_columns
     assert 'name' in source_columns
     assert 'source_type' in source_columns
     assert 'etag' in source_columns
+    assert 'content_revision' in source_columns
 
     domain_columns = {
         row[1]

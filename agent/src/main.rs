@@ -268,6 +268,34 @@ fn schedule_to_day_limits(
 
 async fn handle_command(action: &str, username: &str, args: &serde_json::Value) -> (bool, String, serde_json::Value) {
     match action {
+        "get_domain_policy_state" => match domain_policy::get_state_summary().await {
+            Ok(data) => (true, "Fetched domain policy state".to_string(), data),
+            Err(message) => (false, message, serde_json::json!({})),
+        },
+        "begin_domain_policy_sync" => match domain_policy::begin_sync_from_args(args).await {
+            Ok(message) => (true, message, serde_json::json!({})),
+            Err(message) => (false, message, serde_json::json!({})),
+        },
+        "delete_domain_policy_sources" => match domain_policy::delete_sources_from_args(args).await {
+            Ok(message) => (true, message, serde_json::json!({})),
+            Err(message) => (false, message, serde_json::json!({})),
+        },
+        "sync_domain_policy_chunk" => match domain_policy::push_source_chunk_from_args(args).await {
+            Ok(message) => (true, message, serde_json::json!({})),
+            Err(message) => (false, message, serde_json::json!({})),
+        },
+        "update_domain_policy_manifest" => match domain_policy::update_manifest_from_args(args).await {
+            Ok(message) => (true, message, serde_json::json!({})),
+            Err(message) => (false, message, serde_json::json!({})),
+        },
+        "finalize_domain_policy_sync" => match domain_policy::finalize_sync_from_args(args).await {
+            Ok(message) => (true, message, serde_json::json!({})),
+            Err(message) => (false, message, serde_json::json!({})),
+        },
+        "abort_domain_policy_sync" => match domain_policy::abort_sync_from_args(args).await {
+            Ok(message) => (true, message, serde_json::json!({})),
+            Err(message) => (false, message, serde_json::json!({})),
+        },
         "sync_domain_policy" => match domain_policy::sync_from_args(args).await {
             Ok(message) => (true, message, serde_json::json!({})),
             Err(message) => (false, message, serde_json::json!({})),

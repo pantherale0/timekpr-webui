@@ -163,6 +163,15 @@ class AgentConnectionManager(metaclass=AgentConnectionManagerMeta):
     def is_online(cls, system_id):
         """Check if a system_id is currently online"""
         return system_id in cls.active_connections
+
+    @classmethod
+    def get_online_system_ids(cls):
+        """Return sorted online system IDs without internal IP shadow keys."""
+        return sorted(
+            system_id
+            for system_id in cls.active_connections.keys()
+            if not system_id.endswith("_ip")
+        )
  
     @classmethod
     def get_ip(cls, system_id):
@@ -442,5 +451,88 @@ class AgentClient:
             "sync_domain_policy",
             "",
             payload,
+        )
+        return success, message
+
+    def get_domain_policy_state(self):
+        """
+        Fetch the agent's current cached domain-policy state summary.
+        Returns: (success, message, data)
+        """
+        return AgentConnectionManager.send_command_sync(
+            self.system_id,
+            "get_domain_policy_state",
+            "",
+            {},
+        )
+
+    def begin_domain_policy_sync(self, sync_id):
+        success, message, _ = AgentConnectionManager.send_command_sync(
+            self.system_id,
+            "begin_domain_policy_sync",
+            "",
+            {
+                "sync_id": sync_id,
+            },
+        )
+        return success, message
+
+    def delete_domain_policy_sources(self, sync_id, source_ids):
+        success, message, _ = AgentConnectionManager.send_command_sync(
+            self.system_id,
+            "delete_domain_policy_sources",
+            "",
+            {
+                "sync_id": sync_id,
+                "source_ids": list(source_ids or []),
+            },
+        )
+        return success, message
+
+    def send_domain_policy_chunk(self, sync_id, source_id, revision, domains):
+        success, message, _ = AgentConnectionManager.send_command_sync(
+            self.system_id,
+            "sync_domain_policy_chunk",
+            "",
+            {
+                "sync_id": sync_id,
+                "source_id": str(source_id),
+                "revision": revision,
+                "domains": list(domains or []),
+            },
+        )
+        return success, message
+
+    def update_domain_policy_manifest(self, sync_id, policies):
+        success, message, _ = AgentConnectionManager.send_command_sync(
+            self.system_id,
+            "update_domain_policy_manifest",
+            "",
+            {
+                "sync_id": sync_id,
+                "policies": policies or {},
+            },
+        )
+        return success, message
+
+    def finalize_domain_policy_sync(self, sync_id):
+        success, message, _ = AgentConnectionManager.send_command_sync(
+            self.system_id,
+            "finalize_domain_policy_sync",
+            "",
+            {
+                "sync_id": sync_id,
+            },
+        )
+        return success, message
+
+    def abort_domain_policy_sync(self, sync_id):
+        success, message, _ = AgentConnectionManager.send_command_sync(
+            self.system_id,
+            "abort_domain_policy_sync",
+            "",
+            {
+                "sync_id": sync_id,
+            },
         )
         return success, message

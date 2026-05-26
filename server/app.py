@@ -1,8 +1,9 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
+from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify, abort
 import os
 import threading
 from datetime import datetime, date, timedelta
 import json
+import hashlib
 import logging
 import pytz
 
@@ -30,7 +31,8 @@ from src.blocklist_helper import (
     normalize_domain,
     parse_blocklist_text,
     validate_external_source_url,
-    build_source_domain_map,
+    build_source_state_map,
+    compute_source_revision,
     summarize_mapping_blocklist_sync,
 )
 from flask_sock import Sock
@@ -465,7 +467,7 @@ def _build_user_blocklist_sync_status(user):
         active_sources = BlocklistSource.query.filter(
             BlocklistSource.id.in_(assigned_source_ids)
         ).all()
-    source_domain_map = build_source_domain_map(active_sources)
+    source_state_map = build_source_state_map(active_sources)
 
     mappings = []
     for mapping in sorted(
@@ -476,7 +478,7 @@ def _build_user_blocklist_sync_status(user):
             item.id,
         ),
     ):
-        summary = summarize_mapping_blocklist_sync(mapping, source_domain_map, assigned_source_ids)
+        summary = summarize_mapping_blocklist_sync(mapping, source_state_map, assigned_source_ids)
         mappings.append({
             'mapping_id': mapping.id,
             'system_id': mapping.system_id,
@@ -497,7 +499,10 @@ def _build_user_blocklist_sync_status(user):
     return {
         'assigned_source_ids': sorted(assigned_source_ids),
         'assigned_source_count': len(assigned_source_ids),
-        'effective_domain_count': sum(len(domains) for domains in source_domain_map.values()),
+        'effective_domain_count': sum(
+            int(state.get('domain_count') or 0)
+            for state in source_state_map.values()
+        ),
         'mapping_count': len(mappings),
         'synced_mapping_count': synced_count,
         'awaiting_uid_count': awaiting_uid_count,
@@ -1134,6 +1139,7 @@ def create_blocklist_source():
         source_type=source_type,
         source_url=validated_url,
         is_enabled=True,
+        content_revision=compute_source_revision(domains),
     )
     db.session.add(source)
     db.session.flush()
@@ -1157,9 +1163,23 @@ def delete_blocklist_source(source_id):
     if not session.get('logged_in'):
         return jsonify({'success': False, 'message': 'Not authenticated'}), 401
 
-    source = BlocklistSource.query.get_or_404(source_id)
-    source_name = source.name
-    db.session.delete(source)
+    source_row = db.session.query(
+        BlocklistSource.id,
+        BlocklistSource.name,
+    ).filter_by(id=source_id).first()
+    if source_row is None:
+        abort(404)
+
+    source_name = source_row.name
+    ManagedUserBlocklistAssignment.query.filter_by(source_id=source_id).delete(
+        synchronize_session=False
+    )
+    BlocklistDomain.query.filter_by(source_id=source_id).delete(
+        synchronize_session=False
+    )
+    BlocklistSource.query.filter_by(id=source_id).delete(
+        synchronize_session=False
+    )
     db.session.commit()
     flash(f'Blocklist "{source_name}" deleted', 'success')
     return redirect(url_for('settings'))
@@ -1211,6 +1231,12 @@ def add_blocklist_domain(source_id):
         return redirect(url_for('settings'))
 
     db.session.add(BlocklistDomain(source_id=source.id, domain=domain))
+    source.content_revision = compute_source_revision(
+        row.domain
+        for row in BlocklistDomain.query.with_entities(BlocklistDomain.domain).filter_by(
+            source_id=source.id
+        )
+    )
     source.updated_at = datetime.utcnow()
     db.session.commit()
     flash(f'Added {domain} to "{source.name}"', 'success')
@@ -1226,6 +1252,13 @@ def delete_blocklist_domain(source_id, domain_id):
     domain = BlocklistDomain.query.filter_by(id=domain_id, source_id=source.id).first_or_404()
     domain_text = domain.domain
     db.session.delete(domain)
+    db.session.flush()
+    source.content_revision = compute_source_revision(
+        row.domain
+        for row in BlocklistDomain.query.with_entities(BlocklistDomain.domain).filter_by(
+            source_id=source.id
+        )
+    )
     source.updated_at = datetime.utcnow()
     db.session.commit()
     flash(f'Removed {domain_text} from "{source.name}"', 'success')
@@ -2066,6 +2099,7 @@ def run_schema_migrations():
             last_sync_error TEXT NULL,
             etag VARCHAR(255) NULL,
             source_last_modified VARCHAR(255) NULL,
+            content_revision VARCHAR(64) NULL,
             created_at DATETIME NOT NULL,
             updated_at DATETIME NOT NULL
         )
@@ -2092,6 +2126,26 @@ def run_schema_migrations():
         )
     """))
     db.session.commit()
+
+    blocklist_source_columns = {
+        row[1]
+        for row in db.session.execute(text("PRAGMA table_info(blocklist_source)")).fetchall()
+    }
+    if blocklist_source_columns and 'content_revision' not in blocklist_source_columns:
+        db.session.execute(text("""
+            ALTER TABLE blocklist_source
+            ADD COLUMN content_revision VARCHAR(64) NULL
+        """))
+        db.session.commit()
+
+    legacy_sources = BlocklistSource.query.filter(BlocklistSource.content_revision.is_(None)).all()
+    for source in legacy_sources:
+        basis = source.updated_at or source.created_at or datetime.utcnow()
+        source.content_revision = hashlib.sha256(
+            f'legacy:{source.id}:{basis.isoformat()}'.encode('utf-8')
+        ).hexdigest()
+    if legacy_sources:
+        db.session.commit()
 
     users = ManagedUser.query.filter(ManagedUser.system_id.isnot(None)).all()
     for user in users:

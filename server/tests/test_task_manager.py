@@ -28,11 +28,15 @@ class DummyWS:
             payload = json.loads(message)
             correlation_id = payload.get("correlation_id")
             if correlation_id:
+                action = payload.get("action")
+                data = {"config": {"TIME_SPENT_DAY": 450, "TIME_LEFT_DAY": 1000}}
+                if action == "get_domain_policy_state":
+                    data = {"source_revisions": {}}
                 # Default response
                 AgentConnectionManager.route_response(correlation_id, {
                     "success": True,
                     "message": "Success",
-                    "data": {"config": {"TIME_SPENT_DAY": 450, "TIME_LEFT_DAY": 1000}}
+                    "data": data,
                 })
         except Exception:
             pass
@@ -348,18 +352,83 @@ def test_task_manager_syncs_domain_policy_payloads(app, db_session):
     sent_payloads = [
         json.loads(message)
         for message in ws.sent_messages
-        if json.loads(message).get("action") == "sync_domain_policy"
     ]
-    assert sent_payloads
-    policy_payload = sent_payloads[-1]["args"]
-    assert policy_payload["sources"]["1"] == ["cloudflare-dns.com", "dns.google"]
-    assert policy_payload["policies"]["1005"]["linux_username"] == "policy-user"
-    assert policy_payload["policies"]["1005"]["source_ids"] == ["1"]
+    sent_actions = [payload["action"] for payload in sent_payloads]
+    assert sent_actions == [
+        "get_domain_policy_state",
+        "begin_domain_policy_sync",
+        "sync_domain_policy_chunk",
+        "update_domain_policy_manifest",
+        "finalize_domain_policy_sync",
+    ]
+
+    chunk_payload = next(
+        payload for payload in sent_payloads
+        if payload["action"] == "sync_domain_policy_chunk"
+    )["args"]
+    assert chunk_payload["source_id"] == "1"
+    assert chunk_payload["domains"] == ["cloudflare-dns.com", "dns.google"]
+
+    manifest_payload = next(
+        payload for payload in sent_payloads
+        if payload["action"] == "update_domain_policy_manifest"
+    )["args"]
+    assert manifest_payload["policies"]["1005"]["linux_username"] == "policy-user"
+    assert manifest_payload["policies"]["1005"]["source_ids"] == ["1"]
 
     mapping = ManagedUserDeviceMap.query.filter_by(system_id=device.system_id).first()
     assert mapping.blocklist_is_synced
     assert mapping.blocklist_policy_hash
     assert mapping.blocklist_last_synced is not None
+
+    sent_count = len(ws.sent_messages)
+    with app.app_context():
+        manager._sync_domain_policies()
+    assert len(ws.sent_messages) == sent_count
+
+    AgentConnectionManager.unregister(device.system_id)
+
+
+def test_task_manager_syncs_large_domain_sources_in_multiple_chunks(app, db_session):
+    manager = BackgroundTaskManager(app)
+
+    user = ManagedUser(username="large-policy-user", system_ip="Unassigned", is_valid=True)
+    device = AgentDevice(system_id="sys-policy-large", status="approved", secure_token="tok")
+    source = BlocklistSource(name="Large DoH", source_type=BlocklistSource.TYPE_MANUAL, is_enabled=True)
+    db_session.add_all([user, device, source])
+    db_session.flush()
+    db_session.add(
+        ManagedUserDeviceMap(
+            managed_user_id=user.id,
+            system_id=device.system_id,
+            linux_username="large-policy-user",
+            linux_uid=1010,
+            is_valid=True,
+        )
+    )
+    db_session.add(ManagedUserBlocklistAssignment(managed_user_id=user.id, source_id=source.id))
+    db_session.add_all([
+        BlocklistDomain(source_id=source.id, domain=f"domain-{index:04d}.example.com")
+        for index in range(1003)
+    ])
+    db_session.commit()
+
+    ws = DummyWS()
+    AgentConnectionManager.register(device.system_id, ws, "10.0.0.21")
+
+    with app.app_context():
+        manager._sync_domain_policies()
+
+    chunk_payloads = [
+        json.loads(message)["args"]
+        for message in ws.sent_messages
+        if json.loads(message).get("action") == "sync_domain_policy_chunk"
+    ]
+    assert len(chunk_payloads) == 2
+    assert len(chunk_payloads[0]["domains"]) == 1000
+    assert len(chunk_payloads[1]["domains"]) == 3
+    assert chunk_payloads[0]["domains"][0] == "domain-0000.example.com"
+    assert chunk_payloads[1]["domains"][-1] == "domain-1002.example.com"
 
     AgentConnectionManager.unregister(device.system_id)
 

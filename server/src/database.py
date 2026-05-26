@@ -407,6 +407,7 @@ class BlocklistSource(db.Model):
     last_sync_error = db.Column(db.Text, nullable=True)
     etag = db.Column(db.String(255), nullable=True)
     source_last_modified = db.Column(db.String(255), nullable=True)
+    content_revision = db.Column(db.String(64), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     updated_at = db.Column(
         db.DateTime,

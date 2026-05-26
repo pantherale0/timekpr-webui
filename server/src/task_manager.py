@@ -6,6 +6,7 @@ import json
 import traceback
 import hashlib
 import hmac
+import uuid
 
 import requests
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
@@ -26,7 +27,10 @@ from src.agent_helper import AgentClient, AgentConnectionManager
 from src.blocklist_helper import (
     BLOCKLIST_STREAM_CHUNK_SIZE,
     BlocklistStreamParser,
-    build_source_domain_map,
+    build_source_state_map,
+    compute_source_revision,
+    compute_source_revision_for_source_id,
+    iter_source_domain_batches,
     summarize_mapping_blocklist_sync,
     should_refresh_external_source,
 )
@@ -107,6 +111,7 @@ def _replace_source_domains(source, normalized_domains):
         if domain_text not in existing_by_domain:
             db.session.add(BlocklistDomain(source_id=source.id, domain=domain_text))
 
+    source.content_revision = compute_source_revision(desired_domains)
     source.updated_at = datetime.utcnow()
 
 
@@ -489,6 +494,7 @@ class BackgroundTaskManager:
             source.etag = response.headers.get('ETag')
             source.source_last_modified = response.headers.get('Last-Modified')
             source.mark_sync_ok()
+            source.content_revision = compute_source_revision_for_source_id(source.id)
 
             errors = parser.collected_errors()
             if errors:
@@ -522,14 +528,117 @@ class BackgroundTaskManager:
             else:
                 logger.warning(message)
 
+    def _abort_domain_policy_sync(self, agent_client, sync_id):
+        try:
+            agent_client.abort_domain_policy_sync(sync_id)
+        except Exception:
+            logger.warning(
+                "Failed to abort incremental domain policy sync %s for device %s",
+                sync_id,
+                agent_client.system_id,
+            )
+
+    def _sync_domain_policy_device(self, system_id, mapping_state, source_state_map):
+        device_policies = {}
+        desired_source_ids = set()
+
+        for mapping, assigned_source_ids, _summary in mapping_state:
+            if not assigned_source_ids or mapping.linux_uid is None:
+                continue
+            source_ids = [str(source_id) for source_id in assigned_source_ids]
+            desired_source_ids.update(source_ids)
+            device_policies[str(mapping.linux_uid)] = {
+                'linux_username': mapping.linux_username,
+                'source_ids': source_ids,
+            }
+
+        agent_client = AgentClient(system_id=system_id)
+        success, message, state_payload = agent_client.get_domain_policy_state()
+        if not success:
+            return False, message
+
+        source_revisions = {}
+        if isinstance(state_payload, dict):
+            source_revisions = state_payload.get('source_revisions') or {}
+        if not isinstance(source_revisions, dict):
+            source_revisions = {}
+        source_revisions = {
+            str(source_id): str(revision or '')
+            for source_id, revision in source_revisions.items()
+        }
+
+        sync_id = str(uuid.uuid4())
+        success, message = agent_client.begin_domain_policy_sync(sync_id)
+        if not success:
+            return False, message
+
+        try:
+            stale_source_ids = sorted(set(source_revisions) - desired_source_ids)
+            if stale_source_ids:
+                success, message = agent_client.delete_domain_policy_sources(sync_id, stale_source_ids)
+                if not success:
+                    self._abort_domain_policy_sync(agent_client, sync_id)
+                    return False, message
+
+            for source_id_text in sorted(desired_source_ids, key=int):
+                desired_state = source_state_map.get(source_id_text, {})
+                desired_revision = desired_state.get('revision') or ''
+                if source_revisions.get(source_id_text) == desired_revision:
+                    continue
+
+                source_id = int(source_id_text)
+                sent_any = False
+                for batch in iter_source_domain_batches(source_id):
+                    sent_any = True
+                    success, message = agent_client.send_domain_policy_chunk(
+                        sync_id,
+                        source_id_text,
+                        desired_revision,
+                        batch,
+                    )
+                    if not success:
+                        self._abort_domain_policy_sync(agent_client, sync_id)
+                        return False, message
+
+                if not sent_any:
+                    success, message = agent_client.send_domain_policy_chunk(
+                        sync_id,
+                        source_id_text,
+                        desired_revision,
+                        [],
+                    )
+                    if not success:
+                        self._abort_domain_policy_sync(agent_client, sync_id)
+                        return False, message
+
+            success, message = agent_client.update_domain_policy_manifest(sync_id, device_policies)
+            if not success:
+                self._abort_domain_policy_sync(agent_client, sync_id)
+                return False, message
+
+            success, message = agent_client.finalize_domain_policy_sync(sync_id)
+            if not success:
+                self._abort_domain_policy_sync(agent_client, sync_id)
+                return False, message
+            return True, message
+        except Exception:
+            self._abort_domain_policy_sync(agent_client, sync_id)
+            raise
+
     def _sync_domain_policies(self):
         try:
+            online_system_ids = AgentConnectionManager.get_online_system_ids()
+            if not online_system_ids:
+                return
+
             active_sources = BlocklistSource.query.filter_by(is_enabled=True).all()
             active_source_ids = {source.id for source in active_sources}
-            source_domain_map = build_source_domain_map(active_sources)
+            source_state_map = build_source_state_map(active_sources)
             mappings_by_device = {}
 
-            all_mappings = ManagedUserDeviceMap.query.order_by(
+            all_mappings = ManagedUserDeviceMap.query.filter(
+                ManagedUserDeviceMap.system_id.in_(online_system_ids)
+            ).order_by(
                 ManagedUserDeviceMap.system_id.asc(),
                 ManagedUserDeviceMap.id.asc(),
             ).all()
@@ -537,8 +646,6 @@ class BackgroundTaskManager:
                 mappings_by_device.setdefault(mapping.system_id, []).append(mapping)
 
             for system_id, mappings in mappings_by_device.items():
-                device_sources = {}
-                device_policies = {}
                 mapping_state = []
 
                 for mapping in mappings:
@@ -546,34 +653,18 @@ class BackgroundTaskManager:
                         mapping.managed_user,
                         active_source_ids=active_source_ids,
                     )
-                    summary = summarize_mapping_blocklist_sync(mapping, source_domain_map, assigned_source_ids)
+                    summary = summarize_mapping_blocklist_sync(mapping, source_state_map, assigned_source_ids)
                     mapping_state.append((mapping, assigned_source_ids, summary))
-
-                    if assigned_source_ids and mapping.linux_uid is not None:
-                        for source_id in assigned_source_ids:
-                            source_domains = source_domain_map.get(str(source_id), [])
-                            if source_domains:
-                                device_sources[str(source_id)] = source_domains
-                        device_policies[str(mapping.linux_uid)] = {
-                            'linux_username': mapping.linux_username,
-                            'source_ids': [str(source_id) for source_id in assigned_source_ids],
-                        }
 
                 needs_sync = any(summary['needs_sync'] for _, _, summary in mapping_state)
                 if not needs_sync:
                     continue
 
-                if not AgentConnectionManager.is_online(system_id):
-                    logger.info("Skipping domain policy sync for offline device %s", system_id)
-                    continue
-
-                payload = {
-                    'sources': device_sources,
-                    'policies': device_policies,
-                }
-
-                agent_client = AgentClient(system_id=system_id)
-                success, message = agent_client.sync_domain_policy(payload)
+                success, message = self._sync_domain_policy_device(
+                    system_id,
+                    mapping_state,
+                    source_state_map,
+                )
                 if success:
                     for mapping, assigned_source_ids, summary in mapping_state:
                         if assigned_source_ids and mapping.linux_uid is None:
