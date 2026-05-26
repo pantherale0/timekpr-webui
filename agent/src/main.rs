@@ -55,6 +55,8 @@ struct Config {
     system_id: Option<String>,
     registration_token: Option<String>,
     agent_token: Option<String>,
+    #[serde(default)]
+    github_repo: Option<String>,
 }
 
 #[derive(Deserialize, Debug)]
@@ -67,7 +69,14 @@ enum ServerMessage {
     #[serde(rename = "challenge")]
     Challenge { challenge: String },
     #[serde(rename = "auth_result")]
-    AuthResult { success: bool, message: String },
+    AuthResult {
+        success: bool,
+        message: String,
+        #[serde(default)]
+        update_required: bool,
+        #[serde(default)]
+        target_version: Option<String>,
+    },
     #[serde(rename = "command_request")]
     CommandRequest {
         correlation_id: String,
@@ -89,6 +98,7 @@ enum ClientMessage {
         system_id: String,
         system_hostname: Option<String>,
         registration_token: Option<String>,
+        agent_version: String,
     },
     #[serde(rename = "register")]
     Register {
@@ -151,6 +161,7 @@ fn load_or_create_config() -> Config {
                 system_id: None,
                 registration_token: None,
                 agent_token: None,
+                github_repo: None,
             }
         }
     } else {
@@ -159,6 +170,7 @@ fn load_or_create_config() -> Config {
             system_id: None,
             registration_token: None,
             agent_token: None,
+            github_repo: None,
         }
     };
 
@@ -514,6 +526,108 @@ async fn handle_command(action: &str, username: &str, args: &serde_json::Value) 
         }
         _ => (false, format!("Unknown action '{}'", action), serde_json::json!({})),
     }
+}
+
+async fn trigger_auto_update(target_version: &str, github_repo: &str) -> Result<(), String> {
+    println!("Initializing auto-update to version {}...", target_version);
+    
+    let arch = std::env::consts::ARCH;
+    let target = match arch {
+        "x86_64" => "x86_64-unknown-linux-gnu",
+        "aarch64" => "aarch64-unknown-linux-gnu",
+        other => return Err(format!("Unsupported architecture for auto-update: {}", other)),
+    };
+    
+    let asset_name = format!("timekpr-agent-{}.tar.gz", target);
+    let download_url = format!(
+        "https://github.com/{}/releases/download/{}/{}",
+        github_repo, target_version, asset_name
+    );
+    
+    println!("Downloading release asset from: {}", download_url);
+    
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(60))
+        .build()
+        .map_err(|e| format!("Failed to build HTTP client: {}", e))?;
+        
+    let response = client
+        .get(&download_url)
+        .send()
+        .await
+        .map_err(|e| format!("HTTP request failed: {}", e))?;
+        
+    if !response.status().is_success() {
+        return Err(format!(
+            "Server returned error code {}: {}",
+            response.status(),
+            download_url
+        ));
+    }
+    
+    let bytes = response
+        .bytes()
+        .await
+        .map_err(|e| format!("Failed to read download stream: {}", e))?;
+        
+    println!("Downloaded {} bytes successfully. Extracting archive...", bytes.len());
+    
+    let cursor = std::io::Cursor::new(bytes);
+    let tar = flate2::read::GzDecoder::new(cursor);
+    let mut archive = tar::Archive::new(tar);
+    
+    let mut binary_bytes = None;
+    let entries = archive
+        .entries()
+        .map_err(|e| format!("Failed to read archive entries: {}", e))?;
+        
+    for entry_result in entries {
+        let mut entry = entry_result.map_err(|e| format!("Failed to parse archive entry: {}", e))?;
+        let path = entry
+            .path()
+            .map_err(|e| format!("Failed to get entry path: {}", e))?
+            .to_path_buf();
+            
+        if path.file_name().and_then(|f| f.to_str()) == Some("timekpr-agent") {
+            use std::io::Read;
+            let mut buf = Vec::new();
+            entry
+                .read_to_end(&mut buf)
+                .map_err(|e| format!("Failed to read binary from archive: {}", e))?;
+            binary_bytes = Some(buf);
+            break;
+        }
+    }
+    
+    let binary_bytes = binary_bytes.ok_or_else(|| "Archive did not contain 'timekpr-agent' binary".to_string())?;
+    println!("Extracted new binary ({} bytes). Performing self-replace...", binary_bytes.len());
+    
+    let current_bin = std::env::current_exe()
+        .map_err(|e| format!("Failed to determine current executable path: {}", e))?;
+    let bin_dir = current_bin
+        .parent()
+        .ok_or_else(|| "Failed to get current executable directory".to_string())?;
+        
+    let temp_bin = bin_dir.join("timekpr-agent.tmp");
+    
+    std::fs::write(&temp_bin, &binary_bytes)
+        .map_err(|e| format!("Failed to write temporary binary file: {}", e))?;
+        
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&temp_bin, std::fs::Permissions::from_mode(0o755))
+            .map_err(|e| format!("Failed to set permissions on temporary binary: {}", e))?;
+    }
+    
+    std::fs::rename(&temp_bin, &current_bin)
+        .map_err(|e| {
+            let _ = std::fs::remove_file(&temp_bin);
+            format!("Failed to rename/replace active executable: {}", e)
+        })?;
+        
+    println!("Auto-update completed successfully! Active executable replaced.");
+    Ok(())
 }
 
 fn current_timestamp() -> String {
@@ -926,6 +1040,7 @@ async fn main() {
                     system_id: system_id.clone(),
                     system_hostname: system_hostname.clone(),
                     registration_token,
+                    agent_version: format!("v{}", env!("CARGO_PKG_VERSION")),
                 };
                 let hello_json = serde_json::to_string(&hello_msg).unwrap();
                 if let Err(e) = ws_stream.send(Message::Text(hello_json.into())).await {
@@ -987,13 +1102,33 @@ async fn main() {
                                     break;
                                 }
                             }
-                            Ok(ServerMessage::AuthResult { success, message }) => {
+                            Ok(ServerMessage::AuthResult {
+                                success,
+                                message,
+                                update_required,
+                                target_version,
+                            }) => {
                                 println!("Handshake result: success = {}, message = {}", success, message);
                                 if success {
                                     authenticated = true;
                                     println!("Agent authenticated successfully!");
                                 } else {
-                                    eprintln!("Authentication failed, disconnecting.");
+                                    eprintln!("Authentication failed: {}", message);
+                                    if update_required {
+                                        if let Some(target_ver) = target_version {
+                                            let github_repo = config.github_repo.clone().unwrap_or_else(|| "pantherale0/timekpr-webui".to_string());
+                                            println!("Version update required to: {}. Starting updater...", target_ver);
+                                            match trigger_auto_update(&target_ver, &github_repo).await {
+                                                Ok(_) => {
+                                                    println!("Successfully updated binary! Exiting to allow systemd to restart agent.");
+                                                    std::process::exit(0);
+                                                }
+                                                Err(err) => {
+                                                    eprintln!("Auto-update failed: {}", err);
+                                                }
+                                            }
+                                        }
+                                    }
                                 }
                                 break;
                             }

@@ -10,6 +10,7 @@ import pytest
 
 # Set TESTING environment variable before importing app
 os.environ['TESTING'] = 'True'
+os.environ['TIMEKPR_SERVER_VERSION'] = 'v0.10'
 
 # Add workspace path to sys.path so we can import app and src.
 server_root = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))

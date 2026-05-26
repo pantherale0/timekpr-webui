@@ -13,6 +13,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Set environment variables
+ARG SERVER_VERSION=v0.0.0-nightly
+ENV TIMEKPR_SERVER_VERSION=$SERVER_VERSION
 ENV FLASK_APP=app.py
 ENV FLASK_ENV=production
 

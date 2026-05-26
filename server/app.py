@@ -66,6 +66,7 @@ def _resolve_local_timezone(timezone_name):
 
 
 # Get timezone from environment variable or default to UTC
+__version__ = os.environ.get("TIMEKPR_SERVER_VERSION", "v0.0.0-dev")
 TIMEZONE_STR = os.environ.get('TZ', 'UTC')
 LOCAL_TIMEZONE, TIMEZONE_STR = _resolve_local_timezone(TIMEZONE_STR)
 
@@ -716,6 +717,24 @@ def ws_agent_handler(ws):
             if not system_id:
                 logging.warning("Initial hello missing system_id")
                 ws.send(json.dumps({"type": "auth_result", "success": False, "message": "Missing system_id"}))
+                return
+            
+            agent_version = hello_msg.get("agent_version")
+            stripped_server = __version__.lstrip('v')
+            stripped_agent = agent_version.lstrip('v') if agent_version else ""
+            if stripped_agent != stripped_server:
+                logging.warning(
+                    "Connection rejected: Agent version %s is incompatible with server version %s",
+                    agent_version or "unknown",
+                    __version__,
+                )
+                ws.send(json.dumps({
+                    "type": "auth_result",
+                    "success": False,
+                    "message": f"Incompatible agent version. Please update to {__version__}.",
+                    "update_required": True,
+                    "target_version": __version__
+                }))
                 return
     
             # 2. Check and enforce Registration Token firewall

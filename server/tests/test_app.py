@@ -492,7 +492,8 @@ def test_websocket_handler(app, db_session):
         ws_firewall = MockWS([json.dumps({
             "type": "hello",
             "system_id": "sys-fw",
-            "registration_token": "wrong-token"
+            "registration_token": "wrong-token",
+            "agent_version": "v0.10"
         })])
         with app.test_request_context('/ws', environ_base={'REMOTE_ADDR': '127.0.0.1'}):
             ws_agent_handler(ws_firewall)
@@ -503,6 +504,7 @@ def test_websocket_handler(app, db_session):
         "type": "hello",
         "system_id": "sys-new-pending",
         "system_hostname": "kids-pc",
+        "agent_version": "v0.10"
     })])
     with app.test_request_context('/ws', environ_base={'REMOTE_ADDR': '127.0.0.1'}):
         ws_agent_handler(ws_pending_new)
@@ -520,7 +522,7 @@ def test_websocket_handler(app, db_session):
     db_session.commit()
 
     # Step A: Hello
-    hello_msg = json.dumps({"type": "hello", "system_id": system_id})
+    hello_msg = json.dumps({"type": "hello", "system_id": system_id, "agent_version": "v0.10"})
     
     # Custom MockWS that captures the challenge sent by the handler and generates a valid signature response
     # to feed back on next receive() call
@@ -587,6 +589,7 @@ def test_websocket_handler(app, db_session):
     ws_policy_check = PolicyCheckWS([json.dumps({
         "type": "hello",
         "system_id": policy_check_system_id,
+        "agent_version": "v0.10"
     })])
     with patch.object(task_manager, 'request_domain_policy_sync') as mock_request_sync:
         with app.test_request_context('/ws', environ_base={'REMOTE_ADDR': '127.0.0.1'}):
@@ -622,11 +625,76 @@ def test_websocket_handler(app, db_session):
     db_session.add(invalid_device)
     db_session.commit()
 
-    invalid_ws = InvalidAlertWS([json.dumps({"type": "hello", "system_id": invalid_system_id})])
+    invalid_ws = InvalidAlertWS([json.dumps({"type": "hello", "system_id": invalid_system_id, "agent_version": "v0.10"})])
     with app.test_request_context('/ws', environ_base={'REMOTE_ADDR': '127.0.0.1'}):
         ws_agent_handler(invalid_ws)
 
     assert AgentAlert.query.filter_by(system_id=invalid_system_id).count() == 0
+
+def test_websocket_handler_version_checking(app, db_session):
+    from app import __version__, ws_agent_handler
+
+    class MockWS:
+        def __init__(self, messages):
+            self.messages = messages
+            self.sent_messages = []
+            self.closed = False
+
+        def receive(self, timeout=None):
+            if self.messages:
+                return self.messages.pop(0)
+            return None
+
+        def send(self, data):
+            self.sent_messages.append(data)
+
+        def close(self):
+            self.closed = True
+
+    # 1. Test mismatched agent version
+    ws_mismatch = MockWS([json.dumps({
+        "type": "hello",
+        "system_id": "sys-mismatch",
+        "agent_version": "v0.0.1"
+    })])
+    with app.test_request_context('/ws', environ_base={'REMOTE_ADDR': '127.0.0.1'}):
+        ws_agent_handler(ws_mismatch)
+    
+    assert len(ws_mismatch.sent_messages) == 1
+    resp = json.loads(ws_mismatch.sent_messages[0])
+    assert resp['type'] == "auth_result"
+    assert resp['success'] is False
+    assert resp['update_required'] is True
+    assert resp['target_version'] == __version__
+
+    # 2. Test missing agent version
+    ws_missing_ver = MockWS([json.dumps({
+        "type": "hello",
+        "system_id": "sys-missing-ver"
+    })])
+    with app.test_request_context('/ws', environ_base={'REMOTE_ADDR': '127.0.0.1'}):
+        ws_agent_handler(ws_missing_ver)
+        
+    assert len(ws_missing_ver.sent_messages) == 1
+    resp2 = json.loads(ws_missing_ver.sent_messages[0])
+    assert resp2['type'] == "auth_result"
+    assert resp2['success'] is False
+    assert resp2['update_required'] is True
+    assert resp2['target_version'] == __version__
+
+    # 3. Test matching agent version (v prefix and no prefix stripped match)
+    ws_matching = MockWS([json.dumps({
+        "type": "hello",
+        "system_id": "sys-pending-match",
+        "agent_version": "0.10"
+    })])
+    with app.test_request_context('/ws', environ_base={'REMOTE_ADDR': '127.0.0.1'}):
+        ws_agent_handler(ws_matching)
+    # Since it is a new pending device, it should respond with "pairing_status" or similar (which means it passed the version check!)
+    assert len(ws_matching.sent_messages) == 1
+    resp3 = json.loads(ws_matching.sent_messages[0])
+    assert resp3['type'] == "pairing_status"
+
 
 def test_new_endpoints(client, db_session):
     Settings.set_admin_password("admin")
