@@ -2196,7 +2196,9 @@ def modify_time():
 
 # ── AppArmor Policy Management ──────────────────────────────────────────
 
-APPARMOR_UNSAFE_PATH_CHARS = set('*?[]{}"')
+APPARMOR_UNSAFE_EXECUTABLE_PATH_CHARS = set('*?[]{}"')
+APPARMOR_ALLOWED_PATH_PATTERN_PREFIXES = ('$HOME/', '/home/$USER/')
+APPARMOR_PATH_PATTERN_SUFFIX = '/**'
 
 
 def _validate_apparmor_executable_path(executable_path):
@@ -2208,13 +2210,58 @@ def _validate_apparmor_executable_path(executable_path):
         raise ValueError('Executable path must be an absolute path like /usr/bin/firefox')
     if normalized.endswith('/'):
         raise ValueError('Executable path must point to a single executable, not a directory')
-    if any(char in normalized for char in APPARMOR_UNSAFE_PATH_CHARS):
+    if any(char in normalized for char in APPARMOR_UNSAFE_EXECUTABLE_PATH_CHARS):
         raise ValueError(
             'Executable path must be a single concrete executable; glob patterns like /usr/bin/** are not allowed'
         )
     if any(char.isspace() for char in normalized):
         raise ValueError('Executable paths with spaces are not supported')
     return normalized
+
+
+def _validate_apparmor_path_pattern(path_pattern, linux_username):
+    """Allow only home-directory subtree patterns like $HOME/Downloads/**."""
+    normalized = (path_pattern or '').strip()
+    if not normalized:
+        raise ValueError('Path pattern is required')
+    if any(char.isspace() for char in normalized):
+        raise ValueError('Path patterns with spaces are not supported')
+
+    explicit_home_prefix = f'/home/{linux_username}/'
+    if normalized.startswith(explicit_home_prefix):
+        normalized = '$HOME/' + normalized[len(explicit_home_prefix):]
+    elif normalized.startswith('/home/$USER/'):
+        normalized = '$HOME/' + normalized[len('/home/$USER/'):]
+
+    if not normalized.startswith(APPARMOR_ALLOWED_PATH_PATTERN_PREFIXES):
+        raise ValueError('Path patterns must stay under $HOME/ or /home/$USER/')
+    if not normalized.endswith(APPARMOR_PATH_PATTERN_SUFFIX):
+        raise ValueError('Path patterns must target a subtree and end with /**')
+
+    root = normalized[:-len(APPARMOR_PATH_PATTERN_SUFFIX)]
+    if not root or root in {'$HOME', '/home/$USER'}:
+        return normalized
+    if '*' in root or '?' in root or '[' in root or ']' in root or '{' in root or '}' in root or '"' in root:
+        raise ValueError('Only a trailing /** glob is supported for path rules')
+    if '/./' in normalized or '/../' in normalized or normalized.endswith('/..') or normalized.endswith('/.'):
+        raise ValueError('Path patterns must not contain relative path segments')
+    return normalized
+
+
+def _validate_apparmor_rule_target(match_type, target_value, linux_username):
+    if match_type == AppArmorRule.MATCH_TYPE_PATH_PATTERN:
+        return _validate_apparmor_path_pattern(target_value, linux_username)
+    return _validate_apparmor_executable_path(target_value)
+
+
+def _is_valid_preset_for_match_type(match_type, preset):
+    if match_type == AppArmorRule.MATCH_TYPE_PATH_PATTERN:
+        return preset in {
+            AppArmorRule.PRESET_ALLOWED,
+            AppArmorRule.PRESET_BLOCKED,
+            AppArmorRule.PRESET_COMPLAIN,
+        }
+    return preset in AppArmorRule.VALID_PRESETS
 
 CURATED_APPARMOR_APPS = [
     {'name': 'Firefox',            'path': '/usr/bin/firefox',            'icon': '🦊'},
@@ -2229,16 +2276,18 @@ CURATED_APPARMOR_APPS = [
 CURATED_APPARMOR_PATHS = {app['path'] for app in CURATED_APPARMOR_APPS}
 
 
-def _build_apparmor_policy_sync_payload(mapping_id):
+def _build_apparmor_policy_sync_payload(mapping):
     """Collect restrictive AppArmor rules for a mapping and sanitize them for sync."""
-    all_rules = AppArmorRule.query.filter_by(device_map_id=mapping_id).all()
+    all_rules = AppArmorRule.query.filter_by(device_map_id=mapping.id).all()
     policies_list = []
     skipped_rule_names = []
     for rule in all_rules:
         if not rule.is_restrictive:
             continue
         try:
-            _validate_apparmor_executable_path(rule.executable_path)
+            _validate_apparmor_rule_target(rule.match_type, rule.executable_path, mapping.linux_username)
+            if not _is_valid_preset_for_match_type(rule.match_type, rule.preset):
+                raise ValueError('preset is not supported for this rule type')
         except ValueError:
             skipped_rule_names.append(rule.application_name or rule.executable_path)
             continue
@@ -2341,22 +2390,25 @@ def apparmor_policy(mapping_id):
         # Process preset changes for curated apps
         for app_template in CURATED_APPARMOR_APPS:
             preset = request.form.get(f"preset_{app_template['path']}", 'allowed').strip()
-            if preset not in AppArmorRule.VALID_PRESETS:
+            if not _is_valid_preset_for_match_type(AppArmorRule.MATCH_TYPE_EXECUTABLE, preset):
                 preset = AppArmorRule.PRESET_ALLOWED
 
             existing = AppArmorRule.query.filter_by(
                 device_map_id=mapping.id,
                 executable_path=app_template['path'],
+                match_type=AppArmorRule.MATCH_TYPE_EXECUTABLE,
             ).first()
             if existing:
                 existing.preset = preset
                 existing.application_name = app_template['name']
                 existing.is_custom = False
+                existing.match_type = AppArmorRule.MATCH_TYPE_EXECUTABLE
             else:
                 db.session.add(AppArmorRule(
                     device_map_id=mapping.id,
                     application_name=app_template['name'],
                     executable_path=app_template['path'],
+                    match_type=AppArmorRule.MATCH_TYPE_EXECUTABLE,
                     preset=preset,
                     is_custom=False,
                 ))
@@ -2364,27 +2416,39 @@ def apparmor_policy(mapping_id):
         # Process custom app additions
         custom_name = (request.form.get('custom_app_name') or '').strip()
         custom_path = (request.form.get('custom_app_path') or '').strip()
+        custom_match_type = (
+            request.form.get('custom_app_match_type') or AppArmorRule.MATCH_TYPE_EXECUTABLE
+        ).strip()
         custom_preset = (request.form.get('custom_app_preset') or 'allowed').strip()
         if custom_name and custom_path:
+            if custom_match_type not in AppArmorRule.VALID_MATCH_TYPES:
+                custom_match_type = AppArmorRule.MATCH_TYPE_EXECUTABLE
             try:
-                custom_path = _validate_apparmor_executable_path(custom_path)
+                custom_path = _validate_apparmor_rule_target(
+                    custom_match_type,
+                    custom_path,
+                    mapping.linux_username,
+                )
             except ValueError as exc:
                 flash(str(exc), 'danger')
                 return redirect(url_for('apparmor_policy', mapping_id=mapping.id))
-            if custom_preset not in AppArmorRule.VALID_PRESETS:
+            if not _is_valid_preset_for_match_type(custom_match_type, custom_preset):
                 custom_preset = AppArmorRule.PRESET_ALLOWED
             existing = AppArmorRule.query.filter_by(
                 device_map_id=mapping.id,
                 executable_path=custom_path,
+                match_type=custom_match_type,
             ).first()
             if existing:
                 existing.preset = custom_preset
                 existing.application_name = custom_name
+                existing.match_type = custom_match_type
             else:
                 db.session.add(AppArmorRule(
                     device_map_id=mapping.id,
                     application_name=custom_name,
                     executable_path=custom_path,
+                    match_type=custom_match_type,
                     preset=custom_preset,
                     is_custom=True,
                 ))
@@ -2395,16 +2459,16 @@ def apparmor_policy(mapping_id):
             is_custom=True,
         ).all()
         for rule in custom_rules:
-            form_key = f"preset_{rule.executable_path}"
+            form_key = f"preset_rule_{rule.id}"
             if form_key in request.form:
                 new_preset = request.form[form_key].strip()
-                if new_preset in AppArmorRule.VALID_PRESETS:
+                if _is_valid_preset_for_match_type(rule.match_type, new_preset):
                     rule.preset = new_preset
 
         db.session.commit()
 
         # Push the policy to the agent if it is online
-        policies_list, skipped_rule_names = _build_apparmor_policy_sync_payload(mapping.id)
+        policies_list, skipped_rule_names = _build_apparmor_policy_sync_payload(mapping)
         if skipped_rule_names:
             flash(
                 'Skipped unsafe AppArmor rules during sync: ' + ', '.join(sorted(skipped_rule_names)),
@@ -2427,13 +2491,13 @@ def apparmor_policy(mapping_id):
 
     # GET: Build template data
     existing_rules = {
-        rule.executable_path: rule
+        (rule.match_type, rule.executable_path): rule
         for rule in AppArmorRule.query.filter_by(device_map_id=mapping.id).all()
     }
 
     curated_apps = []
     for app_template in CURATED_APPARMOR_APPS:
-        rule = existing_rules.get(app_template['path'])
+        rule = existing_rules.get((AppArmorRule.MATCH_TYPE_EXECUTABLE, app_template['path']))
         curated_apps.append({
             'name': app_template['name'],
             'path': app_template['path'],
@@ -2445,14 +2509,24 @@ def apparmor_policy(mapping_id):
         {
             'name': rule.application_name,
             'path': rule.executable_path,
+            'match_type': rule.match_type,
+            'supports_network_controls': rule.supports_network_controls,
+            'target_label': (
+                'Path subtree'
+                if rule.match_type == AppArmorRule.MATCH_TYPE_PATH_PATTERN
+                else 'Executable'
+            ),
             'preset': rule.preset,
             'id': rule.id,
         }
         for rule in sorted(
             existing_rules.values(),
-            key=lambda r: (r.application_name.lower(), r.id),
+            key=lambda r: (r.match_type, r.application_name.lower(), r.id),
         )
-        if rule.executable_path not in CURATED_APPARMOR_PATHS
+        if not (
+            rule.match_type == AppArmorRule.MATCH_TYPE_EXECUTABLE
+            and rule.executable_path in CURATED_APPARMOR_PATHS
+        )
     ]
 
     usage_summary = _get_apparmor_usage_summary(mapping.id)
@@ -2771,6 +2845,17 @@ def run_schema_migrations():
         )
     """))
     db.session.commit()
+
+    apparmor_rule_columns = {
+        row[1]
+        for row in db.session.execute(text("PRAGMA table_info(apparmor_rule)")).fetchall()
+    }
+    if apparmor_rule_columns and 'match_type' not in apparmor_rule_columns:
+        db.session.execute(text("""
+            ALTER TABLE apparmor_rule
+            ADD COLUMN match_type VARCHAR(32) NOT NULL DEFAULT 'executable'
+        """))
+        db.session.commit()
 
 
 def initialize_runtime(start_background_tasks=False):

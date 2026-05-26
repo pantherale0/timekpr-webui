@@ -1064,6 +1064,51 @@ def test_apparmor_policy_rejects_globbed_custom_paths(client, db_session):
     ).count() == 0
 
 
+def test_apparmor_policy_accepts_home_subtree_path_rules(client, db_session):
+    Settings.set_admin_password("admin")
+    client.post('/', data={'username': 'admin', 'password': 'admin'})
+
+    device = AgentDevice(
+        system_id="device-apparmor-path",
+        system_hostname="family-pc",
+        system_ip="10.0.0.31",
+        status="approved",
+        secure_token="tok",
+    )
+    user = ManagedUser(username="maya", system_ip="Unassigned", is_valid=True)
+    db_session.add_all([device, user])
+    db_session.flush()
+
+    mapping = ManagedUserDeviceMap(
+        managed_user_id=user.id,
+        system_id=device.system_id,
+        linux_username="maya",
+        is_valid=True,
+    )
+    db_session.add(mapping)
+    db_session.commit()
+
+    res = client.post(
+        f'/apparmor/policy/{mapping.id}',
+        data={
+            'custom_app_name': 'Downloads',
+            'custom_app_match_type': 'path_pattern',
+            'custom_app_path': '$HOME/Downloads/**',
+            'custom_app_preset': 'blocked',
+        },
+        follow_redirects=True,
+    )
+
+    assert res.status_code == 200
+    rule = AppArmorRule.query.filter_by(
+        device_map_id=mapping.id,
+        executable_path='$HOME/Downloads/**',
+    ).first()
+    assert rule is not None
+    assert rule.match_type == AppArmorRule.MATCH_TYPE_PATH_PATTERN
+    assert rule.preset == AppArmorRule.PRESET_BLOCKED
+
+
 def test_delete_apparmor_rule_uses_delete_route_and_resyncs_policy(client, db_session):
     Settings.set_admin_password("admin")
     client.post('/', data={'username': 'admin', 'password': 'admin'})

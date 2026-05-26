@@ -5,6 +5,8 @@ use std::os::unix::io::{AsRawFd, RawFd};
 use tokio::sync::mpsc;
 use tokio::time::Instant;
 
+use crate::apparmor;
+
 /// Alert payload ready to be forwarded to the server.
 #[derive(Debug, Clone)]
 pub struct AppAlert {
@@ -237,6 +239,37 @@ fn pid_to_exe(pid: u32) -> Option<String> {
         .map(|p| p.to_string_lossy().to_string())
 }
 
+/// Read the process command line as argv entries.
+fn pid_to_cmdline(pid: u32) -> Option<Vec<String>> {
+    let raw = std::fs::read(format!("/proc/{}/cmdline", pid)).ok()?;
+    if raw.is_empty() {
+        return None;
+    }
+    let argv: Vec<String> = raw
+        .split(|byte| *byte == 0)
+        .filter(|part| !part.is_empty())
+        .map(|part| String::from_utf8_lossy(part).to_string())
+        .collect();
+    if argv.is_empty() {
+        None
+    } else {
+        Some(argv)
+    }
+}
+
+/// Read the current working directory for relative interpreter targets.
+fn pid_to_cwd(pid: u32) -> Option<String> {
+    std::fs::read_link(format!("/proc/{}/cwd", pid))
+        .ok()
+        .map(|p| p.to_string_lossy().to_string())
+}
+
+fn kill_pid(pid: u32) {
+    unsafe {
+        libc::kill(pid as i32, libc::SIGKILL);
+    }
+}
+
 /// Active process tracking entry.
 struct TrackedProcess {
     pid: u32,
@@ -323,9 +356,38 @@ async fn run_monitor_inner(
 
                 let comm = pid_to_comm(pid).unwrap_or_default();
                 let exe_path = pid_to_exe(pid).unwrap_or_default();
+                let argv = pid_to_cmdline(pid).unwrap_or_default();
+                let cwd = pid_to_cwd(pid);
 
                 if comm.is_empty() || exe_path.is_empty() {
                     continue;
+                }
+
+                if let Some(decision) =
+                    apparmor::evaluate_exec_event(&username, &exe_path, &argv, cwd.as_deref()).await
+                {
+                    let blocked = decision.preset == "blocked";
+                    let _ = alert_tx.send(AppAlert {
+                        event_type: "app_blocked".to_string(),
+                        linux_username: username.clone(),
+                        payload: json!({
+                            "details": {
+                                "application_name": &comm,
+                                "executable_path": &exe_path,
+                                "pid": pid,
+                                "path_rule": decision.rule_name,
+                                "rule_target": decision.rule_target,
+                                "matched_path": decision.matched_path,
+                                "matched_via": decision.matched_via,
+                                "enforcement_source": "exec_monitor",
+                                "disposition": if blocked { "DENIED" } else { "ALLOWED" },
+                            }
+                        }),
+                    });
+                    if blocked {
+                        kill_pid(pid);
+                        continue;
+                    }
                 }
 
                 // Send app_launched alert
@@ -432,5 +494,12 @@ mod tests {
     fn pid_to_exe_reads_own_process() {
         let exe = pid_to_exe(std::process::id());
         assert!(exe.is_some());
+    }
+
+    #[test]
+    fn pid_to_cmdline_reads_own_process() {
+        let argv = pid_to_cmdline(std::process::id());
+        assert!(argv.is_some());
+        assert!(!argv.unwrap().is_empty());
     }
 }

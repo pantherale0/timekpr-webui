@@ -423,32 +423,35 @@
 
             {% if custom_rules %}
             <div class="aa-card">
-                <h2>Custom Application Rules</h2>
-                <p class="aa-card-subtitle">Rules for manually-added executables.</p>
+                <h2>Custom Rules</h2>
+                <p class="aa-card-subtitle">Manually-added executable and home-subtree execution rules.</p>
 
                 {% for rule in custom_rules %}
                 <div class="aa-custom-item">
                     <div class="aa-app-info">
                         <p class="aa-app-name">{{ rule.name }}</p>
+                        <p class="aa-app-path" style="margin-bottom: 4px;">{{ rule.target_label }}</p>
                         <p class="aa-app-path">{{ rule.path }}</p>
                     </div>
                     <div class="aa-preset-control">
-                        <input type="radio" name="preset_{{ rule.path }}" value="allowed"
+                        <input type="radio" name="preset_rule_{{ rule.id }}" value="allowed"
                                id="custom-allowed-{{ rule.id }}"
                                {{ 'checked' if rule.preset == 'allowed' }}>
                         <label for="custom-allowed-{{ rule.id }}">✅ Allowed</label>
 
-                        <input type="radio" name="preset_{{ rule.path }}" value="no_internet"
+                        {% if rule.supports_network_controls %}
+                        <input type="radio" name="preset_rule_{{ rule.id }}" value="no_internet"
                                id="custom-nointernet-{{ rule.id }}"
                                {{ 'checked' if rule.preset == 'no_internet' }}>
                         <label for="custom-nointernet-{{ rule.id }}">🚫 Internet</label>
+                        {% endif %}
 
-                        <input type="radio" name="preset_{{ rule.path }}" value="blocked"
+                        <input type="radio" name="preset_rule_{{ rule.id }}" value="blocked"
                                id="custom-blocked-{{ rule.id }}"
                                {{ 'checked' if rule.preset == 'blocked' }}>
                         <label for="custom-blocked-{{ rule.id }}">⛔ Blocked</label>
 
-                        <input type="radio" name="preset_{{ rule.path }}" value="complain"
+                        <input type="radio" name="preset_rule_{{ rule.id }}" value="complain"
                                id="custom-complain-{{ rule.id }}"
                                {{ 'checked' if rule.preset == 'complain' }}>
                         <label for="custom-complain-{{ rule.id }}">⚠️ Report Only</label>
@@ -465,8 +468,8 @@
             {% endif %}
 
             <div class="aa-card">
-                <h2>Add Custom Application</h2>
-                <p class="aa-card-subtitle">Add a restriction for one concrete executable path. Globs like <code>/usr/bin/**</code> are not allowed.</p>
+                <h2>Add Custom Rule</h2>
+                <p class="aa-card-subtitle">Choose an exact executable or a home-subtree path rule such as <code>$HOME/Downloads/**</code>.</p>
                 <div class="aa-custom-form">
                     <div class="form-group" style="margin-bottom: 0;">
                         <label for="custom_app_name" class="form-label">App Name</label>
@@ -474,7 +477,16 @@
                                class="form-control" placeholder="e.g. OBS Studio">
                     </div>
                     <div class="form-group" style="margin-bottom: 0;">
-                        <label for="custom_app_path" class="form-label">Executable Path</label>
+                        <label for="custom_app_match_type" class="form-label">Rule Type</label>
+                        <select id="custom_app_match_type" name="custom_app_match_type"
+                                class="form-control form-select"
+                                onchange="updateCustomRuleType()">
+                            <option value="executable">Exact Executable</option>
+                            <option value="path_pattern">Home Subtree</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label for="custom_app_path" class="form-label" id="custom_app_path_label">Executable Path</label>
                         <input type="text" id="custom_app_path" name="custom_app_path"
                                class="form-control" placeholder="/usr/bin/obs">
                     </div>
@@ -539,6 +551,32 @@
             complain: 'Runs unrestricted and audits selected network activity in a low-noise report-only mode',
         };
 
+        function updateCustomRuleType() {
+            const matchType = document.getElementById('custom_app_match_type').value;
+            const pathLabel = document.getElementById('custom_app_path_label');
+            const pathInput = document.getElementById('custom_app_path');
+            const presetSelect = document.getElementById('custom_app_preset');
+
+            if (matchType === 'path_pattern') {
+                pathLabel.textContent = 'Path Pattern';
+                pathInput.placeholder = '$HOME/Downloads/**';
+                const internetOption = presetSelect.querySelector('option[value="no_internet"]');
+                if (internetOption) {
+                    internetOption.disabled = true;
+                }
+                if (presetSelect.value === 'no_internet') {
+                    presetSelect.value = 'blocked';
+                }
+            } else {
+                pathLabel.textContent = 'Executable Path';
+                pathInput.placeholder = '/usr/bin/obs';
+                const internetOption = presetSelect.querySelector('option[value="no_internet"]');
+                if (internetOption) {
+                    internetOption.disabled = false;
+                }
+            }
+        }
+
         function updateTile(radio, index) {
             const tile = document.getElementById('tile-' + index);
             const hint = document.getElementById('hint-' + index);
@@ -547,6 +585,8 @@
             tile.classList.add('preset-' + radio.value);
             hint.textContent = HINTS[radio.value] || '';
         }
+
+        updateCustomRuleType();
     </script>
 </body>
 </html>

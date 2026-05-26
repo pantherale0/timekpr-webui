@@ -828,8 +828,11 @@ class AppArmorRule(db.Model):
     PRESET_NO_INTERNET = 'no_internet'
     PRESET_BLOCKED = 'blocked'
     PRESET_COMPLAIN = 'complain'
+    MATCH_TYPE_EXECUTABLE = 'executable'
+    MATCH_TYPE_PATH_PATTERN = 'path_pattern'
 
     VALID_PRESETS = {PRESET_ALLOWED, PRESET_NO_INTERNET, PRESET_BLOCKED, PRESET_COMPLAIN}
+    VALID_MATCH_TYPES = {MATCH_TYPE_EXECUTABLE, MATCH_TYPE_PATH_PATTERN}
 
     id = db.Column(db.Integer, primary_key=True)
     device_map_id = db.Column(
@@ -839,6 +842,11 @@ class AppArmorRule(db.Model):
     )
     application_name = db.Column(db.String(120), nullable=False)
     executable_path = db.Column(db.String(255), nullable=False)
+    match_type = db.Column(
+        db.String(32),
+        nullable=False,
+        default=MATCH_TYPE_EXECUTABLE,
+    )
     preset = db.Column(db.String(32), nullable=False, default=PRESET_ALLOWED)
     is_custom = db.Column(db.Boolean, default=False, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
@@ -863,16 +871,25 @@ class AppArmorRule(db.Model):
     )
 
     def __repr__(self):
-        return f'<AppArmorRule {self.application_name} [{self.preset}]>'
+        return f'<AppArmorRule {self.application_name} [{self.match_type}:{self.preset}]>'
 
     @property
     def is_restrictive(self):
         return self.preset in {self.PRESET_NO_INTERNET, self.PRESET_BLOCKED, self.PRESET_COMPLAIN}
 
+    @property
+    def supports_network_controls(self):
+        return self.match_type == self.MATCH_TYPE_EXECUTABLE
+
+    @property
+    def display_target(self):
+        return self.executable_path
+
     def to_sync_dict(self):
         return {
             'application_name': self.application_name,
             'executable_path': self.executable_path,
+            'match_type': self.match_type,
             'preset': self.preset,
         }
 
