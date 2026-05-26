@@ -1,7 +1,9 @@
-from flask_sqlalchemy import SQLAlchemy
+from collections import defaultdict
 from datetime import datetime, timedelta
 import json
+
 import bcrypt
+from flask_sqlalchemy import SQLAlchemy
 
 db = SQLAlchemy()
 
@@ -122,10 +124,9 @@ class Settings(db.Model):
                 # Migrate old password to hashed format
                 cls.set_admin_password(old_password)
                 return password == old_password
-            else:
-                # No password set, initialize with default
-                cls.set_admin_password('admin')
-                return password == 'admin'
+            # No password set, initialize with default
+            cls.set_admin_password('admin')
+            return password == 'admin'
         return cls.check_password(password, hashed_password)
 
 class AgentDevice(db.Model):
@@ -314,6 +315,8 @@ class ManagedUser(db.Model):
             })
         return result
 
+
+
     def get_usage_monthly_grouped(self, months=12):
         """Get usage totals grouped by calendar month for the last N months"""
         today = datetime.utcnow().date()
@@ -350,7 +353,6 @@ class ManagedUser(db.Model):
         if not records:
             return []
 
-        from collections import defaultdict
         buckets = defaultdict(int)
         for r in records:
             key = r.date.strftime('%Y-%m')

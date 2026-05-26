@@ -1,8 +1,15 @@
+"""Tests for the background task manager and blocklist sync helpers."""
+
+# pylint: disable=protected-access,unused-argument
+
 import json
-from datetime import datetime, date, timedelta
-from src.task_manager import BackgroundTaskManager
+from datetime import date, datetime, timedelta
+from unittest.mock import MagicMock, patch
+
+from src.agent_helper import AgentConnectionManager
 from src.database import (
     AgentAlert,
+    AgentDevice,
     BlocklistDomain,
     BlocklistSource,
     ManagedUser,
@@ -11,12 +18,13 @@ from src.database import (
     UserTimeUsage,
     UserWeeklySchedule,
     UserDailyTimeInterval,
-    AgentDevice,
     Settings,
 )
-from src.agent_helper import AgentConnectionManager
+from src.task_manager import BackgroundTaskManager
 
 class DummyWS:
+    """Simple websocket double that auto-responds to RPC requests."""
+
     def __init__(self):
         self.sent_messages = []
         
@@ -36,11 +44,13 @@ class DummyWS:
                     "message": "Success",
                     "data": data,
                 })
-        except Exception:
+        except (TypeError, ValueError, json.JSONDecodeError):
             pass
 
 
 class StatefulTimeWS:
+    """Websocket double that mutates time-left state across commands."""
+
     def __init__(self, time_spent=450, time_left=1000):
         self.sent_messages = []
         self.time_spent = time_spent
@@ -71,9 +81,6 @@ class StatefulTimeWS:
             "message": "Success",
             "data": data,
         })
-
-from unittest.mock import MagicMock
-
 def test_task_manager_basic_ops(app, db_session):
     manager = BackgroundTaskManager(app)
     manager._run_tasks = MagicMock()
@@ -512,8 +519,6 @@ def test_task_manager_failures_and_threads(app, db_session):
 
     AgentConnectionManager.unregister("sys-fail")
 
-    from unittest.mock import patch
-
     # 2. Hitting loop exceptions and app=None with time.sleep patched to terminate the infinite loop
     manager_no_app = BackgroundTaskManager()
     manager_no_app.running = True
@@ -522,7 +527,7 @@ def test_task_manager_failures_and_threads(app, db_session):
 
     # Mock the entire lock to throw Exception on acquire
     mock_lock_fail = MagicMock()
-    mock_lock_fail.acquire.side_effect = Exception("Lock error")
+    mock_lock_fail.acquire.side_effect = RuntimeError("Lock error")
     with patch.object(manager, '_task_lock', new=mock_lock_fail), \
          patch('time.sleep', side_effect=lambda s: setattr(manager, 'running', False)):
         manager.running = True
@@ -818,8 +823,6 @@ def test_task_manager_refreshes_external_blocklists_in_chunks(app, db_session):
 
     response = StreamingResponse()
 
-    from unittest.mock import patch
-
     with app.app_context(), patch('src.task_manager.requests.get', return_value=response):
         success, message = manager.refresh_external_blocklist_source(source.id, force=True)
 
@@ -869,8 +872,6 @@ def test_task_manager_delivers_pending_alerts(app, db_session):
         status_code = 204
         text = ''
 
-    from unittest.mock import patch
-
     with app.app_context(), patch('src.task_manager.requests.post', return_value=DummyResponse()) as mock_post:
         manager._deliver_pending_alerts()
 
@@ -912,8 +913,6 @@ def test_task_manager_retries_failed_alert_deliveries(app, db_session):
 
     Settings.set_value('alert_webhook_enabled', '1')
     Settings.set_value('alert_webhook_url', 'https://hooks.example.test/timekpr')
-
-    from unittest.mock import patch
 
     with app.app_context(), patch('src.task_manager.requests.post', side_effect=RuntimeError('boom')):
         manager._deliver_pending_alerts()

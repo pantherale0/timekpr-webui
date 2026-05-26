@@ -1,11 +1,18 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify, abort
-import os
-import threading
-from datetime import datetime, date, timedelta
-import json
+"""Flask application for the Timekpr web UI and agent control plane."""
+
 import hashlib
+import json
 import logging
+import os
+import secrets
+import threading
+from datetime import date, datetime
+
 import pytz
+from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify, abort
+from flask_sock import Sock
+from sqlalchemy import func, text
+from sqlalchemy.exc import SQLAlchemyError
 
 from src.database import (
     db,
@@ -36,7 +43,6 @@ from src.blocklist_helper import (
     compute_source_revision,
     summarize_mapping_blocklist_sync,
 )
-from flask_sock import Sock
 from src.task_manager import BackgroundTaskManager
 from src.oidc_helper import OIDCHelper
 
@@ -46,15 +52,20 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 
+def _resolve_local_timezone(timezone_name):
+    """Resolve the configured timezone, falling back to UTC when needed."""
+    try:
+        resolved_timezone = pytz.timezone(timezone_name)
+        logging.info("Using timezone: %s", timezone_name)
+        return resolved_timezone, timezone_name
+    except pytz.exceptions.UnknownTimeZoneError:
+        logging.warning("Unknown timezone '%s', falling back to UTC", timezone_name)
+        return pytz.UTC, 'UTC'
+
+
 # Get timezone from environment variable or default to UTC
 TIMEZONE_STR = os.environ.get('TZ', 'UTC')
-try:
-    LOCAL_TIMEZONE = pytz.timezone(TIMEZONE_STR)
-    logging.info(f"Using timezone: {TIMEZONE_STR}")
-except pytz.exceptions.UnknownTimeZoneError:
-    logging.warning(f"Unknown timezone '{TIMEZONE_STR}', falling back to UTC")
-    LOCAL_TIMEZONE = pytz.UTC
-    TIMEZONE_STR = 'UTC'
+LOCAL_TIMEZONE, TIMEZONE_STR = _resolve_local_timezone(TIMEZONE_STR)
 
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
@@ -84,7 +95,7 @@ task_manager = BackgroundTaskManager(
 )
 task_manager.init_app(app)
 _runtime_init_lock = threading.Lock()
-_runtime_initialized = False
+RUNTIME_STATE = {'initialized': False}
 
 # Initialize OIDC helper
 oidc_helper = OIDCHelper()
@@ -110,7 +121,7 @@ def localtime_filter(dt):
 
     # If datetime is naive (no timezone info), assume it's UTC
     if dt.tzinfo is None:
-        dt = pytz.UTC.localize(dt)
+        dt = dt.replace(tzinfo=pytz.UTC)
 
     # Convert to local timezone
     local_dt = dt.astimezone(LOCAL_TIMEZONE)
@@ -121,9 +132,6 @@ def localtime_filter(dt):
 def inject_timezone():
     """Inject timezone info into all templates"""
     return {'timezone': TIMEZONE_STR}
-
-import secrets
-from sqlalchemy import text, func
 
 
 def _format_seconds(seconds):
@@ -408,11 +416,15 @@ def _serialize_blocklist_source(
 def _get_blocklist_sources(include_domains=False, enabled_only=False, preview_limit=25):
     domain_count_subquery = db.session.query(
         BlocklistDomain.source_id.label('source_id'),
+        # Pylint misidentifies SQLAlchemy's dynamic func.count() as non-callable.
+        # pylint: disable-next=not-callable
         func.count(BlocklistDomain.id).label('domain_count'),
     ).group_by(BlocklistDomain.source_id).subquery()
 
     assignment_count_subquery = db.session.query(
         ManagedUserBlocklistAssignment.source_id.label('source_id'),
+        # Pylint misidentifies SQLAlchemy's dynamic func.count() as non-callable.
+        # pylint: disable-next=not-callable
         func.count(ManagedUserBlocklistAssignment.id).label('assignment_count'),
     ).group_by(ManagedUserBlocklistAssignment.source_id).subquery()
 
@@ -651,6 +663,19 @@ def _store_agent_alert(system_id, payload):
     db.session.commit()
     return alert
 
+
+def _close_websocket_connection(ws, system_id, connection_label):
+    """Close a websocket connection while swallowing routine disconnect errors."""
+    try:
+        ws.close()
+    except (AttributeError, OSError, RuntimeError, TypeError, ValueError):
+        logging.debug(
+            "Ignoring %s close failure for %s",
+            connection_label,
+            system_id,
+        )
+
+
 def ws_agent_handler(ws):
     """
     WebSocket endpoint for client agents.
@@ -660,7 +685,7 @@ def ws_agent_handler(ws):
     if request.headers.get("X-Forwarded-For"):
         remote_ip = request.headers.get("X-Forwarded-For").split(",")[0].strip()
         
-    logging.info(f"WebSocket connection attempt from {remote_ip}")
+    logging.info("WebSocket connection attempt from %s", remote_ip)
     
     # 1. Await initial "hello" registration message
     system_id = None
@@ -672,7 +697,10 @@ def ws_agent_handler(ws):
             
         hello_msg = json.loads(hello_msg_raw)
         if hello_msg.get("type") != "hello":
-            logging.warning(f"Unexpected initial message type: {hello_msg.get('type')}")
+            logging.warning(
+                "Unexpected initial message type: %s",
+                hello_msg.get('type'),
+            )
             ws.send(json.dumps({"type": "auth_result", "success": False, "message": "Expected 'hello' type"}))
             return
             
@@ -688,7 +716,7 @@ def ws_agent_handler(ws):
             return
 
         # 2. Check and enforce Registration Token firewall
-        expected_reg_token = AgentConnectionManager.REGISTRATION_TOKEN
+        expected_reg_token = AgentConnectionManager.registration_token
         
         with app.app_context():
             # Lookup device in database
@@ -697,7 +725,10 @@ def ws_agent_handler(ws):
             if not device:
                 # If a registration token is required, verify it
                 if expected_reg_token and reg_token != expected_reg_token:
-                    logging.warning(f"Registration rejected: Invalid registration token from {system_id}")
+                    logging.warning(
+                        "Registration rejected: Invalid registration token from %s",
+                        system_id,
+                    )
                     ws.send(json.dumps({"type": "auth_result", "success": False, "message": "Invalid registration token"}))
                     return
                 
@@ -710,7 +741,11 @@ def ws_agent_handler(ws):
                 )
                 db.session.add(device)
                 db.session.commit()
-                logging.info(f"New pending device registered: {system_id} from {remote_ip}")
+                logging.info(
+                    "New pending device registered: %s from %s",
+                    system_id,
+                    remote_ip,
+                )
             else:
                 # Existing device, update latest hostname and IP snapshot
                 if "system_hostname" in hello_msg:
@@ -720,7 +755,7 @@ def ws_agent_handler(ws):
 
             # 3. Handle device pairing states
             if device.status == 'pending':
-                logging.info(f"Device {system_id} is PENDING approval. Waiting...")
+                logging.info("Device %s is PENDING approval. Waiting...", system_id)
                 AgentConnectionManager.register_pending(system_id, ws)
                 ws.send(json.dumps({"type": "pairing_status", "status": "pending"}))
                 
@@ -730,16 +765,19 @@ def ws_agent_handler(ws):
                         msg = ws.receive()
                         if not msg:
                             break
-                except Exception:
-                    pass
+                except (OSError, RuntimeError, ValueError):
+                    logging.debug("Pending websocket closed for %s", system_id)
                 return
-                
-            elif device.status == 'rejected':
-                logging.warning(f"Connection rejected: Device {system_id} is banned/rejected")
+
+            if device.status == 'rejected':
+                logging.warning(
+                    "Connection rejected: Device %s is banned/rejected",
+                    system_id,
+                )
                 ws.send(json.dumps({"type": "auth_result", "success": False, "message": "Device rejected/banned"}))
                 return
-                
-            elif device.status == 'approved':
+
+            if device.status == 'approved':
                 # Device is approved! Perform secure challenge-response
                 challenge = secrets.token_hex(32)
                 ws.send(json.dumps({
@@ -750,22 +788,29 @@ def ws_agent_handler(ws):
                 # Wait for authentication signature response
                 auth_msg_raw = ws.receive(timeout=10)
                 if not auth_msg_raw:
-                    logging.warning(f"Handshake timeout for approved device {system_id}")
+                    logging.warning("Handshake timeout for approved device %s", system_id)
                     return
                     
                 auth_msg = json.loads(auth_msg_raw)
                 if auth_msg.get("type") != "register":
-                    logging.warning(f"Unexpected response type from {system_id}: {auth_msg.get('type')}")
+                    logging.warning(
+                        "Unexpected response type from %s: %s",
+                        system_id,
+                        auth_msg.get('type'),
+                    )
                     return
                     
                 signature = auth_msg.get("signature")
                 if not signature:
-                    logging.warning(f"Handshake from {system_id} missing signature")
+                    logging.warning("Handshake from %s missing signature", system_id)
                     return
                     
                 # Verify using device-specific secure token
                 if not AgentConnectionManager.verify_signature(challenge, system_id, signature):
-                    logging.warning(f"Authentication signature verification failed for device {system_id}")
+                    logging.warning(
+                        "Authentication signature verification failed for device %s",
+                        system_id,
+                    )
                     ws.send(json.dumps({"type": "auth_result", "success": False, "message": "Invalid authentication signature"}))
                     return
                     
@@ -780,9 +825,15 @@ def ws_agent_handler(ws):
                     system_id,
                     remote_ip,
                 )
-                
-    except Exception as e:
-        logging.error(f"Error during WebSocket handshake / loop for {system_id}: {e}")
+
+    except (
+        OSError,
+        RuntimeError,
+        TypeError,
+        ValueError,
+        SQLAlchemyError,
+    ):
+        logging.exception("Error during WebSocket handshake / loop for %s", system_id)
         return
 
     # 4. Main message listening loop for approved connections
@@ -823,7 +874,7 @@ def ws_agent_handler(ws):
                         system_id,
                         exc,
                     )
-                except Exception as exc:
+                except SQLAlchemyError as exc:
                     db.session.rollback()
                     logging.error(
                         "Failed to store alert payload from %s: %s",
@@ -831,10 +882,14 @@ def ws_agent_handler(ws):
                         exc,
                     )
             else:
-                logging.warning(f"Received unexpected message type from client {system_id}: {msg_type}")
-                
-    except Exception as e:
-        logging.info(f"WebSocket connection closed for agent {system_id}: {e}")
+                logging.warning(
+                    "Received unexpected message type from client %s: %s",
+                    system_id,
+                    msg_type,
+                )
+
+    except (OSError, RuntimeError, ValueError) as exc:
+        logging.info("WebSocket connection closed for agent %s: %s", system_id, exc)
     finally:
         if system_id:
             AgentConnectionManager.unregister_pending(system_id)
@@ -844,6 +899,7 @@ sock.route('/ws')(ws_agent_handler)
 
 @app.route('/', methods=['GET', 'POST'])
 def login():
+    """Render the login page and optionally start the OIDC login flow."""
     # If already logged in, go straight to dashboard
     if session.get('logged_in'):
         return redirect(url_for('dashboard'))
@@ -859,9 +915,13 @@ def login():
         try:
             auth_url = oidc_helper.get_authorization_url(state, redirect_uri)
             return redirect(auth_url)
-        except Exception as e:
-            logging.error(f"OIDC login redirection failed: {e}")
-            flash(f"OIDC Login failed to initialize: OIDC provider is offline or misconfigured. Falling back to local credentials.", "warning")
+        except (KeyError, RuntimeError, ValueError) as exc:
+            logging.error("OIDC login redirection failed: %s", exc)
+            flash(
+                "OIDC Login failed to initialize: OIDC provider is offline or "
+                "misconfigured. Falling back to local credentials.",
+                "warning",
+            )
             return render_template('login.html', error="OIDC provider connection error.")
 
     # Fallback: Traditional form-based local login
@@ -875,14 +935,14 @@ def login():
             session['logged_in'] = True
             flash('Login successful!', 'success')
             return redirect(url_for('dashboard'))
-        else:
-            error = 'Invalid credentials. Please try again.'
-            flash(error, 'danger')
+        error = 'Invalid credentials. Please try again.'
+        flash(error, 'danger')
     
     return render_template('login.html', error=error)
 
 @app.route('/callback')
 def oidc_callback():
+    """Complete the OIDC callback flow and establish the admin session."""
     if not oidc_helper.is_enabled:
         flash("OIDC is not enabled.", "danger")
         return redirect(url_for('login'))
@@ -919,13 +979,14 @@ def oidc_callback():
         
         flash(f"Logged in successfully as {session['user']['username']}!", "success")
         return redirect(url_for('dashboard'))
-    except Exception as e:
-        logging.error(f"OIDC callback processing failed: {e}")
-        flash(f"Authentication failed: {str(e)}", "danger")
+    except (KeyError, RuntimeError, ValueError) as exc:
+        logging.error("OIDC callback processing failed: %s", exc)
+        flash(f"Authentication failed: {exc}", "danger")
         return redirect(url_for('login'))
 
 @app.route('/dashboard')
 def dashboard():
+    """Render the main dashboard with user status and recent usage data."""
     if not session.get('logged_in'):
         flash('Please login first', 'warning')
         return redirect(url_for('login'))
@@ -973,6 +1034,7 @@ def dashboard():
 
 @app.route('/admin')
 def admin():
+    """Render the administration page for users and agent devices."""
     if not session.get('logged_in'):
         flash('Please login first', 'warning')
         return redirect(url_for('login'))
@@ -992,6 +1054,7 @@ def admin():
 
 @app.route('/api/device/approve/<system_id>', methods=['POST'])
 def approve_device(system_id):
+    """Approve a pending device and send its pairing token if connected."""
     if not session.get('logged_in'):
         return jsonify({'success': False, 'message': 'Not authenticated'}), 401
     
@@ -1019,14 +1082,19 @@ def approve_device(system_id):
             }))
             # Clean up pending connections
             AgentConnectionManager.unregister_pending(system_id)
-        except Exception as e:
-            logging.error(f"Failed to send pairing_approved to device {system_id}: {e}")
-            
-    logging.info(f"Approved device {system_id} and generated secure token.")
+        except (OSError, RuntimeError, TypeError, ValueError) as exc:
+            logging.error(
+                "Failed to send pairing_approved to device %s: %s",
+                system_id,
+                exc,
+            )
+
+    logging.info("Approved device %s and generated secure token.", system_id)
     return jsonify({'success': True, 'message': f'Device {device_label} approved successfully.'})
 
 @app.route('/api/device/reject/<system_id>', methods=['POST'])
 def reject_device(system_id):
+    """Reject a device and close any pending or active websocket sessions."""
     if not session.get('logged_in'):
         return jsonify({'success': False, 'message': 'Not authenticated'}), 401
         
@@ -1042,21 +1110,15 @@ def reject_device(system_id):
     # Close any active or pending connection
     ws_pending = AgentConnectionManager.get_pending_connection(system_id)
     if ws_pending:
-        try:
-            ws_pending.close()
-        except Exception:
-            pass
+        _close_websocket_connection(ws_pending, system_id, 'pending connection')
         AgentConnectionManager.unregister_pending(system_id)
         
     ws_active = AgentConnectionManager.get_connection(system_id)
     if ws_active:
-        try:
-            ws_active.close()
-        except Exception:
-            pass
+        _close_websocket_connection(ws_active, system_id, 'active connection')
         AgentConnectionManager.unregister(system_id)
         
-    logging.info(f"Rejected device {system_id} and closed connections.")
+    logging.info("Rejected device %s and closed connections.", system_id)
     return jsonify({'success': True, 'message': f'Device {device_label} rejected successfully.'})
 
 @app.route('/settings', methods=['GET', 'POST'])
@@ -1349,18 +1411,17 @@ def restart_tasks():
     referrer = request.referrer
     if referrer:
         return redirect(referrer)
-    else:
-        return redirect(url_for('dashboard'))
+    return redirect(url_for('dashboard'))
 
 @app.route('/logout')
 def logout():
+    """Clear the current session and redirect back to the login page."""
     session.pop('logged_in', None)
     session.pop('user', None)
     if oidc_helper.is_enabled:
         return redirect(url_for('login'))
-    else:
-        flash('You have been logged out', 'info')
-        return redirect(url_for('login'))
+    flash('You have been logged out', 'info')
+    return redirect(url_for('login'))
 
 @app.route('/managed-users/add', methods=['POST'])
 def create_managed_user():
@@ -1710,9 +1771,9 @@ def update_weekly_schedule():
     try:
         db.session.commit()
         flash(f'Weekly schedule updated for {user.username}', 'success')
-    except Exception as e:
+    except SQLAlchemyError as exc:
         db.session.rollback()
-        flash(f'Error updating schedule: {str(e)}', 'danger')
+        flash(f'Error updating schedule: {exc}', 'danger')
     
     return redirect(url_for('weekly_schedule_user', user_id=user.id))
 
@@ -1802,11 +1863,11 @@ def update_user_intervals(user_id):
             'username': user.username
         })
         
-    except Exception as e:
+    except SQLAlchemyError as exc:
         db.session.rollback()
         return jsonify({
             'success': False,
-            'message': f'Error updating intervals: {str(e)}'
+            'message': f'Error updating intervals: {exc}'
         }), 500
 
 @app.route('/api/user/<int:user_id>/intervals/sync-status')
@@ -1884,14 +1945,13 @@ def get_schedule_sync_status(user_id):
             'last_synced': last_synced,
             'last_modified': user.weekly_schedule.last_modified.strftime('%Y-%m-%d %H:%M') if user.weekly_schedule.last_modified else None
         })
-    else:
-        return jsonify({
-            'success': True,
-            'is_synced': True,  # No schedule means no sync needed
-            'schedule': None,
-            'last_synced': None,
-            'last_modified': None
-        })
+    return jsonify({
+        'success': True,
+        'is_synced': True,  # No schedule means no sync needed
+        'schedule': None,
+        'last_synced': None,
+        'last_modified': None
+    })
 
 @app.route('/stats/<int:user_id>')
 def user_stats(user_id):
@@ -2368,13 +2428,13 @@ def run_schema_migrations():
 
 
 def initialize_runtime(start_background_tasks=False):
-    global _runtime_initialized
+    """Initialize the runtime database state and optional background workers."""
 
     if os.environ.get('TESTING'):
         return
 
     with _runtime_init_lock:
-        if not _runtime_initialized:
+        if not RUNTIME_STATE['initialized']:
             with app.app_context():
                 db.create_all()
                 run_schema_migrations()
@@ -2385,7 +2445,7 @@ def initialize_runtime(start_background_tasks=False):
                     Settings.set_admin_password('admin')
                     print("Admin password initialized")
 
-            _runtime_initialized = True
+            RUNTIME_STATE['initialized'] = True
 
     if start_background_tasks:
         task_manager.start()

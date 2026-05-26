@@ -1,5 +1,12 @@
+"""Tests for the OIDC helper wrapper around discovery and token exchange."""
+
+# pylint: disable=protected-access
+
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
+import requests
+
 from src.oidc_helper import OIDCHelper
 
 def test_oidc_disabled():
@@ -46,7 +53,7 @@ def test_fetch_discovery_success(mock_get):
 
 @patch('requests.get')
 def test_fetch_discovery_failure(mock_get):
-    mock_get.side_effect = Exception("Network Connection Refused")
+    mock_get.side_effect = requests.RequestException("Network Connection Refused")
 
     helper = OIDCHelper()
     helper.issuer_url = "https://auth.com"
@@ -101,7 +108,7 @@ def test_exchange_code(mock_post):
 
     # Post failure
     helper._endpoints = {'token_endpoint': 'https://auth.com/token'}
-    mock_post.side_effect = Exception("Token server offline")
+    mock_post.side_effect = requests.RequestException("Token server offline")
     with pytest.raises(RuntimeError, match="OIDC code exchange failed"):
         helper.exchange_code("code", "redirect")
 
@@ -127,7 +134,7 @@ def test_get_user_info(mock_get):
 
     # Get failure
     helper._endpoints = {'userinfo_endpoint': 'https://auth.com/userinfo'}
-    mock_get.side_effect = Exception("Userinfo server error")
+    mock_get.side_effect = requests.RequestException("Userinfo server error")
     with pytest.raises(RuntimeError, match="OIDC user info retrieval failed"):
         helper.get_user_info("access-token")
 

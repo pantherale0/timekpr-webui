@@ -1,0 +1,20 @@
+{
+  "include": [
+    "server"
+  ],
+  "exclude": [
+    "**/__pycache__",
+    "**/.pytest_cache"
+  ],
+  "executionEnvironments": [
+    {
+      "root": "server",
+      "extraPaths": [
+        "server"
+      ]
+    }
+  ],
+  "typeCheckingMode": "off",
+  "reportMissingImports": "none",
+  "reportMissingModuleSource": "none"
+}

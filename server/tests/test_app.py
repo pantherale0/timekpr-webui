@@ -1,9 +1,10 @@
+# pylint: disable=unused-argument
+
 import json
-import pytest
 import hmac
 import hashlib
 from datetime import datetime
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 from sqlalchemy import text
 from app import ws_agent_handler, run_schema_migrations, _get_blocklist_sources, task_manager
 from src.database import (

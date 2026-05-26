@@ -1,15 +1,19 @@
-import threading
-import time
-from datetime import datetime, date
-import logging
-import json
-import traceback
+"""Background maintenance jobs for user state, alerts, and blocklist sync."""
+
 import hashlib
 import hmac
+import json
+import logging
+import threading
+import time
+import traceback
 import uuid
+from contextlib import contextmanager
+from datetime import date, datetime
 
 import requests
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
+from sqlalchemy.exc import SQLAlchemyError
 
 from src.database import (
     AgentAlert,
@@ -41,6 +45,7 @@ logger = logging.getLogger(__name__)
 
 
 def _safe_int(value, default=0):
+    """Best-effort integer coercion for agent-provided numeric fields."""
     try:
         return int(value)
     except (TypeError, ValueError):
@@ -48,6 +53,7 @@ def _safe_int(value, default=0):
 
 
 def _setting_enabled(key):
+    """Return whether a boolean-like setting is enabled."""
     raw_value = Settings.get_value(key, '0')
     if raw_value is None:
         return False
@@ -55,6 +61,7 @@ def _setting_enabled(key):
 
 
 def _get_alert_webhook_settings():
+    """Load the current alert webhook settings from persisted server settings."""
     url = (Settings.get_value('alert_webhook_url', '') or '').strip()
     secret = (Settings.get_value('alert_webhook_secret', '') or '').strip()
     enabled = _setting_enabled('alert_webhook_enabled')
@@ -67,10 +74,12 @@ def _get_alert_webhook_settings():
 
 
 def _format_timestamp(value):
+    """Serialize a datetime for webhook payloads using a UTC-style suffix."""
     return value.isoformat() + 'Z' if value else None
 
 
 def _serialize_alert_for_webhook(alert):
+    """Build the alert payload delivered to webhook consumers."""
     payload = alert.payload
     details = payload.get('details', {}) if isinstance(payload, dict) else {}
     return {
@@ -86,6 +95,7 @@ def _serialize_alert_for_webhook(alert):
 
 
 def _build_webhook_headers(alert, payload_body, secret):
+    """Build alert webhook headers, including the optional HMAC signature."""
     headers = {
         'Content-Type': 'application/json',
         'User-Agent': 'timekpr-webui/alert-webhook',
@@ -102,6 +112,7 @@ def _build_webhook_headers(alert, payload_body, secret):
 
 
 def _replace_source_domains(source, normalized_domains):
+    """Replace a source's domains with a normalized in-memory list."""
     existing_by_domain = {domain.domain: domain for domain in source.domains}
     desired_domains = set(normalized_domains)
 
@@ -118,6 +129,7 @@ def _replace_source_domains(source, normalized_domains):
 
 
 def _assigned_source_ids_for_user(user, active_source_ids=None):
+    """Return enabled blocklist source IDs assigned to a user."""
     source_ids = {
         assignment.source_id
         for assignment in getattr(user, 'blocklist_assignments', [])
@@ -127,7 +139,20 @@ def _assigned_source_ids_for_user(user, active_source_ids=None):
         source_ids &= set(active_source_ids)
     return sorted(source_ids)
 
+
+@contextmanager
+def _try_lock(lock):
+    """Acquire a lock without blocking and release it automatically when held."""
+    acquired = lock.acquire(blocking=False)
+    try:
+        yield acquired
+    finally:
+        if acquired:
+            lock.release()
+
 class BackgroundTaskManager:
+    """Coordinate periodic background work for the server process."""
+
     def __init__(
         self,
         app=None,
@@ -149,8 +174,9 @@ class BackgroundTaskManager:
         self.update_user_data_enabled = update_user_data
         self.sync_domain_policies_enabled = sync_domain_policies
         self.deliver_pending_alerts_enabled = deliver_pending_alerts
-    
+
     def init_app(self, app):
+        """Attach the Flask app used to create request-independent app contexts."""
         self.app = app
     
     def start(self):
@@ -200,27 +226,29 @@ class BackgroundTaskManager:
         logger.info("Task loop started in thread ID: %s", threading.current_thread().ident)
         while self.running:
             try:
-                # Only process tasks if we can acquire the lock
-                if self._task_lock.acquire(blocking=False):
-                    try:
-                        logger.info("Starting task execution cycle")
-                        # Use a fresh app context
-                        if self.app:
-                            with self.app.app_context():
-                                self._run_task_cycle()
-                                logger.info("User data update cycle complete")
-                        else:
-                            logger.error("App is not initialized in task manager")
-                        
-                        self.last_error = None  # Clear error on successful run
-                    finally:
-                        self._task_lock.release()
-                else:
-                    logger.info("Task already running, skipping this cycle")
-            except Exception as e:
-                if self._task_lock.locked():
-                    self._task_lock.release()
-                error_msg = f"Error in background task: {str(e)}"
+                with _try_lock(self._task_lock) as acquired:
+                    if not acquired:
+                        logger.info("Task already running, skipping this cycle")
+                        continue
+
+                    logger.info("Starting task execution cycle")
+                    # Use a fresh app context
+                    if self.app:
+                        with self.app.app_context():
+                            self._run_task_cycle()
+                            logger.info("User data update cycle complete")
+                    else:
+                        logger.error("App is not initialized in task manager")
+
+                    self.last_error = None  # Clear error on successful run
+            except (
+                requests.RequestException,
+                RuntimeError,
+                TypeError,
+                ValueError,
+                SQLAlchemyError,
+            ) as exc:
+                error_msg = f"Error in background task: {exc}"
                 trace = traceback.format_exc()
                 logger.error("%s\n%s", error_msg, trace)
                 self.last_error = {
@@ -228,7 +256,25 @@ class BackgroundTaskManager:
                     'trace': trace,
                     'time': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                 }
-            
+            except OSError as exc:
+                error_msg = f"OS-level error in background task: {exc}"
+                trace = traceback.format_exc()
+                logger.error("%s\n%s", error_msg, trace)
+                self.last_error = {
+                    'message': error_msg,
+                    'trace': trace,
+                    'time': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                }
+            except AttributeError as exc:
+                error_msg = f"Task manager state error: {exc}"
+                trace = traceback.format_exc()
+                logger.error("%s\n%s", error_msg, trace)
+                self.last_error = {
+                    'message': error_msg,
+                    'trace': trace,
+                    'time': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                }
+
             # Sleep for 10 seconds before next run
             logger.info("Task cycle finished, sleeping for 10 seconds")
             for _ in range(10):
@@ -503,25 +549,36 @@ class BackgroundTaskManager:
                             reason='mapping_state_changed',
                         )
 
-                except Exception as e:
+                except (
+                    RuntimeError,
+                    TypeError,
+                    ValueError,
+                    SQLAlchemyError,
+                ) as exc:
                     logger.error(
                         "Error updating user %s: %s\n%s",
                         user.username,
-                        str(e),
+                        exc,
                         traceback.format_exc(),
                     )
                     # Continue with the next user, but make sure we commit any pending changes
                     db.session.rollback()
-                    
-        except Exception as e:
+
+        except (
+            RuntimeError,
+            TypeError,
+            ValueError,
+            SQLAlchemyError,
+        ) as exc:
             logger.error(
                 "Error in user data update: %s\n%s",
-                str(e),
+                exc,
                 traceback.format_exc(),
             )
             db.session.rollback()
 
     def refresh_external_blocklist_source(self, source_id, force=False):
+        """Refresh a single external blocklist source and persist its new revision."""
         source = BlocklistSource.query.get(source_id)
         if not source:
             return False, 'Blocklist source not found'
@@ -544,7 +601,7 @@ class BackgroundTaskManager:
                 timeout=10,
                 stream=True,
             )
-        except Exception as exc:
+        except requests.RequestException as exc:
             source.mark_sync_error(str(exc))
             db.session.commit()
             return False, f'Failed to refresh "{source.name}": {exc}'
@@ -555,7 +612,7 @@ class BackgroundTaskManager:
                 db.session.commit()
                 return True, f'External blocklist "{source.name}" was unchanged'
 
-            if not (200 <= response.status_code < 300):
+            if not 200 <= response.status_code < 300:
                 source.mark_sync_error(f'HTTP {response.status_code}')
                 db.session.commit()
                 return False, f'Failed to refresh "{source.name}": HTTP {response.status_code}'
@@ -586,11 +643,12 @@ class BackgroundTaskManager:
 
             db.session.flush()
             domain_count = BlocklistDomain.query.filter_by(source_id=source.id).count()
+            updated_revision = source.content_revision
             db.session.commit()
-            if source.content_revision != previous_revision:
+            if updated_revision != previous_revision:
                 self.notify_domain_policy_hint(reason='blocklist_catalog_updated')
             return True, f'Refreshed "{source.name}" with {domain_count} domain(s)'
-        except Exception as exc:
+        except (requests.RequestException, SQLAlchemyError, ValueError) as exc:
             db.session.rollback()
             source = BlocklistSource.query.get(source_id)
             if source:
@@ -615,6 +673,7 @@ class BackgroundTaskManager:
                 logger.warning(message)
 
     def notify_domain_policy_hint(self, system_ids=None, reason='server_update'):
+        """Notify online agents that domain policy state may have changed."""
         if not self.sync_domain_policies_enabled:
             return 0
 
@@ -635,6 +694,7 @@ class BackgroundTaskManager:
         return notified
 
     def request_domain_policy_sync(self, system_id, source_revisions=None, reason='agent_check'):
+        """Queue a device-specific domain policy sync in its own worker thread."""
         if not self.sync_domain_policies_enabled:
             return False
         if not system_id or not AgentConnectionManager.is_online(system_id):
@@ -678,7 +738,7 @@ class BackgroundTaskManager:
                         reason,
                         message,
                     )
-        except Exception:
+        except (RuntimeError, TypeError, ValueError, SQLAlchemyError):
             logger.error(
                 "Error running requested domain policy sync for %s\n%s",
                 system_id,
@@ -697,7 +757,7 @@ class BackgroundTaskManager:
     def _abort_domain_policy_sync(self, agent_client, sync_id):
         try:
             agent_client.abort_domain_policy_sync(sync_id)
-        except Exception:
+        except (OSError, RuntimeError, TypeError, ValueError, AttributeError):
             logger.warning(
                 "Failed to abort incremental domain policy sync %s for device %s",
                 sync_id,
@@ -788,7 +848,7 @@ class BackgroundTaskManager:
                 self._abort_domain_policy_sync(agent_client, sync_id)
                 return False, message
             return True, message
-        except Exception:
+        except (OSError, RuntimeError, TypeError, ValueError):
             self._abort_domain_policy_sync(agent_client, sync_id)
             raise
 
@@ -861,7 +921,7 @@ class BackgroundTaskManager:
                         system_id,
                         message,
                     )
-        except Exception as exc:
+        except (RuntimeError, TypeError, ValueError, SQLAlchemyError) as exc:
             logger.error(
                 "Error synchronizing domain policies: %s\n%s",
                 exc,
@@ -913,7 +973,13 @@ class BackgroundTaskManager:
                     )
 
                 db.session.commit()
-            except Exception as exc:
+            except (
+                requests.RequestException,
+                RuntimeError,
+                TypeError,
+                ValueError,
+                SQLAlchemyError,
+            ) as exc:
                 logger.warning(
                     "Alert webhook delivery failed for alert %s: %s",
                     alert.id,

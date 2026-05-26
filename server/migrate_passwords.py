@@ -7,9 +7,9 @@ It's automatically handled in the Settings.check_admin_password() method,
 but this script can be run manually if needed.
 """
 
-from src.database import db, Settings
 from flask import Flask
-import os
+
+from src.database import Settings, db
 
 def create_app():
     """Create Flask app for migration context"""
@@ -22,13 +22,13 @@ def create_app():
 def migrate_passwords():
     """Migrate plain text passwords to bcrypt hashes"""
     print("Starting password migration...")
-    
+
     # Check if we have an old plain text password
     old_password = Settings.get_value('admin_password')
     hashed_password = Settings.get_value('admin_password_hash')
-    
+
     if old_password and not hashed_password:
-        print(f"Found plain text password, migrating to bcrypt hash...")
+        print("Found plain text password, migrating to bcrypt hash...")
         Settings.set_admin_password(old_password)
         print("✅ Password migrated successfully!")
         print("🔐 Old plain text password has been removed from database")
@@ -38,12 +38,12 @@ def migrate_passwords():
         print("🔧 No password found, initializing with default 'admin'")
         Settings.set_admin_password('admin')
         print("✅ Default password initialized with bcrypt hash")
-    
+
     print("Migration completed!")
 
 if __name__ == '__main__':
-    app = create_app()
-    
-    with app.app_context():
+    migration_app = create_app()
+
+    with migration_app.app_context():
         db.create_all()
         migrate_passwords()

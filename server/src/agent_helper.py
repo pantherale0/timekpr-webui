@@ -1,12 +1,16 @@
-import uuid
+"""Helpers for managing agent connections and agent-facing commands."""
+
+import hashlib
+import hmac
 import json
 import logging
-import hmac
-import hashlib
 import os
 import re
+import uuid
 from datetime import datetime, timezone
 from queue import Queue, Empty
+
+from src.database import AgentDevice
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +29,7 @@ ALLOWED_AGENT_ALERT_TYPES = {
 
 
 def _coerce_alert_string(value, field_name, max_length, allow_empty=False):
+    """Validate and normalize a string field from an agent alert payload."""
     if value is None:
         return None
     if not isinstance(value, str):
@@ -39,6 +44,7 @@ def _coerce_alert_string(value, field_name, max_length, allow_empty=False):
 
 
 def parse_agent_alert_timestamp(value):
+    """Parse an ISO-8601 alert timestamp into a naive UTC datetime."""
     if not isinstance(value, str):
         raise ValueError('occurred_at must be an ISO-8601 string')
 
@@ -63,6 +69,7 @@ def parse_agent_alert_timestamp(value):
 
 
 def normalize_agent_alert_payload(system_id, payload):
+    """Validate an incoming alert payload and serialize its canonical form."""
     if not isinstance(payload, dict):
         raise ValueError('alert payload must be an object')
 
@@ -99,31 +106,36 @@ def normalize_agent_alert_payload(system_id, payload):
     }
 
 class AgentConnectionManagerMeta(type):
+    """Expose registration-token state through the manager class."""
+
     @property
-    def REGISTRATION_TOKEN(cls):
+    def registration_token(cls):
+        """Return the current registration token configured for the server."""
         return REGISTRATION_TOKEN
 
 class AgentConnectionManager(metaclass=AgentConnectionManagerMeta):
+    """Track live agent connections and coordinate synchronous requests."""
+
     # Active connections (fully approved & authenticated): system_id -> ws_object
     active_connections = {}
-    
+
     # Pending connections (unapproved devices): system_id -> ws_object
     pending_connections = {}
-    
+
     # Dynamic IP mapping: system_id -> remote_ip
     active_ips = {}
-    
+
     # Thread-safe pending requests: correlation_id -> Queue
     pending_requests = {}
-    
+
     @classmethod
     def register(cls, system_id, ws, remote_ip):
         """Register an active WebSocket connection and snapshot its current IP"""
         cls.active_connections[system_id] = ws
         cls.active_ips[remote_ip] = system_id
         cls.active_connections[system_id + "_ip"] = remote_ip
-        logger.info(f"Agent registered: {system_id} from IP {remote_ip}")
-        
+        logger.info("Agent registered: %s from IP %s", system_id, remote_ip)
+
     @classmethod
     def unregister(cls, system_id):
         """Unregister an active connection"""
@@ -134,31 +146,31 @@ class AgentConnectionManager(metaclass=AgentConnectionManagerMeta):
             if system_id + "_ip" in cls.active_connections:
                 del cls.active_connections[system_id + "_ip"]
             del cls.active_connections[system_id]
-            logger.info(f"Agent unregistered: {system_id}")
+            logger.info("Agent unregistered: %s", system_id)
 
     @classmethod
     def register_pending(cls, system_id, ws):
         """Register an active connection in a pending state"""
         cls.pending_connections[system_id] = ws
-        logger.info(f"Agent registered in PENDING state: {system_id}")
+        logger.info("Agent registered in PENDING state: %s", system_id)
 
     @classmethod
     def unregister_pending(cls, system_id):
         """Unregister a pending connection"""
         if system_id in cls.pending_connections:
             del cls.pending_connections[system_id]
-            logger.info(f"Agent PENDING connection removed: {system_id}")
+            logger.info("Agent PENDING connection removed: %s", system_id)
 
     @classmethod
     def get_pending_connection(cls, system_id):
         """Get the active pending connection for a system_id"""
         return cls.pending_connections.get(system_id)
-        
+
     @classmethod
     def get_connection(cls, system_id):
         """Get the active WebSocket connection for a system_id"""
         return cls.active_connections.get(system_id)
-        
+
     @classmethod
     def is_online(cls, system_id):
         """Check if a system_id is currently online"""
@@ -169,15 +181,15 @@ class AgentConnectionManager(metaclass=AgentConnectionManagerMeta):
         """Return sorted online system IDs without internal IP shadow keys."""
         return sorted(
             system_id
-            for system_id in cls.active_connections.keys()
+            for system_id in cls.active_connections
             if not system_id.endswith("_ip")
         )
- 
+
     @classmethod
     def get_ip(cls, system_id):
         """Get the last snapshotted IP address for a system_id"""
         return cls.active_connections.get(system_id + "_ip", "Offline")
- 
+
     @classmethod
     def route_response(cls, correlation_id, response_data):
         """Route a response message from client back to the waiting thread"""
@@ -213,10 +225,10 @@ class AgentConnectionManager(metaclass=AgentConnectionManagerMeta):
 
         try:
             ws.send(json.dumps(payload))
-        except Exception as e:
+        except (OSError, RuntimeError, TypeError, ValueError) as exc:
             if correlation_id in cls.pending_requests:
                 del cls.pending_requests[correlation_id]
-            return False, f"Failed to send command over WebSocket: {str(e)}", None
+            return False, f"Failed to send command over WebSocket: {exc}", None
 
         try:
             # Wait for response in the queue (blocking)
@@ -247,35 +259,44 @@ class AgentConnectionManager(metaclass=AgentConnectionManagerMeta):
         try:
             ws.send(json.dumps(payload))
             return True, "Message sent"
-        except Exception as e:
-            return False, f"Failed to send message over WebSocket: {str(e)}"
+        except (OSError, RuntimeError, TypeError, ValueError) as exc:
+            return False, f"Failed to send message over WebSocket: {exc}"
 
     @classmethod
     def verify_signature(cls, challenge, system_id, signature_hex):
         """Verify the HMAC-SHA256 signature of challenge + system_id using the device-specific token"""
         try:
-            from src.database import AgentDevice
             device = AgentDevice.query.get(system_id)
             if not device or not device.secure_token or device.status != 'approved':
-                logger.warning(f"Signature verification rejected: Device {system_id} not approved or missing token")
+                logger.warning(
+                    "Signature verification rejected: Device %s not approved or missing token",
+                    system_id,
+                )
                 return False
-                
+
             token_bytes = device.secure_token.encode('utf-8')
             msg = (challenge + system_id).encode('utf-8')
             expected = hmac.new(token_bytes, msg, hashlib.sha256).hexdigest()
             return hmac.compare_digest(expected, signature_hex)
-        except Exception as e:
-            logger.error(f"Error during signature verification: {e}")
+        except (
+            AttributeError,
+            RuntimeError,
+            TypeError,
+            ValueError,
+        ) as exc:
+            logger.error("Error during signature verification: %s", exc)
             return False
 
 class AgentClient:
+    """Client wrapper for issuing commands to a connected agent."""
+
     def __init__(self, system_id):
         self.system_id = system_id
 
     def _parse_timekpr_output(self, output):
         """Parse the legacy CLI output format into a dictionary"""
         config_dict = {}
-        
+
         # Regular expression to match key-value pairs
         pattern = r'([A-Z_]+):\s*(.*)'
         
@@ -486,6 +507,7 @@ class AgentClient:
         )
 
     def begin_domain_policy_sync(self, sync_id):
+        """Start an incremental domain-policy sync session on the agent."""
         success, message, _ = AgentConnectionManager.send_command_sync(
             self.system_id,
             "begin_domain_policy_sync",
@@ -497,6 +519,7 @@ class AgentClient:
         return success, message
 
     def delete_domain_policy_sources(self, sync_id, source_ids):
+        """Remove stale source payloads from an in-progress policy sync."""
         success, message, _ = AgentConnectionManager.send_command_sync(
             self.system_id,
             "delete_domain_policy_sources",
@@ -509,6 +532,7 @@ class AgentClient:
         return success, message
 
     def send_domain_policy_chunk(self, sync_id, source_id, revision, domains):
+        """Send one chunk of domains for a single source revision."""
         success, message, _ = AgentConnectionManager.send_command_sync(
             self.system_id,
             "sync_domain_policy_chunk",
@@ -523,6 +547,7 @@ class AgentClient:
         return success, message
 
     def update_domain_policy_manifest(self, sync_id, policies):
+        """Publish the per-user source manifest for an in-progress sync."""
         success, message, _ = AgentConnectionManager.send_command_sync(
             self.system_id,
             "update_domain_policy_manifest",
@@ -535,6 +560,7 @@ class AgentClient:
         return success, message
 
     def finalize_domain_policy_sync(self, sync_id):
+        """Commit an incremental domain-policy sync on the agent."""
         success, message, _ = AgentConnectionManager.send_command_sync(
             self.system_id,
             "finalize_domain_policy_sync",
@@ -546,6 +572,7 @@ class AgentClient:
         return success, message
 
     def abort_domain_policy_sync(self, sync_id):
+        """Abort an incremental domain-policy sync on the agent."""
         success, message, _ = AgentConnectionManager.send_command_sync(
             self.system_id,
             "abort_domain_policy_sync",

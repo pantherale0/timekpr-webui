@@ -1,7 +1,14 @@
 {
+    "python.analysis.extraPaths": [
+        "${workspaceFolder}/server"
+    ],
     "python.testing.pytestArgs": [
         "server/tests"
     ],
     "python.testing.unittestEnabled": false,
-    "python.testing.pytestEnabled": true
+    "python.testing.pytestEnabled": true,
+    "pylint.args": [
+        "--rcfile=${workspaceFolder}/server/.pylintrc"
+    ],
+    "pylint.cwd": "${workspaceFolder}/server"
 }

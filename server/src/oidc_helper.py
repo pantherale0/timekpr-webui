@@ -1,21 +1,28 @@
-import os
+"""Helpers for OpenID Connect discovery and login flows."""
+
 import logging
+import os
 import secrets
+
 import requests
 
 logger = logging.getLogger(__name__)
 
+
 class OIDCHelper:
+    """Fetch and cache OIDC metadata, then drive browser-based login."""
+
     def __init__(self):
+        """Load OIDC settings from the environment."""
         self.issuer_url = os.environ.get('OIDC_ISSUER_URL')
         self.client_id = os.environ.get('OIDC_CLIENT_ID')
         self.client_secret = os.environ.get('OIDC_CLIENT_SECRET')
         self.redirect_uri_override = os.environ.get('OIDC_REDIRECT_URI')
-        
+
         # Load verify SSL toggle (default to True)
         verify_ssl_str = os.environ.get('OIDC_VERIFY_SSL', 'true').lower()
         self.verify_ssl = verify_ssl_str not in ('false', '0', 'no', 'off')
-        
+
         self._endpoints = None
 
     @property
@@ -33,14 +40,18 @@ class OIDCHelper:
 
         discovery_url = f"{self.issuer_url.rstrip('/')}/.well-known/openid-configuration"
         try:
-            logger.info(f"Fetching OIDC configuration from: {discovery_url}")
+            logger.info("Fetching OIDC configuration from: %s", discovery_url)
             response = requests.get(discovery_url, verify=self.verify_ssl, timeout=10)
             response.raise_for_status()
             self._endpoints = response.json()
             return self._endpoints
-        except Exception as e:
-            logger.error(f"Failed to fetch OIDC discovery document from {discovery_url}: {e}")
-            raise RuntimeError(f"OIDC configuration error: {str(e)}")
+        except (requests.RequestException, ValueError) as exc:
+            logger.error(
+                "Failed to fetch OIDC discovery document from %s: %s",
+                discovery_url,
+                exc,
+            )
+            raise RuntimeError(f"OIDC configuration error: {exc}") from exc
 
     def get_authorization_url(self, state, redirect_uri):
         """Constructs the authorization URL to redirect the user to."""
@@ -79,17 +90,22 @@ class OIDCHelper:
             'code': code,
             'redirect_uri': actual_redirect,
             'client_id': self.client_id,
-            'client_secret': self.client_secret
+            'client_secret': self.client_secret,
         }
 
         try:
-            logger.info(f"Exchanging code at OIDC token endpoint: {token_endpoint}")
-            response = requests.post(token_endpoint, data=data, verify=self.verify_ssl, timeout=10)
+            logger.info("Exchanging code at OIDC token endpoint: %s", token_endpoint)
+            response = requests.post(
+                token_endpoint,
+                data=data,
+                verify=self.verify_ssl,
+                timeout=10,
+            )
             response.raise_for_status()
             return response.json()
-        except Exception as e:
-            logger.error(f"Failed to exchange OIDC authorization code: {e}")
-            raise RuntimeError(f"OIDC code exchange failed: {str(e)}")
+        except (requests.RequestException, ValueError) as exc:
+            logger.error("Failed to exchange OIDC authorization code: %s", exc)
+            raise RuntimeError(f"OIDC code exchange failed: {exc}") from exc
 
     def get_user_info(self, access_token):
         """Retrieves user profile using access token."""
@@ -99,17 +115,22 @@ class OIDCHelper:
             raise KeyError("OIDC discovery is missing 'userinfo_endpoint'")
 
         headers = {
-            'Authorization': f'Bearer {access_token}'
+            'Authorization': f'Bearer {access_token}',
         }
 
         try:
-            logger.info(f"Fetching userinfo from: {userinfo_endpoint}")
-            response = requests.get(userinfo_endpoint, headers=headers, verify=self.verify_ssl, timeout=10)
+            logger.info("Fetching userinfo from: %s", userinfo_endpoint)
+            response = requests.get(
+                userinfo_endpoint,
+                headers=headers,
+                verify=self.verify_ssl,
+                timeout=10,
+            )
             response.raise_for_status()
             return response.json()
-        except Exception as e:
-            logger.error(f"Failed to fetch OIDC user info: {e}")
-            raise RuntimeError(f"OIDC user info retrieval failed: {str(e)}")
+        except (requests.RequestException, ValueError) as exc:
+            logger.error("Failed to fetch OIDC user info: %s", exc)
+            raise RuntimeError(f"OIDC user info retrieval failed: {exc}") from exc
 
     @staticmethod
     def generate_state():

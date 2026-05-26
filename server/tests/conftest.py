@@ -1,7 +1,12 @@
+"""Shared pytest fixtures for server-side tests."""
+
 # pylint: disable=import-error,redefined-outer-name,unused-argument
 
+import importlib
 import os
 import sys
+
+import pytest
 
 # Set TESTING environment variable before importing app
 os.environ['TESTING'] = 'True'
@@ -24,12 +29,14 @@ venv_site_packages = os.path.join(
 if os.path.isdir(venv_site_packages):
     sys.path.insert(0, venv_site_packages)
 
-import pytest
-from app import app as flask_app, run_schema_migrations
-from src.database import db
+app_module = importlib.import_module('app')
+flask_app = app_module.app
+run_schema_migrations = app_module.run_schema_migrations
+db = importlib.import_module('src.database').db
 
 @pytest.fixture(scope='session')
 def app():
+    """Return the Flask app configured for isolated in-memory tests."""
     flask_app.config.update({
         'TESTING': True,
         'SQLALCHEMY_DATABASE_URI': 'sqlite:///:memory:',
@@ -40,6 +47,7 @@ def app():
 
 @pytest.fixture(scope='function')
 def db_session(app):
+    """Provide a clean database session for each test function."""
     with app.app_context():
         db.create_all()
         run_schema_migrations()
@@ -49,10 +57,11 @@ def db_session(app):
 
 @pytest.fixture(scope='function')
 def client(app, db_session):
+    """Return a test client bound to the isolated test database."""
     return app.test_client()
 
 @pytest.fixture(autouse=True)
 def cleanup_background_tasks():
+    """Stop the shared background task manager after each test."""
     yield
-    from app import task_manager
-    task_manager.stop()
+    app_module.task_manager.stop()

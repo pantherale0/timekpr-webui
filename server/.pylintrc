@@ -1,0 +1,23 @@
+[MAIN]
+init-hook=import os; import sys; cwd = os.getcwd(); server_root = cwd if os.path.basename(cwd) == 'server' else os.path.join(cwd, 'server'); sys.path.insert(0, server_root)
+jobs=1
+
+[MESSAGES CONTROL]
+disable=
+    duplicate-code,
+    line-too-long,
+    missing-class-docstring,
+    missing-final-newline,
+    missing-function-docstring,
+    missing-module-docstring,
+    too-few-public-methods,
+    too-many-arguments,
+    too-many-branches,
+    too-many-instance-attributes,
+    too-many-lines,
+    too-many-locals,
+    too-many-nested-blocks,
+    too-many-positional-arguments,
+    too-many-return-statements,
+    too-many-statements,
+    trailing-whitespace,

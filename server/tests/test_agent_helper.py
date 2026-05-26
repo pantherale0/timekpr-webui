@@ -1,12 +1,22 @@
-import json
-import pytest
-import hmac
+"""Tests for agent connection helpers and alert payload normalization."""
+
+# pylint: disable=unused-argument
+
 import hashlib
-from src.agent_helper import AgentConnectionManager, AgentClient
+import hmac
+import json
+from queue import Empty
+from unittest.mock import patch
+
+import pytest
+
+from src.agent_helper import AgentClient, AgentConnectionManager
 from src.agent_helper import normalize_agent_alert_payload, parse_agent_alert_timestamp
-from src.database import AgentDevice, db
+from src.database import AgentDevice
 
 class DummyWS:
+    """Minimal websocket double that auto-responds to RPC-style requests."""
+
     def __init__(self):
         self.sent_messages = []
         self.closed = False
@@ -24,7 +34,7 @@ class DummyWS:
                     "message": "Mocked Command Success",
                     "data": {"stdout": "stdout_val"}
                 })
-        except Exception:
+        except (TypeError, ValueError, json.JSONDecodeError):
             pass
 
     def close(self):
@@ -62,12 +72,12 @@ def test_route_response():
 
 def test_send_command_sync_failures():
     # Case: system_id is None or empty
-    success, msg, data = AgentConnectionManager.send_command_sync(None, "action", "john")
+    success, msg, _data = AgentConnectionManager.send_command_sync(None, "action", "john")
     assert not success
     assert "No system ID" in msg
 
     # Case: agent is offline
-    success, msg, data = AgentConnectionManager.send_command_sync("offline-sys", "action", "john")
+    success, msg, _data = AgentConnectionManager.send_command_sync("offline-sys", "action", "john")
     assert not success
     assert "is offline" in msg
 
@@ -87,12 +97,12 @@ def test_send_command_sync_success():
 def test_send_command_sync_socket_error():
     class ErrorWS:
         def send(self, message):
-            raise Exception("Websocket socket send error")
+            raise RuntimeError("Websocket socket send error")
             
     system_id = "error-sys"
     AgentConnectionManager.register(system_id, ErrorWS(), "127.0.0.1")
 
-    success, msg, data = AgentConnectionManager.send_command_sync(system_id, "action", "john")
+    success, msg, _data = AgentConnectionManager.send_command_sync(system_id, "action", "john")
     assert not success
     assert "Failed to send command" in msg
 
@@ -217,7 +227,7 @@ def test_agent_client(db_session):
         2: [MockInterval(True, False, None)],
         3: [MockInterval(False, True, None)]
     }
-    success, msg = client.set_allowed_hours("john", intervals)
+    success, _msg = client.set_allowed_hours("john", intervals)
     assert success
 
     allowed_hours_payload = next(
@@ -298,17 +308,19 @@ def test_send_command_sync_timeout():
     system_id = "timeout-sys"
     AgentConnectionManager.register(system_id, ws, "127.0.0.1")
     
-    from unittest.mock import patch
-    from queue import Empty
     with patch('queue.Queue.get', side_effect=Empty):
-        success, msg, data = AgentConnectionManager.send_command_sync(system_id, "action", "john", timeout=0.01)
+        success, msg, _data = AgentConnectionManager.send_command_sync(
+            system_id,
+            "action",
+            "john",
+            timeout=0.01,
+        )
         assert not success
         assert "timed out" in msg
 
     AgentConnectionManager.unregister(system_id)
 
 def test_agent_client_parser_missing_lines():
-    ws = DummyWS()
     system_id = "parser-sys"
     client = AgentClient(system_id=system_id)
 
@@ -323,7 +335,7 @@ def test_agent_client_parser_missing_lines():
                 "data": {"stdout": stdout_output}
             })
     AgentConnectionManager.register(system_id, ParserWS(), "127.0.0.1")
-    is_valid, msg, config = client.validate_user("john")
+    is_valid, _msg, config = client.validate_user("john")
     assert is_valid
     assert config["DIGITS"] == [1, 2, 3]
     assert config["BOOL_F"] is False
@@ -348,7 +360,7 @@ def test_agent_client_parser_missing_lines():
     intervals = {
         1: MockInterval(True, True, []),
     }
-    success, msg = client.set_allowed_hours("john", intervals)
+    success, _msg = client.set_allowed_hours("john", intervals)
     assert success
 
 

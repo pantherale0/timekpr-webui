@@ -1,3 +1,5 @@
+"""Utilities for parsing, validating, and diffing blocklist sources."""
+
 import codecs
 import hashlib
 import json
@@ -20,6 +22,7 @@ MAX_BLOCKLIST_ERRORS = 20
 
 
 def normalize_domain(raw_domain):
+    """Normalize a domain name and reject unsupported input formats."""
     if raw_domain is None:
         raise ValueError('Domain is required')
 
@@ -61,6 +64,7 @@ def _parse_blocklist_line(raw_line, line_number):
 
 
 def parse_blocklist_text(raw_text, strict=False):
+    """Parse newline-delimited blocklist text into unique domains and errors."""
     domains = []
     errors = []
     seen = set()
@@ -83,6 +87,8 @@ def parse_blocklist_text(raw_text, strict=False):
 
 
 class BlocklistStreamParser:
+    """Incrementally decode streamed blocklists into normalized domain batches."""
+
     def __init__(
         self,
         *,
@@ -97,6 +103,7 @@ class BlocklistStreamParser:
         self.ignored_error_count = 0
 
     def _record_error(self, message):
+        """Record a recoverable parser error or fail fast in strict mode."""
         if self.strict:
             raise ValueError(message)
         if len(self.errors) < self.error_limit:
@@ -133,6 +140,7 @@ class BlocklistStreamParser:
         encoding='utf-8',
         batch_size=BLOCKLIST_SYNC_BATCH_SIZE,
     ):
+        """Yield parsed domain batches from streamed blocklist byte chunks."""
         decoder = codecs.getincrementaldecoder(encoding or 'utf-8')(errors='replace')
         pending = ''
         line_number = 0
@@ -181,6 +189,7 @@ class BlocklistStreamParser:
             batch.clear()
 
     def collected_errors(self):
+        """Return parser errors plus a summary of any omitted excess errors."""
         if self.ignored_error_count:
             return self.errors + [
                 f'{self.ignored_error_count} additional parse error(s) omitted'
@@ -189,6 +198,7 @@ class BlocklistStreamParser:
 
 
 def validate_external_source_url(raw_url):
+    """Validate and normalize an external blocklist URL."""
     normalized = (raw_url or '').strip()
     if not normalized:
         raise ValueError('External blocklist URL is required')
@@ -201,6 +211,7 @@ def validate_external_source_url(raw_url):
 
 
 def compute_source_revision(domains):
+    """Compute a stable content hash for a set of domains."""
     digest = hashlib.sha256()
     for domain in sorted({
         str(domain).strip().lower().rstrip('.')
@@ -213,6 +224,7 @@ def compute_source_revision(domains):
 
 
 def compute_source_revision_for_source_id(source_id):
+    """Compute the persisted revision hash for a stored blocklist source."""
     digest = hashlib.sha256()
     query = (
         BlocklistDomain.query.with_entities(BlocklistDomain.domain)
@@ -229,6 +241,7 @@ def compute_source_revision_for_source_id(source_id):
 
 
 def iter_source_domain_batches(source_id, batch_size=BLOCKLIST_SYNC_BATCH_SIZE):
+    """Yield stored source domains in deterministic batches for agent sync."""
     batch = []
     query = (
         BlocklistDomain.query.with_entities(BlocklistDomain.domain)
@@ -248,6 +261,7 @@ def iter_source_domain_batches(source_id, batch_size=BLOCKLIST_SYNC_BATCH_SIZE):
 
 
 def build_source_state_map(sources):
+    """Build revision and domain-count metadata for enabled sources."""
     source_rows = [
         source
         for source in (sources or [])
@@ -260,6 +274,8 @@ def build_source_state_map(sources):
         count_rows = (
             BlocklistDomain.query.with_entities(
                 BlocklistDomain.source_id,
+                # Pylint misidentifies SQLAlchemy's dynamic func.count() as non-callable.
+                # pylint: disable-next=not-callable
                 func.count(BlocklistDomain.id),
             )
             .filter(BlocklistDomain.source_id.in_(source_ids))
@@ -284,6 +300,7 @@ def build_source_state_map(sources):
 
 
 def build_source_domain_map(sources):
+    """Return the normalized domain set for each enabled blocklist source."""
     domain_map = {}
     for source in sources:
         if not getattr(source, 'is_enabled', True):
@@ -300,6 +317,7 @@ def build_source_domain_map(sources):
 
 
 def compute_mapping_policy_hash(linux_uid, source_state_map, assigned_source_ids):
+    """Hash a mapping's effective blocklist policy for sync comparisons."""
     payload = {
         'linux_uid': linux_uid,
         'sources': {
@@ -336,6 +354,7 @@ def _retry_due(mapping, retry_hash, now=None):
 
 
 def summarize_mapping_blocklist_sync(mapping, source_state_map, assigned_source_ids):
+    """Summarize whether a device mapping still needs blocklist synchronization."""
     source_ids = sorted({int(source_id) for source_id in assigned_source_ids})
     effective_domain_count = sum(
         int(source_state_map.get(str(source_id), {}).get('domain_count') or 0)
@@ -393,6 +412,7 @@ def summarize_mapping_blocklist_sync(mapping, source_state_map, assigned_source_
 
 
 def should_refresh_external_source(source, now=None):
+    """Return whether an external source is due for refresh."""
     if source is None:
         return False
 
