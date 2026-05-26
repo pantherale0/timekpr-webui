@@ -16,6 +16,8 @@ REGISTRATION_TOKEN_FILE=""
 DOWNLOAD_ONLY=0
 NO_START=0
 REPLACE_AGENT_TOKEN=0
+SECURITY_STACK_REBOOT_REQUIRED=0
+SECURITY_STACK_KERNEL_BUG_DETECTED=0
 
 usage() {
     cat <<'EOF'
@@ -48,6 +50,8 @@ Notes:
   - On first install, the script prompts for missing secrets if they were not supplied.
   - On upgrades, an existing config token is preserved by default so you do not accidentally
     replace the per-device secret minted after pairing.
+  - On full installs, the script attempts to install and enable AppArmor plus auditd so
+    application monitoring works with minimal manual setup.
   - The script expects release assets named:
       timekpr-agent-x86_64-unknown-linux-gnu.tar.gz
       timekpr-agent-aarch64-unknown-linux-gnu.tar.gz
@@ -69,6 +73,10 @@ die() {
 
 need_cmd() {
     command -v "$1" >/dev/null 2>&1 || die "Required command not found: $1"
+}
+
+has_cmd() {
+    command -v "$1" >/dev/null 2>&1
 }
 
 prompt() {
@@ -94,6 +102,105 @@ from pathlib import Path
 import sys
 print(Path(sys.argv[1]).read_text(encoding="utf-8").strip())
 PY
+}
+
+detect_package_manager() {
+    if has_cmd apt-get; then
+        printf 'apt-get'
+    elif has_cmd pacman; then
+        printf 'pacman'
+    elif has_cmd dnf; then
+        printf 'dnf'
+    elif has_cmd zypper; then
+        printf 'zypper'
+    else
+        return 1
+    fi
+}
+
+install_security_stack_packages() {
+    local package_manager
+    package_manager="$(detect_package_manager)" || die \
+        "Could not detect a supported package manager for installing AppArmor/auditd"
+
+    log "Installing AppArmor and auditd dependencies via ${package_manager}"
+    case "$package_manager" in
+        apt-get)
+            DEBIAN_FRONTEND=noninteractive apt-get update
+            DEBIAN_FRONTEND=noninteractive apt-get install -y \
+                apparmor apparmor-utils auditd
+            ;;
+        pacman)
+            pacman -Sy --noconfirm --needed apparmor audit
+            ;;
+        dnf)
+            dnf install -y apparmor apparmor-utils audit
+            ;;
+        zypper)
+            zypper --non-interactive install --no-confirm \
+                apparmor-parser apparmor-utils audit
+            ;;
+        *)
+            die "Unsupported package manager: ${package_manager}"
+            ;;
+    esac
+}
+
+systemd_unit_exists() {
+    local unit_name="$1"
+    local units
+    units="$(systemctl list-unit-files "$unit_name" --no-legend 2>/dev/null || true)"
+    [[ -n "$units" ]]
+}
+
+enable_service_now_if_possible() {
+    local unit_name="$1"
+    if ! systemd_unit_exists "$unit_name"; then
+        warn "Systemd unit ${unit_name} was not found after package installation"
+        return 1
+    fi
+
+    if [[ "$NO_START" -eq 1 ]]; then
+        log "Enabling ${unit_name} (service start deferred by --no-start)"
+        systemctl enable "$unit_name"
+    else
+        log "Enabling and starting ${unit_name}"
+        systemctl enable --now "$unit_name"
+    fi
+}
+
+apparmor_runtime_enabled() {
+    [[ -r /sys/module/apparmor/parameters/enabled ]] || return 1
+    [[ "$(< /sys/module/apparmor/parameters/enabled)" == "Y" ]]
+}
+
+ensure_security_stack() {
+    install_security_stack_packages
+
+    has_cmd apparmor_parser || die "AppArmor parser was not installed successfully"
+    has_cmd aa-status || warn "aa-status is not available; AppArmor diagnostics will be limited"
+
+    enable_service_now_if_possible apparmor.service || true
+    enable_service_now_if_possible auditd.service || true
+
+    if apparmor_runtime_enabled; then
+        log "Verified that AppArmor is active in the running kernel"
+    else
+        SECURITY_STACK_REBOOT_REQUIRED=1
+        warn "AppArmor is installed but not active in the running kernel."
+        warn "Protections will not apply until the host boots with AppArmor enabled."
+        if [[ -r /proc/cmdline ]]; then
+            warn "Current kernel cmdline: $(< /proc/cmdline)"
+        fi
+        warn "Ensure your bootloader enables AppArmor (for example apparmor=1 and lsm includes apparmor), then reboot."
+    fi
+
+    if journalctl -k --no-pager -n 200 2>/dev/null | rg -q 'audit_log_(subj|object)_ctx'; then
+        SECURITY_STACK_KERNEL_BUG_DETECTED=1
+        warn "Detected kernel audit/AppArmor context logging errors in the kernel log."
+        warn "This is usually a kernel bug, not an agent configuration problem."
+        warn "Application monitoring may be noisy or unreliable until the kernel is updated."
+    fi
 }
 
 github_api_get() {
@@ -362,6 +469,8 @@ fi
 
 need_cmd systemctl
 
+ensure_security_stack
+
 EXISTING_SERVER_URL="$(get_existing_config_value "server_url" || true)"
 EXISTING_AGENT_TOKEN="$(get_existing_config_value "agent_token" || true)"
 EXISTING_REGISTRATION_TOKEN="$(get_existing_config_value "registration_token" || true)"
@@ -422,3 +531,28 @@ Next steps:
 If this is the first time the agent has run, the logs will show the generated system ID
 that must be approved in the Web UI admin panel.
 EOF
+
+if [[ "$SECURITY_STACK_REBOOT_REQUIRED" -eq 1 ]]; then
+    cat <<'EOF'
+
+Important:
+  - AppArmor was installed, but the running kernel does not currently have it active.
+  - Reboot after enabling AppArmor in the bootloader/kernel command line, then re-run:
+      aa-status
+      systemctl status apparmor auditd timekpr-agent
+EOF
+fi
+
+if [[ "$SECURITY_STACK_KERNEL_BUG_DETECTED" -eq 1 ]]; then
+    cat <<'EOF'
+
+Important:
+  - The running kernel is logging audit/AppArmor context errors such as:
+      audit: error in audit_log_subj_ctx
+  - This is typically a kernel bug in audit/LSM context handling, not a bad TimeKpr install.
+  - Recommended action:
+      1. Update the host to a newer kernel build.
+      2. Reboot.
+      3. Re-check: journalctl -k | rg 'audit_log_(subj|object)_ctx'
+EOF
+fi
