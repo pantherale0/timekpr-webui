@@ -116,6 +116,13 @@ pub async fn get_state_summary() -> Result<serde_json::Value, String> {
         .map_err(|error| format!("failed to serialize domain policy state summary: {}", error))
 }
 
+pub async fn get_source_revisions() -> Result<HashMap<String, String>, String> {
+    let runtime = get_runtime();
+    let mut guard = runtime.lock().await;
+    guard.ensure_restored().await?;
+    Ok(guard.state_summary().source_revisions)
+}
+
 pub async fn begin_sync_from_args(args: &serde_json::Value) -> Result<String, String> {
     let request: SyncRequest = serde_json::from_value(args.clone())
         .map_err(|error| format!("invalid domain policy sync request: {}", error))?;

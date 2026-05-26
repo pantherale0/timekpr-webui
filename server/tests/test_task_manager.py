@@ -95,6 +95,22 @@ def test_task_manager_runs_only_enabled_task_roles(app, db_session):
     manager._sync_domain_policies.assert_not_called()
     manager._refresh_external_blocklists.assert_not_called()
 
+
+def test_task_manager_does_not_poll_domain_policies_in_task_cycle(app, db_session):
+    manager = BackgroundTaskManager(
+        app,
+        refresh_external_blocklists=False,
+        update_user_data=False,
+        sync_domain_policies=True,
+        deliver_pending_alerts=False,
+    )
+    manager._sync_domain_policies = MagicMock()
+
+    with app.app_context():
+        manager._run_task_cycle()
+
+    manager._sync_domain_policies.assert_not_called()
+
 def test_task_manager_update_user_data(app, db_session):
     manager = BackgroundTaskManager(app)
 
@@ -430,6 +446,134 @@ def test_task_manager_syncs_large_domain_sources_in_multiple_chunks(app, db_sess
     assert chunk_payloads[0]["domains"][0] == "domain-0000.example.com"
     assert chunk_payloads[1]["domains"][-1] == "domain-1002.example.com"
 
+    AgentConnectionManager.unregister(device.system_id)
+
+
+def test_task_manager_backoffs_repeated_domain_policy_failures(app, db_session):
+    manager = BackgroundTaskManager(app)
+
+    user = ManagedUser(username="retry-policy-user", system_ip="Unassigned", is_valid=True)
+    device = AgentDevice(system_id="sys-policy-retry", status="approved", secure_token="tok")
+    source = BlocklistSource(name="Retry DoH", source_type=BlocklistSource.TYPE_MANUAL, is_enabled=True)
+    db_session.add_all([user, device, source])
+    db_session.flush()
+    mapping = ManagedUserDeviceMap(
+        managed_user_id=user.id,
+        system_id=device.system_id,
+        linux_username="retry-policy-user",
+        linux_uid=1020,
+        is_valid=True,
+    )
+    db_session.add_all([
+        mapping,
+        ManagedUserBlocklistAssignment(managed_user_id=user.id, source_id=source.id),
+        BlocklistDomain(source_id=source.id, domain="dns.google"),
+    ])
+    db_session.commit()
+
+    class FailingWS:
+        def __init__(self):
+            self.sent_messages = []
+
+        def send(self, message):
+            self.sent_messages.append(message)
+            payload = json.loads(message)
+            correlation_id = payload.get("correlation_id")
+            if not correlation_id:
+                return
+            action = payload.get("action")
+            if action == "get_domain_policy_state":
+                AgentConnectionManager.route_response(correlation_id, {
+                    "success": False,
+                    "message": "agent unavailable for policy sync",
+                    "data": {},
+                })
+            else:
+                AgentConnectionManager.route_response(correlation_id, {
+                    "success": True,
+                    "message": "Success",
+                    "data": {},
+                })
+
+    ws = FailingWS()
+    AgentConnectionManager.register(device.system_id, ws, "10.0.0.22")
+
+    with app.app_context():
+        manager._sync_domain_policies()
+
+    first_sent_count = len(ws.sent_messages)
+    assert first_sent_count == 1
+
+    with app.app_context():
+        manager._sync_domain_policies()
+
+    assert len(ws.sent_messages) == first_sent_count
+
+    db_session.refresh(mapping)
+    mapping.blocklist_last_attempted = datetime.utcnow() - timedelta(hours=5)
+    db_session.commit()
+
+    with app.app_context():
+        manager._sync_domain_policies()
+
+    assert len(ws.sent_messages) == first_sent_count + 1
+    AgentConnectionManager.unregister(device.system_id)
+
+
+def test_task_manager_retries_immediately_when_policy_hash_changes(app, db_session):
+    manager = BackgroundTaskManager(app)
+
+    user = ManagedUser(username="changed-policy-user", system_ip="Unassigned", is_valid=True)
+    device = AgentDevice(system_id="sys-policy-change", status="approved", secure_token="tok")
+    source = BlocklistSource(name="Change DoH", source_type=BlocklistSource.TYPE_MANUAL, is_enabled=True)
+    db_session.add_all([user, device, source])
+    db_session.flush()
+    mapping = ManagedUserDeviceMap(
+        managed_user_id=user.id,
+        system_id=device.system_id,
+        linux_username="changed-policy-user",
+        linux_uid=1030,
+        is_valid=True,
+    )
+    db_session.add_all([
+        mapping,
+        ManagedUserBlocklistAssignment(managed_user_id=user.id, source_id=source.id),
+        BlocklistDomain(source_id=source.id, domain="dns.google"),
+    ])
+    db_session.commit()
+
+    class FailingWS:
+        def __init__(self):
+            self.sent_messages = []
+
+        def send(self, message):
+            self.sent_messages.append(message)
+            payload = json.loads(message)
+            correlation_id = payload.get("correlation_id")
+            if not correlation_id:
+                return
+            AgentConnectionManager.route_response(correlation_id, {
+                "success": False,
+                "message": "agent unavailable for policy sync",
+                "data": {},
+            })
+
+    ws = FailingWS()
+    AgentConnectionManager.register(device.system_id, ws, "10.0.0.23")
+
+    with app.app_context():
+        manager._sync_domain_policies()
+    first_sent_count = len(ws.sent_messages)
+    assert first_sent_count == 1
+
+    db_session.refresh(source)
+    source.content_revision = "forced-new-revision"
+    db_session.commit()
+
+    with app.app_context():
+        manager._sync_domain_policies()
+
+    assert len(ws.sent_messages) == first_sent_count + 1
     AgentConnectionManager.unregister(device.system_id)
 
 

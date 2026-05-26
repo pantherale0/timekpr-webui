@@ -24,6 +24,7 @@ use uuid::Uuid;
 use zbus::{Connection, Proxy};
 
 type HmacSha256 = Hmac<Sha256>;
+const POLICY_SYNC_INTERVAL_SECS: u64 = 4 * 60 * 60;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 struct Config {
@@ -50,6 +51,10 @@ enum ServerMessage {
         action: String,
         username: String,
         args: serde_json::Value,
+    },
+    #[serde(rename = "policy_sync_hint")]
+    PolicySyncHint {
+        reason: Option<String>,
     },
 }
 
@@ -80,6 +85,10 @@ enum ClientMessage {
         occurred_at: String,
         linux_username: Option<String>,
         details: serde_json::Value,
+    },
+    #[serde(rename = "policy_sync_check")]
+    PolicySyncCheck {
+        source_revisions: HashMap<String, String>,
     },
 }
 
@@ -491,6 +500,56 @@ fn build_alert_message(
     }
 }
 
+async fn build_policy_sync_check_message() -> Result<ClientMessage, String> {
+    let source_revisions = domain_policy::get_source_revisions().await?;
+    Ok(ClientMessage::PolicySyncCheck { source_revisions })
+}
+
+fn spawn_policy_sync_scheduler(
+    client_tx: mpsc::UnboundedSender<ClientMessage>,
+    mut shutdown: watch::Receiver<bool>,
+    mut trigger_rx: mpsc::UnboundedReceiver<()>,
+) -> JoinHandle<()> {
+    tokio::spawn(async move {
+        if let Ok(message) = build_policy_sync_check_message().await {
+            let _ = client_tx.send(message);
+        }
+
+        loop {
+            tokio::select! {
+                changed = shutdown.changed() => {
+                    if changed.is_err() || *shutdown.borrow() {
+                        break;
+                    }
+                }
+                maybe_trigger = trigger_rx.recv() => {
+                    if maybe_trigger.is_none() {
+                        break;
+                    }
+                    match build_policy_sync_check_message().await {
+                        Ok(message) => {
+                            let _ = client_tx.send(message);
+                        }
+                        Err(error) => {
+                            eprintln!("Failed to build policy sync check message: {}", error);
+                        }
+                    }
+                }
+                _ = sleep(Duration::from_secs(POLICY_SYNC_INTERVAL_SECS)) => {
+                    match build_policy_sync_check_message().await {
+                        Ok(message) => {
+                            let _ = client_tx.send(message);
+                        }
+                        Err(error) => {
+                            eprintln!("Failed to build periodic policy sync check message: {}", error);
+                        }
+                    }
+                }
+            }
+        }
+    })
+}
+
 fn is_user_session_class(session_class: Option<&str>) -> bool {
     session_class.is_some_and(|class_name| class_name.starts_with("user"))
 }
@@ -853,6 +912,9 @@ async fn main() {
                                 }
                                 break;
                             }
+                            Ok(ServerMessage::PolicySyncHint { .. }) => {
+                                eprintln!("Ignoring policy sync hint during handshake.");
+                            }
                             Ok(ServerMessage::CommandRequest { .. }) => {
                                 eprintln!("Received command request before the message loop was ready.");
                             }
@@ -899,6 +961,12 @@ async fn main() {
 
                 let (shutdown_tx, shutdown_rx) = watch::channel(false);
                 let listener_handles = spawn_logind_listeners(client_tx.clone(), shutdown_rx);
+                let (policy_sync_tx, policy_sync_rx) = mpsc::unbounded_channel::<()>();
+                let policy_sync_handle = spawn_policy_sync_scheduler(
+                    client_tx.clone(),
+                    shutdown_tx.subscribe(),
+                    policy_sync_rx,
+                );
 
                 let startup_details = serde_json::json!({
                     "source": "agent_service",
@@ -930,6 +998,16 @@ async fn main() {
                                     break;
                                 }
                             }
+                            Ok(ServerMessage::PolicySyncHint { reason }) => {
+                                println!(
+                                    "Received policy sync hint{}",
+                                    reason
+                                        .as_deref()
+                                        .map(|value| format!(": {}", value))
+                                        .unwrap_or_default()
+                                );
+                                let _ = policy_sync_tx.send(());
+                            }
                             Ok(other) => {
                                 eprintln!("Ignoring unexpected server message after authentication: {:?}", other);
                             }
@@ -951,10 +1029,12 @@ async fn main() {
 
                 let _ = shutdown_tx.send(true);
                 drop(client_tx);
+                drop(policy_sync_tx);
 
                 for handle in listener_handles {
                     let _ = handle.await;
                 }
+                let _ = policy_sync_handle.await;
                 let _ = writer_handle.await;
             }
             Err(e) => {

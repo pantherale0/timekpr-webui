@@ -5,7 +5,7 @@ import hashlib
 from datetime import datetime
 from unittest.mock import patch, MagicMock
 from sqlalchemy import text
-from app import ws_agent_handler, run_schema_migrations, _get_blocklist_sources
+from app import ws_agent_handler, run_schema_migrations, _get_blocklist_sources, task_manager
 from src.database import (
     AgentAlert,
     AgentDevice,
@@ -560,6 +560,42 @@ def test_websocket_handler(app, db_session):
     assert stored_alert.delivery_status == AgentAlert.DELIVERY_DISABLED
     assert stored_alert.payload["details"]["source"] == "test-suite"
 
+    policy_check_system_id = "policy-check-system-id"
+    policy_check_token = "policy-check-token"
+    db_session.add(AgentDevice(system_id=policy_check_system_id, status="approved", secure_token=policy_check_token))
+    db_session.commit()
+
+    class PolicyCheckWS(MockWS):
+        def send(self, data):
+            super().send(data)
+            payload = json.loads(data)
+            if payload.get("type") == "challenge":
+                challenge = payload.get("challenge")
+                token_bytes = policy_check_token.encode('utf-8')
+                msg = (challenge + policy_check_system_id).encode('utf-8')
+                signature = hmac.new(token_bytes, msg, hashlib.sha256).hexdigest()
+                self.messages.append(json.dumps({
+                    "type": "register",
+                    "signature": signature
+                }))
+                self.messages.append(json.dumps({
+                    "type": "policy_sync_check",
+                    "source_revisions": {"1": "rev-1"}
+                }))
+
+    ws_policy_check = PolicyCheckWS([json.dumps({
+        "type": "hello",
+        "system_id": policy_check_system_id,
+    })])
+    with patch.object(task_manager, 'request_domain_policy_sync') as mock_request_sync:
+        with app.test_request_context('/ws', environ_base={'REMOTE_ADDR': '127.0.0.1'}):
+            ws_agent_handler(ws_policy_check)
+    mock_request_sync.assert_called_once_with(
+        policy_check_system_id,
+        source_revisions={"1": "rev-1"},
+        reason='agent_timer',
+    )
+
     class InvalidAlertWS(MockWS):
         def send(self, data):
             super().send(data)
@@ -1042,6 +1078,8 @@ def test_run_schema_migrations_creates_blocklist_tables_and_mapping_sync_columns
     assert 'blocklist_policy_hash' in mapping_columns
     assert 'blocklist_is_synced' in mapping_columns
     assert 'blocklist_last_synced' in mapping_columns
+    assert 'blocklist_last_attempted' in mapping_columns
+    assert 'blocklist_last_attempt_hash' in mapping_columns
     assert 'blocklist_last_error' in mapping_columns
 
     source_columns = {

@@ -355,6 +355,8 @@ class ManagedUserDeviceMap(db.Model):
     blocklist_policy_hash = db.Column(db.String(64), nullable=True)
     blocklist_is_synced = db.Column(db.Boolean, default=False, nullable=False)
     blocklist_last_synced = db.Column(db.DateTime, nullable=True)
+    blocklist_last_attempted = db.Column(db.DateTime, nullable=True)
+    blocklist_last_attempt_hash = db.Column(db.String(64), nullable=True)
     blocklist_last_error = db.Column(db.Text, nullable=True)
 
     __table_args__ = (
@@ -380,10 +382,14 @@ class ManagedUserDeviceMap(db.Model):
         self.blocklist_policy_hash = policy_hash
         self.blocklist_is_synced = True
         self.blocklist_last_synced = datetime.utcnow()
+        self.blocklist_last_attempted = self.blocklist_last_synced
+        self.blocklist_last_attempt_hash = policy_hash
         self.blocklist_last_error = None
 
-    def mark_blocklist_sync_failed(self, error_message):
+    def mark_blocklist_sync_failed(self, error_message, attempt_hash=None):
         self.blocklist_is_synced = False
+        self.blocklist_last_attempted = datetime.utcnow()
+        self.blocklist_last_attempt_hash = attempt_hash
         self.blocklist_last_error = error_message
 
 

@@ -232,6 +232,25 @@ class AgentConnectionManager(metaclass=AgentConnectionManagerMeta):
                 del cls.pending_requests[correlation_id]
 
     @classmethod
+    def send_message(cls, system_id, payload):
+        """
+        Send a non-RPC JSON message to the connected agent.
+        Returns: (success, message)
+        """
+        if not system_id:
+            return False, "No system ID associated with this user"
+
+        ws = cls.get_connection(system_id)
+        if not ws:
+            return False, f"Agent for system ID '{system_id}' is offline"
+
+        try:
+            ws.send(json.dumps(payload))
+            return True, "Message sent"
+        except Exception as e:
+            return False, f"Failed to send message over WebSocket: {str(e)}"
+
+    @classmethod
     def verify_signature(cls, challenge, system_id, signature_hex):
         """Verify the HMAC-SHA256 signature of challenge + system_id using the device-specific token"""
         try:

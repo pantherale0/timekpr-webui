@@ -140,6 +140,9 @@ class BackgroundTaskManager:
         self.thread = None
         self.last_error = None
         self._task_lock = threading.Lock()  # Add a lock to prevent concurrent executions
+        self._domain_policy_sync_lock = threading.Lock()
+        self._domain_policy_sync_in_progress = set()
+        self._domain_policy_sync_pending = set()
         self.refresh_external_blocklists_enabled = refresh_external_blocklists
         self.update_user_data_enabled = update_user_data
         self.sync_domain_policies_enabled = sync_domain_policies
@@ -242,8 +245,7 @@ class BackgroundTaskManager:
             self._update_user_data()
 
         if self.sync_domain_policies_enabled:
-            logger.info("Synchronizing domain policies")
-            self._sync_domain_policies()
+            logger.debug("Domain policy sync is agent-initiated")
 
         if self.deliver_pending_alerts_enabled:
             logger.info("Delivering alert webhooks")
@@ -299,6 +301,7 @@ class BackgroundTaskManager:
                     any_valid_mapping = False
                     all_schedule_synced = True
                     all_interval_synced = True
+                    domain_policy_hint_system_ids = set()
 
                     for mapping in mappings:
                         mapping.last_checked = datetime.utcnow()
@@ -370,9 +373,12 @@ class BackgroundTaskManager:
                         is_valid, result_message, config_dict = agent_client.validate_user(mapping.linux_username)
                         if is_valid and config_dict:
                             any_valid_mapping = True
+                            previous_linux_uid = mapping.linux_uid
                             mapping.is_valid = True
                             mapping.last_config = json.dumps(config_dict)
                             mapping.linux_uid = _safe_int(config_dict.get("LINUX_UID"), mapping.linux_uid)
+                            if mapping.linux_uid != previous_linux_uid:
+                                domain_policy_hint_system_ids.add(mapping.system_id)
                             shared_time_spent += coerce_time_spent_day(config_dict.get('TIME_SPENT_DAY', 0))
                             time_left = config_dict.get("TIME_LEFT_DAY")
                             if isinstance(time_left, int):
@@ -419,6 +425,11 @@ class BackgroundTaskManager:
                     user.last_checked = datetime.utcnow()
                     user.is_valid = any_valid_mapping
                     db.session.commit()
+                    if domain_policy_hint_system_ids:
+                        self.notify_domain_policy_hint(
+                            system_ids=domain_policy_hint_system_ids,
+                            reason='mapping_state_changed',
+                        )
 
                 except Exception as e:
                     logger.error(
@@ -446,6 +457,7 @@ class BackgroundTaskManager:
             return False, f'Blocklist "{source.name}" is not an external URL source'
         if not force and not should_refresh_external_source(source):
             return True, f'Blocklist "{source.name}" is already up to date'
+        previous_revision = source.content_revision
 
         headers = {}
         if source.etag:
@@ -503,6 +515,8 @@ class BackgroundTaskManager:
             db.session.flush()
             domain_count = BlocklistDomain.query.filter_by(source_id=source.id).count()
             db.session.commit()
+            if source.content_revision != previous_revision:
+                self.notify_domain_policy_hint(reason='blocklist_catalog_updated')
             return True, f'Refreshed "{source.name}" with {domain_count} domain(s)'
         except Exception as exc:
             db.session.rollback()
@@ -528,6 +542,86 @@ class BackgroundTaskManager:
             else:
                 logger.warning(message)
 
+    def notify_domain_policy_hint(self, system_ids=None, reason='server_update'):
+        if not self.sync_domain_policies_enabled:
+            return 0
+
+        target_system_ids = system_ids or AgentConnectionManager.get_online_system_ids()
+        notified = 0
+        for system_id in sorted(set(target_system_ids)):
+            if not AgentConnectionManager.is_online(system_id):
+                continue
+            success, _message = AgentConnectionManager.send_message(
+                system_id,
+                {
+                    "type": "policy_sync_hint",
+                    "reason": reason,
+                },
+            )
+            if success:
+                notified += 1
+        return notified
+
+    def request_domain_policy_sync(self, system_id, source_revisions=None, reason='agent_check'):
+        if not self.sync_domain_policies_enabled:
+            return False
+        if not system_id or not AgentConnectionManager.is_online(system_id):
+            return False
+        if self.app is None:
+            logger.warning("Ignoring domain policy sync request for %s because app is not initialized", system_id)
+            return False
+
+        with self._domain_policy_sync_lock:
+            if system_id in self._domain_policy_sync_in_progress:
+                self._domain_policy_sync_pending.add(system_id)
+                return False
+            self._domain_policy_sync_in_progress.add(system_id)
+
+        sync_thread = threading.Thread(
+            target=self._run_requested_domain_policy_sync,
+            args=(system_id, dict(source_revisions or {}), reason),
+            daemon=True,
+        )
+        sync_thread.start()
+        return True
+
+    def _run_requested_domain_policy_sync(self, system_id, source_revisions, reason):
+        try:
+            with self.app.app_context():
+                success, message = self._sync_domain_policy_system(
+                    system_id,
+                    agent_source_revisions=source_revisions,
+                )
+                if success:
+                    logger.info(
+                        "Completed agent-initiated domain policy sync for %s (%s): %s",
+                        system_id,
+                        reason,
+                        message,
+                    )
+                else:
+                    logger.warning(
+                        "Agent-initiated domain policy sync failed for %s (%s): %s",
+                        system_id,
+                        reason,
+                        message,
+                    )
+        except Exception:
+            logger.error(
+                "Error running requested domain policy sync for %s\n%s",
+                system_id,
+                traceback.format_exc(),
+            )
+        finally:
+            rerun = False
+            with self._domain_policy_sync_lock:
+                self._domain_policy_sync_in_progress.discard(system_id)
+                if system_id in self._domain_policy_sync_pending:
+                    self._domain_policy_sync_pending.discard(system_id)
+                    rerun = True
+            if rerun and AgentConnectionManager.is_online(system_id):
+                self.request_domain_policy_sync(system_id, reason='queued_followup')
+
     def _abort_domain_policy_sync(self, agent_client, sync_id):
         try:
             agent_client.abort_domain_policy_sync(sync_id)
@@ -538,7 +632,7 @@ class BackgroundTaskManager:
                 agent_client.system_id,
             )
 
-    def _sync_domain_policy_device(self, system_id, mapping_state, source_state_map):
+    def _sync_domain_policy_device(self, system_id, mapping_state, source_state_map, source_revisions=None):
         device_policies = {}
         desired_source_ids = set()
 
@@ -553,13 +647,14 @@ class BackgroundTaskManager:
             }
 
         agent_client = AgentClient(system_id=system_id)
-        success, message, state_payload = agent_client.get_domain_policy_state()
-        if not success:
-            return False, message
+        if source_revisions is None:
+            success, message, state_payload = agent_client.get_domain_policy_state()
+            if not success:
+                return False, message
 
-        source_revisions = {}
-        if isinstance(state_payload, dict):
-            source_revisions = state_payload.get('source_revisions') or {}
+            source_revisions = {}
+            if isinstance(state_payload, dict):
+                source_revisions = state_payload.get('source_revisions') or {}
         if not isinstance(source_revisions, dict):
             source_revisions = {}
         source_revisions = {
@@ -625,61 +720,70 @@ class BackgroundTaskManager:
             self._abort_domain_policy_sync(agent_client, sync_id)
             raise
 
+    def _build_domain_policy_mapping_state(self, system_id):
+        active_sources = BlocklistSource.query.filter_by(is_enabled=True).all()
+        active_source_ids = {source.id for source in active_sources}
+        source_state_map = build_source_state_map(active_sources)
+        mappings = ManagedUserDeviceMap.query.filter_by(system_id=system_id).order_by(
+            ManagedUserDeviceMap.id.asc(),
+        ).all()
+
+        mapping_state = []
+        for mapping in mappings:
+            assigned_source_ids = _assigned_source_ids_for_user(
+                mapping.managed_user,
+                active_source_ids=active_source_ids,
+            )
+            summary = summarize_mapping_blocklist_sync(mapping, source_state_map, assigned_source_ids)
+            mapping_state.append((mapping, assigned_source_ids, summary))
+        return mapping_state, source_state_map
+
+    def _sync_domain_policy_system(self, system_id, agent_source_revisions=None):
+        mapping_state, source_state_map = self._build_domain_policy_mapping_state(system_id)
+        if not mapping_state:
+            return True, 'No managed-user mappings required policy sync'
+
+        needs_sync = any(summary['needs_sync'] for _, _, summary in mapping_state)
+        if not needs_sync:
+            return True, 'Domain policy already up to date'
+
+        success, message = self._sync_domain_policy_device(
+            system_id,
+            mapping_state,
+            source_state_map,
+            source_revisions=agent_source_revisions,
+        )
+        if success:
+            for mapping, assigned_source_ids, summary in mapping_state:
+                if assigned_source_ids and mapping.linux_uid is None:
+                    mapping.mark_blocklist_sync_failed(
+                        'Linux UID is required before domain policy can sync',
+                        summary.get('retry_hash'),
+                    )
+                    continue
+
+                if assigned_source_ids:
+                    mapping.mark_blocklist_synced(summary['policy_hash'])
+                else:
+                    mapping.mark_blocklist_synced(None)
+            db.session.commit()
+        else:
+            for mapping, _, summary in mapping_state:
+                mapping.mark_blocklist_sync_failed(
+                    message,
+                    summary.get('retry_hash'),
+                )
+            db.session.commit()
+        return success, message
+
     def _sync_domain_policies(self):
         try:
             online_system_ids = AgentConnectionManager.get_online_system_ids()
             if not online_system_ids:
                 return
-
-            active_sources = BlocklistSource.query.filter_by(is_enabled=True).all()
-            active_source_ids = {source.id for source in active_sources}
-            source_state_map = build_source_state_map(active_sources)
-            mappings_by_device = {}
-
-            all_mappings = ManagedUserDeviceMap.query.filter(
-                ManagedUserDeviceMap.system_id.in_(online_system_ids)
-            ).order_by(
-                ManagedUserDeviceMap.system_id.asc(),
-                ManagedUserDeviceMap.id.asc(),
-            ).all()
-            for mapping in all_mappings:
-                mappings_by_device.setdefault(mapping.system_id, []).append(mapping)
-
-            for system_id, mappings in mappings_by_device.items():
-                mapping_state = []
-
-                for mapping in mappings:
-                    assigned_source_ids = _assigned_source_ids_for_user(
-                        mapping.managed_user,
-                        active_source_ids=active_source_ids,
-                    )
-                    summary = summarize_mapping_blocklist_sync(mapping, source_state_map, assigned_source_ids)
-                    mapping_state.append((mapping, assigned_source_ids, summary))
-
-                needs_sync = any(summary['needs_sync'] for _, _, summary in mapping_state)
-                if not needs_sync:
-                    continue
-
-                success, message = self._sync_domain_policy_device(
-                    system_id,
-                    mapping_state,
-                    source_state_map,
-                )
-                if success:
-                    for mapping, assigned_source_ids, summary in mapping_state:
-                        if assigned_source_ids and mapping.linux_uid is None:
-                            mapping.mark_blocklist_sync_failed('Linux UID is required before domain policy can sync')
-                            continue
-
-                        if assigned_source_ids:
-                            mapping.mark_blocklist_synced(summary['policy_hash'])
-                        else:
-                            mapping.mark_blocklist_synced(None)
-                    db.session.commit()
-                else:
-                    for mapping, _, _ in mapping_state:
-                        mapping.mark_blocklist_sync_failed(message)
-                    db.session.commit()
+            for system_id in online_system_ids:
+                success, message = self._sync_domain_policy_system(system_id)
+                if not success:
                     logger.warning(
                         "Domain policy sync failed for device %s: %s",
                         system_id,

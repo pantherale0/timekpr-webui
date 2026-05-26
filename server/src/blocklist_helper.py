@@ -12,6 +12,7 @@ from src.database import BlocklistDomain
 
 DOMAIN_LABEL_RE = re.compile(r'^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$')
 EXTERNAL_SYNC_INTERVAL = timedelta(hours=24)
+BLOCKLIST_SYNC_RETRY_INTERVAL = timedelta(hours=4)
 BLOCKLIST_STREAM_CHUNK_SIZE = 64 * 1024
 BLOCKLIST_SYNC_BATCH_SIZE = 1000
 MAX_BLOCKLIST_LINE_LENGTH = 4096
@@ -313,6 +314,27 @@ def compute_mapping_policy_hash(linux_uid, source_state_map, assigned_source_ids
     return hashlib.sha256(digest_source.encode('utf-8')).hexdigest()
 
 
+def _compute_retry_key(label, payload):
+    digest_source = json.dumps(
+        {'label': label, 'payload': payload},
+        sort_keys=True,
+        separators=(',', ':'),
+    )
+    return hashlib.sha256(digest_source.encode('utf-8')).hexdigest()
+
+
+def _retry_due(mapping, retry_hash, now=None):
+    if retry_hash is None:
+        return True
+    if getattr(mapping, 'blocklist_last_attempt_hash', None) != retry_hash:
+        return True
+    last_attempted = getattr(mapping, 'blocklist_last_attempted', None)
+    if last_attempted is None:
+        return True
+    reference_time = now or datetime.utcnow()
+    return (reference_time - last_attempted) >= BLOCKLIST_SYNC_RETRY_INTERVAL
+
+
 def summarize_mapping_blocklist_sync(mapping, source_state_map, assigned_source_ids):
     source_ids = sorted({int(source_id) for source_id in assigned_source_ids})
     effective_domain_count = sum(
@@ -321,19 +343,39 @@ def summarize_mapping_blocklist_sync(mapping, source_state_map, assigned_source_
     )
 
     if not source_ids:
+        retry_hash = (
+            _compute_retry_key('clear', {'mapping_id': mapping.id})
+            if mapping.blocklist_policy_hash
+            else None
+        )
         return {
-            'needs_sync': bool(mapping.blocklist_policy_hash),
+            'needs_sync': bool(mapping.blocklist_policy_hash) and _retry_due(mapping, retry_hash),
             'status': 'pending_clear' if mapping.blocklist_policy_hash else 'not_configured',
             'effective_domain_count': 0,
             'policy_hash': None,
+            'retry_hash': retry_hash,
         }
 
     if mapping.linux_uid is None:
+        retry_hash = _compute_retry_key(
+            'awaiting_uid',
+            {
+                'mapping_id': mapping.id,
+                'linux_username': mapping.linux_username,
+                'sources': {
+                    str(source_id): (
+                        source_state_map.get(str(source_id), {}).get('revision') or ''
+                    )
+                    for source_id in source_ids
+                },
+            },
+        )
         return {
-            'needs_sync': True,
+            'needs_sync': _retry_due(mapping, retry_hash),
             'status': 'awaiting_uid',
             'effective_domain_count': effective_domain_count,
             'policy_hash': None,
+            'retry_hash': retry_hash,
         }
 
     policy_hash = compute_mapping_policy_hash(mapping.linux_uid, source_state_map, source_ids)
@@ -342,10 +384,11 @@ def summarize_mapping_blocklist_sync(mapping, source_state_map, assigned_source_
         and mapping.blocklist_policy_hash == policy_hash
     )
     return {
-        'needs_sync': not is_current,
+        'needs_sync': (not is_current) and _retry_due(mapping, policy_hash),
         'status': 'synced' if is_current else 'pending',
         'effective_domain_count': effective_domain_count,
         'policy_hash': policy_hash,
+        'retry_hash': policy_hash,
     }
 
 

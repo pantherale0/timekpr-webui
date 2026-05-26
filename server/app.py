@@ -791,6 +791,15 @@ def ws_agent_handler(ws):
             if msg_type == "command_response":
                 correlation_id = msg.get("correlation_id")
                 AgentConnectionManager.route_response(correlation_id, msg)
+            elif msg_type == "policy_sync_check":
+                source_revisions = msg.get("source_revisions") or {}
+                if not isinstance(source_revisions, dict):
+                    source_revisions = {}
+                task_manager.request_domain_policy_sync(
+                    system_id,
+                    source_revisions=source_revisions,
+                    reason='agent_timer',
+                )
             elif msg_type == "alert_event":
                 try:
                     normalized_alert = normalize_agent_alert_payload(system_id, msg)
@@ -1153,6 +1162,7 @@ def create_blocklist_source():
         success, message = task_manager.refresh_external_blocklist_source(source.id)
         flash(message, 'success' if success else 'warning')
     else:
+        task_manager.notify_domain_policy_hint(reason='blocklist_catalog_updated')
         flash(f'Blocklist "{source.name}" created with {len(domains)} domain(s)', 'success')
 
     return redirect(url_for('settings'))
@@ -1181,6 +1191,7 @@ def delete_blocklist_source(source_id):
         synchronize_session=False
     )
     db.session.commit()
+    task_manager.notify_domain_policy_hint(reason='blocklist_catalog_updated')
     flash(f'Blocklist "{source_name}" deleted', 'success')
     return redirect(url_for('settings'))
 
@@ -1204,6 +1215,7 @@ def toggle_blocklist_source(source_id):
     source.is_enabled = request.form.get('is_enabled') == 'on'
     source.updated_at = datetime.utcnow()
     db.session.commit()
+    task_manager.notify_domain_policy_hint(reason='blocklist_catalog_updated')
     flash(f'Blocklist "{source.name}" {"enabled" if source.is_enabled else "disabled"}', 'success')
     return redirect(url_for('settings'))
 
@@ -1239,6 +1251,7 @@ def add_blocklist_domain(source_id):
     )
     source.updated_at = datetime.utcnow()
     db.session.commit()
+    task_manager.notify_domain_policy_hint(reason='blocklist_catalog_updated')
     flash(f'Added {domain} to "{source.name}"', 'success')
     return redirect(url_for('settings'))
 
@@ -1261,6 +1274,7 @@ def delete_blocklist_domain(source_id, domain_id):
     )
     source.updated_at = datetime.utcnow()
     db.session.commit()
+    task_manager.notify_domain_policy_hint(reason='blocklist_catalog_updated')
     flash(f'Removed {domain_text} from "{source.name}"', 'success')
     return redirect(url_for('settings'))
 
@@ -1298,6 +1312,7 @@ def update_user_blocklists(user_id):
         db.session.add(ManagedUserBlocklistAssignment(managed_user_id=user.id, source_id=source_id))
 
     db.session.commit()
+    task_manager.notify_domain_policy_hint(reason='blocklist_assignment_updated')
     flash(f'Updated blocklist assignments for {user.username}', 'success')
     return redirect(url_for('weekly_schedule_user', user_id=user.id))
 
@@ -1412,6 +1427,7 @@ def add_user_mapping(user_id):
     )
     db.session.add(mapping)
     db.session.commit()
+    task_manager.notify_domain_policy_hint(system_ids={system_id}, reason='mapping_updated')
 
     flash(f'Mapping added: {user.username} -> {linux_username}@{device_label}', 'success')
     return redirect(url_for('admin'))
@@ -1462,6 +1478,7 @@ def add_user():
     )
     db.session.add(mapping)
     db.session.commit()
+    task_manager.notify_domain_policy_hint(system_ids={system_id}, reason='mapping_updated')
     flash(f'Managed user {username} and mapping added', 'success')
     return redirect(url_for('admin'))
 
@@ -1481,7 +1498,9 @@ def validate_user(user_id):
     total_valid = 0
     messages = []
     device_labels = _get_device_label_map()
+    policy_hint_system_ids = set()
     for mapping in mappings:
+        previous_linux_uid = mapping.linux_uid
         agent_client = AgentClient(system_id=mapping.system_id)
         is_valid, message, config_dict = agent_client.validate_user(mapping.linux_username)
         mapping.last_checked = datetime.utcnow()
@@ -1493,6 +1512,8 @@ def validate_user(user_id):
                     mapping.linux_uid = int(config_dict.get("LINUX_UID"))
                 except (TypeError, ValueError):
                     pass
+            if mapping.linux_uid != previous_linux_uid:
+                policy_hint_system_ids.add(mapping.system_id)
             total_spent += coerce_time_spent_day(config_dict.get('TIME_SPENT_DAY', 0))
             total_valid += 1
         else:
@@ -1514,6 +1535,11 @@ def validate_user(user_id):
         db.session.add(UserTimeUsage(user_id=user.id, date=today, time_spent=total_spent))
 
     db.session.commit()
+    if policy_hint_system_ids:
+        task_manager.notify_domain_policy_hint(
+            system_ids=policy_hint_system_ids,
+            reason='mapping_updated',
+        )
     if total_valid:
         flash(f'Validated {total_valid}/{len(mappings)} mapping(s) for {user.username}', 'success')
     else:
@@ -1531,6 +1557,7 @@ def validate_mapping(user_id, mapping_id):
     agent_client = AgentClient(system_id=mapping.system_id)
     is_valid, message, config_dict = agent_client.validate_user(mapping.linux_username)
 
+    previous_linux_uid = mapping.linux_uid
     mapping.last_checked = datetime.utcnow()
     mapping.is_valid = is_valid
     if is_valid and config_dict:
@@ -1543,6 +1570,11 @@ def validate_mapping(user_id, mapping_id):
 
     _refresh_managed_user_summary(user)
     db.session.commit()
+    if mapping.linux_uid != previous_linux_uid:
+        task_manager.notify_domain_policy_hint(
+            system_ids={mapping.system_id},
+            reason='mapping_updated',
+        )
     device_labels = _get_device_label_map()
 
     if is_valid:
@@ -1560,10 +1592,12 @@ def delete_mapping(user_id, mapping_id):
     user = ManagedUser.query.get_or_404(user_id)
     mapping = ManagedUserDeviceMap.query.filter_by(id=mapping_id, managed_user_id=user.id).first_or_404()
     mapping_label = _mapping_display_label(mapping)
+    affected_system_id = mapping.system_id
     db.session.delete(mapping)
     db.session.flush()
     _refresh_managed_user_summary(user)
     db.session.commit()
+    task_manager.notify_domain_policy_hint(system_ids={affected_system_id}, reason='mapping_updated')
     flash(f'Mapping removed: {mapping_label}', 'success')
     return redirect(url_for('admin'))
 
@@ -1574,9 +1608,12 @@ def delete_user(user_id):
     
     user = ManagedUser.query.get_or_404(user_id)
     username = user.username
+    affected_system_ids = {mapping.system_id for mapping in user.device_mappings}
     
     db.session.delete(user)
     db.session.commit()
+    if affected_system_ids:
+        task_manager.notify_domain_policy_hint(system_ids=affected_system_ids, reason='mapping_updated')
     
     flash(f'User {username} removed successfully', 'success')
     return redirect(url_for('admin'))
@@ -2051,6 +2088,8 @@ def run_schema_migrations():
             blocklist_policy_hash VARCHAR(64) NULL,
             blocklist_is_synced BOOLEAN NOT NULL DEFAULT 0,
             blocklist_last_synced DATETIME NULL,
+            blocklist_last_attempted DATETIME NULL,
+            blocklist_last_attempt_hash VARCHAR(64) NULL,
             blocklist_last_error TEXT NULL,
             FOREIGN KEY(managed_user_id) REFERENCES managed_user(id),
             FOREIGN KEY(system_id) REFERENCES agent_device(system_id),
@@ -2079,6 +2118,16 @@ def run_schema_migrations():
         db.session.execute(text("""
             ALTER TABLE managed_user_device_map
             ADD COLUMN blocklist_last_synced DATETIME NULL
+        """))
+    if mapping_columns and 'blocklist_last_attempted' not in mapping_columns:
+        db.session.execute(text("""
+            ALTER TABLE managed_user_device_map
+            ADD COLUMN blocklist_last_attempted DATETIME NULL
+        """))
+    if mapping_columns and 'blocklist_last_attempt_hash' not in mapping_columns:
+        db.session.execute(text("""
+            ALTER TABLE managed_user_device_map
+            ADD COLUMN blocklist_last_attempt_hash VARCHAR(64) NULL
         """))
     if mapping_columns and 'blocklist_last_error' not in mapping_columns:
         db.session.execute(text("""
