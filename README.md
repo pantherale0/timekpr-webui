@@ -96,7 +96,7 @@ Download the script, review it, then run it:
 
 ```bash
 curl -fsSLo /tmp/install-timekpr-agent.sh \
-  https://raw.githubusercontent.com/adambie/timekpr-webui/master/scripts/install-agent.sh
+  https://raw.githubusercontent.com/pantherale0/timekpr-webui/master/scripts/install-agent.sh
 chmod 0755 /tmp/install-timekpr-agent.sh
 sudo /tmp/install-timekpr-agent.sh --server-url "wss://timekpr.example.com/ws"
 ```
@@ -194,6 +194,38 @@ Notes:
    sudo systemctl enable timekpr-agent.service
    sudo systemctl start timekpr-agent.service
    ```
+
+### Option C: Run the Python Debug Agent
+
+If you want to debug server-side flows without a separate Linux client, TimeKpr D-Bus, or a second computer on the network, the repository includes a lightweight Python simulator at `server/debug_agent.py`.
+
+It speaks the same WebSocket protocol as the Rust agent, persists its state in a JSON file, auto-creates users on first validation by default, and supports the server actions used for:
+
+- user validation
+- time-left adjustments
+- weekly schedule sync
+- allowed-hours sync
+- domain-policy sync
+- AppArmor policy sync
+
+Run it from the repository checkout:
+
+```bash
+cd server
+pip install -r requirements.txt
+python debug_agent.py --server-url "ws://127.0.0.1:5000/ws" --agent-version "v0.10"
+```
+
+Notes:
+
+- The script creates `server/debug-agent.json` automatically and stores the generated `system_id`, paired `agent_token`, fake user state, and synced policy state there.
+- A fresh config starts with three fake users (`alice`, `bob`, and `charlie`) so validation, schedule sync, and time adjustments have something to operate on immediately.
+- On first start, the server will usually register it as a pending device. Approve it in the admin UI once, and the script will store the issued device token and reconnect automatically.
+- After the first successful authentication, it also sends a small one-shot set of synthetic alerts so the device and alert views have sample activity to inspect.
+- Once authenticated, the connection now stays open and the agent emits a random synthetic alert or policy-sync check on a timer. Use `--activity-interval 5` to make it chattier during debugging, or `--activity-interval 0` to disable that background traffic.
+- The `agent_version` must match the server version reported by the running server, just like the Rust agent.
+- Add `--strict-users` if you want validation to fail for usernames that are not already present in the JSON state file.
+- Add `--emit-startup-alert` if you also want to exercise the alert-ingest path on each successful authentication.
 
 ### Important Token Lifecycle Notes
 

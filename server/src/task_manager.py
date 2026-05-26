@@ -9,7 +9,7 @@ import time
 import traceback
 import uuid
 from contextlib import contextmanager
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 
 import requests
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
@@ -125,7 +125,7 @@ def _replace_source_domains(source, normalized_domains):
             db.session.add(BlocklistDomain(source_id=source.id, domain=domain_text))
 
     source.content_revision = compute_source_revision(desired_domains)
-    source.updated_at = datetime.utcnow()
+    source.updated_at = datetime.now(timezone.utc)
 
 
 def _assigned_source_ids_for_user(user, active_source_ids=None):
@@ -337,7 +337,7 @@ class BackgroundTaskManager:
 
                     if not mappings:
                         user.is_valid = False
-                        user.last_checked = datetime.utcnow()
+                        user.last_checked = datetime.now(timezone.utc)
                         db.session.commit()
                         continue
 
@@ -381,7 +381,7 @@ class BackgroundTaskManager:
                     validated_mappings = []
 
                     for mapping in mappings:
-                        mapping.last_checked = datetime.utcnow()
+                        mapping.last_checked = datetime.now(timezone.utc)
 
                         if not AgentConnectionManager.is_online(mapping.system_id):
                             logger.info(
@@ -542,7 +542,7 @@ class BackgroundTaskManager:
                         "ONLINE_MAPPING_COUNT": online_mappings,
                     }
                     user.last_config = json.dumps(shared_config)
-                    user.last_checked = datetime.utcnow()
+                    user.last_checked = datetime.now(timezone.utc)
                     user.is_valid = any_valid_mapping
                     db.session.commit()
                     if domain_policy_hint_system_ids:

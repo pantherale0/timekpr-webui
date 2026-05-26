@@ -14,13 +14,31 @@
                 "FLASK_ENV": "development",
                 "FLASK_DEBUG": "1",
                 "TZ": "UTC"
-                // OIDC Testing configuration environment variables:
-                // "OIDC_ISSUER_URL": "https://keycloak.example.com/realms/myrealm",
-                // "OIDC_CLIENT_ID": "timekpr-webui",
-                // "OIDC_CLIENT_SECRET": "your-client-secret",
-                // "OIDC_REDIRECT_URI": "http://localhost:5000/callback",
-                // "OIDC_VERIFY_SSL": "False"
-            }
+            },
+            "postDebugTask": "Launch Browser"
+        },
+        {
+            "name": "Python: Simple Agent",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/server/debug_agent.py",
+            "cwd": "${workspaceFolder}/server",
+            "console": "integratedTerminal",
+            "jinja": true,
+            "justMyCode": true,
+            "env": {
+                "TZ": "UTC"
+            },
+            "args": [
+                "--server-url", "ws://127.0.0.1:5000/ws",
+                "--agent-version", "v0.0.0-dev"
+            ]
+        }
+    ],
+    "compounds": [
+        {
+            "name": "Debug Server",
+            "configurations": ["Python: Flask App", "Python: Simple Agent"]
         }
     ]
 }

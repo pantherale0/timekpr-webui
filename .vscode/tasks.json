@@ -2,6 +2,20 @@
     "version": "2.0.0",
     "tasks": [
         {
+            "label": "Launch Browser",
+            "type": "shell",
+            "command": "start http://localhost:5000",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            },
+            "problemMatcher": []
+        },
+        {
             "label": "Run TimeKpr WebUI (Local)",
             "type": "shell",
             "command": "python app.py",

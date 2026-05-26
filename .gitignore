@@ -19,3 +19,5 @@ instance/
 
 agent/target
 agent/Cargo.lock
+
+server/debug-agent.json
