@@ -2562,7 +2562,7 @@ def delete_apparmor_rule(rule_id):
     db.session.delete(rule)
     db.session.commit()
 
-    policies_list, skipped_rule_names = _build_apparmor_policy_sync_payload(mapping.id)
+    policies_list, skipped_rule_names = _build_apparmor_policy_sync_payload(mapping)
     if skipped_rule_names:
         flash(
             'Skipped unsafe AppArmor rules during sync: ' + ', '.join(sorted(skipped_rule_names)),
