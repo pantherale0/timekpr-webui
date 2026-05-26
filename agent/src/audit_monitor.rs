@@ -1,18 +1,22 @@
 use serde_json::json;
 use std::collections::HashMap;
 use std::process::Stdio;
+use std::time::{Duration, Instant};
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;
 use tokio::sync::mpsc;
 
 use crate::netlink::AppAlert;
 
-/// Tail the system journal for AppArmor DENIED messages and forward them as
-/// `app_blocked` alert events through the provided channel.
+const ALERT_DEDUP_WINDOW: Duration = Duration::from_secs(30);
+const ALERT_DEDUP_RETENTION: Duration = Duration::from_secs(5 * 60);
+
+/// Tail the system journal for AppArmor policy-violation messages and forward
+/// them as `app_blocked`-compatible alert events through the provided channel.
 ///
 /// This spawns `journalctl --follow` filtering for AppArmor messages. Each
-/// DENIED line is parsed to extract the blocked executable and the profile that
-/// denied it.
+/// DENIED or complain-mode ALLOWED line is parsed to extract the executable and
+/// the profile involved in the policy violation.
 pub async fn run_audit_monitor(
     uid_map: HashMap<u32, String>,
     alert_tx: mpsc::UnboundedSender<AppAlert>,
@@ -61,10 +65,17 @@ async fn run_monitor_inner(
 
     let mut reader = BufReader::new(stdout).lines();
 
-    println!("audit_monitor: tailing journal for AppArmor denials");
+    println!("audit_monitor: tailing journal for AppArmor policy violations");
+    let mut last_sent_by_key: HashMap<String, Instant> = HashMap::new();
+    let mut last_prune = Instant::now();
 
     while let Ok(Some(line)) = reader.next_line().await {
-        if !line.contains("apparmor=\"DENIED\"") && !line.contains("apparmor=DENIED") {
+        let disposition = match extract_apparmor_disposition(&line) {
+            Some(value) => value,
+            None => continue,
+        };
+
+        if disposition != "DENIED" && disposition != "ALLOWED" {
             continue;
         }
 
@@ -101,9 +112,31 @@ async fn run_monitor_inner(
             None => continue, // Not a Timekpr-managed denial
         };
 
+        let dedup_key = format!(
+            "{}|{}|{}|{}|{}|{}",
+            username,
+            disposition,
+            profile.as_deref().unwrap_or_default(),
+            operation.as_deref().unwrap_or_default(),
+            name.as_deref().unwrap_or_default(),
+            comm.as_deref().unwrap_or_default(),
+        );
+        let now = Instant::now();
+        if let Some(last_sent_at) = last_sent_by_key.get(&dedup_key) {
+            if now.duration_since(*last_sent_at) < ALERT_DEDUP_WINDOW {
+                continue;
+            }
+        }
+        last_sent_by_key.insert(dedup_key, now);
+
+        if now.duration_since(last_prune) >= ALERT_DEDUP_WINDOW {
+            last_prune = now;
+            last_sent_by_key.retain(|_, timestamp| now.duration_since(*timestamp) < ALERT_DEDUP_RETENTION);
+        }
+
         println!(
-            "audit_monitor: AppArmor DENIED for user={} profile={:?} comm={:?} name={:?}",
-            username, profile, comm, name
+            "audit_monitor: AppArmor {} for user={} profile={:?} comm={:?} name={:?}",
+            disposition, username, profile, comm, name
         );
 
         let _ = alert_tx.send(AppAlert {
@@ -111,6 +144,7 @@ async fn run_monitor_inner(
             linux_username: username,
             payload: json!({
                 "details": {
+                    "disposition": disposition,
                     "profile": profile.unwrap_or_default(),
                     "operation": operation.unwrap_or_default(),
                     "blocked_path": name.unwrap_or_default(),
@@ -122,6 +156,16 @@ async fn run_monitor_inner(
     }
 
     Ok(())
+}
+
+fn extract_apparmor_disposition(line: &str) -> Option<&'static str> {
+    if line.contains("apparmor=\"DENIED\"") || line.contains("apparmor=DENIED") {
+        Some("DENIED")
+    } else if line.contains("apparmor=\"ALLOWED\"") || line.contains("apparmor=ALLOWED") {
+        Some("ALLOWED")
+    } else {
+        None
+    }
 }
 
 /// Extract a key=value or key="value" field from an audit log line.
@@ -188,5 +232,18 @@ mod tests {
     fn extract_missing_field() {
         let line = "some random log line without fields";
         assert_eq!(extract_field(line, "profile="), None);
+    }
+
+    #[test]
+    fn extract_apparmor_disposition_matches_allowed_and_denied() {
+        assert_eq!(
+            extract_apparmor_disposition(r#"audit: apparmor="DENIED" operation="open""#),
+            Some("DENIED")
+        );
+        assert_eq!(
+            extract_apparmor_disposition(r#"audit: apparmor="ALLOWED" operation="connect""#),
+            Some("ALLOWED")
+        );
+        assert_eq!(extract_apparmor_disposition("audit: operation=open"), None);
     }
 }

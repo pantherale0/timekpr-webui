@@ -535,7 +535,7 @@
             allowed: 'Unrestricted access — no AppArmor sandbox applied',
             no_internet: 'Runs normally but all network access is denied',
             blocked: 'Execution is completely prevented',
-            complain: 'Runs unrestricted but logs blocks/network access attempts (report-only)',
+            complain: 'Runs unrestricted and audits selected network activity in a low-noise report-only mode',
         };
 
         function updateTile(radio, index) {

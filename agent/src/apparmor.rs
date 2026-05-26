@@ -275,12 +275,14 @@ fn make_profile_name(username: &str, app_name: &str) -> String {
 fn generate_profile(profile_name: &str, executable_path: &str, preset: &str) -> String {
     match preset {
         "complain" => format!(
-            r#"# Timekpr managed profile – COMPLAIN (report-only)
-profile {profile_name} {executable_path} flags=(complain) {{
-  # Deny rules in complain mode only report warnings to logs
-  deny /** rwlkx,
-  deny network,
-  deny capability,
+            r#"# Timekpr managed profile – REPORT ONLY
+profile {profile_name} {executable_path} flags=(default_allow) {{
+  # Browsers generate far too much log traffic under sparse complain-mode
+  # profiles. Use default_allow and audit only selected activity so the app
+  # remains unrestricted without overwhelming the desktop with audit spam.
+  audit network inet,
+  audit network inet6,
+  audit network netlink,
 }}
 "#,
             profile_name = profile_name,
@@ -361,9 +363,12 @@ mod tests {
     #[test]
     fn complain_profile_denies_everything_with_complain_flag() {
         let profile = generate_profile("timekpr-alice-steam", "/usr/bin/steam", "complain");
-        assert!(profile.contains("flags=(complain)"));
-        assert!(profile.contains("deny /** rwlkx,"));
-        assert!(profile.contains("deny network,"));
+        assert!(profile.contains("flags=(default_allow)"));
+        assert!(profile.contains("audit network inet,"));
+        assert!(profile.contains("audit network inet6,"));
+        assert!(profile.contains("audit network netlink,"));
+        assert!(!profile.contains("deny /** rwlkx,"));
+        assert!(!profile.contains("deny network,"));
     }
 
     #[test]
