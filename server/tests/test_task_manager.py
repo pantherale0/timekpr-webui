@@ -1,4 +1,3 @@
-import pytest
 import json
 from datetime import datetime, date, timedelta
 from src.task_manager import BackgroundTaskManager
@@ -14,7 +13,6 @@ from src.database import (
     UserDailyTimeInterval,
     AgentDevice,
     Settings,
-    db,
 )
 from src.agent_helper import AgentConnectionManager
 
@@ -40,6 +38,39 @@ class DummyWS:
                 })
         except Exception:
             pass
+
+
+class StatefulTimeWS:
+    def __init__(self, time_spent=450, time_left=1000):
+        self.sent_messages = []
+        self.time_spent = time_spent
+        self.time_left = time_left
+
+    def send(self, message):
+        self.sent_messages.append(message)
+        payload = json.loads(message)
+        correlation_id = payload.get("correlation_id")
+        if not correlation_id:
+            return
+
+        action = payload.get("action")
+        if action == "modify_time_left":
+            operation = payload.get("args", {}).get("operation")
+            seconds = int(payload.get("args", {}).get("seconds", 0))
+            if operation == "+":
+                self.time_left += seconds
+            elif operation == "-":
+                self.time_left -= seconds
+
+        data = {"config": {"TIME_SPENT_DAY": self.time_spent, "TIME_LEFT_DAY": self.time_left}}
+        if action == "get_domain_policy_state":
+            data = {"source_revisions": {}}
+
+        AgentConnectionManager.route_response(correlation_id, {
+            "success": True,
+            "message": "Success",
+            "data": data,
+        })
 
 from unittest.mock import MagicMock
 
@@ -250,6 +281,180 @@ def test_task_manager_update_user_data(app, db_session):
     # Clean up registry
     AgentConnectionManager.unregister("sys-offline")
     AgentConnectionManager.unregister("sys-online")
+
+
+def test_task_manager_retains_same_day_usage_for_offline_mappings(app, db_session):
+    manager = BackgroundTaskManager(app)
+
+    user = ManagedUser(
+        username="shared_user",
+        system_ip="Unassigned",
+        is_valid=True,
+    )
+    offline_device = AgentDevice(system_id="sys-cached", status="approved", secure_token="tok")
+    online_device = AgentDevice(system_id="sys-live", status="approved", secure_token="tok")
+    db_session.add_all([user, offline_device, online_device])
+    db_session.flush()
+
+    offline_mapping = ManagedUserDeviceMap(
+        managed_user_id=user.id,
+        system_id="sys-cached",
+        linux_username="shared_user",
+        is_valid=True,
+        last_checked=datetime.utcnow(),
+        last_config='{"TIME_SPENT_DAY": 1800, "TIME_LEFT_DAY": 1200}',
+    )
+    online_mapping = ManagedUserDeviceMap(
+        managed_user_id=user.id,
+        system_id="sys-live",
+        linux_username="shared_user",
+        is_valid=True,
+    )
+    db_session.add_all([offline_mapping, online_mapping])
+    db_session.commit()
+
+    ws = DummyWS()
+    AgentConnectionManager.register("sys-live", ws, "10.0.0.4")
+
+    with app.app_context():
+        manager._update_user_data()
+
+    refreshed_user = ManagedUser.query.filter_by(id=user.id).first()
+    usage = UserTimeUsage.query.filter_by(user_id=user.id, date=date.today()).first()
+    assert usage.time_spent == 2250
+    assert refreshed_user.get_config_value("TIME_SPENT_DAY") == 2250
+
+    AgentConnectionManager.unregister("sys-live")
+
+    with app.app_context():
+        manager._update_user_data()
+
+    refreshed_user = ManagedUser.query.filter_by(id=user.id).first()
+    usage = UserTimeUsage.query.filter_by(user_id=user.id, date=date.today()).first()
+    assert usage.time_spent == 2250
+    assert refreshed_user.get_config_value("TIME_SPENT_DAY") == 2250
+
+
+def test_task_manager_rebalances_shared_time_left_across_devices(app, db_session):
+    manager = BackgroundTaskManager(app)
+
+    user = ManagedUser(
+        username="shared_limit_user",
+        system_ip="Unassigned",
+        is_valid=True,
+    )
+    offline_device = AgentDevice(system_id="sys-offline-balance", status="approved", secure_token="tok")
+    online_device = AgentDevice(system_id="sys-online-balance", status="approved", secure_token="tok")
+    db_session.add_all([user, offline_device, online_device])
+    db_session.flush()
+
+    schedule = UserWeeklySchedule(user_id=user.id, is_synced=True)
+    weekday_columns = (
+        'monday_hours',
+        'tuesday_hours',
+        'wednesday_hours',
+        'thursday_hours',
+        'friday_hours',
+        'saturday_hours',
+        'sunday_hours',
+    )
+    setattr(schedule, weekday_columns[date.today().weekday()], 1.0)
+    db_session.add(schedule)
+
+    offline_mapping = ManagedUserDeviceMap(
+        managed_user_id=user.id,
+        system_id="sys-offline-balance",
+        linux_username="shared_limit_user",
+        is_valid=True,
+        last_checked=datetime.utcnow(),
+        last_config='{"TIME_SPENT_DAY": 1200, "TIME_LEFT_DAY": 2400}',
+    )
+    online_mapping = ManagedUserDeviceMap(
+        managed_user_id=user.id,
+        system_id="sys-online-balance",
+        linux_username="shared_limit_user",
+        is_valid=True,
+    )
+    db_session.add_all([offline_mapping, online_mapping])
+    db_session.commit()
+
+    ws = StatefulTimeWS(time_spent=600, time_left=3000)
+    AgentConnectionManager.register("sys-online-balance", ws, "10.0.0.5")
+
+    with app.app_context():
+        manager._update_user_data()
+
+    rebalance_calls = [
+        json.loads(message)
+        for message in ws.sent_messages
+        if json.loads(message).get("action") == "modify_time_left"
+    ]
+    assert rebalance_calls
+    assert rebalance_calls[-1]["args"] == {"operation": "-", "seconds": 1200}
+
+    refreshed_user = ManagedUser.query.filter_by(id=user.id).first()
+    usage = UserTimeUsage.query.filter_by(user_id=user.id, date=date.today()).first()
+    assert usage.time_spent == 1800
+    assert refreshed_user.get_config_value("TIME_LEFT_DAY") == 1800
+    assert online_mapping.get_config_value("TIME_LEFT_DAY") == 1800
+
+    AgentConnectionManager.unregister("sys-online-balance")
+
+
+def test_task_manager_uses_server_daily_adjustment_when_rebalancing(app, db_session):
+    manager = BackgroundTaskManager(app)
+
+    user = ManagedUser(
+        username="adjusted_limit_user",
+        system_ip="Unassigned",
+        is_valid=True,
+    )
+    online_device = AgentDevice(system_id="sys-adjusted-balance", status="approved", secure_token="tok")
+    db_session.add_all([user, online_device])
+    db_session.flush()
+
+    schedule = UserWeeklySchedule(user_id=user.id, is_synced=True)
+    weekday_columns = (
+        'monday_hours',
+        'tuesday_hours',
+        'wednesday_hours',
+        'thursday_hours',
+        'friday_hours',
+        'saturday_hours',
+        'sunday_hours',
+    )
+    setattr(schedule, weekday_columns[date.today().weekday()], 1.0)
+    db_session.add(schedule)
+
+    mapping = ManagedUserDeviceMap(
+        managed_user_id=user.id,
+        system_id="sys-adjusted-balance",
+        linux_username="adjusted_limit_user",
+        is_valid=True,
+    )
+    db_session.add(mapping)
+    user.apply_daily_limit_adjustment('+', 300, date.today())
+    db_session.commit()
+
+    ws = StatefulTimeWS(time_spent=600, time_left=3000)
+    AgentConnectionManager.register("sys-adjusted-balance", ws, "10.0.0.6")
+
+    with app.app_context():
+        manager._update_user_data()
+
+    rebalance_calls = [
+        json.loads(message)
+        for message in ws.sent_messages
+        if json.loads(message).get("action") == "modify_time_left"
+    ]
+    assert rebalance_calls
+    assert rebalance_calls[-1]["args"] == {"operation": "+", "seconds": 300}
+
+    refreshed_user = ManagedUser.query.filter_by(id=user.id).first()
+    assert refreshed_user.get_config_value("TIME_LEFT_DAY") == 3300
+
+    AgentConnectionManager.unregister("sys-adjusted-balance")
+
 
 def test_task_manager_failures_and_threads(app, db_session):
     manager = BackgroundTaskManager(app)

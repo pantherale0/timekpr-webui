@@ -22,6 +22,48 @@ def coerce_time_spent_day(value):
         return 0
 
 
+def coerce_time_left_day(value):
+    """Normalise TIME_LEFT_DAY en entier, ou None si absent."""
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, (list, tuple)):
+        return coerce_time_left_day(value[0]) if value else None
+    try:
+        return int(str(value).strip())
+    except (TypeError, ValueError):
+        return None
+
+
+def get_mapping_time_spent_for_day(mapping, day=None):
+    """Return a mapping's last known TIME_SPENT_DAY only for the requested day."""
+    if mapping is None:
+        return 0
+
+    day = day or datetime.utcnow().date()
+    last_checked = getattr(mapping, 'last_checked', None)
+    if last_checked is None or last_checked.date() != day:
+        return 0
+
+    return coerce_time_spent_day(mapping.get_config_value('TIME_SPENT_DAY'))
+
+
+def get_mapping_time_left_for_day(mapping, day=None):
+    """Return a mapping's last known TIME_LEFT_DAY only for the requested day."""
+    if mapping is None:
+        return None
+
+    day = day or datetime.utcnow().date()
+    last_checked = getattr(mapping, 'last_checked', None)
+    if last_checked is None or last_checked.date() != day:
+        return None
+
+    return coerce_time_left_day(mapping.get_config_value('TIME_LEFT_DAY'))
+
+
 class Settings(db.Model):
     __tablename__ = 'settings'
     id = db.Column(db.Integer, primary_key=True)
@@ -201,6 +243,8 @@ class ManagedUser(db.Model):
     last_config = db.Column(db.Text, nullable=True) # Store the full config JSON
     pending_time_adjustment = db.Column(db.Integer, nullable=True) # Pending time adjustment in seconds
     pending_time_operation = db.Column(db.String(1), nullable=True) # + or -
+    daily_limit_adjustment_date = db.Column(db.Date, nullable=True)
+    daily_limit_adjustment_seconds = db.Column(db.Integer, nullable=True)
     
     # Relationship with usage data and weekly schedules
     usage_data = db.relationship('UserTimeUsage', backref='user', lazy=True, cascade="all, delete-orphan")
@@ -328,6 +372,47 @@ class ManagedUser(db.Model):
             return config.get(key)
         except (TypeError, ValueError, json.JSONDecodeError):
             return None
+
+    def get_daily_limit_adjustment_seconds(self, day=None):
+        day = day or datetime.utcnow().date()
+        if self.daily_limit_adjustment_date != day:
+            return 0
+        return int(self.daily_limit_adjustment_seconds or 0)
+
+    def set_daily_limit_adjustment_seconds(self, seconds, day=None):
+        day = day or datetime.utcnow().date()
+        seconds = int(seconds or 0)
+        if seconds:
+            self.daily_limit_adjustment_date = day
+            self.daily_limit_adjustment_seconds = seconds
+        else:
+            self.daily_limit_adjustment_date = None
+            self.daily_limit_adjustment_seconds = None
+
+    def apply_daily_limit_adjustment(self, operation, seconds, day=None):
+        if operation not in {'+', '-'}:
+            raise ValueError("operation must be '+' or '-'")
+        seconds = int(seconds)
+        if seconds < 0:
+            raise ValueError('seconds must be non-negative')
+
+        day = day or datetime.utcnow().date()
+        current = self.get_daily_limit_adjustment_seconds(day)
+        delta = seconds if operation == '+' else -seconds
+        updated = current + delta
+        self.set_daily_limit_adjustment_seconds(updated, day)
+        return updated
+
+    def get_effective_daily_limit_seconds(self, day=None):
+        day = day or datetime.utcnow().date()
+        if not self.weekly_schedule:
+            return None
+
+        base_limit = self.weekly_schedule.get_limit_seconds_for_day(day)
+        if base_limit is None:
+            return None
+
+        return max(base_limit + self.get_daily_limit_adjustment_seconds(day), 0)
 
     def get_device_online_summary(self, online_checker):
         """Return tuple of (online_count, total_count) for mapped devices."""
@@ -534,6 +619,25 @@ class UserWeeklySchedule(db.Model):
             'saturday': self.saturday_hours,
             'sunday': self.sunday_hours
         }
+
+    def get_limit_hours_for_day(self, day=None):
+        day = day or datetime.utcnow().date()
+        day_names = (
+            'monday',
+            'tuesday',
+            'wednesday',
+            'thursday',
+            'friday',
+            'saturday',
+            'sunday',
+        )
+        return self.get_schedule_dict().get(day_names[day.weekday()], 0)
+
+    def get_limit_seconds_for_day(self, day=None):
+        hours = self.get_limit_hours_for_day(day)
+        if hours is None or hours <= 0:
+            return None
+        return int(round(hours * 3600))
     
     def set_schedule_from_dict(self, schedule_dict):
         """Set schedule from a dictionary"""

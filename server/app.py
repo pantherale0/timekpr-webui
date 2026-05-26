@@ -17,7 +17,8 @@ from src.database import (
     Settings,
     UserWeeklySchedule,
     UserDailyTimeInterval,
-    coerce_time_spent_day,
+    get_mapping_time_spent_for_day,
+    get_mapping_time_left_for_day,
     AgentDevice,
     BlocklistSource,
     BlocklistDomain,
@@ -333,12 +334,14 @@ def _build_device_alert_entries(device, search_query=''):
 def _refresh_managed_user_summary(user):
     valid_mappings = [mapping for mapping in user.device_mappings if mapping.is_valid]
     user.is_valid = bool(valid_mappings)
+    today = date.today()
+    effective_daily_limit_seconds = user.get_effective_daily_limit_seconds(today)
 
     if not valid_mappings:
         user.last_checked = datetime.utcnow()
         user.last_config = json.dumps({
             "TIME_SPENT_DAY": 0,
-            "TIME_LEFT_DAY": None,
+            "TIME_LEFT_DAY": effective_daily_limit_seconds,
             "MAPPING_COUNT": len(user.device_mappings),
             "ONLINE_MAPPING_COUNT": 0,
         })
@@ -347,11 +350,16 @@ def _refresh_managed_user_summary(user):
     shared_spent = 0
     time_left_values = []
     for mapping in valid_mappings:
-        config = _mapping_config(mapping)
-        shared_spent += coerce_time_spent_day(config.get("TIME_SPENT_DAY", 0))
-        time_left = config.get("TIME_LEFT_DAY")
-        if isinstance(time_left, int):
+        shared_spent += get_mapping_time_spent_for_day(mapping, today)
+        time_left = get_mapping_time_left_for_day(mapping, today)
+        if time_left is not None:
             time_left_values.append(time_left)
+
+    shared_time_left = (
+        max(effective_daily_limit_seconds - shared_spent, 0)
+        if effective_daily_limit_seconds is not None
+        else (min(time_left_values) if time_left_values else None)
+    )
 
     user.last_checked = max(
         (mapping.last_checked for mapping in valid_mappings if mapping.last_checked),
@@ -359,14 +367,13 @@ def _refresh_managed_user_summary(user):
     )
     user.last_config = json.dumps({
         "TIME_SPENT_DAY": shared_spent,
-        "TIME_LEFT_DAY": min(time_left_values) if time_left_values else None,
+        "TIME_LEFT_DAY": shared_time_left,
         "MAPPING_COUNT": len(user.device_mappings),
         "ONLINE_MAPPING_COUNT": sum(
             1 for mapping in user.device_mappings if AgentConnectionManager.is_online(mapping.system_id)
         ),
     })
 
-    today = date.today()
     usage = UserTimeUsage.query.filter_by(user_id=user.id, date=today).first()
     if usage:
         usage.time_spent = shared_spent
@@ -1494,7 +1501,6 @@ def validate_user(user_id):
         flash('No device mappings configured for this managed user', 'warning')
         return redirect(url_for('admin'))
 
-    total_spent = 0
     total_valid = 0
     messages = []
     device_labels = _get_device_label_map()
@@ -1514,25 +1520,11 @@ def validate_user(user_id):
                     pass
             if mapping.linux_uid != previous_linux_uid:
                 policy_hint_system_ids.add(mapping.system_id)
-            total_spent += coerce_time_spent_day(config_dict.get('TIME_SPENT_DAY', 0))
             total_valid += 1
         else:
             messages.append(f"{_mapping_display_label(mapping, device_labels)}: {message}")
 
-    user.is_valid = total_valid > 0
-    user.last_checked = datetime.utcnow()
-    user.last_config = json.dumps({
-        "TIME_SPENT_DAY": total_spent,
-        "MAPPING_COUNT": len(mappings),
-        "VALID_MAPPING_COUNT": total_valid,
-    })
-
-    today = date.today()
-    usage = UserTimeUsage.query.filter_by(user_id=user.id, date=today).first()
-    if usage:
-        usage.time_spent = total_spent
-    else:
-        db.session.add(UserTimeUsage(user_id=user.id, date=today, time_spent=total_spent))
+    _refresh_managed_user_summary(user)
 
     db.session.commit()
     if policy_hint_system_ids:
@@ -2010,10 +2002,62 @@ def modify_time():
     
     # Get user from database
     user = ManagedUser.query.get_or_404(user_id)
+    today = date.today()
+    effective_daily_limit_before_adjustment = user.get_effective_daily_limit_seconds(today)
     
     mappings = list(user.device_mappings)
     if not mappings:
         return jsonify({'success': False, 'message': 'No device mappings configured for this user'}), 400
+
+    if effective_daily_limit_before_adjustment is not None:
+        user.apply_daily_limit_adjustment(operation, seconds, today)
+        user.pending_time_adjustment = None
+        user.pending_time_operation = None
+        user.last_checked = datetime.utcnow()
+        db.session.commit()
+
+        online_mappings = [mapping for mapping in mappings if AgentConnectionManager.is_online(mapping.system_id)]
+        device_labels = _get_device_label_map()
+        if not online_mappings:
+            return jsonify({
+                'success': True,
+                'message': 'Adjustment saved on the server and will rebalance when a mapped device reconnects.',
+                'username': user.username,
+                'pending': True,
+                'refresh': True
+            })
+
+        failures = []
+        for mapping in online_mappings:
+            agent_client = AgentClient(system_id=mapping.system_id)
+            success, message = agent_client.modify_time_left(mapping.linux_username, operation, seconds)
+            if not success:
+                failures.append(f"{_mapping_display_label(mapping, device_labels)}: {message}")
+
+        remaining_mappings = len(mappings) - len(online_mappings)
+        if failures or remaining_mappings > 0:
+            pending_fragments = []
+            if failures:
+                pending_fragments.append(f"{len(failures)} online mapping(s) need retry")
+            if remaining_mappings > 0:
+                pending_fragments.append(f"{remaining_mappings} offline mapping(s) will rebalance on reconnect")
+            return jsonify({
+                'success': True,
+                'message': f"Adjustment stored on the server. Applied immediately to {len(online_mappings) - len(failures)}/{len(online_mappings)} online mapping(s).",
+                'details': failures,
+                'username': user.username,
+                'pending': True,
+                'pending_reason': '; '.join(pending_fragments),
+                'refresh': True
+            })
+
+        return jsonify({
+            'success': True,
+            'message': f"Adjustment applied to {len(online_mappings)} mapping(s).",
+            'username': user.username,
+            'pending': False,
+            'refresh': True
+        })
 
     online_mappings = [mapping for mapping in mappings if AgentConnectionManager.is_online(mapping.system_id)]
     device_labels = _get_device_label_map()
@@ -2072,6 +2116,22 @@ def run_schema_migrations():
             ADD COLUMN system_hostname VARCHAR(255) NULL
         """))
         db.session.commit()
+
+    managed_user_columns = {
+        row[1]
+        for row in db.session.execute(text("PRAGMA table_info(managed_user)")).fetchall()
+    }
+    if managed_user_columns and 'daily_limit_adjustment_date' not in managed_user_columns:
+        db.session.execute(text("""
+            ALTER TABLE managed_user
+            ADD COLUMN daily_limit_adjustment_date DATE NULL
+        """))
+    if managed_user_columns and 'daily_limit_adjustment_seconds' not in managed_user_columns:
+        db.session.execute(text("""
+            ALTER TABLE managed_user
+            ADD COLUMN daily_limit_adjustment_seconds INTEGER NULL
+        """))
+    db.session.commit()
 
     db.session.execute(text("""
         CREATE TABLE IF NOT EXISTS managed_user_device_map (

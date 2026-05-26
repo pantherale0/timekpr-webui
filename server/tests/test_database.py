@@ -1,6 +1,9 @@
-from datetime import datetime, date, timedelta
+from datetime import datetime, timedelta
 from src.database import (
+    coerce_time_left_day,
     coerce_time_spent_day,
+    get_mapping_time_spent_for_day,
+    get_mapping_time_left_for_day,
     Settings,
     AgentAlert,
     AgentDevice,
@@ -9,7 +12,6 @@ from src.database import (
     UserTimeUsage,
     UserWeeklySchedule,
     UserDailyTimeInterval,
-    db
 )
 
 def test_coerce_time_spent_day():
@@ -21,6 +23,65 @@ def test_coerce_time_spent_day():
     assert coerce_time_spent_day([]) == 0
     assert coerce_time_spent_day(" 123 \n") == 123
     assert coerce_time_spent_day("invalid") == 0
+
+
+def test_coerce_time_left_day():
+    assert coerce_time_left_day(None) is None
+    assert coerce_time_left_day(True) is None
+    assert coerce_time_left_day(42) == 42
+    assert coerce_time_left_day([10, 20]) == 10
+    assert coerce_time_left_day(" 123 \n") == 123
+    assert coerce_time_left_day("invalid") is None
+
+
+def test_get_mapping_time_spent_for_day_uses_same_day_snapshot(db_session):
+    device = AgentDevice(system_id="dev-day-check", status="approved", secure_token="token")
+    user = ManagedUser(username="same_day_user", system_ip="Unassigned", is_valid=True)
+    db_session.add_all([device, user])
+    db_session.flush()
+
+    mapping = ManagedUserDeviceMap(
+        managed_user_id=user.id,
+        system_id=device.system_id,
+        linux_username="same_day_user",
+        is_valid=True,
+        last_checked=datetime.utcnow(),
+        last_config='{"TIME_SPENT_DAY": 900}',
+    )
+    db_session.add(mapping)
+    db_session.commit()
+
+    today = datetime.utcnow().date()
+    assert get_mapping_time_spent_for_day(mapping, today) == 900
+
+    mapping.last_checked = datetime.utcnow() - timedelta(days=1)
+    db_session.commit()
+    assert get_mapping_time_spent_for_day(mapping, today) == 0
+
+
+def test_get_mapping_time_left_for_day_uses_same_day_snapshot(db_session):
+    device = AgentDevice(system_id="dev-left-check", status="approved", secure_token="token")
+    user = ManagedUser(username="left_day_user", system_ip="Unassigned", is_valid=True)
+    db_session.add_all([device, user])
+    db_session.flush()
+
+    mapping = ManagedUserDeviceMap(
+        managed_user_id=user.id,
+        system_id=device.system_id,
+        linux_username="left_day_user",
+        is_valid=True,
+        last_checked=datetime.utcnow(),
+        last_config='{"TIME_LEFT_DAY": 1500}',
+    )
+    db_session.add(mapping)
+    db_session.commit()
+
+    today = datetime.utcnow().date()
+    assert get_mapping_time_left_for_day(mapping, today) == 1500
+
+    mapping.last_checked = datetime.utcnow() - timedelta(days=1)
+    db_session.commit()
+    assert get_mapping_time_left_for_day(mapping, today) is None
 
 def test_settings_model(db_session):
     # Test setting and getting values
@@ -157,6 +218,30 @@ def test_managed_user_and_usage(db_session):
     assert mapping.get_config_value("LINUX_UID") == 1000
     assert user.get_config_value("TIME_SPENT_DAY") == 1800
     assert user.get_config_value("nonexistent") is None
+
+    today = datetime.utcnow().date()
+    schedule = UserWeeklySchedule(user_id=user.id)
+    weekday_columns = (
+        'monday_hours',
+        'tuesday_hours',
+        'wednesday_hours',
+        'thursday_hours',
+        'friday_hours',
+        'saturday_hours',
+        'sunday_hours',
+    )
+    setattr(schedule, weekday_columns[today.weekday()], 2.0)
+    db_session.add(schedule)
+    db_session.commit()
+
+    assert schedule.get_limit_seconds_for_day(today) == 7200
+    assert user.get_effective_daily_limit_seconds(today) == 7200
+    user.apply_daily_limit_adjustment('+', 300, today)
+    assert user.get_daily_limit_adjustment_seconds(today) == 300
+    assert user.get_effective_daily_limit_seconds(today) == 7500
+    user.apply_daily_limit_adjustment('-', 120, today)
+    assert user.get_daily_limit_adjustment_seconds(today) == 180
+    assert user.get_effective_daily_limit_seconds(today) == 7380
     
     # Test invalid config JSON
     user.last_config = "{invalid_json}"
@@ -166,7 +251,6 @@ def test_managed_user_and_usage(db_session):
     assert user.get_config_value("ANY") is None
 
     # Test usage data
-    today = datetime.utcnow().date()
     usage1 = UserTimeUsage(user_id=user.id, date=today, time_spent=1200)
     usage2 = UserTimeUsage(user_id=user.id, date=today - timedelta(days=1), time_spent=2400)
     db_session.add_all([usage1, usage2])

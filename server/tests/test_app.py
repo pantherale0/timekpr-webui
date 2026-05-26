@@ -833,8 +833,10 @@ def test_new_endpoints(client, db_session):
     data = json.loads(res.data)
     assert data['success']
     assert data['pending']
-    assert user.pending_time_adjustment == 600
-    assert user.pending_time_operation == '-'
+    assert user.pending_time_adjustment is None
+    assert user.pending_time_operation is None
+    assert user.daily_limit_adjustment_seconds == -300
+    assert user.daily_limit_adjustment_date == datetime.utcnow().date()
 
     res = client.post('/api/modify-time', data={
         'user_id': user.id,
@@ -949,6 +951,71 @@ def test_alert_pages_for_user_and_device(client, db_session):
     assert admin_res.status_code == 200
     assert f'/devices/{device.system_id}'.encode() in admin_res.data
 
+
+def test_modify_time_tracks_server_daily_adjustment_for_scheduled_users(client, db_session):
+    Settings.set_admin_password("admin")
+    client.post('/', data={'username': 'admin', 'password': 'admin'})
+
+    online_device = AgentDevice(system_id="sched-online", status="approved", secure_token="tok")
+    offline_device = AgentDevice(system_id="sched-offline", status="approved", secure_token="tok")
+    user = ManagedUser(username="scheduled_user", system_ip="Unassigned", is_valid=True)
+    db_session.add_all([online_device, offline_device, user])
+    db_session.flush()
+    db_session.add_all([
+        ManagedUserDeviceMap(
+            managed_user_id=user.id,
+            system_id="sched-online",
+            linux_username="scheduled_user",
+            is_valid=True,
+        ),
+        ManagedUserDeviceMap(
+            managed_user_id=user.id,
+            system_id="sched-offline",
+            linux_username="scheduled_user",
+            is_valid=True,
+        ),
+    ])
+
+    schedule = UserWeeklySchedule(user_id=user.id, is_synced=True)
+    weekday_columns = (
+        'monday_hours',
+        'tuesday_hours',
+        'wednesday_hours',
+        'thursday_hours',
+        'friday_hours',
+        'saturday_hours',
+        'sunday_hours',
+    )
+    setattr(schedule, weekday_columns[datetime.utcnow().date().weekday()], 2.0)
+    db_session.add(schedule)
+    db_session.commit()
+
+    class DummyWS:
+        def send(self, message):
+            pass
+
+    AgentConnectionManager.register("sched-online", DummyWS(), "127.0.0.1")
+
+    with patch('src.agent_helper.AgentClient.modify_time_left') as mock_modify:
+        mock_modify.return_value = (True, "Time modified successfully")
+        res = client.post('/api/modify-time', data={
+            'user_id': user.id,
+            'operation': '+',
+            'seconds': '300'
+        })
+
+    assert res.status_code == 200
+    data = json.loads(res.data)
+    assert data['success']
+    assert data['pending']
+    assert user.daily_limit_adjustment_seconds == 300
+    assert user.daily_limit_adjustment_date == datetime.utcnow().date()
+    assert user.pending_time_adjustment is None
+    assert user.pending_time_operation is None
+    assert mock_modify.call_count == 1
+
+    AgentConnectionManager.unregister("sched-online")
+
 def test_run_schema_migrations_upgrades_time_intervals(app, db_session):
     user = ManagedUser(username="legacy-user", system_ip="Unassigned")
     db_session.add(user)
@@ -1049,6 +1116,18 @@ def test_run_schema_migrations_adds_device_hostname_column(app, db_session):
     legacy_device = AgentDevice.query.get('legacy-device-aa')
     assert legacy_device is not None
     assert legacy_device.system_hostname is None
+
+
+def test_run_schema_migrations_adds_daily_limit_adjustment_columns(app, db_session):
+    with app.app_context():
+        run_schema_migrations()
+
+    columns = {
+        row[1]
+        for row in db_session.execute(text("PRAGMA table_info(managed_user)")).fetchall()
+    }
+    assert 'daily_limit_adjustment_date' in columns
+    assert 'daily_limit_adjustment_seconds' in columns
 
 
 def test_run_schema_migrations_creates_agent_alert_table(app, db_session):

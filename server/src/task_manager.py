@@ -21,7 +21,9 @@ from src.database import (
     ManagedUserDeviceMap,
     UserTimeUsage,
     UserDailyTimeInterval,
+    coerce_time_left_day,
     coerce_time_spent_day,
+    get_mapping_time_spent_for_day,
 )
 from src.agent_helper import AgentClient, AgentConnectionManager
 from src.blocklist_helper import (
@@ -261,6 +263,29 @@ class BackgroundTaskManager:
                 try:
                     mappings = list(user.device_mappings)
                     logger.info("Processing managed user: %s across %d mapping(s)", user.username, len(mappings))
+                    today = date.today()
+                    effective_daily_limit_seconds = user.get_effective_daily_limit_seconds(today)
+
+                    if (
+                        effective_daily_limit_seconds is not None
+                        and user.pending_time_adjustment is not None
+                        and user.pending_time_operation is not None
+                        and user.get_daily_limit_adjustment_seconds(today) == 0
+                    ):
+                        try:
+                            user.apply_daily_limit_adjustment(
+                                user.pending_time_operation,
+                                user.pending_time_adjustment,
+                                today,
+                            )
+                            effective_daily_limit_seconds = user.get_effective_daily_limit_seconds(today)
+                        except ValueError:
+                            logger.warning(
+                                "Ignoring invalid pending adjustment for %s: %s%s",
+                                user.username,
+                                user.pending_time_operation,
+                                user.pending_time_adjustment,
+                            )
 
                     if not mappings:
                         user.is_valid = False
@@ -296,12 +321,16 @@ class BackgroundTaskManager:
                     pending_adjustment_failed = False
                     applied_pending_adjustment = False
                     online_mappings = 0
-                    shared_time_spent = 0
+                    time_spent_by_mapping = {
+                        mapping.id: get_mapping_time_spent_for_day(mapping, today)
+                        for mapping in mappings
+                    }
                     shared_time_left_candidates = []
                     any_valid_mapping = False
                     all_schedule_synced = True
                     all_interval_synced = True
                     domain_policy_hint_system_ids = set()
+                    validated_mappings = []
 
                     for mapping in mappings:
                         mapping.last_checked = datetime.utcnow()
@@ -319,7 +348,11 @@ class BackgroundTaskManager:
                         online_mappings += 1
                         agent_client = AgentClient(system_id=mapping.system_id)
 
-                        if user.pending_time_adjustment is not None and user.pending_time_operation is not None:
+                        if (
+                            effective_daily_limit_seconds is None
+                            and user.pending_time_adjustment is not None
+                            and user.pending_time_operation is not None
+                        ):
                             success, message = agent_client.modify_time_left(
                                 mapping.linux_username,
                                 user.pending_time_operation,
@@ -379,10 +412,13 @@ class BackgroundTaskManager:
                             mapping.linux_uid = _safe_int(config_dict.get("LINUX_UID"), mapping.linux_uid)
                             if mapping.linux_uid != previous_linux_uid:
                                 domain_policy_hint_system_ids.add(mapping.system_id)
-                            shared_time_spent += coerce_time_spent_day(config_dict.get('TIME_SPENT_DAY', 0))
-                            time_left = config_dict.get("TIME_LEFT_DAY")
-                            if isinstance(time_left, int):
+                            time_spent_by_mapping[mapping.id] = coerce_time_spent_day(
+                                config_dict.get('TIME_SPENT_DAY', 0)
+                            )
+                            time_left = coerce_time_left_day(config_dict.get("TIME_LEFT_DAY"))
+                            if time_left is not None:
                                 shared_time_left_candidates.append(time_left)
+                            validated_mappings.append((mapping, agent_client, config_dict))
                         else:
                             mapping.is_valid = False
                             logger.warning(
@@ -400,11 +436,43 @@ class BackgroundTaskManager:
                             interval.mark_synced()
 
                     if user.pending_time_adjustment is not None and user.pending_time_operation is not None:
-                        if online_mappings > 0 and applied_pending_adjustment and not pending_adjustment_failed:
+                        if effective_daily_limit_seconds is not None and online_mappings > 0:
+                            user.pending_time_adjustment = None
+                            user.pending_time_operation = None
+                        elif online_mappings > 0 and applied_pending_adjustment and not pending_adjustment_failed:
                             user.pending_time_adjustment = None
                             user.pending_time_operation = None
 
-                    today = date.today()
+                    shared_time_spent = sum(time_spent_by_mapping.values())
+                    shared_time_left = None
+                    if effective_daily_limit_seconds is not None:
+                        shared_time_left = max(effective_daily_limit_seconds - shared_time_spent, 0)
+                        for mapping, agent_client, config_dict in validated_mappings:
+                            current_time_left = coerce_time_left_day(config_dict.get("TIME_LEFT_DAY"))
+                            if current_time_left is None:
+                                continue
+
+                            delta = shared_time_left - current_time_left
+                            if delta == 0:
+                                continue
+
+                            operation = "+" if delta > 0 else "-"
+                            success, message = agent_client.modify_time_left(
+                                mapping.linux_username,
+                                operation,
+                                abs(delta),
+                            )
+                            if success:
+                                config_dict["TIME_LEFT_DAY"] = shared_time_left
+                                mapping.last_config = json.dumps(config_dict)
+                            else:
+                                logger.warning(
+                                    "Daily time rebalance failed for %s on %s: %s",
+                                    mapping.linux_username,
+                                    mapping.system_id,
+                                    message,
+                                )
+
                     usage = UserTimeUsage.query.filter_by(user_id=user.id, date=today).first()
                     if usage:
                         usage.time_spent = shared_time_spent
@@ -417,7 +485,11 @@ class BackgroundTaskManager:
 
                     shared_config = {
                         "TIME_SPENT_DAY": shared_time_spent,
-                        "TIME_LEFT_DAY": min(shared_time_left_candidates) if shared_time_left_candidates else None,
+                        "TIME_LEFT_DAY": (
+                            shared_time_left
+                            if shared_time_left is not None
+                            else (min(shared_time_left_candidates) if shared_time_left_candidates else None)
+                        ),
                         "MAPPING_COUNT": len(mappings),
                         "ONLINE_MAPPING_COUNT": online_mappings,
                     }
