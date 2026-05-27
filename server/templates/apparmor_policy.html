@@ -1,592 +1,308 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AppArmor Policy – {{ user.username }} @ {{ device_label }} – TimeKpr WebUI</title>
-    <meta name="description" content="Manage application restrictions for {{ user.username }} on {{ device_label }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
-    <style>
-        .aa-main {
-            max-width: 1100px;
-            margin: 0 auto;
-            padding: var(--space-6);
-        }
+{% extends "base.html" %}
 
-        .aa-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            gap: var(--space-4);
-            flex-wrap: wrap;
-            margin-bottom: var(--space-6);
-        }
+{% block title %}App Restrictions - {{ user.username }} - TimeKpr WebUI{% endblock %}
 
-        .aa-summary-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-            gap: var(--space-4);
-            margin-bottom: var(--space-6);
-        }
+{% block content %}
+<div class="aa-header-title" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; flex-wrap: wrap; gap: 1rem;">
+    <div>
+        <h1 style="margin: 0; font-size: 2rem;">🛡️ Application Restrictions</h1>
+        <p style="margin: 0; color: var(--pico-muted-color); font-weight: 500;">
+            {{ user.username }} on <strong>{{ device_label }}</strong> (<code>{{ mapping.linux_username }}</code>)
+        </p>
+    </div>
+    <div>
+        <a href="{{ url_for('admin') }}" class="btn btn-secondary btn-sm">
+            <svg width="14" height="14" fill="currentColor" viewBox="0 0 16 16" style="margin-right: 4px;">
+                <path fill-rule="evenodd" d="M15 8a.5.5 0 0 0-.5-.5H2.707l3.147-3.146a.5.5 0 1 0-.708-.708l-4 4a.5.5 0 0 0 0 .708l4 4a.5.5 0 0 0 .708-.708L2.707 8.5H14.5A.5.5 0 0 0 15 8z"/>
+            </svg>
+            Back to Admin
+        </a>
+    </div>
+</div>
 
-        .aa-summary-card {
-            background: var(--bg-elevated);
-            border: 1px solid var(--border-primary);
-            border-radius: var(--radius-xl);
-            padding: var(--space-5);
-        }
-
-        .aa-summary-label {
-            color: var(--text-tertiary);
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            font-size: var(--font-size-xs);
-            font-weight: 600;
-            margin-bottom: var(--space-1);
-        }
-
-        .aa-summary-value {
-            font-size: var(--font-size-lg);
-            font-weight: 700;
-        }
-
-        .aa-card {
-            background: var(--bg-elevated);
-            border: 1px solid var(--border-primary);
-            border-radius: var(--radius-xl);
-            padding: var(--space-6);
-            margin-bottom: var(--space-6);
-        }
-
-        .aa-card h2 {
-            margin-top: 0;
-            margin-bottom: var(--space-2);
-            font-size: var(--font-size-lg);
-        }
-
-        .aa-card-subtitle {
-            color: var(--text-tertiary);
-            font-size: var(--font-size-sm);
-            margin-bottom: var(--space-5);
-        }
-
-        /* Application Grid */
-        .aa-app-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-            gap: var(--space-4);
-        }
-
-        .aa-app-tile {
-            background: var(--bg-secondary);
-            border: 1px solid var(--border-primary);
-            border-radius: var(--radius-lg);
-            padding: var(--space-5);
-            transition: all var(--transition-fast);
-        }
-
-        .aa-app-tile:hover {
-            border-color: var(--border-secondary);
-            box-shadow: var(--shadow-md);
-            transform: translateY(-2px);
-        }
-
-        .aa-app-tile.preset-blocked {
-            border-color: var(--danger);
-            background: var(--danger-bg);
-        }
-
-        .aa-app-tile.preset-no_internet {
-            border-color: var(--warning);
-            background: var(--warning-bg);
-        }
-
-        .aa-app-tile.preset-complain {
-            border-color: var(--text-muted);
-            background: var(--bg-secondary);
-        }
-
-        .aa-app-header {
-            display: flex;
-            align-items: center;
-            gap: var(--space-3);
-            margin-bottom: var(--space-4);
-        }
-
-        .aa-app-icon {
-            font-size: 1.75rem;
-            line-height: 1;
-            flex-shrink: 0;
-        }
-
-        .aa-app-info {
-            flex: 1;
-            min-width: 0;
-        }
-
-        .aa-app-name {
-            font-weight: 600;
-            font-size: var(--font-size-base);
-            margin: 0;
-        }
-
-        .aa-app-path {
-            font-size: var(--font-size-xs);
-            color: var(--text-tertiary);
-            font-family: monospace;
-            word-break: break-all;
-            margin: var(--space-1) 0 0 0;
-        }
-
-        /* Segmented Preset Control */
-        .aa-preset-control {
-            display: flex;
-            border: 1px solid var(--border-primary);
-            border-radius: var(--radius-md);
-            overflow: hidden;
-            background: var(--bg-elevated);
-        }
-
-        .aa-preset-control input[type="radio"] {
-            display: none;
-        }
-
-        .aa-preset-control label {
-            flex: 1;
-            text-align: center;
-            padding: var(--space-2) var(--space-2);
-            font-size: var(--font-size-xs);
-            font-weight: 500;
-            cursor: pointer;
-            transition: all var(--transition-fast);
-            color: var(--text-secondary);
-            border-right: 1px solid var(--border-primary);
-            user-select: none;
-        }
-
-        .aa-preset-control label:last-of-type {
-            border-right: none;
-        }
-
-        .aa-preset-control label:hover {
-            background: var(--bg-tertiary);
-        }
-
-        .aa-preset-control input[value="allowed"]:checked + label {
-            background: var(--success);
-            color: white;
-            font-weight: 600;
-        }
-
-        .aa-preset-control input[value="no_internet"]:checked + label {
-            background: var(--warning);
-            color: white;
-            font-weight: 600;
-        }
-
-        .aa-preset-control input[value="blocked"]:checked + label {
-            background: var(--danger);
-            color: white;
-            font-weight: 600;
-        }
-
-        .aa-preset-control input[value="complain"]:checked + label {
-            background: var(--text-secondary);
-            color: white;
-            font-weight: 600;
-        }
-
-        /* Preset explanations */
-        .aa-preset-hint {
-            font-size: var(--font-size-xs);
-            color: var(--text-muted);
-            margin-top: var(--space-2);
-            text-align: center;
-            min-height: 2.5em;
-        }
-
-        /* Custom Apps Form */
-        .aa-custom-form {
-            display: grid;
-            grid-template-columns: 1fr 2fr 1fr auto;
-            gap: var(--space-3);
-            align-items: end;
-            margin-top: var(--space-4);
-            padding-top: var(--space-4);
-            border-top: 1px solid var(--border-primary);
-        }
-
-        @media (max-width: 768px) {
-            .aa-custom-form {
-                grid-template-columns: 1fr;
-            }
-        }
-
-        /* Custom Rule Item */
-        .aa-custom-item {
-            display: flex;
-            align-items: center;
-            gap: var(--space-3);
-            padding: var(--space-3) var(--space-4);
-            background: var(--bg-secondary);
-            border: 1px solid var(--border-primary);
-            border-radius: var(--radius-md);
-            margin-bottom: var(--space-3);
-        }
-
-        .aa-custom-item .aa-app-info {
-            flex: 1;
-        }
-
-        .aa-custom-item .aa-preset-control {
-            width: 360px;
-            flex-shrink: 0;
-        }
-
-        /* Usage Summary */
-        .aa-usage-list {
-            display: grid;
-            gap: var(--space-3);
-        }
-
-        .aa-usage-row {
-            display: flex;
-            align-items: center;
-            gap: var(--space-4);
-            padding: var(--space-3) 0;
-            border-bottom: 1px solid var(--border-primary);
-        }
-
-        .aa-usage-row:last-child {
-            border-bottom: none;
-        }
-
-        .aa-usage-label {
-            min-width: 140px;
-            font-weight: 500;
-            font-size: var(--font-size-sm);
-        }
-
-        .aa-usage-bar-container {
-            flex: 1;
-            height: 24px;
-            background: var(--bg-tertiary);
-            border-radius: var(--radius-sm);
-            overflow: hidden;
-            position: relative;
-        }
-
-        .aa-usage-bar {
-            height: 100%;
-            border-radius: var(--radius-sm);
-            background: linear-gradient(90deg, hsl(210, 80%, 55%), hsl(200, 85%, 50%));
-            transition: width var(--transition-slow);
-            min-width: 2px;
-        }
-
-        .aa-usage-time {
-            min-width: 80px;
-            text-align: right;
-            font-size: var(--font-size-sm);
-            font-weight: 600;
-            color: var(--text-secondary);
-        }
-
-        .aa-usage-sessions {
-            min-width: 80px;
-            text-align: right;
-            font-size: var(--font-size-xs);
-            color: var(--text-tertiary);
-        }
-
-        /* Save actions */
-        .aa-save-bar {
-            display: flex;
-            justify-content: flex-end;
-            gap: var(--space-3);
-            padding-top: var(--space-5);
-            border-top: 1px solid var(--border-primary);
-            margin-top: var(--space-5);
-        }
-    </style>
-</head>
-<body>
-    <div class="aa-main">
-        <div class="aa-header">
-            <div>
-                <h1 style="margin: 0;">🛡️ App Restrictions</h1>
-                <p style="margin: var(--space-1) 0 0 0; color: var(--text-tertiary);">
-                    {{ user.username }} on <strong>{{ device_label }}</strong>
-                    ({{ mapping.linux_username }})
-                </p>
-            </div>
-            <div style="display:flex; gap: var(--space-3); flex-wrap: wrap;">
-                <a href="{{ url_for('admin') }}" class="btn btn-secondary">Back to Admin</a>
-                <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">Dashboard</a>
+<div class="aa-main">
+    <!-- Summary metrics strip -->
+    <div class="aa-summary-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+        <div class="aa-summary-card" style="margin: 0; padding: 1rem; text-align: center; background: var(--pico-card-background-color); border: 1px solid var(--pico-card-border-color); border-radius: 0.75rem;">
+            <div class="aa-summary-label" style="font-size: 0.72rem; font-weight: bold; color: var(--pico-muted-color); text-transform: uppercase;">Device Connection</div>
+            <div class="aa-summary-value" style="font-size: 1.15rem; font-weight: 700;">
+                {% if is_online %}
+                <span class="badge badge-success">Online</span>
+                {% else %}
+                <span class="badge badge-secondary">Offline</span>
+                {% endif %}
             </div>
         </div>
-
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                {% for category, message in messages %}
-                    <div class="alert alert-{{ category }}">{{ message }}</div>
-                {% endfor %}
-            {% endif %}
-        {% endwith %}
-
-        <div class="aa-summary-grid">
-            <div class="aa-summary-card">
-                <div class="aa-summary-label">Device Status</div>
-                <div class="aa-summary-value">
-                    {% if is_online %}
-                    <span class="status-indicator status-active">Online</span>
-                    {% else %}
-                    <span class="status-indicator status-inactive">Offline</span>
-                    {% endif %}
-                </div>
-            </div>
-            <div class="aa-summary-card">
-                <div class="aa-summary-label">Active Restrictions</div>
-                <div class="aa-summary-value">{{ restrictive_count }}</div>
-            </div>
-            <div class="aa-summary-card">
-                <div class="aa-summary-label">Linux Account</div>
-                <div class="aa-summary-value" style="font-size: var(--font-size-base);">{{ mapping.linux_username }}</div>
-            </div>
-            <div class="aa-summary-card">
-                <div class="aa-summary-label">UID</div>
-                <div class="aa-summary-value">{{ mapping.linux_uid if mapping.linux_uid is not none else '—' }}</div>
-            </div>
+        <div class="aa-summary-card" style="margin: 0; padding: 1rem; text-align: center; background: var(--pico-card-background-color); border: 1px solid var(--pico-card-border-color); border-radius: 0.75rem;">
+            <div class="aa-summary-label" style="font-size: 0.72rem; font-weight: bold; color: var(--pico-muted-color); text-transform: uppercase;">Active Restrictions</div>
+            <div class="aa-summary-value" style="font-size: 1.25rem; font-weight: 700; color: var(--warning-color);">{{ restrictive_count }} policies</div>
         </div>
-
-        <form method="POST" id="apparmor-form">
-            <div class="aa-card">
-                <h2>Application Controls</h2>
-                <p class="aa-card-subtitle">
-                    Choose how each application behaves when {{ user.username }} is logged in.
-                    Rules are enforced via AppArmor profiles or agent-side activity logging.
-                </p>
-
-                <div class="aa-app-grid">
-                    {% for app in curated_apps %}
-                    <div class="aa-app-tile preset-{{ app.preset }}" id="tile-{{ loop.index }}">
-                        <div class="aa-app-header">
-                            <span class="aa-app-icon">{{ app.icon }}</span>
-                            <div class="aa-app-info">
-                                <p class="aa-app-name">{{ app.name }}</p>
-                                <p class="aa-app-path">{{ app.path }}</p>
-                            </div>
-                        </div>
-
-                        <div class="aa-preset-control">
-                            <input type="radio" name="preset_{{ app.path }}" value="allowed"
-                                   id="allowed-{{ loop.index }}"
-                                   {{ 'checked' if app.preset == 'allowed' }}
-                                   onchange="updateTile(this, {{ loop.index }})">
-                            <label for="allowed-{{ loop.index }}">✅ Allowed</label>
-
-                            <input type="radio" name="preset_{{ app.path }}" value="no_internet"
-                                   id="nointernet-{{ loop.index }}"
-                                   {{ 'checked' if app.preset == 'no_internet' }}
-                                   onchange="updateTile(this, {{ loop.index }})">
-                            <label for="nointernet-{{ loop.index }}">🚫 Internet</label>
-
-                            <input type="radio" name="preset_{{ app.path }}" value="blocked"
-                                   id="blocked-{{ loop.index }}"
-                                   {{ 'checked' if app.preset == 'blocked' }}
-                                   onchange="updateTile(this, {{ loop.index }})">
-                            <label for="blocked-{{ loop.index }}">⛔ Blocked</label>
-
-                            <input type="radio" name="preset_{{ app.path }}" value="complain"
-                                   id="complain-{{ loop.index }}"
-                                   {{ 'checked' if app.preset == 'complain' }}
-                                   onchange="updateTile(this, {{ loop.index }})">
-                            <label for="complain-{{ loop.index }}">⚠️ Report Only</label>
-                        </div>
-
-                        <div class="aa-preset-hint" id="hint-{{ loop.index }}">
-                            {% if app.preset == 'allowed' %}
-                                Unrestricted access — no AppArmor sandbox applied
-                            {% elif app.preset == 'no_internet' %}
-                                Runs normally but all network access is denied
-                            {% elif app.preset == 'blocked' %}
-                                Execution is completely prevented
-                            {% elif app.preset == 'complain' %}
-                                Runs unrestricted but logs application activity through the agent
-                            {% endif %}
-                        </div>
-                    </div>
-                    {% endfor %}
-                </div>
-            </div>
-
-            {% if custom_rules %}
-            <div class="aa-card">
-                <h2>Custom Rules</h2>
-                <p class="aa-card-subtitle">Manually-added executable and home-subtree execution rules.</p>
-
-                {% for rule in custom_rules %}
-                <div class="aa-custom-item">
-                    <div class="aa-app-info">
-                        <p class="aa-app-name">{{ rule.name }}</p>
-                        <p class="aa-app-path" style="margin-bottom: 4px;">{{ rule.target_label }}</p>
-                        <p class="aa-app-path">{{ rule.path }}</p>
-                    </div>
-                    <div class="aa-preset-control">
-                        <input type="radio" name="preset_rule_{{ rule.id }}" value="allowed"
-                               id="custom-allowed-{{ rule.id }}"
-                               {{ 'checked' if rule.preset == 'allowed' }}>
-                        <label for="custom-allowed-{{ rule.id }}">✅ Allowed</label>
-
-                        {% if rule.supports_network_controls %}
-                        <input type="radio" name="preset_rule_{{ rule.id }}" value="no_internet"
-                               id="custom-nointernet-{{ rule.id }}"
-                               {{ 'checked' if rule.preset == 'no_internet' }}>
-                        <label for="custom-nointernet-{{ rule.id }}">🚫 Internet</label>
-                        {% endif %}
-
-                        <input type="radio" name="preset_rule_{{ rule.id }}" value="blocked"
-                               id="custom-blocked-{{ rule.id }}"
-                               {{ 'checked' if rule.preset == 'blocked' }}>
-                        <label for="custom-blocked-{{ rule.id }}">⛔ Blocked</label>
-
-                        <input type="radio" name="preset_rule_{{ rule.id }}" value="complain"
-                               id="custom-complain-{{ rule.id }}"
-                               {{ 'checked' if rule.preset == 'complain' }}>
-                        <label for="custom-complain-{{ rule.id }}">⚠️ Report Only</label>
-                    </div>
-                    <button type="submit"
-                            class="btn btn-sm btn-danger"
-                            title="Remove rule"
-                            formaction="{{ url_for('delete_apparmor_rule', rule_id=rule.id) }}"
-                            formmethod="POST"
-                            onclick="return confirm('Remove this custom rule?')">✕</button>
-                </div>
-                {% endfor %}
-            </div>
-            {% endif %}
-
-            <div class="aa-card">
-                <h2>Add Custom Rule</h2>
-                <p class="aa-card-subtitle">Choose an exact executable or a home-subtree path rule such as <code>$HOME/Downloads/**</code>.</p>
-                <div class="aa-custom-form">
-                    <div class="form-group" style="margin-bottom: 0;">
-                        <label for="custom_app_name" class="form-label">App Name</label>
-                        <input type="text" id="custom_app_name" name="custom_app_name"
-                               class="form-control" placeholder="e.g. OBS Studio">
-                    </div>
-                    <div class="form-group" style="margin-bottom: 0;">
-                        <label for="custom_app_match_type" class="form-label">Rule Type</label>
-                        <select id="custom_app_match_type" name="custom_app_match_type"
-                                class="form-control form-select"
-                                onchange="updateCustomRuleType()">
-                            <option value="executable">Exact Executable</option>
-                            <option value="path_pattern">Home Subtree</option>
-                        </select>
-                    </div>
-                    <div class="form-group" style="margin-bottom: 0;">
-                        <label for="custom_app_path" class="form-label" id="custom_app_path_label">Executable Path</label>
-                        <input type="text" id="custom_app_path" name="custom_app_path"
-                               class="form-control" placeholder="/usr/bin/obs">
-                    </div>
-                    <div class="form-group" style="margin-bottom: 0;">
-                        <label for="custom_app_preset" class="form-label">Preset</label>
-                        <select id="custom_app_preset" name="custom_app_preset" class="form-control form-select">
-                            <option value="allowed">Allowed</option>
-                            <option value="no_internet">No Internet</option>
-                            <option value="blocked" selected>Blocked</option>
-                            <option value="complain">Report Only (Complain)</option>
-                        </select>
-                    </div>
-                    <div style="display:flex; align-items: end;">
-                        <button type="submit" class="btn btn-primary">Add & Save</button>
-                    </div>
-                </div>
-            </div>
-
-            <div class="aa-save-bar">
-                <a href="{{ url_for('admin') }}" class="btn btn-secondary">Cancel</a>
-                <button type="submit" class="btn btn-primary btn-lg">💾 Save All Changes</button>
-            </div>
-        </form>
-
-        {% if usage_summary %}
-        <div class="aa-card" style="margin-top: var(--space-6);">
-            <h2>📊 Application Usage (Last 7 Days)</h2>
-            <p class="aa-card-subtitle">
-                Tracked runtime for applications used by {{ user.username }} on this device.
-            </p>
-            <div class="aa-usage-list">
-                {% set max_seconds = usage_summary[0].total_seconds if usage_summary else 1 %}
-                {% for item in usage_summary %}
-                <div class="aa-usage-row">
-                    <div class="aa-usage-label">{{ item.application_name }}</div>
-                    <div class="aa-usage-bar-container">
-                        <div class="aa-usage-bar"
-                             style="width: {{ (item.total_seconds / max_seconds * 100)|round(1) }}%;">
-                        </div>
-                    </div>
-                    <div class="aa-usage-time">{{ item.formatted }}</div>
-                    <div class="aa-usage-sessions">{{ item.session_count }} session{{ 's' if item.session_count != 1 }}</div>
-                </div>
-                {% endfor %}
-            </div>
+        <div class="aa-summary-card" style="margin: 0; padding: 1rem; text-align: center; background: var(--pico-card-background-color); border: 1px solid var(--pico-card-border-color); border-radius: 0.75rem;">
+            <div class="aa-summary-label" style="font-size: 0.72rem; font-weight: bold; color: var(--pico-muted-color); text-transform: uppercase;">Target Linux Profile</div>
+            <div class="aa-summary-value" style="font-size: 1.15rem; font-weight: 700;"><code>{{ mapping.linux_username }}</code></div>
         </div>
-        {% else %}
-        <div class="aa-card" style="margin-top: var(--space-6);">
-            <h2>📊 Application Usage</h2>
-            <p style="margin: 0; color: var(--text-tertiary);">
-                No application usage recorded yet. Usage data will appear here once the agent begins tracking.
-            </p>
+        <div class="aa-summary-card" style="margin: 0; padding: 1rem; text-align: center; background: var(--pico-card-background-color); border: 1px solid var(--pico-card-border-color); border-radius: 0.75rem;">
+            <div class="aa-summary-label" style="font-size: 0.72rem; font-weight: bold; color: var(--pico-muted-color); text-transform: uppercase;">Active UID</div>
+            <div class="aa-summary-value" style="font-size: 1.15rem; font-weight: 700; color: var(--pico-muted-color);">{{ mapping.linux_uid if mapping.linux_uid is not none else 'Unassigned' }}</div>
         </div>
-        {% endif %}
     </div>
 
-    <script>
-        const HINTS = {
-            allowed: 'Unrestricted access — no AppArmor sandbox applied',
-            no_internet: 'Runs normally but all network access is denied',
-            blocked: 'Execution is completely prevented',
-            complain: 'Runs unrestricted and logs activity through the agent without AppArmor enforcement',
-        };
+    <form method="POST" id="apparmor-form">
+        <!-- Predefined application rules -->
+        <article class="card">
+            <h2 style="font-size: 1.25rem; font-weight: 700; margin-bottom: 0.25rem;">Predefined Application Controls</h2>
+            <p style="color: var(--pico-muted-color); font-size: 0.85rem; font-weight: 500; margin-bottom: 1.5rem;">
+                Select execution behaviors for standard social, browsing, and gaming applications.
+            </p>
 
-        function updateCustomRuleType() {
-            const matchType = document.getElementById('custom_app_match_type').value;
-            const pathLabel = document.getElementById('custom_app_path_label');
-            const pathInput = document.getElementById('custom_app_path');
-            const presetSelect = document.getElementById('custom_app_preset');
+            <div class="aa-app-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 1rem; margin-bottom: 1rem;">
+                {% for app in curated_apps %}
+                <div class="aa-app-tile preset-{{ app.preset }}" id="tile-{{ loop.index }}" style="border: 1px solid var(--pico-card-border-color); border-radius: 0.75rem; padding: 1rem; background: var(--pico-background-color); transition: all 0.2s;">
+                    <div class="aa-app-header" style="display: flex; gap: 0.75rem; align-items: center; margin-bottom: 0.75rem;">
+                        <span class="aa-app-icon" style="font-size: 1.75rem;">{{ app.icon }}</span>
+                        <div class="aa-app-info" style="flex: 1; min-width: 0;">
+                            <strong class="aa-app-name" style="font-size: 1.05rem;">{{ app.name }}</strong>
+                            <div class="aa-app-path" style="font-size: 0.7rem; color: var(--pico-muted-color); font-family: monospace; word-break: break-all; margin-top: 0.15rem;">{{ app.path }}</div>
+                        </div>
+                    </div>
 
-            if (matchType === 'path_pattern') {
-                pathLabel.textContent = 'Path Pattern';
-                pathInput.placeholder = '$HOME/Downloads/**';
-                const internetOption = presetSelect.querySelector('option[value="no_internet"]');
-                if (internetOption) {
-                    internetOption.disabled = true;
-                }
-                if (presetSelect.value === 'no_internet') {
-                    presetSelect.value = 'blocked';
-                }
-            } else {
-                pathLabel.textContent = 'Executable Path';
-                pathInput.placeholder = '/usr/bin/obs';
-                const internetOption = presetSelect.querySelector('option[value="no_internet"]');
-                if (internetOption) {
-                    internetOption.disabled = false;
-                }
+                    <!-- Preset switch segment styled using Pico semantics -->
+                    <div class="aa-preset-control" style="display: flex; border: 1px solid var(--pico-card-border-color); border-radius: 0.5rem; overflow: hidden; background: var(--pico-card-background-color); margin-bottom: 0.5rem;">
+                        <input type="radio" name="preset_{{ app.path }}" value="allowed"
+                               id="allowed-{{ loop.index }}" style="display: none;"
+                               {{ 'checked' if app.preset == 'allowed' }}
+                               onchange="updateTile(this, {{ loop.index }})">
+                        <label for="allowed-{{ loop.index }}" style="flex: 1; text-align: center; font-size: 0.7rem; padding: 0.35rem 0.15rem; cursor: pointer; font-weight: bold; margin: 0; border-right: 1px solid var(--pico-card-border-color);">Allowed</label>
+
+                        <input type="radio" name="preset_{{ app.path }}" value="no_internet"
+                               id="nointernet-{{ loop.index }}" style="display: none;"
+                               {{ 'checked' if app.preset == 'no_internet' }}
+                               onchange="updateTile(this, {{ loop.index }})">
+                        <label for="nointernet-{{ loop.index }}" style="flex: 1; text-align: center; font-size: 0.7rem; padding: 0.35rem 0.15rem; cursor: pointer; font-weight: bold; margin: 0; border-right: 1px solid var(--pico-card-border-color);">No Net</label>
+
+                        <input type="radio" name="preset_{{ app.path }}" value="blocked"
+                               id="blocked-{{ loop.index }}" style="display: none;"
+                               {{ 'checked' if app.preset == 'blocked' }}
+                               onchange="updateTile(this, {{ loop.index }})">
+                        <label for="blocked-{{ loop.index }}" style="flex: 1; text-align: center; font-size: 0.7rem; padding: 0.35rem 0.15rem; cursor: pointer; font-weight: bold; margin: 0; border-right: 1px solid var(--pico-card-border-color);">Blocked</label>
+
+                        <input type="radio" name="preset_{{ app.path }}" value="complain"
+                               id="complain-{{ loop.index }}" style="display: none;"
+                               {{ 'checked' if app.preset == 'complain' }}
+                               onchange="updateTile(this, {{ loop.index }})">
+                        <label for="complain-{{ loop.index }}" style="flex: 1; text-align: center; font-size: 0.7rem; padding: 0.35rem 0.15rem; cursor: pointer; font-weight: bold; margin: 0;">Report</label>
+                    </div>
+
+                    <div class="aa-preset-hint" id="hint-{{ loop.index }}" style="font-size: 0.7rem; color: var(--pico-muted-color); text-align: center; min-height: 2.2em; font-weight: 500; line-height: 1.2;">
+                        {% if app.preset == 'allowed' %}
+                            Unrestricted access — no sandbox applied
+                        {% elif app.preset == 'no_internet' %}
+                            Runs normally but all network access is blocked
+                        {% elif app.preset == 'blocked' %}
+                            Execution is completely prevented
+                        {% elif app.preset == 'complain' %}
+                            Runs unrestricted but logs activity to parent console
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </article>
+
+        <!-- Custom application rules -->
+        {% if custom_rules %}
+        <article class="card">
+            <h2 style="font-size: 1.25rem; font-weight: 700; margin-bottom: 0.25rem;">Custom Executable Rules</h2>
+            <p style="color: var(--pico-muted-color); font-size: 0.85rem; font-weight: 500; margin-bottom: 1.5rem;">
+                Custom constraints for directories, paths, or uncurated binaries.
+            </p>
+
+            <div style="display: grid; gap: 0.5rem; margin-bottom: 1rem;">
+                {% for rule in custom_rules %}
+                <div class="aa-custom-item" style="display: flex; align-items: center; justify-content: space-between; gap: 1rem; border: 1px solid var(--pico-card-border-color); border-radius: 0.75rem; padding: 0.75rem 1rem; background: var(--pico-background-color); flex-wrap: wrap;">
+                    <div style="flex: 1; min-width: 200px;">
+                        <strong style="font-size: 0.95rem;">{{ rule.name }}</strong>
+                        <div style="font-size: 0.75rem; color: var(--pico-muted-color); font-weight: bold; font-family: monospace;">Scope: {{ rule.target_label }} &bull; Path: {{ rule.path }}</div>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <div class="aa-preset-control" style="display: flex; border: 1px solid var(--pico-card-border-color); border-radius: 0.5rem; overflow: hidden; background: var(--pico-card-background-color); width: 320px;">
+                            <input type="radio" name="preset_rule_{{ rule.id }}" value="allowed"
+                                   id="custom-allowed-{{ rule.id }}" style="display: none;"
+                                   {{ 'checked' if rule.preset == 'allowed' }}>
+                            <label for="custom-allowed-{{ rule.id }}" style="flex: 1; text-align: center; font-size: 0.7rem; padding: 0.35rem; cursor: pointer; font-weight: bold; margin: 0; border-right: 1px solid var(--pico-card-border-color);">Allowed</label>
+
+                            {% if rule.supports_network_controls %}
+                            <input type="radio" name="preset_rule_{{ rule.id }}" value="no_internet"
+                                   id="custom-nointernet-{{ rule.id }}" style="display: none;"
+                                   {{ 'checked' if rule.preset == 'no_internet' }}>
+                            <label for="custom-nointernet-{{ rule.id }}" style="flex: 1; text-align: center; font-size: 0.7rem; padding: 0.35rem; cursor: pointer; font-weight: bold; margin: 0; border-right: 1px solid var(--pico-card-border-color);">No Net</label>
+                            {% endif %}
+
+                            <input type="radio" name="preset_rule_{{ rule.id }}" value="blocked"
+                                   id="custom-blocked-{{ rule.id }}" style="display: none;"
+                                   {{ 'checked' if rule.preset == 'blocked' }}>
+                            <label for="custom-blocked-{{ rule.id }}" style="flex: 1; text-align: center; font-size: 0.7rem; padding: 0.35rem; cursor: pointer; font-weight: bold; margin: 0; border-right: 1px solid var(--pico-card-border-color);">Blocked</label>
+
+                            <input type="radio" name="preset_rule_{{ rule.id }}" value="complain"
+                                   id="custom-complain-{{ rule.id }}" style="display: none;"
+                                   {{ 'checked' if rule.preset == 'complain' }}>
+                            <label for="custom-complain-{{ rule.id }}" style="flex: 1; text-align: center; font-size: 0.7rem; padding: 0.35rem; cursor: pointer; font-weight: bold; margin: 0;">Report</label>
+                        </div>
+                        <button type="submit"
+                                class="btn btn-sm btn-danger"
+                                style="margin: 0; padding: 0.25rem 0.5rem;"
+                                formaction="{{ url_for('delete_apparmor_rule', rule_id=rule.id) }}"
+                                formaction_method="POST"
+                                onclick="return confirm('Remove custom AppArmor rule for {{ rule.name }}?')">✕</button>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </article>
+        {% endif %}
+
+        <!-- Create custom app rules -->
+        <article class="card">
+            <h2 style="font-size: 1.25rem; font-weight: 700; margin-bottom: 0.25rem;">Create Custom App Restriction</h2>
+            <p style="color: var(--pico-muted-color); font-size: 0.85rem; font-weight: 500; margin-bottom: 1.5rem;">
+                Block or monitor directories, home subtree folders, or custom application paths.
+            </p>
+            <div class="aa-custom-form" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)) auto; gap: 0.75rem; align-items: end;">
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label for="custom_app_name" class="form-label" style="font-size: 0.8rem; font-weight: bold;">App Label Name</label>
+                    <input type="text" id="custom_app_name" name="custom_app_name"
+                           class="form-control" placeholder="e.g. OBS Studio" style="margin: 0; padding: 0.25rem 0.5rem; font-size: 0.85rem;">
+                </div>
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label for="custom_app_match_type" class="form-label" style="font-size: 0.8rem; font-weight: bold;">Rule Scope Type</label>
+                    <select id="custom_app_match_type" name="custom_app_match_type"
+                            class="form-control form-select"
+                            onchange="updateCustomRuleType()" style="margin: 0; padding: 0.25rem 0.5rem; font-size: 0.85rem;">
+                        <option value="executable">Exact Executable binary</option>
+                        <option value="path_pattern">Home Subtree Folder</option>
+                    </select>
+                </div>
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label for="custom_app_path" class="form-label" id="custom_app_path_label" style="font-size: 0.8rem; font-weight: bold;">Binary System Path</label>
+                    <input type="text" id="custom_app_path" name="custom_app_path"
+                           class="form-control" placeholder="/usr/bin/obs" style="margin: 0; padding: 0.25rem 0.5rem; font-size: 0.85rem;">
+                </div>
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label for="custom_app_preset" class="form-label" style="font-size: 0.8rem; font-weight: bold;">Default Preset</label>
+                    <select id="custom_app_preset" name="custom_app_preset" class="form-control form-select" style="margin: 0; padding: 0.25rem 0.5rem; font-size: 0.85rem;">
+                        <option value="allowed">Allowed</option>
+                        <option value="no_internet">No Internet</option>
+                        <option value="blocked" selected>Blocked</option>
+                        <option value="complain">Report Only (Complain)</option>
+                    </select>
+                </div>
+                <div style="display:flex; align-items: end;">
+                    <button type="submit" class="btn btn-sm btn-primary btn-cta" style="margin: 0; padding: 0.35rem 0.75rem;">Add & Save</button>
+                </div>
+            </div>
+        </article>
+
+        <!-- Save block bar sticky -->
+        <div class="actions-section" style="position: sticky; bottom: 0.5rem; background: var(--pico-card-background-color); border: 1px solid var(--pico-card-border-color); border-radius: 1.25rem; padding: 1rem; box-shadow: var(--shadow-hover); display: flex; justify-content: center; gap: 0.75rem; z-index: 50; margin-top: 2rem;">
+            <button type="submit" class="btn btn-primary btn-cta btn-lg" style="margin: 0;">
+                <svg width="18" height="18" fill="currentColor" viewBox="0 0 16 16" style="margin-right: 4px;">
+                    <path d="M15.854 5.146a.5.5 0 0 1 0 .708l-3 3a.5.5 0 0 1-.708 0l-1.5-1.5a.5.5 0 0 1 .708-.708L12.5 7.793l2.646-2.647a.5.5 0 0 1 .708 0z"/>
+                </svg>
+                Save All Changes
+            </button>
+            <a href="{{ url_for('admin') }}" class="btn btn-secondary btn-lg" style="margin: 0;">Cancel</a>
+        </div>
+    </form>
+
+    <!-- Application usage tracker details -->
+    {% if usage_summary %}
+    <article class="card" style="margin-top: 2rem;">
+        <h2 style="font-size: 1.25rem; font-weight: 700; margin-bottom: 0.25rem;">📊 Application Runtime Tracker (Last 7 Days)</h2>
+        <p style="color: var(--pico-muted-color); font-size: 0.85rem; font-weight: 500; margin-bottom: 1.5rem;">
+            Runtime stats of applications used by {{ user.username }} on this mapped device profile.
+        </p>
+        <div class="aa-usage-list" style="display: grid; gap: 0.4rem;">
+            {% set max_seconds = usage_summary[0].total_seconds if usage_summary else 1 %}
+            {% for item in usage_summary %}
+            <div class="aa-usage-row" style="display: flex; align-items: center; gap: 1rem; padding: 0.25rem 0; border-bottom: 1px solid var(--pico-card-border-color);">
+                <div class="aa-usage-label" style="min-width: 140px; font-weight: bold; font-size: 0.85rem;">{{ item.application_name }}</div>
+                <div class="aa-usage-bar-container" style="flex: 1; height: 16px; background: var(--pico-background-color); border: 1px solid var(--pico-card-border-color); border-radius: 0.5rem; overflow: hidden; position: relative;">
+                    <div class="aa-usage-bar"
+                         style="width: {{ (item.total_seconds / max_seconds * 100)|round(1) }}%; height: 100%; border-radius: 0.5rem; background: linear-gradient(90deg, var(--pico-primary-background), var(--pico-primary-hover)); transition: width 0.3s; min-width: 2px;">
+                    </div>
+                </div>
+                <div class="aa-usage-time" style="min-width: 80px; text-align: right; font-size: 0.85rem; font-weight: bold; color: var(--pico-color);">{{ item.formatted }}</div>
+                <div class="aa-usage-sessions" style="min-width: 70px; text-align: right; font-size: 0.75rem; color: var(--pico-muted-color); font-weight: bold;">{{ item.session_count }} session{{ 's' if item.session_count != 1 }}</div>
+            </div>
+            {% endfor %}
+        </div>
+    </article>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const HINTS = {
+        allowed: 'Unrestricted access — no sandbox applied',
+        no_internet: 'Runs normally but all network access is denied',
+        blocked: 'Execution is completely prevented',
+        complain: 'Runs unrestricted but logs activity in the parents console',
+    };
+
+    function updateCustomRuleType() {
+        const matchType = document.getElementById('custom_app_match_type').value;
+        const pathLabel = document.getElementById('custom_app_path_label');
+        const pathInput = document.getElementById('custom_app_path');
+        const presetSelect = document.getElementById('custom_app_preset');
+
+        if (matchType === 'path_pattern') {
+            pathLabel.textContent = 'Path Pattern';
+            pathInput.placeholder = '$HOME/Downloads/**';
+            const internetOption = presetSelect.querySelector('option[value="no_internet"]');
+            if (internetOption) {
+                internetOption.disabled = true;
+            }
+            if (presetSelect.value === 'no_internet') {
+                presetSelect.value = 'blocked';
+            }
+        } else {
+            pathLabel.textContent = 'Executable Path';
+            pathInput.placeholder = '/usr/bin/obs';
+            const internetOption = presetSelect.querySelector('option[value="no_internet"]');
+            if (internetOption) {
+                internetOption.disabled = false;
             }
         }
+    }
 
-        function updateTile(radio, index) {
-            const tile = document.getElementById('tile-' + index);
-            const hint = document.getElementById('hint-' + index);
-            // Remove existing preset classes
-            tile.classList.remove('preset-allowed', 'preset-no_internet', 'preset-blocked', 'preset-complain');
-            tile.classList.add('preset-' + radio.value);
-            hint.textContent = HINTS[radio.value] || '';
+    function updateTile(radio, index) {
+        const tile = document.getElementById('tile-' + index);
+        const hint = document.getElementById('hint-' + index);
+        tile.className = 'aa-app-tile preset-' + radio.value;
+        // Pico overrides style styling matching segment
+        if (radio.value === 'allowed') {
+            tile.style.borderColor = 'var(--pico-card-border-color)';
+            tile.style.background = 'var(--pico-background-color)';
+        } else if (radio.value === 'no_internet') {
+            tile.style.borderColor = 'var(--warning-color)';
+            tile.style.background = 'var(--warning-bg)';
+        } else if (radio.value === 'blocked') {
+            tile.style.borderColor = 'var(--danger-color)';
+            tile.style.background = 'var(--danger-bg)';
+        } else if (radio.value === 'complain') {
+            tile.style.borderColor = 'var(--pico-muted-border-color)';
+            tile.style.background = 'var(--pico-background-color)';
         }
+        hint.textContent = HINTS[radio.value] || '';
+    }
 
-        updateCustomRuleType();
-    </script>
-</body>
-</html>
+    // Init custom types on mount
+    updateCustomRuleType();
+    
+    // Inject default loaded app tile borders
+    {% for app in curated_apps %}
+        updateTile({value: '{{ app.preset }}'}, {{ loop.index }});
+    {% endfor %}
+</script>
+{% endblock %}

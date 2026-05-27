@@ -1032,7 +1032,7 @@ def dashboard():
             1 for mapping in user.device_mappings if AgentConnectionManager.is_online(mapping.system_id)
         )
         valid_mapping_count = sum(1 for mapping in user.device_mappings if mapping.is_valid)
-        time_left_formatted = _format_seconds(user.get_config_value('TIME_LEFT_DAY'))
+        time_left_formatted = _format_seconds(user.get_effective_time_left_seconds())
         
         # Check for pending time adjustments
         if user.pending_time_adjustment is not None and user.pending_time_operation is not None:
@@ -1720,6 +1720,27 @@ def get_user_usage(user_id):
         'username': user.username
     })
 
+@app.route('/weekly-schedule')
+def weekly_schedule():
+    """Display weekly schedules overview for all users"""
+    if not session.get('logged_in'):
+        flash('Please login first', 'warning')
+        return redirect(url_for('login'))
+    
+    users = ManagedUser.query.order_by(ManagedUser.username.asc()).all()
+    
+    # Ensure all users have a weekly schedule record
+    db_changed = False
+    for user in users:
+        if not user.weekly_schedule:
+            schedule = UserWeeklySchedule(user_id=user.id)
+            db.session.add(schedule)
+            db_changed = True
+    if db_changed:
+        db.session.commit()
+        
+    return render_template('weekly_schedule.html', users=users)
+
 @app.route('/weekly-schedule/<int:user_id>')
 def weekly_schedule_user(user_id):
     """Display weekly schedule management page for a specific user"""
@@ -2091,72 +2112,26 @@ def modify_time():
     
     # Get user from database
     user = ManagedUser.query.get_or_404(user_id)
-    today = date.today()
-    effective_daily_limit_before_adjustment = user.get_effective_daily_limit_seconds(today)
-    
+    today = datetime.utcnow().date()
+
     mappings = list(user.device_mappings)
     if not mappings:
         return jsonify({'success': False, 'message': 'No device mappings configured for this user'}), 400
 
-    if effective_daily_limit_before_adjustment is not None:
-        user.apply_daily_limit_adjustment(operation, seconds, today)
-        user.pending_time_adjustment = None
-        user.pending_time_operation = None
-        user.last_checked = datetime.utcnow()
-        db.session.commit()
-
-        online_mappings = [mapping for mapping in mappings if AgentConnectionManager.is_online(mapping.system_id)]
-        device_labels = _get_device_label_map()
-        if not online_mappings:
-            return jsonify({
-                'success': True,
-                'message': 'Adjustment saved on the server and will rebalance when a mapped device reconnects.',
-                'username': user.username,
-                'pending': True,
-                'refresh': True
-            })
-
-        failures = []
-        for mapping in online_mappings:
-            agent_client = AgentClient(system_id=mapping.system_id)
-            success, message = agent_client.modify_time_left(mapping.linux_username, operation, seconds)
-            if not success:
-                failures.append(f"{_mapping_display_label(mapping, device_labels)}: {message}")
-
-        remaining_mappings = len(mappings) - len(online_mappings)
-        if failures or remaining_mappings > 0:
-            pending_fragments = []
-            if failures:
-                pending_fragments.append(f"{len(failures)} online mapping(s) need retry")
-            if remaining_mappings > 0:
-                pending_fragments.append(f"{remaining_mappings} offline mapping(s) will rebalance on reconnect")
-            return jsonify({
-                'success': True,
-                'message': f"Adjustment stored on the server. Applied immediately to {len(online_mappings) - len(failures)}/{len(online_mappings)} online mapping(s).",
-                'details': failures,
-                'username': user.username,
-                'pending': True,
-                'pending_reason': '; '.join(pending_fragments),
-                'refresh': True
-            })
-
-        return jsonify({
-            'success': True,
-            'message': f"Adjustment applied to {len(online_mappings)} mapping(s).",
-            'username': user.username,
-            'pending': False,
-            'refresh': True
-        })
+    # Always accumulate the adjustment on the server (daily_limit_adjustment_seconds),
+    # regardless of whether the user has a weekly schedule for today.
+    user.apply_daily_limit_adjustment(operation, seconds, today)
+    user.pending_time_adjustment = None
+    user.pending_time_operation = None
+    user.last_checked = datetime.utcnow()
+    db.session.commit()
 
     online_mappings = [mapping for mapping in mappings if AgentConnectionManager.is_online(mapping.system_id)]
     device_labels = _get_device_label_map()
     if not online_mappings:
-        user.pending_time_adjustment = seconds
-        user.pending_time_operation = operation
-        db.session.commit()
         return jsonify({
             'success': True,
-            'message': f"All mapped devices are offline. Adjustment {operation}{seconds}s queued.",
+            'message': 'All mapped devices are offline. Adjustment saved on the server and will rebalance when a mapped device reconnects.',
             'username': user.username,
             'pending': True,
             'refresh': True
@@ -2169,27 +2144,28 @@ def modify_time():
         if not success:
             failures.append(f"{_mapping_display_label(mapping, device_labels)}: {message}")
 
-    if failures:
-        user.pending_time_adjustment = seconds
-        user.pending_time_operation = operation
-        db.session.commit()
+    remaining_mappings = len(mappings) - len(online_mappings)
+    if failures or remaining_mappings > 0:
+        pending_fragments = []
+        if failures:
+            pending_fragments.append(f"{len(failures)} online mapping(s) need retry")
+        if remaining_mappings > 0:
+            pending_fragments.append(f"{remaining_mappings} offline mapping(s) will rebalance on reconnect")
         return jsonify({
             'success': True,
-            'message': f"Applied to {len(online_mappings) - len(failures)}/{len(online_mappings)} online mapping(s). Remaining queued.",
+            'message': f"Adjustment stored on the server. Applied immediately to {len(online_mappings) - len(failures)}/{len(online_mappings)} online mapping(s).",
             'details': failures,
             'username': user.username,
             'pending': True,
+            'pending_reason': '; '.join(pending_fragments),
             'refresh': True
         })
 
-    user.pending_time_adjustment = None
-    user.pending_time_operation = None
-    user.last_checked = datetime.utcnow()
-    db.session.commit()
     return jsonify({
         'success': True,
         'message': f"Adjustment applied to {len(online_mappings)} mapping(s).",
         'username': user.username,
+        'pending': False,
         'refresh': True
     })
 

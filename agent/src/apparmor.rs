@@ -107,12 +107,6 @@ pub async fn unload_profiles_for_user(username: &str) -> Result<(), String> {
     guard.unload_user_profiles(username)
 }
 
-pub async fn get_monitored_executables() -> HashMap<String, Vec<AppArmorPolicy>> {
-    let runtime = get_runtime();
-    let guard = runtime.lock().await;
-    guard.current_state.users.clone()
-}
-
 pub async fn evaluate_exec_event(
     username: &str,
     exe_path: &str,

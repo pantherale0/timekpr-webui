@@ -14,8 +14,7 @@
                 "FLASK_ENV": "development",
                 "FLASK_DEBUG": "1",
                 "TZ": "UTC"
-            },
-            "postDebugTask": "Launch Browser"
+            }
         },
         {
             "name": "Python: Simple Agent",
@@ -30,15 +29,37 @@
                 "TZ": "UTC"
             },
             "args": [
-                "--server-url", "ws://127.0.0.1:5000/ws",
-                "--agent-version", "v0.0.0-dev"
+                "--server-url",
+                "ws://127.0.0.1:5000/ws",
+                "--agent-version",
+                "v0.0.0-dev"
+            ]
+        },
+        {
+            "name": "Rust: Agent",
+            "type": "lldb",
+            "request": "launch",
+            "program": "${workspaceFolder}/agent/target/debug/timekpr-agent",
+            "cwd": "${workspaceFolder}/agent",
+            "console": "integratedTerminal",
+            "env": {
+                "TZ": "UTC"
+            },
+            "args": [
+                "--server-url",
+                "ws://127.0.0.1:5000/ws",
+                "--agent-version",
+                "v0.0.0-dev"
             ]
         }
     ],
     "compounds": [
         {
             "name": "Debug Server",
-            "configurations": ["Python: Flask App", "Python: Simple Agent"]
+            "configurations": [
+                "Python: Flask App",
+                "Python: Simple Agent"
+            ]
         }
     ]
 }

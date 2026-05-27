@@ -1,641 +1,413 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Usage History - {{ user.username }} - TimeKpr WebUI</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
-    <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
-    <style>
-        .stats-main {
-            max-width: 1000px;
-            margin: 0 auto;
-            padding: var(--space-6);
-        }
+{% extends "base.html" %}
 
-        .stats-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: var(--space-6);
-            flex-wrap: wrap;
-            gap: var(--space-4);
-        }
+{% block title %}Usage History - {{ user.username }} - TimeKpr WebUI{% endblock %}
 
-        .stats-header-title h1 {
-            font-size: var(--font-size-2xl);
-            font-weight: 700;
-            color: var(--text-primary);
-            margin: 0;
-        }
+{% block extra_head %}
+<!-- Include Chart.js for analytics tab visualization -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+{% endblock %}
 
-        .stats-header-title p {
-            color: var(--text-tertiary);
-            margin: var(--space-1) 0 0 0;
-            font-size: var(--font-size-sm);
-        }
+{% block content %}
+<div class="stats-header-title" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; flex-wrap: wrap; gap: 1rem;">
+    <div>
+        <h1 style="margin: 0; font-size: 2rem;">{{ user.username }} &mdash; History</h1>
+        <p style="margin: 0; color: var(--pico-muted-color); font-weight: 500;">
+            {{ user.device_mappings|length }} linked mapping(s) &bull; Usage statistics and alerts
+        </p>
+    </div>
+</div>
 
-        .summary-strip {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: var(--space-4);
-            margin-bottom: var(--space-6);
-        }
-
-        .summary-card {
-            background: var(--bg-elevated);
-            border: 1px solid var(--border-primary);
-            border-radius: var(--radius-xl);
-            padding: var(--space-4) var(--space-5);
-        }
-
-        .summary-card .summary-label {
-            font-size: var(--font-size-xs);
-            color: var(--text-tertiary);
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            font-weight: 600;
-            margin-bottom: var(--space-1);
-        }
-
-        .summary-card .summary-value {
-            font-size: var(--font-size-xl);
-            font-weight: 700;
-            color: var(--text-primary);
-        }
-
-        .summary-card .summary-sub {
-            font-size: var(--font-size-xs);
-            color: var(--text-tertiary);
-            margin-top: var(--space-1);
-        }
-
-        .period-tabs {
-            display: flex;
-            gap: var(--space-2);
-            margin-bottom: var(--space-6);
-            border-bottom: 1px solid var(--border-primary);
-            padding-bottom: 0;
-        }
-
-        .period-tab {
-            padding: var(--space-2) var(--space-4);
-            border: none;
-            background: none;
-            color: var(--text-tertiary);
-            font-size: var(--font-size-sm);
-            font-weight: 500;
-            cursor: pointer;
-            border-bottom: 2px solid transparent;
-            margin-bottom: -1px;
-            transition: color 0.15s, border-color 0.15s;
-        }
-
-        .period-tab:hover {
-            color: var(--text-primary);
-        }
-
-        .period-tab.active {
-            color: var(--primary);
-            border-bottom-color: var(--primary);
-        }
-
-        .chart-panel {
-            display: none;
-            background: var(--bg-elevated);
-            border: 1px solid var(--border-primary);
-            border-radius: var(--radius-xl);
-            padding: var(--space-6);
-        }
-
-        .chart-panel.active {
-            display: block;
-        }
-
-        .chart-panel-title {
-            font-size: var(--font-size-sm);
-            font-weight: 600;
-            color: var(--text-secondary);
-            margin-bottom: var(--space-4);
-        }
-
-        .chart-wrapper {
-            height: 300px;
-            position: relative;
-        }
-
-        .no-data-msg {
-            text-align: center;
-            color: var(--text-tertiary);
-            padding: var(--space-12) 0;
-            font-size: var(--font-size-sm);
-        }
-
-        .alerts-section {
-            margin-top: var(--space-6);
-            background: var(--bg-elevated);
-            border: 1px solid var(--border-primary);
-            border-radius: var(--radius-xl);
-            padding: var(--space-6);
-        }
-
-        .alerts-section h2 {
-            margin: 0;
-            font-size: var(--font-size-xl);
-        }
-
-        .alerts-section-header {
-            display: flex;
-            justify-content: space-between;
-            gap: var(--space-4);
-            align-items: flex-start;
-            flex-wrap: wrap;
-            margin-bottom: var(--space-5);
-        }
-
-        .alerts-toolbar {
-            display: flex;
-            gap: var(--space-3);
-            align-items: end;
-            flex-wrap: wrap;
-            margin-bottom: var(--space-5);
-        }
-
-        .alerts-toolbar form {
-            display: flex;
-            gap: var(--space-3);
-            align-items: end;
-            flex-wrap: wrap;
-            width: 100%;
-        }
-
-        .alerts-group-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-            gap: var(--space-4);
-            margin-bottom: var(--space-5);
-        }
-
-        .alerts-group-card {
-            background: var(--bg-primary);
-            border: 1px solid var(--border-primary);
-            border-radius: var(--radius-lg);
-            padding: var(--space-4);
-        }
-
-        .alerts-group-card-title {
-            font-weight: 600;
-            margin-bottom: var(--space-2);
-        }
-
-        .alerts-group-card-sub {
-            color: var(--text-tertiary);
-            font-size: var(--font-size-sm);
-        }
-
-        .alerts-table-wrapper {
-            overflow-x: auto;
-        }
-
-        .alerts-table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-
-        .alerts-table th,
-        .alerts-table td {
-            padding: 10px 8px;
-            text-align: left;
-            border-bottom: 1px solid var(--border-primary);
-            vertical-align: top;
-            font-size: var(--font-size-sm);
-        }
-
-        .alerts-table th {
-            color: var(--text-tertiary);
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            font-size: var(--font-size-xs);
-        }
-
-        .alerts-details {
-            max-width: 320px;
-            overflow-wrap: anywhere;
-            color: var(--text-secondary);
-            font-family: var(--font-family-mono, monospace);
-            font-size: var(--font-size-xs);
-        }
-
-        .alerts-empty {
-            color: var(--text-tertiary);
-            padding: var(--space-6) 0;
-        }
-    </style>
-</head>
-<body>
-    <div class="stats-main">
-        <div class="stats-header">
-            <div class="stats-header-title">
-                <h1>{{ user.username }}</h1>
-                <p>{{ user.device_mappings|length }} linked device mapping(s) &mdash; Usage History</p>
-            </div>
-            <div style="display: flex; align-items: center; gap: var(--space-4);">
-                {% if oidc_enabled and session_user %}
-                <div class="user-badge" style="display: flex; align-items: center; gap: var(--space-2); font-size: var(--font-size-sm); color: var(--text-secondary); background: var(--bg-elevated); padding: var(--space-1) var(--space-3); border-radius: var(--radius-full); border: 1px solid var(--border-primary);">
-                    <svg width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
-                        <path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm2-3a2 2 0 1 1-4 0 2 2 0 0 1 4 0zm4 8c0 1-1 1-1 1H3s-1 0-1-1 1-4 6-4 6 3 6 4zm-1-.004c-.001-.246-.154-.986-.832-1.664C11.516 10.68 10.289 10 8 10c-2.29 0-3.516.68-4.168 1.332-.678.678-.83 1.418-.832 1.664h10z"/>
-                    </svg>
-                    <span>{{ session_user.username }}</span>
-                </div>
-                {% endif %}
-                <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">&#8592; Dashboard</a>
-            </div>
-        </div>
-
-        <!-- Summary strip — values injected by JS after period switch -->
-        <div class="summary-strip">
-            <div class="summary-card">
-                <div class="summary-label">Total</div>
-                <div class="summary-value" id="stat-total">—</div>
-                <div class="summary-sub" id="stat-total-sub"></div>
-            </div>
-            <div class="summary-card">
-                <div class="summary-label">Daily Avg</div>
-                <div class="summary-value" id="stat-avg">—</div>
-                <div class="summary-sub" id="stat-avg-sub">per day</div>
-            </div>
-            <div class="summary-card">
-                <div class="summary-label">Peak</div>
-                <div class="summary-value" id="stat-peak">—</div>
-                <div class="summary-sub" id="stat-peak-label"></div>
-            </div>
-        </div>
-
-        <!-- Period tabs -->
-        <div class="period-tabs">
-            <button class="period-tab active" data-period="daily">Last 30 Days</button>
-            <button class="period-tab" data-period="weekly">Last 3 Months</button>
-            <button class="period-tab" data-period="monthly">Last 12 Months</button>
-            <button class="period-tab" data-period="alltime">All Time</button>
-        </div>
-
-        <!-- Chart panels -->
-        <div class="chart-panel active" id="panel-daily">
-            <div class="chart-panel-title">Daily usage — last 30 days</div>
-            {% if daily_30 %}
-                <div class="chart-wrapper"><canvas id="chart-daily"></canvas></div>
-            {% else %}
-                <div class="no-data-msg">No data recorded yet.</div>
-            {% endif %}
-        </div>
-
-        <div class="chart-panel" id="panel-weekly">
-            <div class="chart-panel-title">Weekly totals — last 13 weeks</div>
-            {% if weekly_13 %}
-                <div class="chart-wrapper"><canvas id="chart-weekly"></canvas></div>
-            {% else %}
-                <div class="no-data-msg">No data recorded yet.</div>
-            {% endif %}
-        </div>
-
-        <div class="chart-panel" id="panel-monthly">
-            <div class="chart-panel-title">Monthly totals — last 12 months</div>
-            {% if monthly_12 %}
-                <div class="chart-wrapper"><canvas id="chart-monthly"></canvas></div>
-            {% else %}
-                <div class="no-data-msg">No data recorded yet.</div>
-            {% endif %}
-        </div>
-
-        <div class="chart-panel" id="panel-alltime">
-            <div class="chart-panel-title">All recorded history by month</div>
-            {% if all_monthly %}
-                <div class="chart-wrapper"><canvas id="chart-alltime"></canvas></div>
-            {% else %}
-                <div class="no-data-msg">No data recorded yet.</div>
-            {% endif %}
-        </div>
-
-        <section class="alerts-section">
-            <div class="alerts-section-header">
-                <div>
-                    <h2>Alert Audit</h2>
-                    <p style="margin: var(--space-1) 0 0 0; color: var(--text-tertiary); font-size: var(--font-size-sm);">
-                        Alerts tied to this user's linked accounts and device-wide alerts on their mapped devices.
-                    </p>
-                </div>
-                <div style="display:flex; gap: var(--space-4); flex-wrap: wrap;">
-                    <div class="summary-card" style="min-width: 120px; margin: 0;">
-                        <div class="summary-label">Alerts</div>
-                        <div class="summary-value">{{ alert_summary.total }}</div>
-                    </div>
-                    <div class="summary-card" style="min-width: 120px; margin: 0;">
-                        <div class="summary-label">Account Specific</div>
-                        <div class="summary-value">{{ alert_summary.account_specific }}</div>
-                    </div>
-                    <div class="summary-card" style="min-width: 120px; margin: 0;">
-                        <div class="summary-label">Device Wide</div>
-                        <div class="summary-value">{{ alert_summary.device_wide }}</div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="alerts-toolbar">
-                <form method="GET">
-                    <div class="form-group" style="margin: 0; flex: 1 1 280px;">
-                        <label for="alert_search" class="form-label">Search alerts</label>
-                        <input
-                            type="text"
-                            id="alert_search"
-                            name="alert_search"
-                            class="form-control"
-                            placeholder="Search by event, device, account, status, or details"
-                            value="{{ alert_search }}"
-                        >
-                    </div>
-                    <button type="submit" class="btn btn-secondary">Search</button>
-                    {% if alert_search %}
-                    <a href="{{ url_for('user_stats', user_id=user.id) }}" class="btn btn-secondary">Clear</a>
-                    {% endif %}
-                </form>
-            </div>
-
-            {% if alert_groups %}
-            <div class="alerts-group-grid">
-                {% for group in alert_groups %}
-                <div class="alerts-group-card">
-                    <div class="alerts-group-card-title">{{ group.title }}</div>
-                    <div class="alerts-group-card-sub">{{ group.count }} matching alert(s)</div>
-                </div>
-                {% endfor %}
-            </div>
-            {% endif %}
-
-            {% if alert_entries %}
-            <div class="alerts-table-wrapper">
-                <table class="alerts-table">
-                    <thead>
-                        <tr>
-                            <th>When</th>
-                            <th>Event</th>
-                            <th>Scope</th>
-                            <th>Device</th>
-                            <th>Delivery</th>
-                            <th>Details</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for alert in alert_entries %}
-                        <tr>
-                            <td>
-                                {% if alert.occurred_at %}
-                                {{ (alert.occurred_at|localtime).strftime('%Y-%m-%d %H:%M') }}
-                                {% else %}
-                                Unknown
-                                {% endif %}
-                            </td>
-                            <td>
-                                <div>{{ alert.event_label }}</div>
-                                <div style="font-size: var(--font-size-xs); color: var(--text-tertiary);">#{{ alert.id }}</div>
-                            </td>
-                            <td>{{ alert.scope_label }}</td>
-                            <td>
-                                <a href="{{ url_for('device_detail', system_id=alert.system_id) }}">{{ alert.device_label }}</a>
-                            </td>
-                            <td>
-                                <div>{{ alert.delivery_status|replace('_', ' ')|title }}</div>
-                                <div style="font-size: var(--font-size-xs); color: var(--text-tertiary);">
-                                    {{ alert.delivery_attempts }} attempt(s)
-                                    {% if alert.last_delivery_error %}
-                                    <br>{{ alert.last_delivery_error }}
-                                    {% endif %}
-                                </div>
-                            </td>
-                            <td class="alerts-details">{{ alert.details_text }}</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-            {% else %}
-            <div class="alerts-empty">
-                {% if alert_search %}
-                No alerts matched "{{ alert_search }}".
-                {% else %}
-                No alerts recorded yet for this user's linked devices.
-                {% endif %}
-            </div>
-            {% endif %}
-        </section>
+<div class="stats-main">
+    <!-- Summary strip — values injected by JS after period switch -->
+    <div class="summary-strip" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+        <article class="card summary-card" style="margin: 0; padding: 1rem; text-align: center;">
+            <div class="summary-label" style="font-size: 0.75rem; font-weight: bold; color: var(--pico-muted-color); text-transform: uppercase;">Total Time</div>
+            <div class="summary-value" id="stat-total" style="font-size: 1.75rem; font-weight: 700; color: var(--pico-primary);">—</div>
+            <div class="summary-sub" id="stat-total-sub" style="font-size: 0.75rem; color: var(--pico-muted-color); font-weight: bold;"></div>
+        </article>
+        <article class="card summary-card" style="margin: 0; padding: 1rem; text-align: center;">
+            <div class="summary-label" style="font-size: 0.75rem; font-weight: bold; color: var(--pico-muted-color); text-transform: uppercase;">Daily Average</div>
+            <div class="summary-value" id="stat-avg" style="font-size: 1.75rem; font-weight: 700; color: var(--pico-color);">—</div>
+            <div class="summary-sub" id="stat-avg-sub" style="font-size: 0.75rem; color: var(--pico-muted-color); font-weight: bold;">per day</div>
+        </article>
+        <article class="card summary-card" style="margin: 0; padding: 1rem; text-align: center;">
+            <div class="summary-label" style="font-size: 0.75rem; font-weight: bold; color: var(--pico-muted-color); text-transform: uppercase;">Peak Usage</div>
+            <div class="summary-value" id="stat-peak" style="font-size: 1.75rem; font-weight: 700; color: var(--warning-color);">—</div>
+            <div class="summary-sub" id="stat-peak-label" style="font-size: 0.75rem; color: var(--pico-muted-color); font-weight: bold;"></div>
+        </article>
     </div>
 
-    <script>
-    (function() {
-        // ── Data from server ──────────────────────────────────────────────
+    <!-- Period Tabs using PicoCSS Nav -->
+    <nav class="period-tabs-nav" style="margin-bottom: 1.5rem; background: var(--pico-card-background-color); border: 1px solid var(--pico-card-border-color); border-radius: 0.75rem; padding: 0.25rem;">
+        <ul style="display: flex; gap: 0.25rem; list-style: none; margin: 0; padding: 0; flex-wrap: wrap;">
+            <li style="flex: 1; text-align: center; margin: 0; padding: 0;">
+                <button class="period-tab active btn btn-ghost btn-sm" data-period="daily" style="width: 100%; margin: 0; font-weight: bold; font-size: 0.85rem;">Last 30 Days</button>
+            </li>
+            <li style="flex: 1; text-align: center; margin: 0; padding: 0;">
+                <button class="period-tab btn btn-ghost btn-sm" data-period="weekly" style="width: 100%; margin: 0; font-weight: bold; font-size: 0.85rem;">Last 3 Months</button>
+            </li>
+            <li style="flex: 1; text-align: center; margin: 0; padding: 0;">
+                <button class="period-tab btn btn-ghost btn-sm" data-period="monthly" style="width: 100%; margin: 0; font-weight: bold; font-size: 0.85rem;">Last 12 Months</button>
+            </li>
+            <li style="flex: 1; text-align: center; margin: 0; padding: 0;">
+                <button class="period-tab btn btn-ghost btn-sm" data-period="alltime" style="width: 100%; margin: 0; font-weight: bold; font-size: 0.85rem;">All Time</button>
+            </li>
+        </ul>
+    </nav>
 
-        const datasets = {
-            daily: {
-                labels: [],
-                values: [],
-                daysInPeriod: 30,
-                granularity: 'day',
+    <!-- Chart Panels Redesigned -->
+    <article class="card chart-panel active" id="panel-daily" style="margin-bottom: 1.5rem; padding: 1.25rem;">
+        <h3 class="chart-panel-title" style="font-size: 0.95rem; font-weight: bold; color: var(--pico-muted-color); text-transform: uppercase; margin-bottom: 1rem;">Daily usage &mdash; last 30 days</h3>
+        {% if daily_30 %}
+            <div class="chart-wrapper" style="height: 280px; position: relative;"><canvas id="chart-daily"></canvas></div>
+        {% else %}
+            <div class="no-data-msg" style="text-align: center; color: var(--pico-muted-color); padding: 3rem 0;">No usage records found.</div>
+        {% endif %}
+    </article>
+
+    <article class="card chart-panel" id="panel-weekly" style="margin-bottom: 1.5rem; padding: 1.25rem; display: none;">
+        <h3 class="chart-panel-title" style="font-size: 0.95rem; font-weight: bold; color: var(--pico-muted-color); text-transform: uppercase; margin-bottom: 1rem;">Weekly totals &mdash; last 13 weeks</h3>
+        {% if weekly_13 %}
+            <div class="chart-wrapper" style="height: 280px; position: relative;"><canvas id="chart-weekly"></canvas></div>
+        {% else %}
+            <div class="no-data-msg" style="text-align: center; color: var(--pico-muted-color); padding: 3rem 0;">No usage records found.</div>
+        {% endif %}
+    </article>
+
+    <article class="card chart-panel" id="panel-monthly" style="margin-bottom: 1.5rem; padding: 1.25rem; display: none;">
+        <h3 class="chart-panel-title" style="font-size: 0.95rem; font-weight: bold; color: var(--pico-muted-color); text-transform: uppercase; margin-bottom: 1rem;">Monthly totals &mdash; last 12 months</h3>
+        {% if monthly_12 %}
+            <div class="chart-wrapper" style="height: 280px; position: relative;"><canvas id="chart-monthly"></canvas></div>
+        {% else %}
+            <div class="no-data-msg" style="text-align: center; color: var(--pico-muted-color); padding: 3rem 0;">No usage records found.</div>
+        {% endif %}
+    </article>
+
+    <article class="card chart-panel" id="panel-alltime" style="margin-bottom: 1.5rem; padding: 1.25rem; display: none;">
+        <h3 class="chart-panel-title" style="font-size: 0.95rem; font-weight: bold; color: var(--pico-muted-color); text-transform: uppercase; margin-bottom: 1rem;">All recorded history by month</h3>
+        {% if all_monthly %}
+            <div class="chart-wrapper" style="height: 280px; position: relative;"><canvas id="chart-alltime"></canvas></div>
+        {% else %}
+            <div class="no-data-msg" style="text-align: center; color: var(--pico-muted-color); padding: 3rem 0;">No usage records found.</div>
+        {% endif %}
+    </article>
+
+    <!-- Alerts Audits System -->
+    <article class="card alerts-section" style="margin-bottom: 1.5rem; padding: 1.25rem;">
+        <div class="alerts-section-header" style="display: flex; justify-content: space-between; gap: 1rem; align-items: flex-start; flex-wrap: wrap; border-bottom: 1px solid var(--pico-card-border-color); padding-bottom: 1rem; margin-bottom: 1.25rem;">
+            <div>
+                <h2 style="margin: 0; font-size: 1.5rem;">Alert Audit Trail</h2>
+                <p style="margin: 0.25rem 0 0 0; color: var(--pico-muted-color); font-size: 0.9rem; font-weight: 500;">
+                    Log of parent alerts, locklist violations, and local device events
+                </p>
+            </div>
+            <div style="display:flex; gap: 0.5rem; flex-wrap: wrap;">
+                <div style="text-align: center; padding: 0.4rem 0.75rem; background: var(--pico-background-color); border: 1px solid var(--pico-card-border-color); border-radius: 0.5rem; min-width: 100px;">
+                    <div style="font-size: 0.7rem; font-weight: bold; color: var(--pico-muted-color); text-transform: uppercase;">Total</div>
+                    <div style="font-size: 1.1rem; font-weight: 700;">{{ alert_summary.total }}</div>
+                </div>
+                <div style="text-align: center; padding: 0.4rem 0.75rem; background: var(--pico-background-color); border: 1px solid var(--pico-card-border-color); border-radius: 0.5rem; min-width: 100px;">
+                    <div style="font-size: 0.7rem; font-weight: bold; color: var(--pico-muted-color); text-transform: uppercase;">Account</div>
+                    <div style="font-size: 1.1rem; font-weight: 700;">{{ alert_summary.account_specific }}</div>
+                </div>
+                <div style="text-align: center; padding: 0.4rem 0.75rem; background: var(--pico-background-color); border: 1px solid var(--pico-card-border-color); border-radius: 0.5rem; min-width: 100px;">
+                    <div style="font-size: 0.7rem; font-weight: bold; color: var(--pico-muted-color); text-transform: uppercase;">Device</div>
+                    <div style="font-size: 1.1rem; font-weight: 700;">{{ alert_summary.device_wide }}</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="alerts-toolbar" style="margin-bottom: 1.25rem;">
+            <form method="GET" style="display: flex; gap: 0.5rem; align-items: end; flex-wrap: wrap; margin: 0;">
+                <div class="form-group" style="margin: 0; flex: 1 1 300px;">
+                    <input
+                        type="text"
+                        id="alert_search"
+                        name="alert_search"
+                        class="form-control"
+                        placeholder="Search event, device, scope, account, status..."
+                        value="{{ alert_search }}"
+                        style="margin: 0;"
+                    >
+                </div>
+                <button type="submit" class="btn btn-secondary btn-sm" style="margin: 0;">Search Logs</button>
+                {% if alert_search %}
+                <a href="{{ url_for('user_stats', user_id=user.id) }}" class="btn btn-ghost btn-sm" style="margin: 0;">Clear Filter</a>
+                {% endif %}
+            </form>
+        </div>
+
+        {% if alert_groups %}
+        <div class="alerts-group-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.75rem; margin-bottom: 1.25rem;">
+            {% for group in alert_groups %}
+            <div class="alerts-group-card" style="background: var(--pico-background-color); border: 1px solid var(--pico-card-border-color); border-radius: 0.5rem; padding: 0.5rem 0.75rem;">
+                <div class="alerts-group-card-title" style="font-weight: bold; font-size: 0.9rem;">{{ group.title }}</div>
+                <div class="alerts-group-card-sub" style="font-size: 0.75rem; color: var(--pico-muted-color); font-weight: bold;">{{ group.count }} match(es)</div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {% if alert_entries %}
+        <div class="alerts-table-wrapper" style="overflow-x: auto;">
+            <table class="striped alerts-table" style="width: 100%; border-collapse: collapse; margin: 0;">
+                <thead>
+                    <tr>
+                        <th>Date & Time</th>
+                        <th>Event Type</th>
+                        <th>Scope</th>
+                        <th>Target Device</th>
+                        <th>Webhook Delivery</th>
+                        <th>Diagnostic Details</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for alert in alert_entries %}
+                    <tr>
+                        <td style="font-size: 0.8rem; font-weight: bold; color: var(--pico-muted-color); white-space: nowrap;">
+                            {% if alert.occurred_at %}
+                            {{ (alert.occurred_at|localtime).strftime('%Y-%m-%d %H:%M') }}
+                            {% else %}
+                            Unknown
+                            {% endif %}
+                        </td>
+                        <td>
+                            <strong style="font-size: 0.9rem;">{{ alert.event_label }}</strong>
+                            <div style="font-size: 0.7rem; color: var(--pico-muted-color); font-weight: bold;">ID: #{{ alert.id }}</div>
+                        </td>
+                        <td><span class="badge badge-secondary" style="font-weight: bold;">{{ alert.scope_label }}</span></td>
+                        <td>
+                            <a href="{{ url_for('device_detail', system_id=alert.system_id) }}" style="font-weight: bold;">{{ alert.device_label }}</a>
+                        </td>
+                        <td>
+                            <div style="font-weight: bold; font-size: 0.85rem;">{{ alert.delivery_status|replace('_', ' ')|title }}</div>
+                            <div style="font-size: 0.7rem; color: var(--pico-muted-color); font-weight: bold;">
+                                {{ alert.delivery_attempts }} attempt(s)
+                                {% if alert.last_delivery_error %}
+                                <br><span style="color: var(--danger-color);">Error: {{ alert.last_delivery_error }}</span>
+                                {% endif %}
+                            </div>
+                        </td>
+                        <td class="alerts-details" style="font-size: 0.75rem; color: var(--pico-muted-color); font-family: monospace; max-width: 280px; overflow-wrap: break-word;">{{ alert.details_text }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="alerts-empty" style="text-align: center; color: var(--pico-muted-color); padding: 2rem 0; font-weight: 500;">
+            {% if alert_search %}
+            No audit records matched search filter "{{ alert_search }}".
+            {% else %}
+            No alert logs found for this child account's mapped clients.
+            {% endif %}
+        </div>
+        {% endif %}
+    </article>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function() {
+    // ── Local Dataset bindings ──────────────────────────────────────────────
+    const datasets = {
+        daily: {
+            labels: [],
+            values: [],
+            daysInPeriod: 30,
+            granularity: 'day',
+        },
+        weekly: {
+            labels: [],
+            values: [],
+            weekStarts: [],
+            daysInPeriod: 91,
+            granularity: 'week',
+        },
+        monthly: {
+            labels: [],
+            values: [],
+            months: [],
+            daysInPeriod: 365,
+            granularity: 'month',
+        },
+        alltime: {
+            labels: [],
+            values: [],
+            months: [],
+            daysInPeriod: null,
+            granularity: 'month',
+        },
+    };
+
+    // Load data from Jinja loop bindings
+    {% for date, seconds in daily_30.items() %}
+    datasets.daily.labels.push('{{ date }}');
+    datasets.daily.values.push({{ seconds / 3600 }});
+    {% endfor %}
+
+    {% for w in weekly_13 %}
+    datasets.weekly.labels.push('{{ w.label }}');
+    datasets.weekly.values.push({{ w.total / 3600 }});
+    datasets.weekly.weekStarts.push('{{ w.week_start }}');
+    {% endfor %}
+
+    {% for m in monthly_12 %}
+    datasets.monthly.labels.push('{{ m.label }}');
+    datasets.monthly.values.push({{ m.total / 3600 }});
+    datasets.monthly.months.push('{{ m.month }}');
+    {% endfor %}
+
+    {% for m in all_monthly %}
+    datasets.alltime.labels.push('{{ m.label }}');
+    datasets.alltime.values.push({{ m.total / 3600 }});
+    datasets.alltime.months.push('{{ m.month }}');
+    {% endfor %}
+
+    // Weekend checker
+    function isWeekend(label, granularity) {
+        if (granularity !== 'day') return false;
+        const d = new Date(label + 'T00:00:00');
+        return d.getDay() === 0 || d.getDay() === 6;
+    }
+
+    function fmtHours(h) {
+        if (h === 0) return '0h';
+        if (h < 1) return Math.round(h * 60) + 'm';
+        if (h % 1 === 0) return h + 'h';
+        return Math.floor(h) + 'h ' + Math.round((h % 1) * 60) + 'm';
+    }
+
+    function buildChart(canvasId, data) {
+        const canvas = document.getElementById(canvasId);
+        if (!canvas) return null;
+        const ctx = canvas.getContext('2d');
+        const { labels, values, granularity } = data;
+
+        const maxVal = Math.max(...values, 0.1);
+        const niceSteps = [0.1, 0.2, 0.25, 0.5, 1, 2, 3, 4, 6, 8, 12, 24];
+        const minStep = maxVal / 6;
+        const stepSize = niceSteps.find(s => s >= minStep) || niceSteps[niceSteps.length - 1];
+        const yMax = Math.ceil(maxVal / stepSize) * stepSize;
+
+        return new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Hours Used',
+                    data: values,
+                    backgroundColor: labels.map((l, i) =>
+                        isWeekend(l, granularity)
+                            ? 'rgba(245, 158, 11, 0.6)'
+                            : 'rgba(59, 130, 246, 0.6)'
+                    ),
+                    borderColor: labels.map((l, i) =>
+                        isWeekend(l, granularity)
+                            ? 'rgb(245, 158, 11)'
+                            : 'rgb(59, 130, 246)'
+                    ),
+                    borderWidth: 2,
+                    borderRadius: 8,
+                    borderSkipped: false,
+                }]
             },
-            weekly: {
-                labels: [],
-                values: [],
-                weekStarts: [],
-                daysInPeriod: 91,
-                granularity: 'week',
-            },
-            monthly: {
-                labels: [],
-                values: [],
-                months: [],
-                daysInPeriod: 365,
-                granularity: 'month',
-            },
-            alltime: {
-                labels: [],
-                values: [],
-                months: [],
-                daysInPeriod: null,
-                granularity: 'month',
-            },
-        };
-
-        // Daily (30 days) — dict iteration preserves insertion order in Python 3.7+
-        {% for date, seconds in daily_30.items() %}
-        datasets.daily.labels.push('{{ date }}');
-        datasets.daily.values.push({{ seconds / 3600 }});
-        {% endfor %}
-
-        // Weekly (13 weeks)
-        {% for w in weekly_13 %}
-        datasets.weekly.labels.push('{{ w.label }}');
-        datasets.weekly.values.push({{ w.total / 3600 }});
-        datasets.weekly.weekStarts.push('{{ w.week_start }}');
-        {% endfor %}
-
-        // Monthly (12 months)
-        {% for m in monthly_12 %}
-        datasets.monthly.labels.push('{{ m.label }}');
-        datasets.monthly.values.push({{ m.total / 3600 }});
-        datasets.monthly.months.push('{{ m.month }}');
-        {% endfor %}
-
-        // All time
-        {% for m in all_monthly %}
-        datasets.alltime.labels.push('{{ m.label }}');
-        datasets.alltime.values.push({{ m.total / 3600 }});
-        datasets.alltime.months.push('{{ m.month }}');
-        {% endfor %}
-
-        // ── Chart helpers ─────────────────────────────────────────────────
-
-        function isWeekend(label, granularity) {
-            if (granularity !== 'day') return false;
-            const d = new Date(label + 'T00:00:00');
-            return d.getDay() === 0 || d.getDay() === 6;
-        }
-
-        function fmtHours(h) {
-            if (h === 0) return '0h';
-            if (h < 1) return Math.round(h * 60) + 'm';
-            if (h % 1 === 0) return h + 'h';
-            return Math.floor(h) + 'h ' + Math.round((h % 1) * 60) + 'm';
-        }
-
-        function buildChart(canvasId, data) {
-            const canvas = document.getElementById(canvasId);
-            if (!canvas) return null;
-            const ctx = canvas.getContext('2d');
-            const { labels, values, granularity } = data;
-
-            const maxVal = Math.max(...values, 0.1);
-            const niceSteps = [0.1, 0.2, 0.25, 0.5, 1, 2, 3, 4, 6, 8, 12, 24];
-            const minStep = maxVal / 6;
-            const stepSize = niceSteps.find(s => s >= minStep) || niceSteps[niceSteps.length - 1];
-            const yMax = Math.ceil(maxVal / stepSize) * stepSize;
-
-            return new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: labels,
-                    datasets: [{
-                        label: 'Hours',
-                        data: values,
-                        backgroundColor: labels.map((l, i) =>
-                            isWeekend(l, granularity)
-                                ? 'rgb(245 158 11 / 0.6)'
-                                : 'rgb(59 130 246 / 0.6)'
-                        ),
-                        borderColor: labels.map((l, i) =>
-                            isWeekend(l, granularity)
-                                ? 'rgb(245 158 11)'
-                                : 'rgb(59 130 246)'
-                        ),
-                        borderWidth: 2,
-                        borderRadius: 4,
-                        borderSkipped: false,
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    interaction: { intersect: false, mode: 'index' },
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            max: yMax,
-                            ticks: {
-                                stepSize: stepSize,
-                                color: 'rgb(100 116 139)',
-                                font: { size: 11 },
-                                callback: v => fmtHours(v),
-                            },
-                            grid: { color: 'rgb(226 232 240 / 0.5)' },
-                        },
-                        x: {
-                            grid: { display: false },
-                            ticks: {
-                                color: labels.map((l, i) =>
-                                    isWeekend(l, granularity)
-                                        ? 'rgb(245 158 11)'
-                                        : 'rgb(100 116 139)'
-                                ),
-                                font: { size: 11, weight: '500' },
-                                maxRotation: granularity === 'day' ? 45 : 0,
-                            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { intersect: false, mode: 'index' },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: yMax,
+                        ticks: {
+                            stepSize: stepSize,
+                            font: { size: 10, weight: 'bold' },
+                            callback: v => fmtHours(v),
+                        }
+                    },
+                    x: {
+                        grid: { display: false },
+                        ticks: {
+                            font: { size: 10, weight: 'bold' },
+                            maxRotation: granularity === 'day' ? 45 : 0,
                         },
                     },
-                    plugins: {
-                        legend: { display: false },
-                        tooltip: {
-                            callbacks: {
-                                label: ctx => fmtHours(ctx.parsed.y),
-                            }
+                },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: ctx => fmtHours(ctx.parsed.y),
                         }
                     }
                 }
-            });
-        }
-
-        // ── Summary stats ─────────────────────────────────────────────────
-
-        function updateSummary(key) {
-            const d = datasets[key];
-            const values = d.values;
-            const total = values.reduce((a, b) => a + b, 0);
-            const days = d.daysInPeriod || (values.length * 30); // alltime: approx
-            const avg = days > 0 ? total / days : 0;
-            const peakVal = Math.max(...values, 0);
-            const peakIdx = values.indexOf(peakVal);
-            const peakLabel = peakIdx >= 0 ? d.labels[peakIdx] : '—';
-
-            const granularityLabel = {
-                day: 'in 30 days',
-                week: 'in 13 weeks',
-                month: 'in 12 months',
-            }[d.granularity] || 'recorded';
-
-            document.getElementById('stat-total').textContent = fmtHours(Math.round(total * 10) / 10);
-            document.getElementById('stat-total-sub').textContent = granularityLabel;
-            document.getElementById('stat-avg').textContent = fmtHours(Math.round(avg * 10) / 10);
-            document.getElementById('stat-peak').textContent = fmtHours(Math.round(peakVal * 10) / 10);
-            document.getElementById('stat-peak-label').textContent = peakLabel;
-        }
-
-        // ── Tab switching ─────────────────────────────────────────────────
-
-        const chartInstances = {};
-        let activePeriod = 'daily';
-
-        function switchPeriod(period) {
-            // Update tab styles
-            document.querySelectorAll('.period-tab').forEach(t => {
-                t.classList.toggle('active', t.dataset.period === period);
-            });
-            // Update panel visibility
-            document.querySelectorAll('.chart-panel').forEach(p => {
-                p.classList.toggle('active', p.id === 'panel-' + period);
-            });
-            // Build chart lazily (only once)
-            if (!chartInstances[period] && datasets[period].values.length > 0) {
-                chartInstances[period] = buildChart('chart-' + period, datasets[period]);
             }
-            updateSummary(period);
-            activePeriod = period;
-        }
-
-        document.querySelectorAll('.period-tab').forEach(btn => {
-            btn.addEventListener('click', () => switchPeriod(btn.dataset.period));
         });
+    }
 
-        // Init default period
-        switchPeriod('daily');
-    })();
-    </script>
-</body>
-</html>
+    function updateSummary(key) {
+        const d = datasets[key];
+        const values = d.values;
+        const total = values.reduce((a, b) => a + b, 0);
+        const days = d.daysInPeriod || (values.length * 30);
+        const avg = days > 0 ? total / days : 0;
+        const peakVal = Math.max(...values, 0);
+        const peakIdx = values.indexOf(peakVal);
+        const peakLabel = peakIdx >= 0 ? d.labels[peakIdx] : '—';
+
+        const granularityLabel = {
+            day: 'in 30 days',
+            week: 'in 13 weeks',
+            month: 'in 12 months',
+        }[d.granularity] || 'recorded';
+
+        document.getElementById('stat-total').textContent = fmtHours(Math.round(total * 10) / 10);
+        document.getElementById('stat-total-sub').textContent = granularityLabel;
+        document.getElementById('stat-avg').textContent = fmtHours(Math.round(avg * 10) / 10);
+        document.getElementById('stat-peak').textContent = fmtHours(Math.round(peakVal * 10) / 10);
+        document.getElementById('stat-peak-label').textContent = peakLabel;
+    }
+
+    // Tab toggler bindings
+    const chartInstances = {};
+    let activePeriod = 'daily';
+
+    function switchPeriod(period) {
+        document.querySelectorAll('.period-tab').forEach(t => {
+            t.classList.toggle('active', t.dataset.period === period);
+            // style helper
+            if (t.dataset.period === period) {
+                t.style.backgroundColor = 'var(--pico-primary-background)';
+                t.style.color = '#ffffff';
+            } else {
+                t.style.backgroundColor = 'transparent';
+                t.style.color = '';
+            }
+        });
+        
+        document.querySelectorAll('.chart-panel').forEach(p => {
+            if (p.id === 'panel-' + period) {
+                p.style.display = 'block';
+            } else {
+                p.style.display = 'none';
+            }
+        });
+        
+        if (!chartInstances[period] && datasets[period].values.length > 0) {
+            chartInstances[period] = buildChart('chart-' + period, datasets[period]);
+        }
+        updateSummary(period);
+        activePeriod = period;
+    }
+
+    document.querySelectorAll('.period-tab').forEach(btn => {
+        btn.addEventListener('click', () => switchPeriod(btn.dataset.period));
+    });
+
+    // Start with default daily
+    switchPeriod('daily');
+})();
+</script>
+{% endblock %}

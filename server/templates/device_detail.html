@@ -1,396 +1,239 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ device_label }} - Device Alerts - TimeKpr WebUI</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
-    <style>
-        .device-main {
-            max-width: 1100px;
-            margin: 0 auto;
-            padding: var(--space-6);
-        }
+{% extends "base.html" %}
 
-        .device-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            gap: var(--space-4);
-            flex-wrap: wrap;
-            margin-bottom: var(--space-6);
-        }
+{% block title %}{{ device_label }} - Device Details - TimeKpr WebUI{% endblock %}
 
-        .device-meta-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-            gap: var(--space-4);
-            margin-bottom: var(--space-6);
-        }
+{% block content %}
+<div class="device-header-title" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; flex-wrap: wrap; gap: 1rem;">
+    <div>
+        <h1 style="margin: 0; font-size: 2rem;">{{ device_label }}</h1>
+        <p style="margin: 0; color: var(--pico-muted-color); font-weight: 500;">
+            Device details, linked accounts, and alert history
+        </p>
+    </div>
+    <div>
+        <a href="{{ url_for('admin') }}" class="btn btn-secondary btn-sm">
+            <svg width="14" height="14" fill="currentColor" viewBox="0 0 16 16" style="margin-right: 4px;">
+                <path fill-rule="evenodd" d="M15 8a.5.5 0 0 0-.5-.5H2.707l3.147-3.146a.5.5 0 1 0-.708-.708l-4 4a.5.5 0 0 0 0 .708l4 4a.5.5 0 0 0 .708-.708L2.707 8.5H14.5A.5.5 0 0 0 15 8z"/>
+            </svg>
+            Back to Admin
+        </a>
+    </div>
+</div>
 
-        .device-card {
-            background: var(--bg-elevated);
-            border: 1px solid var(--border-primary);
-            border-radius: var(--radius-xl);
-            padding: var(--space-5);
-        }
-
-        .device-card h2 {
-            margin-top: 0;
-            margin-bottom: var(--space-4);
-            font-size: var(--font-size-lg);
-        }
-
-        .meta-label {
-            color: var(--text-tertiary);
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            font-size: var(--font-size-xs);
-            font-weight: 600;
-            margin-bottom: var(--space-1);
-        }
-
-        .meta-value {
-            font-size: var(--font-size-lg);
-            font-weight: 700;
-        }
-
-        .mapped-accounts-list {
-            display: grid;
-            gap: var(--space-3);
-        }
-
-        .mapped-account-item {
-            border: 1px solid var(--border-primary);
-            border-radius: var(--radius-lg);
-            padding: var(--space-4);
-            background: var(--bg-primary);
-        }
-
-        /* Usage Summary styles */
-        .aa-usage-list {
-            display: grid;
-            gap: var(--space-2);
-        }
-
-        .aa-usage-row {
-            display: flex;
-            align-items: center;
-            gap: var(--space-4);
-            padding: var(--space-2) 0;
-            border-bottom: 1px solid var(--border-primary);
-        }
-
-        .aa-usage-row:last-child {
-            border-bottom: none;
-        }
-
-        .aa-usage-label {
-            min-width: 140px;
-            font-weight: 500;
-            font-size: var(--font-size-sm);
-        }
-
-        .aa-usage-bar-container {
-            flex: 1;
-            height: 20px;
-            background: var(--bg-tertiary);
-            border-radius: var(--radius-sm);
-            overflow: hidden;
-            position: relative;
-        }
-
-        .aa-usage-bar {
-            height: 100%;
-            border-radius: var(--radius-sm);
-            background: linear-gradient(90deg, hsl(210, 80%, 55%), hsl(200, 85%, 50%));
-            transition: width var(--transition-slow);
-            min-width: 2px;
-        }
-
-        .aa-usage-time {
-            min-width: 80px;
-            text-align: right;
-            font-size: var(--font-size-sm);
-            font-weight: 600;
-            color: var(--text-secondary);
-        }
-
-        .aa-usage-sessions {
-            min-width: 80px;
-            text-align: right;
-            font-size: var(--font-size-xs);
-            color: var(--text-tertiary);
-        }
-
-        .alerts-toolbar {
-            display: flex;
-            gap: var(--space-3);
-            align-items: end;
-            flex-wrap: wrap;
-            margin-bottom: var(--space-5);
-        }
-
-        .alerts-toolbar form {
-            display: flex;
-            gap: var(--space-3);
-            align-items: end;
-            flex-wrap: wrap;
-            width: 100%;
-        }
-
-        .alerts-table-wrapper {
-            overflow-x: auto;
-        }
-
-        .alerts-table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-
-        .alerts-table th,
-        .alerts-table td {
-            padding: 10px 8px;
-            text-align: left;
-            border-bottom: 1px solid var(--border-primary);
-            vertical-align: top;
-            font-size: var(--font-size-sm);
-        }
-
-        .alerts-table th {
-            color: var(--text-tertiary);
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            font-size: var(--font-size-xs);
-        }
-
-        .alerts-details {
-            max-width: 360px;
-            overflow-wrap: anywhere;
-            color: var(--text-secondary);
-            font-family: var(--font-family-mono, monospace);
-            font-size: var(--font-size-xs);
-        }
-    </style>
-</head>
-<body>
-    <div class="device-main">
-        <div class="device-header">
-            <div>
-                <h1 style="margin: 0;">{{ device_label }}</h1>
-                <p style="margin: var(--space-1) 0 0 0; color: var(--text-tertiary);">
-                    Device details, linked accounts, and alert history
-                </p>
-            </div>
-            <div style="display:flex; gap: var(--space-3); flex-wrap: wrap;">
-                <a href="{{ url_for('admin') }}" class="btn btn-secondary">Back to Admin</a>
-                <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">Dashboard</a>
-            </div>
+<div class="device-main">
+    <!-- Meta metrics cards grid -->
+    <div class="device-meta-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+        <div class="device-card" style="margin: 0; padding: 1rem; text-align: center;">
+            <div class="meta-label" style="font-size: 0.75rem; font-weight: bold; color: var(--pico-muted-color); text-transform: uppercase;">System ID</div>
+            <div class="meta-value" style="font-size: 0.95rem; font-weight: bold; overflow-wrap: anywhere;">{{ device.system_id }}</div>
         </div>
-
-        <div class="device-meta-grid">
-            <div class="device-card">
-                <div class="meta-label">System ID</div>
-                <div class="meta-value" style="font-size: var(--font-size-base);">{{ device.system_id }}</div>
-            </div>
-            <div class="device-card">
-                <div class="meta-label">Status</div>
-                <div class="meta-value">{{ device.status|title }}</div>
-            </div>
-            <div class="device-card">
-                <div class="meta-label">Last Known IP</div>
-                <div class="meta-value">{{ device.system_ip or 'Unknown' }}</div>
-            </div>
-            <div class="device-card">
-                <div class="meta-label">Alerts</div>
-                <div class="meta-value">{{ alert_summary.total }}</div>
-            </div>
+        <div class="device-card" style="margin: 0; padding: 1rem; text-align: center;">
+            <div class="meta-label" style="font-size: 0.75rem; font-weight: bold; color: var(--pico-muted-color); text-transform: uppercase;">Trust Status</div>
+            <div class="meta-value" style="font-size: 1.25rem; font-weight: 700; color: var(--pico-primary);">{{ device.status|title }}</div>
         </div>
-
-        <div class="device-card" style="margin-bottom: var(--space-6);">
-            <h2>Mapped Accounts</h2>
-            {% if mapped_accounts %}
-            <div class="mapped-accounts-list">
-                {% for mapping in mapped_accounts %}
-                <div class="mapped-account-item" style="display: flex; justify-content: space-between; align-items: center; gap: var(--space-4); flex-wrap: wrap;">
-                    <div>
-                        <div style="font-weight: 600; font-size: var(--font-size-base);">{{ mapping.managed_user.username }} &rarr; {{ mapping.linux_username }}</div>
-                        <div style="font-size: var(--font-size-sm); color: var(--text-tertiary); margin-top: var(--space-1);">
-                            UID: {{ mapping.linux_uid if mapping.linux_uid is not none else '-' }}
-                            <span style="margin-left: var(--space-3);">
-                                Status: {{ 'Valid' if mapping.is_valid else 'Unverified' }}
-                            </span>
-                        </div>
-                    </div>
-                    <div>
-                        <a href="{{ url_for('apparmor_policy', mapping_id=mapping.id) }}" class="btn btn-sm btn-secondary" style="font-size: var(--font-size-xs);">🛡️ Manage AppArmor</a>
-                    </div>
-                </div>
-                {% endfor %}
-            </div>
-            {% else %}
-            <p style="margin: 0; color: var(--text-tertiary);">No managed accounts are currently mapped to this device.</p>
-            {% endif %}
+        <div class="device-card" style="margin: 0; padding: 1rem; text-align: center;">
+            <div class="meta-label" style="font-size: 0.75rem; font-weight: bold; color: var(--pico-muted-color); text-transform: uppercase;">Last IP Address</div>
+            <div class="meta-value" style="font-size: 1.25rem; font-weight: 700;"><code>{{ device.system_ip or 'Offline' }}</code></div>
         </div>
-
-        <div class="device-card" style="margin-bottom: var(--space-6);">
-            <h2>📊 Application Runtime Activity (Last 7 Days)</h2>
-            <p style="margin: 0 0 var(--space-4) 0; color: var(--text-tertiary); font-size: var(--font-size-sm);">
-                Real-time usage tracking of active applications per child user profile.
-            </p>
-            {% if mapped_accounts %}
-                {% set ns = namespace(has_any_usage=false) %}
-                {% for mapping in mapped_accounts %}
-                    {% set usage = usage_summaries.get(mapping.id) %}
-                    {% if usage %}
-                        {% set ns.has_any_usage = true %}
-                        <div style="margin-bottom: var(--space-4); border: 1px solid var(--border-primary); border-radius: var(--radius-lg); padding: var(--space-4); background: var(--bg-primary);">
-                            <h3 style="margin-top: 0; margin-bottom: var(--space-3); font-size: var(--font-size-base); font-weight: 600; color: var(--text-secondary);">
-                                👤 {{ mapping.managed_user.username }} ({{ mapping.linux_username }})
-                            </h3>
-                            <div class="aa-usage-list">
-                                {% set max_seconds = usage[0].total_seconds if usage else 1 %}
-                                {% for item in usage %}
-                                <div class="aa-usage-row">
-                                    <div class="aa-usage-label">{{ item.application_name }}</div>
-                                    <div class="aa-usage-bar-container">
-                                        <div class="aa-usage-bar"
-                                             style="width: {{ (item.total_seconds / max_seconds * 100)|round(1) }}%;">
-                                        </div>
-                                    </div>
-                                    <div class="aa-usage-time">{{ item.formatted }}</div>
-                                    <div class="aa-usage-sessions">{{ item.session_count }} session{{ 's' if item.session_count != 1 }}</div>
-                                </div>
-                                {% endfor %}
-                            </div>
-                        </div>
-                    {% endif %}
-                {% endfor %}
-                {% if not ns.has_any_usage %}
-                    <p style="margin: 0; color: var(--text-tertiary);">No application usage recorded for any user profile yet.</p>
-                {% endif %}
-            {% else %}
-                <p style="margin: 0; color: var(--text-tertiary);">No mapped accounts available to track.</p>
-            {% endif %}
-        </div>
-
-        <div class="device-card" style="margin-bottom: var(--space-6);">
-            <h2>Domain Policy Contributors</h2>
-            {% if blocklist_contributors %}
-            <div class="mapped-accounts-list">
-                {% for contributor in blocklist_contributors %}
-                <div class="mapped-account-item">
-                    <div style="font-weight: 600;">{{ contributor.managed_user }} -> {{ contributor.linux_username }}</div>
-                    <div style="font-size: var(--font-size-sm); color: var(--text-tertiary); margin-top: var(--space-1);">
-                        UID: {{ contributor.linux_uid if contributor.linux_uid is not none else '-' }}
-                        <span style="margin-left: var(--space-3);">Lists: {{ contributor.assigned_source_count }}</span>
-                        <span style="margin-left: var(--space-3);">Domains: {{ contributor.effective_domain_count }}</span>
-                        <span style="margin-left: var(--space-3);">Sync: {{ contributor.sync_status|replace('_', ' ')|title }}</span>
-                    </div>
-                </div>
-                {% endfor %}
-            </div>
-            {% else %}
-            <p style="margin: 0; color: var(--text-tertiary);">No mapped accounts on this device currently contribute any blocklist policy.</p>
-            {% endif %}
-        </div>
-
-        <div class="device-card">
-            <div style="display:flex; justify-content:space-between; align-items:flex-start; gap: var(--space-4); flex-wrap: wrap; margin-bottom: var(--space-5);">
-                <div>
-                    <h2 style="margin-bottom: var(--space-1);">Alert History</h2>
-                    <p style="margin: 0; color: var(--text-tertiary); font-size: var(--font-size-sm);">
-                        Includes device-wide and account-specific alerts for this host.
-                    </p>
-                </div>
-                <div style="display:flex; gap: var(--space-4); flex-wrap: wrap;">
-                    <div><strong>{{ alert_summary.device_wide }}</strong> device-wide</div>
-                    <div><strong>{{ alert_summary.account_specific }}</strong> account-specific</div>
-                </div>
-            </div>
-
-            {% if alert_summary.counts_by_type %}
-            <div style="display:flex; gap: var(--space-2); flex-wrap: wrap; margin-bottom: var(--space-5);">
-                {% for label, count in alert_summary.counts_by_type %}
-                <span class="badge badge-secondary">{{ label }}: {{ count }}</span>
-                {% endfor %}
-            </div>
-            {% endif %}
-
-            <div class="alerts-toolbar">
-                <form method="GET">
-                    <div class="form-group" style="margin: 0; flex: 1 1 280px;">
-                        <label for="alert_search" class="form-label">Search alerts</label>
-                        <input
-                            type="text"
-                            id="alert_search"
-                            name="alert_search"
-                            class="form-control"
-                            placeholder="Search by event, account, status, or details"
-                            value="{{ alert_search }}"
-                        >
-                    </div>
-                    <button type="submit" class="btn btn-secondary">Search</button>
-                    {% if alert_search %}
-                    <a href="{{ url_for('device_detail', system_id=device.system_id) }}" class="btn btn-secondary">Clear</a>
-                    {% endif %}
-                </form>
-            </div>
-
-            {% if alert_entries %}
-            <div class="alerts-table-wrapper">
-                <table class="alerts-table">
-                    <thead>
-                        <tr>
-                            <th>When</th>
-                            <th>Event</th>
-                            <th>Scope</th>
-                            <th>Delivery</th>
-                            <th>Details</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for alert in alert_entries %}
-                        <tr>
-                            <td>
-                                {% if alert.occurred_at %}
-                                {{ (alert.occurred_at|localtime).strftime('%Y-%m-%d %H:%M') }}
-                                {% else %}
-                                Unknown
-                                {% endif %}
-                            </td>
-                            <td>
-                                <div>{{ alert.event_label }}</div>
-                                <div style="font-size: var(--font-size-xs); color: var(--text-tertiary);">#{{ alert.id }}</div>
-                            </td>
-                            <td>{{ alert.scope_label }}</td>
-                            <td>
-                                <div>{{ alert.delivery_status|replace('_', ' ')|title }}</div>
-                                <div style="font-size: var(--font-size-xs); color: var(--text-tertiary);">
-                                    {{ alert.delivery_attempts }} attempt(s)
-                                    {% if alert.last_delivery_error %}
-                                    <br>{{ alert.last_delivery_error }}
-                                    {% endif %}
-                                </div>
-                            </td>
-                            <td class="alerts-details">{{ alert.details_text }}</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-            {% else %}
-            <p style="margin: 0; color: var(--text-tertiary);">
-                {% if alert_search %}
-                No alerts matched "{{ alert_search }}".
-                {% else %}
-                No alerts recorded yet for this device.
-                {% endif %}
-            </p>
-            {% endif %}
+        <div class="device-card" style="margin: 0; padding: 1rem; text-align: center;">
+            <div class="meta-label" style="font-size: 0.75rem; font-weight: bold; color: var(--pico-muted-color); text-transform: uppercase;">Host Logs</div>
+            <div class="meta-value" style="font-size: 1.25rem; font-weight: 700; color: var(--warning-color);">{{ alert_summary.total }} alerts</div>
         </div>
     </div>
-</body>
-</html>
+
+    <!-- Mapped accounts lists -->
+    <article class="card">
+        <h2 style="font-size: 1.25rem; font-weight: 700; margin-bottom: 1rem; border-bottom: 1px solid var(--pico-card-border-color); padding-bottom: 0.5rem;">Linked Managed Accounts</h2>
+        {% if mapped_accounts %}
+        <div class="mapped-accounts-list" style="display: grid; gap: 0.5rem;">
+            {% for mapping in mapped_accounts %}
+            <div class="mapped-account-item" style="display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap; border: 1px solid var(--pico-card-border-color); border-radius: 0.75rem; padding: 0.75rem 1rem; background: var(--pico-background-color);">
+                <div>
+                    <div style="font-weight: 700; font-size: 1.05rem; color: var(--pico-color);">{{ mapping.managed_user.username }} &rarr; {{ mapping.linux_username }}</div>
+                    <div style="font-size: 0.75rem; color: var(--pico-muted-color); font-weight: bold; margin-top: 0.15rem;">
+                        Linux UID: {{ mapping.linux_uid if mapping.linux_uid is not none else 'Unassigned' }}
+                        <span class="badge {% if mapping.is_valid %}badge-success{% else %}badge-warning{% endif %}" style="margin-left: 0.5rem; font-size: 0.7rem;">
+                            {{ 'Verified' if mapping.is_valid else 'Pending Check' }}
+                        </span>
+                    </div>
+                </div>
+                <div>
+                    <a href="{{ url_for('apparmor_policy', mapping_id=mapping.id) }}" class="btn btn-sm btn-secondary" style="margin: 0; padding: 0.25rem 0.5rem; font-size: 0.8rem;">🛡️ Application policies</a>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p style="margin: 0; color: var(--pico-muted-color); font-weight: 500;">No accounts mapped to this device yet.</p>
+        {% endif %}
+    </article>
+
+    <!-- Application Runtime Activity Redesigned -->
+    <article class="card">
+        <h2 style="font-size: 1.25rem; font-weight: 700; margin-bottom: 0.25rem;">📊 Application Runtime Tracker (Last 7 Days)</h2>
+        <p style="color: var(--pico-muted-color); font-size: 0.85rem; font-weight: 500; margin-bottom: 1.5rem;">
+            Real-time usage history of active applications tracked on the child profile client.
+        </p>
+        {% if mapped_accounts %}
+            {% set ns = namespace(has_any_usage=false) %}
+            {% for mapping in mapped_accounts %}
+                {% set usage = usage_summaries.get(mapping.id) %}
+                {% if usage %}
+                    {% set ns.has_any_usage = true %}
+                    <div style="margin-bottom: 1rem; border: 1px solid var(--pico-card-border-color); border-radius: 0.75rem; padding: 1rem; background: var(--pico-background-color);">
+                        <h3 style="margin-top: 0; margin-bottom: 0.75rem; font-size: 1rem; font-weight: 700; color: var(--pico-color);">
+                            👤 {{ mapping.managed_user.username }} (<code>{{ mapping.linux_username }}</code>)
+                        </h3>
+                        <div class="aa-usage-list" style="display: grid; gap: 0.4rem;">
+                            {% set max_seconds = usage[0].total_seconds if usage else 1 %}
+                            {% for item in usage %}
+                            <div class="aa-usage-row" style="display: flex; align-items: center; gap: 1rem; padding: 0.25rem 0; border-bottom: 1px solid var(--pico-card-border-color);">
+                                <div class="aa-usage-label" style="min-width: 140px; font-weight: bold; font-size: 0.85rem;">{{ item.application_name }}</div>
+                                <div class="aa-usage-bar-container" style="flex: 1; height: 16px; background: var(--pico-card-background-color); border: 1px solid var(--pico-card-border-color); border-radius: 0.5rem; overflow: hidden; position: relative;">
+                                    <div class="aa-usage-bar"
+                                         style="width: {{ (item.total_seconds / max_seconds * 100)|round(1) }}%; height: 100%; border-radius: 0.5rem; background: linear-gradient(90deg, var(--pico-primary-background), var(--pico-primary-hover)); transition: width 0.3s; min-width: 2px;">
+                                    </div>
+                                </div>
+                                <div class="aa-usage-time" style="min-width: 80px; text-align: right; font-size: 0.85rem; font-weight: bold; color: var(--pico-color);">{{ item.formatted }}</div>
+                                <div class="aa-usage-sessions" style="min-width: 70px; text-align: right; font-size: 0.75rem; color: var(--pico-muted-color); font-weight: bold;">{{ item.session_count }} session{{ 's' if item.session_count != 1 }}</div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                {% endif %}
+            {% endfor %}
+            {% if not ns.has_any_usage %}
+                <p style="margin: 0; color: var(--pico-muted-color); font-weight: 500;">No application runtime usage recorded for mapped accounts on this device.</p>
+            {% endif %}
+        {% else %}
+            <p style="margin: 0; color: var(--pico-muted-color); font-weight: 500;">No mapped accounts available to audit.</p>
+        {% endif %}
+    </article>
+
+    <!-- Blocklist Contributors Redesigned -->
+    <article class="card">
+        <h2 style="font-size: 1.25rem; font-weight: 700; margin-bottom: 1rem; border-bottom: 1px solid var(--pico-card-border-color); padding-bottom: 0.5rem;">Domain Policy Contributors</h2>
+        {% if blocklist_contributors %}
+        <div class="mapped-accounts-list" style="display: grid; gap: 0.5rem;">
+            {% for contributor in blocklist_contributors %}
+            <div class="mapped-account-item" style="border: 1px solid var(--pico-card-border-color); border-radius: 0.75rem; padding: 0.75rem 1rem; background: var(--pico-background-color);">
+                <div style="font-weight: 700; font-size: 0.95rem; color: var(--pico-color);">{{ contributor.managed_user }} &rarr; <code>{{ contributor.linux_username }}</code></div>
+                <div style="font-size: 0.75rem; color: var(--pico-muted-color); font-weight: bold; margin-top: 0.25rem; display: flex; gap: 0.75rem; flex-wrap: wrap;">
+                    <span>Linux UID: {{ contributor.linux_uid if contributor.linux_uid is not none else '-' }}</span>
+                    <span>Lists: {{ contributor.assigned_source_count }}</span>
+                    <span>Blocked Hosts: {{ contributor.effective_domain_count }}</span>
+                    <span class="badge {% if contributor.sync_status == 'synced' %}badge-success{% else %}badge-warning{% endif %}">
+                        Sync: {{ contributor.sync_status|replace('_', ' ')|title }}
+                    </span>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p style="margin: 0; color: var(--pico-muted-color); font-weight: 500;">No blocklist filtering profiles are contributing to this device.</p>
+        {% endif %}
+    </article>
+
+    <!-- Alert History for this host -->
+    <article class="card">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap: 1rem; flex-wrap: wrap; border-bottom: 1px solid var(--pico-card-border-color); padding-bottom: 1rem; margin-bottom: 1.25rem;">
+            <div>
+                <h2 style="margin: 0; font-size: 1.5rem;">Diagnostic Alert History</h2>
+                <p style="margin: 0.25rem 0 0 0; color: var(--pico-muted-color); font-size: 0.9rem; font-weight: 500;">
+                    Outbound connection alerts and system exceptions generated by this client
+                </p>
+            </div>
+            <div style="display:flex; gap: 0.5rem; flex-wrap: wrap;">
+                <div style="text-align: center; padding: 0.4rem 0.75rem; background: var(--pico-background-color); border: 1px solid var(--pico-card-border-color); border-radius: 0.5rem; min-width: 100px;">
+                    <div style="font-size: 0.7rem; font-weight: bold; color: var(--pico-muted-color); text-transform: uppercase;">Device Wide</div>
+                    <div style="font-size: 1.1rem; font-weight: 700;">{{ alert_summary.device_wide }}</div>
+                </div>
+                <div style="text-align: center; padding: 0.4rem 0.75rem; background: var(--pico-background-color); border: 1px solid var(--pico-card-border-color); border-radius: 0.5rem; min-width: 100px;">
+                    <div style="font-size: 0.7rem; font-weight: bold; color: var(--pico-muted-color); text-transform: uppercase;">Account Specific</div>
+                    <div style="font-size: 1.1rem; font-weight: 700;">{{ alert_summary.account_specific }}</div>
+                </div>
+            </div>
+        </div>
+
+        {% if alert_summary.counts_by_type %}
+        <div style="display:flex; gap: 0.25rem; flex-wrap: wrap; margin-bottom: 1.25rem;">
+            {% for label, count in alert_summary.counts_by_type %}
+            <span class="badge badge-secondary" style="font-weight: bold;">{{ label }}: {{ count }}</span>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <div class="alerts-toolbar" style="margin-bottom: 1.25rem;">
+            <form method="GET" style="display: flex; gap: 0.5rem; align-items: end; flex-wrap: wrap; margin: 0;">
+                <div class="form-group" style="margin: 0; flex: 1 1 280px;">
+                    <input
+                        type="text"
+                        id="alert_search"
+                        name="alert_search"
+                        class="form-control"
+                        placeholder="Search alerts by event, account, status, details..."
+                        value="{{ alert_search }}"
+                        style="margin: 0;"
+                    >
+                </div>
+                <button type="submit" class="btn btn-secondary btn-sm" style="margin: 0;">Search logs</button>
+                {% if alert_search %}
+                <a href="{{ url_for('device_detail', system_id=device.system_id) }}" class="btn btn-ghost btn-sm" style="margin: 0;">Clear filter</a>
+                {% endif %}
+            </form>
+        </div>
+
+        {% if alert_entries %}
+        <div class="alerts-table-wrapper" style="overflow-x: auto;">
+            <table class="striped alerts-table" style="width: 100%; border-collapse: collapse; margin: 0;">
+                <thead>
+                    <tr>
+                        <th>Date & Time</th>
+                        <th>Event Type</th>
+                        <th>Scope</th>
+                        <th>Delivery Status</th>
+                        <th>Diagnostic Details</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for alert in alert_entries %}
+                    <tr>
+                        <td style="font-size: 0.8rem; font-weight: bold; color: var(--pico-muted-color); white-space: nowrap;">
+                            {% if alert.occurred_at %}
+                            {{ (alert.occurred_at|localtime).strftime('%Y-%m-%d %H:%M') }}
+                            {% else %}
+                            Unknown
+                            {% endif %}
+                        </td>
+                        <td>
+                            <strong style="font-size: 0.9rem;">{{ alert.event_label }}</strong>
+                            <div style="font-size: 0.7rem; color: var(--pico-muted-color); font-weight: bold;">ID: #{{ alert.id }}</div>
+                        </td>
+                        <td><span class="badge badge-secondary" style="font-weight: bold;">{{ alert.scope_label }}</span></td>
+                        <td>
+                            <div style="font-weight: bold; font-size: 0.85rem;">{{ alert.delivery_status|replace('_', ' ')|title }}</div>
+                            <div style="font-size: 0.7rem; color: var(--pico-muted-color); font-weight: bold;">
+                                {{ alert.delivery_attempts }} attempt(s)
+                                {% if alert.last_delivery_error %}
+                                <br><span style="color: var(--danger-color);">Error: {{ alert.last_delivery_error }}</span>
+                                {% endif %}
+                            </div>
+                        </td>
+                        <td class="alerts-details" style="font-size: 0.75rem; color: var(--pico-muted-color); font-family: monospace; max-width: 320px; overflow-wrap: break-word;">{{ alert.details_text }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p style="margin: 0; color: var(--pico-muted-color); font-weight: 500; text-align: center; padding: 2rem 0;">
+            {% if alert_search %}
+            No alerts matched search filter "{{ alert_search }}".
+            {% else %}
+            No alerts recorded yet for this client.
+            {% endif %}
+        </p>
+        {% endif %}
+    </article>
+</div>
+{% endblock %}

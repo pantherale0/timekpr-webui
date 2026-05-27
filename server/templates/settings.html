@@ -1,435 +1,336 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TimeKpr webUI Settings</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
-</head>
-<body>
-    <div class="dashboard-container">
-        <header class="dashboard-header">
-            <div class="dashboard-title">
-                <h1>Settings</h1>
-                <p class="dashboard-subtitle">Application Configuration & Security</p>
+{% extends "base.html" %}
+
+{% block title %}Settings - TimeKpr WebUI{% endblock %}
+
+{% block content %}
+<div class="settings-header-title" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; flex-wrap: wrap; gap: 1rem;">
+    <div>
+        <h1 style="margin: 0; font-size: 2rem;">Settings</h1>
+        <p style="margin: 0; color: var(--pico-muted-color); font-weight: 500;">Application configuration, webhook alerts, and blocklist catalogs</p>
+    </div>
+</div>
+
+<div class="users-grid" style="grid-template-columns: 1fr; max-width: 1200px; margin: 0 auto;">
+    <!-- Authentication & Security Cards -->
+    <article class="card">
+        <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem; border-bottom: 1px solid var(--pico-card-border-color); padding-bottom: 0.5rem;">
+            <svg width="22" height="22" fill="var(--pico-primary)" viewBox="0 0 16 16">
+                <path d="M8 1a2 2 0 0 1 2 2v4H6V3a2 2 0 0 1 2-2zm3 6V3a3 3 0 0 0-6 0v4a2 2 0 0 0-2 2v5a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2zM5 8h6a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/>
+            </svg>
+            <h2 style="font-size: 1.25rem; font-weight: 700; margin: 0;">{% if oidc_enabled %}Authentication Status{% else %}Change Admin Password{% endif %}</h2>
+        </div>
+
+        <div class="card-body" style="padding: 0;">
+            {% if oidc_enabled %}
+            <div class="flash-alert flash-alert-info">
+                <svg width="18" height="18" fill="currentColor" viewBox="0 0 16 16" style="flex-shrink: 0;">
+                    <path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16zm.93-9.412-1 4.705c-.07.34.029.533.304.533.194 0 .487-.07.686-.246l-.088.416c-.287.346-.92.598-1.465.598-.703 0-1.002-.422-.808-1.319l.738-3.468c.064-.293.006-.399-.287-.47l-.451-.081.082-.381 2.29-.287zM8 5.5a1 1 0 1 1 0-2 1 1 0 0 1 0 2z"/>
+                </svg>
+                <span><strong>OIDC Single Sign-On Active:</strong> Authentication is handled by your external identity provider. Password configuration must be managed there.</span>
             </div>
-            <div class="dashboard-controls">
-                <div class="task-status-container">
-                    <span class="status-indicator" id="task-status-indicator">Unknown</span>
-                    <a href="{{ url_for('restart_tasks') }}" class="btn btn-sm btn-secondary btn-icon" title="Restart Background Tasks">
-                        <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-                            <path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2v1z"/>
-                            <path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z"/>
-                        </svg>
-                    </a>
+            {% if session_user %}
+            <div style="background: var(--pico-background-color); padding: 1rem; border-radius: 0.75rem; border: 1px solid var(--pico-card-border-color); margin-bottom: 1.25rem;">
+                <h3 style="margin-top: 0; font-size: 0.95rem; color: var(--pico-muted-color); text-transform: uppercase;">Identity Details</h3>
+                <div style="display: grid; grid-template-columns: auto 1fr; gap: 0.25rem 1rem; font-size: 0.85rem;">
+                    <span style="color: var(--pico-muted-color);">Username:</span>
+                    <strong>{{ session_user.username }}</strong>
+                    {% if session_user.name %}
+                    <span style="color: var(--pico-muted-color);">Full Name:</span>
+                    <strong>{{ session_user.name }}</strong>
+                    {% endif %}
+                    {% if session_user.email %}
+                    <span style="color: var(--pico-muted-color);">Email:</span>
+                    <strong>{{ session_user.email }}</strong>
+                    {% endif %}
                 </div>
-                <a href="{{ url_for('dashboard') }}" class="btn btn-sm btn-secondary">Dashboard</a>
-                <a href="{{ url_for('admin') }}" class="btn btn-sm btn-secondary">Admin</a>
-                {% if not oidc_enabled %}
-                <a href="{{ url_for('logout') }}" class="btn btn-sm btn-danger">Logout</a>
-                {% endif %}
             </div>
-        </header>
-        
-        <script>
-            // Function to update the task status indicator
-            function updateTaskStatus() {
-                fetch('/api/task-status')
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.success) {
-                            const indicator = document.getElementById('task-status-indicator');
-                            const status = data.status;
-                            
-                            if (status.running && status.thread_alive) {
-                                indicator.className = 'status-active';
-                                indicator.textContent = 'Active';
-                            } else {
-                                indicator.className = 'status-inactive';
-                                indicator.textContent = 'Inactive';
-                            }
-                            
-                            // Set tooltip to show last error if any
-                            if (status.last_error) {
-                                indicator.title = `Last error: ${status.last_error.message} at ${status.last_error.time}`;
-                            } else {
-                                indicator.title = 'Background tasks are running normally';
-                            }
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Error fetching task status:', error);
-                        const indicator = document.getElementById('task-status-indicator');
-                        indicator.className = 'status-error';
-                        indicator.textContent = 'Error';
-                    });
-            }
-            updateTaskStatus();
-            setInterval(updateTaskStatus, 30000);
-            
-            // Password confirmation validation
-            const confirmPasswordField = document.getElementById('confirm_password');
-            const newPasswordField = document.getElementById('new_password');
-            if (confirmPasswordField && newPasswordField) {
-                confirmPasswordField.addEventListener('input', function() {
-                    const newPassword = newPasswordField.value;
-                    const confirmPassword = this.value;
-                    
-                    if (confirmPassword && newPassword !== confirmPassword) {
-                        this.setCustomValidity('Passwords do not match');
-                        this.style.borderColor = 'var(--danger)';
-                    } else {
-                        this.setCustomValidity('');
-                        this.style.borderColor = '';
-                    }
-                });
-                
-                newPasswordField.addEventListener('input', function() {
-                    if (confirmPasswordField.value && this.value !== confirmPasswordField.value) {
-                        confirmPasswordField.setCustomValidity('Passwords do not match');
-                        confirmPasswordField.style.borderColor = 'var(--danger)';
-                    } else {
-                        confirmPasswordField.setCustomValidity('');
-                        confirmPasswordField.style.borderColor = '';
-                    }
-                });
-            }
-        </script>
-        
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                {% for category, message in messages %}
-                    <div class="alert alert-{{ category }}">
-                        <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-                            {% if category == 'success' %}
-                                <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zm-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.061L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z"/>
-                            {% elif category == 'danger' or category == 'error' %}
-                                <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zM5.354 4.646a.5.5 0 1 0-.708.708L7.293 8l-2.647 2.646a.5.5 0 0 0 .708.708L8 8.707l2.646 2.647a.5.5 0 0 0 .708-.708L8.707 8l2.647-2.646a.5.5 0 0 0-.708-.708L8 7.293 5.354 4.646z"/>
-                            {% elif category == 'warning' %}
-                                <path d="M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767L8.982 1.566zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5zm.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2z"/>
-                            {% else %}
-                                <path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16zm.93-9.412-1 4.705c-.07.34.029.533.304.533.194 0 .487-.07.686-.246l-.088.416c-.287.346-.92.598-1.465.598-.703 0-1.002-.422-.808-1.319l.738-3.468c.064-.293.006-.399-.287-.47l-.451-.081.082-.381 2.29-.287zM8 5.5a1 1 0 1 1 0-2 1 1 0 0 1 0 2z"/>
-                            {% endif %}
-                        </svg>
-                        {{ message }}
-                    </div>
-                {% endfor %}
             {% endif %}
-        {% endwith %}
-        
-        <div class="users-grid" style="grid-template-columns: 1fr; max-width: 1200px; margin: 0 auto;">
-            <div class="card">
-                <div class="card-header">
-                    <div style="display: flex; align-items: center; gap: var(--space-3);">
-                        <svg width="24" height="24" fill="var(--text-secondary)" viewBox="0 0 16 16">
-                            <path d="M8 1a2 2 0 0 1 2 2v4H6V3a2 2 0 0 1 2-2zm3 6V3a3 3 0 0 0-6 0v4a2 2 0 0 0-2 2v5a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2zM5 8h6a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/>
-                        </svg>
-                        <div>
-                            <h2>{% if oidc_enabled %}Authentication Status{% else %}Change Password{% endif %}</h2>
-                            <p style="margin: 0; color: var(--text-tertiary); font-size: var(--font-size-sm);">{% if oidc_enabled %}View current OIDC session details{% else %}Update your admin login password{% endif %}</p>
-                        </div>
-                    </div>
+            {% else %}
+            <div class="flash-alert flash-alert-info" style="margin-bottom: 1rem;">
+                <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                    <path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16zm.93-9.412-1 4.705c-.07.34.029.533.304.533.194 0 .487-.07.686-.246l-.088.416c-.287.346-.92.598-1.465.598-.703 0-1.002-.422-.808-1.319l.738-3.468c.064-.293.006-.399-.287-.47l-.451-.081.082-.381 2.29-.287zM8 5.5a1 1 0 1 1 0-2 1 1 0 0 1 0 2z"/>
+                </svg>
+                <span>This password controls local parent access to the TimeKpr WebUI console.</span>
+            </div>
+            
+            <form action="{{ url_for('settings') }}" method="POST" style="margin-bottom: 1.5rem;">
+                <input type="hidden" name="form_name" value="password">
+                <div class="form-group">
+                    <label for="current_password" class="form-label">Current Admin Password</label>
+                    <input type="password" id="current_password" name="current_password" class="form-control" placeholder="Enter your current password" required>
                 </div>
-                <div class="card-body">
-                    {% if oidc_enabled %}
-                    <div class="alert alert-info" style="margin-bottom: var(--space-6); display: flex; align-items: flex-start; gap: 8px;">
-                        <svg width="24" height="24" fill="currentColor" viewBox="0 0 16 16" style="flex-shrink: 0; margin-top: 2px;">
-                            <path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16zm.93-9.412-1 4.705c-.07.34.029.533.304.533.194 0 .487-.07.686-.246l-.088.416c-.287.346-.92.598-1.465.598-.703 0-1.002-.422-.808-1.319l.738-3.468c.064-.293.006-.399-.287-.47l-.451-.081.082-.381 2.29-.287zM8 5.5a1 1 0 1 1 0-2 1 1 0 0 1 0 2z"/>
-                        </svg>
-                        <div>
-                            <strong>OIDC Single Sign-On Active:</strong> Authentication is handled by your identity provider. Password changes must be performed through your identity provider management console.
-                        </div>
+                
+                <div class="form-group">
+                    <label for="new_password" class="form-label">New Password</label>
+                    <input type="password" id="new_password" name="new_password" class="form-control" placeholder="Enter new password" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="confirm_password" class="form-label">Confirm New Password</label>
+                    <input type="password" id="confirm_password" name="confirm_password" class="form-control" placeholder="Confirm new password" required>
+                </div>
+                
+                <div class="form-group" style="margin: 0;">
+                    <button type="submit" class="btn btn-primary btn-cta btn-lg" style="width: 100%;">Update admin password</button>
+                </div>
+            </form>
+            {% endif %}
+            
+            <!-- Alert Webhook Section Redesigned -->
+            <div style="margin-top: 2rem; padding-top: 2rem; border-top: 1px solid var(--pico-card-border-color);">
+                <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem;">
+                    <svg width="18" height="18" fill="var(--pico-primary)" viewBox="0 0 16 16">
+                        <path d="M8 16a2 2 0 0 0 2-2H6a2 2 0 0 0 2 2zM8 1.918l-.797.161A4.002 4.002 0 0 0 4 6c0 .628-.134 2.197-.459 3.742-.16.767-.376 1.566-.663 2.258h10.244c-.287-.692-.502-1.49-.663-2.258C12.134 8.197 12 6.628 12 6a4.002 4.002 0 0 0-3.203-3.92L8 1.917zM14.22 12c.223.447.481.801.78 1H1c.299-.199.557-.553.78-1C2.68 10.2 3 6.88 3 6c0-2.42 1.72-4.44 4.005-4.901a1 1 0 1 1 1.99 0A5.002 5.002 0 0 1 13 6c0 .88.32 4.2 1.22 6z"/>
+                    </svg>
+                    <h3 style="margin: 0; font-size: 1.15rem; font-weight: 700;">Alert Webhooks</h3>
+                </div>
+                <form action="{{ url_for('settings') }}" method="POST" style="margin: 0;">
+                    <input type="hidden" name="form_name" value="alert_webhook">
+                    
+                    <fieldset>
+                        <label for="alert_webhook_enabled" style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem; cursor: pointer; font-weight: bold;">
+                            <input
+                                type="checkbox"
+                                id="alert_webhook_enabled"
+                                name="alert_webhook_enabled"
+                                role="switch"
+                                {% if alert_webhook_settings.enabled %}checked{% endif %}
+                            >
+                            <span>Enable webhook deliveries for device status changes</span>
+                        </label>
+                    </fieldset>
+
+                    <div class="form-group">
+                        <label for="alert_webhook_url" class="form-label">Outbound Webhook URL</label>
+                        <input
+                            type="url"
+                            id="alert_webhook_url"
+                            name="alert_webhook_url"
+                            class="form-control"
+                            placeholder="https://example.com/timekpr-alerts-endpoint"
+                            value="{{ alert_webhook_settings.url }}"
+                        >
                     </div>
-                    {% if session_user %}
-                    <div style="margin-bottom: var(--space-6); background: var(--bg-primary); padding: var(--space-4); border-radius: var(--radius-md); border: 1px solid var(--border-primary);">
-                        <h3 style="margin-top: 0; font-size: var(--font-size-base); color: var(--text-secondary);">Logged In User</h3>
-                        <div style="display: grid; grid-template-columns: auto 1fr; gap: var(--space-2) var(--space-4); font-size: var(--font-size-sm); margin-top: var(--space-3);">
-                            <span style="color: var(--text-tertiary);">Username:</span>
-                            <strong style="color: var(--text-primary);">{{ session_user.username }}</strong>
-                            {% if session_user.name %}
-                            <span style="color: var(--text-tertiary);">Full Name:</span>
-                            <strong style="color: var(--text-primary);">{{ session_user.name }}</strong>
-                            {% endif %}
-                            {% if session_user.email %}
-                            <span style="color: var(--text-tertiary);">Email:</span>
-                            <strong style="color: var(--text-primary);">{{ session_user.email }}</strong>
-                            {% endif %}
-                        </div>
+
+                    <div class="form-group">
+                        <label for="alert_webhook_secret" class="form-label">Webhook Secret (outbound cryptographic signature)</label>
+                        <input
+                            type="password"
+                            id="alert_webhook_secret"
+                            name="alert_webhook_secret"
+                            class="form-control"
+                            placeholder="Optional secret key to verify request signatures"
+                            value="{{ alert_webhook_settings.secret }}"
+                        >
                     </div>
-                    {% endif %}
-                    {% else %}
-                    <div class="alert alert-info" style="margin-bottom: var(--space-6);">
+
+                    <div class="flash-alert flash-alert-info" style="margin-bottom: 1rem;">
                         <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
                             <path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16zm.93-9.412-1 4.705c-.07.34.029.533.304.533.194 0 .487-.07.686-.246l-.088.416c-.287.346-.92.598-1.465.598-.703 0-1.002-.422-.808-1.319l.738-3.468c.064-.293.006-.399-.287-.47l-.451-.081.082-.381 2.29-.287zM8 5.5a1 1 0 1 1 0-2 1 1 0 0 1 0 2z"/>
                         </svg>
-                        <strong>Important:</strong> This password controls local admin access to the web UI.
-                    </div>
-                    
-                    <form action="{{ url_for('settings') }}" method="POST">
-                        <input type="hidden" name="form_name" value="password">
-                        <div class="form-group">
-                            <label for="current_password" class="form-label">
-                                <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16" style="margin-right: var(--space-2);">
-                                    <path d="M3.5 11.5a3.5 3.5 0 1 1 3.163-5H14L15.5 8 14 9.5l-1-1-1 1-1-1-1 1-1-1-1 1H6.663a3.5 3.5 0 0 1-3.163 2zM2.5 9a1 1 0 1 0 0-2 1 1 0 0 0 0 2z"/>
-                                </svg>
-                                Current Password
-                            </label>
-                            <input type="password" id="current_password" name="current_password" class="form-control" placeholder="Enter your current password" required>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label for="new_password" class="form-label">
-                                <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16" style="margin-right: var(--space-2);">
-                                    <path d="M8 1a2 2 0 0 1 2 2v4H6V3a2 2 0 0 1 2-2zm3 6V3a3 3 0 0 0-6 0v4a2 2 0 0 0-2 2v5a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z"/>
-                                </svg>
-                                New Password
-                            </label>
-                            <input type="password" id="new_password" name="new_password" class="form-control" placeholder="Enter new password" required>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label for="confirm_password" class="form-label">
-                                <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16" style="margin-right: var(--space-2);">
-                                    <path d="M10.067.87a2.89 2.89 0 0 0-4.134 0l-.622.638-.89-.011a2.89 2.89 0 0 0-2.924 2.924l.01.89-.636.622a2.89 2.89 0 0 0 0 4.134l.637.622-.011.89a2.89 2.89 0 0 0 2.924 2.924l.89-.01.622.636a2.89 2.89 0 0 0 4.134 0l.622-.637.89.011a2.89 2.89 0 0 0 2.924-2.924l-.01-.89.636-.622a2.89 2.89 0 0 0 0-4.134l-.637-.622.011-.89a2.89 2.89 0 0 0-2.924-2.924l-.89.01-.622-.636zm.287 5.984-3 3a.5.5 0 0 1-.708 0l-1.5-1.5a.5.5 0 1 1 .708-.708L7 8.793l2.646-2.647a.5.5 0 0 1 .708.708z"/>
-                                </svg>
-                                Confirm New Password
-                            </label>
-                            <input type="password" id="confirm_password" name="confirm_password" class="form-control" placeholder="Confirm new password" required>
-                        </div>
-                        
-                        <div class="form-group">
-                            <button type="submit" class="btn btn-primary btn-lg" style="width: 100%;">
-                                <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-                                    <path d="M15.854 5.146a.5.5 0 0 1 0 .708l-3 3a.5.5 0 0 1-.708 0l-1.5-1.5a.5.5 0 0 1 .708-.708L12.5 7.793l2.646-2.647a.5.5 0 0 1 .708 0z"/>
-                                    <path d="M1 14s-1 0-1-1 1-4 6-4 6 3 6 4-1 1-1 1H1zm5-6a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/>
-                                </svg>
-                                Update Password
-                            </button>
-                        </div>
-                    </form>
-                    {% endif %}
-                    
-                    <div style="margin-top: var(--space-6); padding-top: var(--space-6); border-top: 1px solid var(--border-primary);">
-                        <h4 style="color: var(--text-secondary); font-size: var(--font-size-sm); margin-bottom: var(--space-3);">Alert Webhook</h4>
-                        <form action="{{ url_for('settings') }}" method="POST">
-                            <input type="hidden" name="form_name" value="alert_webhook">
-                            <div class="form-group" style="display:flex; align-items:center; gap: var(--space-3);">
-                                <input
-                                    type="checkbox"
-                                    id="alert_webhook_enabled"
-                                    name="alert_webhook_enabled"
-                                    {% if alert_webhook_settings.enabled %}checked{% endif %}
-                                >
-                                <label for="alert_webhook_enabled" class="form-label" style="margin:0;">
-                                    Enable webhook delivery for new agent alerts
-                                </label>
-                            </div>
-
-                            <div class="form-group">
-                                <label for="alert_webhook_url" class="form-label">Webhook URL</label>
-                                <input
-                                    type="url"
-                                    id="alert_webhook_url"
-                                    name="alert_webhook_url"
-                                    class="form-control"
-                                    placeholder="https://example.com/timekpr-alerts"
-                                    value="{{ alert_webhook_settings.url }}"
-                                >
-                            </div>
-
-                            <div class="form-group">
-                                <label for="alert_webhook_secret" class="form-label">Webhook Secret (optional)</label>
-                                <input
-                                    type="password"
-                                    id="alert_webhook_secret"
-                                    name="alert_webhook_secret"
-                                    class="form-control"
-                                    placeholder="Used to sign outbound alert payloads"
-                                    value="{{ alert_webhook_settings.secret }}"
-                                >
-                            </div>
-
-                            <div class="alert alert-info" style="margin-bottom: var(--space-4);">
-                                <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-                                    <path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16zm.93-9.412-1 4.705c-.07.34.029.533.304.533.194 0 .487-.07.686-.246l-.088.416c-.287.346-.92.598-1.465.598-.703 0-1.002-.422-.808-1.319l.738-3.468c.064-.293.006-.399-.287-.47l-.451-.081.082-.381 2.29-.287zM8 5.5a1 1 0 1 1 0-2 1 1 0 0 1 0 2z"/>
-                                </svg>
-                                Alerts are always stored locally. Webhook delivery is optional and only applies to new alerts while this setting is active.
-                            </div>
-
-                            <div style="font-size: var(--font-size-sm); color: var(--text-tertiary); margin-bottom: var(--space-4);">
-                                Current status:
-                                <strong style="color: var(--text-secondary);">
-                                    {% if alert_webhook_settings.is_active %}
-                                    Active
-                                    {% elif alert_webhook_settings.enabled %}
-                                    Enabled but missing URL
-                                    {% else %}
-                                    Disabled
-                                    {% endif %}
-                                </strong>
-                            </div>
-
-                            <div class="form-group" style="margin-bottom: 0;">
-                                <button type="submit" class="btn btn-secondary btn-lg" style="width: 100%;">Save Webhook Settings</button>
-                            </div>
-                        </form>
+                        <span>Alerts are stored inside the TimeKpr database. Dispatching to an external webhook is an optional feature.</span>
                     </div>
 
-                    <div style="margin-top: var(--space-6); padding-top: var(--space-6); border-top: 1px solid var(--border-primary);">
-                        <h4 style="color: var(--text-secondary); font-size: var(--font-size-sm); margin-bottom: var(--space-3);">Security Tips</h4>
-                        <ul style="margin: 0; padding-left: var(--space-4); font-size: var(--font-size-sm); color: var(--text-tertiary);">
-                            <li style="margin-bottom: var(--space-1);">Use a strong password with at least 8 characters</li>
-                            <li style="margin-bottom: var(--space-1);">Include uppercase, lowercase, numbers, and symbols</li>
-                            <li>Rotate this password if you suspect the web UI credentials were exposed</li>
-                        </ul>
+                    <div style="font-size: 0.8rem; color: var(--pico-muted-color); font-weight: bold; margin-bottom: 1rem;">
+                        Outbound Delivery Status:
+                        <span class="badge {% if alert_webhook_settings.is_active %}badge-success{% elif alert_webhook_settings.enabled %}badge-warning{% else %}badge-secondary{% endif %}" style="margin-left: 0.25rem;">
+                            {% if alert_webhook_settings.is_active %}
+                            Active
+                            {% elif alert_webhook_settings.enabled %}
+                            Enabled but missing URL
+                            {% else %}
+                            Disabled
+                            {% endif %}
+                        </span>
                     </div>
 
-                    <div style="margin-top: var(--space-6); padding-top: var(--space-6); border-top: 1px solid var(--border-primary);">
-                        <h4 style="color: var(--text-secondary); font-size: var(--font-size-sm); margin-bottom: var(--space-3);">System Information</h4>
-                        <div style="font-size: var(--font-size-sm); color: var(--text-tertiary);">
-                            <div style="display: flex; justify-content: space-between; margin-bottom: var(--space-2);">
-                                <span>Timezone:</span>
-                                <span style="color: var(--text-secondary); font-weight: 500;">{{ timezone }}</span>
-                            </div>
-                            <div style="font-size: var(--font-size-xs); color: var(--text-muted); margin-top: var(--space-2);">
-                                All times are displayed in {{ timezone }}. To change, set the TZ environment variable in docker-compose.yaml
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                    <button type="submit" class="btn btn-secondary btn-sm" style="width: 100%; margin: 0;">Save webhook configuration</button>
+                </form>
             </div>
 
-            <div class="card">
-                <div class="card-header">
-                    <div style="display: flex; align-items: center; gap: var(--space-3);">
-                        <svg width="24" height="24" fill="var(--text-secondary)" viewBox="0 0 16 16">
-                            <path d="M13 6V4a1 1 0 0 0-1-1H9.5V2a1.5 1.5 0 0 0-3 0v1H4a1 1 0 0 0-1 1v2h10zM4 7v5a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V7H4zm2 1h4v1H6V8zm0 2h4v1H6v-1z"/>
-                        </svg>
-                        <div>
-                            <h2>Blocklist Catalog</h2>
-                            <p style="margin: 0; color: var(--text-tertiary); font-size: var(--font-size-sm);">Create manual lists, register external URLs, and manage domains.</p>
-                        </div>
+            <!-- Systems Info -->
+            <div style="margin-top: 2rem; padding-top: 2rem; border-top: 1px solid var(--pico-card-border-color); display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem;">
+                <div>
+                    <h4 style="font-size: 0.85rem; font-weight: bold; color: var(--pico-muted-color); text-transform: uppercase; margin-bottom: 0.5rem;">System Configuration</h4>
+                    <div style="font-size: 0.85rem; display: flex; justify-content: space-between; align-items: center; background: var(--pico-background-color); border: 1px solid var(--pico-card-border-color); padding: 0.5rem 0.75rem; border-radius: 0.5rem;">
+                        <span style="color: var(--pico-muted-color); font-weight: bold;">System Timezone:</span>
+                        <strong style="color: var(--pico-color);">{{ timezone }}</strong>
                     </div>
+                    <p style="font-size: 0.75rem; color: var(--pico-muted-color); margin-top: 0.25rem; font-weight: 500;">
+                        To modify the timezone, configure the `TZ` environment variable in your docker-compose parameters.
+                    </p>
                 </div>
-                <div class="card-body">
-                    <form action="{{ url_for('create_blocklist_source') }}" method="POST" style="display: grid; gap: var(--space-4); margin-bottom: var(--space-6);">
-                        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: var(--space-4);">
-                            <div class="form-group">
-                                <label for="blocklist_name" class="form-label">List Name</label>
-                                <input type="text" id="blocklist_name" name="name" class="form-control" placeholder="School Hours" required>
-                            </div>
-                            <div class="form-group">
-                                <label for="blocklist_source_type" class="form-label">Source Type</label>
-                                <select id="blocklist_source_type" name="source_type" class="form-control">
-                                    <option value="manual">Manual domains</option>
-                                    <option value="external_url">External URL</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: var(--space-4);">
-                            <div class="form-group">
-                                <label for="blocklist_source_url" class="form-label">External URL</label>
-                                <input type="url" id="blocklist_source_url" name="source_url" class="form-control" placeholder="https://example.com/blocklist.txt">
-                            </div>
-                            <div class="form-group">
-                                <label for="manual_domains" class="form-label">Manual Domains</label>
-                                <textarea id="manual_domains" name="manual_domains" class="form-control" rows="4" placeholder="one domain per line"></textarea>
-                            </div>
-                        </div>
-                        <div>
-                            <button type="submit" class="btn btn-primary">Create Blocklist</button>
-                        </div>
-                    </form>
-
-                    {% if blocklist_sources %}
-                    <div style="display:grid; gap: var(--space-4);">
-                        {% for source in blocklist_sources %}
-                        <div style="border: 1px solid var(--border-primary); border-radius: var(--radius-lg); padding: var(--space-4); background: var(--bg-primary);">
-                            <div style="display:flex; justify-content:space-between; gap: var(--space-4); flex-wrap: wrap; margin-bottom: var(--space-4);">
-                                <div>
-                                    <div style="display:flex; gap: var(--space-2); align-items:center; flex-wrap: wrap;">
-                                        <strong>{{ source.name }}</strong>
-                                        <span class="badge badge-secondary">{{ source.source_type|replace('_', ' ')|title }}</span>
-                                        {% if source.is_enabled %}
-                                        <span class="badge badge-success">Enabled</span>
-                                        {% else %}
-                                        <span class="badge badge-warning">Disabled</span>
-                                        {% endif %}
-                                    </div>
-                                    <div style="font-size: var(--font-size-sm); color: var(--text-tertiary); margin-top: var(--space-1);">
-                                        {{ source.domain_count }} domain(s), assigned to {{ source.assigned_user_count }} user(s)
-                                        {% if source.source_url %}
-                                        <br>{{ source.source_url }}
-                                        {% endif %}
-                                        {% if source.last_sync_at %}
-                                        <br>Last refresh: {{ source.last_sync_at }} ({{ source.last_sync_status }})
-                                        {% endif %}
-                                        {% if source.last_sync_error %}
-                                        <br>Error: {{ source.last_sync_error }}
-                                        {% endif %}
-                                    </div>
-                                </div>
-                                <div style="display:flex; gap: var(--space-2); flex-wrap: wrap;">
-                                    <form action="{{ url_for('toggle_blocklist_source', source_id=source.id) }}" method="POST">
-                                        <label style="display:flex; align-items:center; gap: var(--space-2); font-size: var(--font-size-sm);">
-                                            <input type="checkbox" name="is_enabled" onchange="this.form.submit()" {% if source.is_enabled %}checked{% endif %}>
-                                            Enabled
-                                        </label>
-                                    </form>
-                                    {% if source.source_type == 'external_url' %}
-                                    <form action="{{ url_for('refresh_blocklist_source', source_id=source.id) }}" method="POST">
-                                        <button type="submit" class="btn btn-secondary btn-sm">Refresh</button>
-                                    </form>
-                                    {% endif %}
-                                    <form action="{{ url_for('delete_blocklist_source', source_id=source.id) }}" method="POST" onsubmit="return confirm('Delete blocklist {{ source.name }}?');">
-                                        <button type="submit" class="btn btn-danger btn-sm">Delete</button>
-                                    </form>
-                                </div>
-                            </div>
-
-                            {% if source.source_type == 'manual' %}
-                            <div style="display:grid; gap: var(--space-4);">
-                                <form action="{{ url_for('add_blocklist_domain', source_id=source.id) }}" method="POST" style="display:flex; gap: var(--space-3); flex-wrap: wrap;">
-                                    <input type="text" name="domain" class="form-control" style="flex: 1 1 260px;" placeholder="example.com">
-                                    <button type="submit" class="btn btn-secondary">Add Domain</button>
-                                </form>
-
-                                {% if source.domains %}
-                                <div style="display:grid; gap: var(--space-2);">
-                                    {% for domain in source.domains[:25] %}
-                                    <div style="display:flex; justify-content:space-between; gap: var(--space-3); align-items:center; padding: var(--space-2) var(--space-3); border: 1px solid var(--border-primary); border-radius: var(--radius-md);">
-                                        <code>{{ domain.domain }}</code>
-                                        <form action="{{ url_for('delete_blocklist_domain', source_id=source.id, domain_id=domain.id) }}" method="POST">
-                                            <button type="submit" class="btn btn-danger btn-sm">Remove</button>
-                                        </form>
-                                    </div>
-                                    {% endfor %}
-                                    {% if source.domain_count > 25 %}
-                                    <div style="font-size: var(--font-size-sm); color: var(--text-tertiary);">
-                                        Showing the first 25 domains. The full list still syncs to agents.
-                                    </div>
-                                    {% endif %}
-                                </div>
-                                {% else %}
-                                <div style="font-size: var(--font-size-sm); color: var(--text-tertiary);">No manual domains added yet.</div>
-                                {% endif %}
-                            </div>
-                            {% endif %}
-                        </div>
-                        {% endfor %}
-                    </div>
-                    {% else %}
-                    <div class="alert alert-info">
-                        <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-                            <path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16zm.93-9.412-1 4.705c-.07.34.029.533.304.533.194 0 .487-.07.686-.246l-.088.416c-.287.346-.92.598-1.465.598-.703 0-1.002-.422-.808-1.319l.738-3.468c.064-.293.006-.399-.287-.47l-.451-.081.082-.381 2.29-.287zM8 5.5a1 1 0 1 1 0-2 1 1 0 0 1 0 2z"/>
-                        </svg>
-                        No blocklists created yet.
-                    </div>
-                    {% endif %}
+                <div>
+                    <h4 style="font-size: 0.85rem; font-weight: bold; color: var(--pico-muted-color); text-transform: uppercase; margin-bottom: 0.5rem;">Security Guidelines</h4>
+                    <ul style="margin: 0; padding-left: 1rem; font-size: 0.8rem; color: var(--pico-muted-color); font-weight: 500;">
+                        <li style="margin-bottom: 0.2rem;">Choose a password with 8+ random characters.</li>
+                        <li style="margin-bottom: 0.2rem;">Combine uppercase, symbols, and numeric characters.</li>
+                        <li>Rotate keys immediately if suspicious device activity is detected.</li>
+                    </ul>
                 </div>
             </div>
         </div>
-    </div>
-</body>
-</html>
+    </article>
+
+    <!-- Blocklist Catalog Redesigned -->
+    <article class="card">
+        <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem; border-bottom: 1px solid var(--pico-card-border-color); padding-bottom: 0.5rem;">
+            <svg width="22" height="22" fill="var(--pico-primary)" viewBox="0 0 16 16">
+                <path d="M13 6V4a1 1 0 0 0-1-1H9.5V2a1.5 1.5 0 0 0-3 0v1H4a1 1 0 0 0-1 1v2h10zM4 7v5a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V7H4zm2 1h4v1H6V8zm0 2h4v1H6v-1z"/>
+            </svg>
+            <h2 style="font-size: 1.25rem; font-weight: 700; margin: 0;">Blocklist Catalog Manager</h2>
+        </div>
+
+        <div class="card-body" style="padding: 0;">
+            <form action="{{ url_for('create_blocklist_source') }}" method="POST" style="display: grid; gap: 1rem; margin-bottom: 2rem; background: var(--pico-background-color); border: 1px solid var(--pico-card-border-color); border-radius: 0.75rem; padding: 1.25rem;">
+                <h3 style="font-size: 0.95rem; font-weight: bold; color: var(--pico-muted-color); text-transform: uppercase; margin: 0;">Create New Filter List</h3>
+                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.75rem;">
+                    <div class="form-group" style="margin: 0;">
+                        <label for="blocklist_name" class="form-label" style="font-size: 0.8rem;">Catalog Label Name</label>
+                        <input type="text" id="blocklist_name" name="name" class="form-control" placeholder="e.g. School Day Blocklist" required style="margin: 0;">
+                    </div>
+                    <div class="form-group" style="margin: 0;">
+                        <label for="blocklist_source_type" class="form-label" style="font-size: 0.8rem;">Filter Source Type</label>
+                        <select id="blocklist_source_type" name="source_type" class="form-control" style="margin: 0;">
+                            <option value="manual">Manual domain records</option>
+                            <option value="external_url">Synchronized URL lists</option>
+                        </select>
+                    </div>
+                </div>
+                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 0.75rem;">
+                    <div class="form-group" style="margin: 0;">
+                        <label for="blocklist_source_url" class="form-label" style="font-size: 0.8rem;">Outbound List URL (Hosts format)</label>
+                        <input type="url" id="blocklist_source_url" name="source_url" class="form-control" placeholder="https://example.com/adult-sites.txt" style="margin: 0;">
+                    </div>
+                    <div class="form-group" style="margin: 0;">
+                        <label for="manual_domains" class="form-label" style="font-size: 0.8rem;">Manual Domains (One host record per line)</label>
+                        <textarea id="manual_domains" name="manual_domains" class="form-control" rows="3" placeholder="youtube.com&#10;tiktok.com" style="margin: 0;"></textarea>
+                    </div>
+                </div>
+                <div style="margin: 0;">
+                    <button type="submit" class="btn btn-primary btn-cta btn-sm" style="margin: 0;">Create blocklist catalog</button>
+                </div>
+            </form>
+
+            <h3 style="font-size: 0.95rem; font-weight: bold; color: var(--pico-muted-color); text-transform: uppercase; margin-bottom: 1rem;">Active Blocklist Catalogs</h3>
+            {% if blocklist_sources %}
+            <div style="display:grid; gap: 0.75rem;">
+                {% for source in blocklist_sources %}
+                <div style="border: 1px solid var(--pico-card-border-color); border-radius: 0.75rem; padding: 1rem; background: var(--pico-background-color);">
+                    <div style="display:flex; justify-content:space-between; gap: 1rem; flex-wrap: wrap; align-items: center; border-bottom: 1px solid var(--pico-card-border-color); padding-bottom: 0.5rem; margin-bottom: 0.75rem;">
+                        <div>
+                            <div style="display:flex; gap: 0.4rem; align-items:center; flex-wrap: wrap;">
+                                <strong style="font-size: 1.05rem;">{{ source.name }}</strong>
+                                <span class="badge badge-secondary" style="font-weight: bold;">{{ source.source_type|replace('_', ' ')|title }}</span>
+                                {% if source.is_enabled %}
+                                <span class="badge badge-success">Enabled</span>
+                                {% else %}
+                                <span class="badge badge-warning">Disabled</span>
+                                {% endif %}
+                            </div>
+                            <div style="font-size: 0.75rem; color: var(--pico-muted-color); font-weight: bold; margin-top: 0.25rem; line-height: 1.3;">
+                                {{ source.domain_count }} domain(s) &bull; Enforced on {{ source.assigned_user_count }} child account(s)
+                                {% if source.source_url %}
+                                <br>Sync URL: <code>{{ source.source_url }}</code>
+                                {% endif %}
+                                {% if source.last_sync_at %}
+                                <br>Refresh: {{ source.last_sync_at }} ({{ source.last_sync_status }})
+                                {% endif %}
+                                {% if source.last_sync_error %}
+                                <br><span style="color: var(--danger-color);">Sync Error: {{ source.last_sync_error }}</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div style="display:flex; gap: 0.5rem; flex-wrap: wrap; align-items: center;">
+                            <form action="{{ url_for('toggle_blocklist_source', source_id=source.id) }}" method="POST" style="margin: 0;">
+                                <label style="display:flex; align-items:center; gap: 0.4rem; font-size: 0.8rem; font-weight: bold; margin: 0; cursor: pointer;">
+                                    <input type="checkbox" name="is_enabled" onchange="this.form.submit()" {% if source.is_enabled %}checked{% endif %}>
+                                    Enforce Active
+                                </label>
+                            </form>
+                            {% if source.source_type == 'external_url' %}
+                            <form action="{{ url_for('refresh_blocklist_source', source_id=source.id) }}" method="POST" style="margin: 0;">
+                                <button type="submit" class="btn btn-secondary btn-sm" style="margin: 0; padding: 0.2rem 0.5rem;">Force sync</button>
+                            </form>
+                            {% endif %}
+                            <form action="{{ url_for('delete_blocklist_source', source_id=source.id) }}" method="POST" onsubmit="return confirm('Delete blocklist catalog {{ source.name }}?');" style="margin: 0;">
+                                <button type="submit" class="btn btn-danger btn-sm" style="margin: 0; padding: 0.2rem 0.5rem;">Delete catalog</button>
+                            </form>
+                        </div>
+                    </div>
+
+                    {% if source.source_type == 'manual' %}
+                    <div style="display:grid; gap: 0.5rem; margin-top: 0.5rem;">
+                        <form action="{{ url_for('add_blocklist_domain', source_id=source.id) }}" method="POST" style="display:flex; gap: 0.4rem; flex-wrap: wrap; margin: 0;">
+                            <input type="text" name="domain" class="form-control" style="flex: 1 1 200px; margin: 0; padding: 0.25rem 0.5rem; font-size: 0.85rem;" placeholder="e.g. reddit.com" required>
+                            <button type="submit" class="btn btn-secondary btn-sm" style="margin: 0; padding: 0.25rem 0.75rem;">Add host</button>
+                        </form>
+
+                        {% if source.domains %}
+                        <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 0.4rem; margin-top: 0.5rem;">
+                            {% for domain in source.domains[:25] %}
+                            <div style="display:flex; justify-content:space-between; gap: 0.5rem; align-items:center; padding: 0.25rem 0.5rem; border: 1px solid var(--pico-card-border-color); border-radius: 0.5rem; background: var(--pico-card-background-color);">
+                                <code style="font-size: 0.75rem;">{{ domain.domain }}</code>
+                                <form action="{{ url_for('delete_blocklist_domain', source_id=source.id, domain_id=domain.id) }}" method="POST" style="margin: 0;">
+                                    <button type="submit" class="btn btn-danger btn-sm" style="margin: 0; padding: 0.1rem 0.3rem; font-size: 0.7rem;">×</button>
+                                </form>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% if source.domain_count > 25 %}
+                        <div style="font-size: 0.75rem; color: var(--pico-muted-color); font-weight: bold; margin-top: 0.25rem;">
+                            Showing first 25 domains. All {{ source.domain_count }} domains remain synced dynamically.
+                        </div>
+                        {% endif %}
+                        {% else %}
+                        <div style="font-size: 0.8rem; color: var(--pico-muted-color); font-weight: 500;">No manual domains added to this list yet.</div>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="flash-alert flash-alert-info">
+                <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                    <path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16zm.93-9.412-1 4.705c-.07.34.029.533.304.533.194 0 .487-.07.686-.246l-.088.416c-.287.346-.92.598-1.465.598-.703 0-1.002-.422-.808-1.319l.738-3.468c.064-.293.006-.399-.287-.47l-.451-.081.082-.381 2.29-.287zM8 5.5a1 1 0 1 1 0-2 1 1 0 0 1 0 2z"/>
+                </svg>
+                <span>No blocklists created yet. Formulate a list above to restrict web access.</span>
+            </div>
+            {% endif %}
+        </div>
+    </article>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Outbound form validation for local passwords
+    const confirmPasswordField = document.getElementById('confirm_password');
+    const newPasswordField = document.getElementById('new_password');
+    if (confirmPasswordField && newPasswordField) {
+        confirmPasswordField.addEventListener('input', function() {
+            const newPassword = newPasswordField.value;
+            const confirmPassword = this.value;
+            
+            if (confirmPassword && newPassword !== confirmPassword) {
+                this.setCustomValidity('Passwords do not match');
+                this.style.borderColor = 'var(--danger-color)';
+            } else {
+                this.setCustomValidity('');
+                this.style.borderColor = '';
+            }
+        });
+        
+        newPasswordField.addEventListener('input', function() {
+            if (confirmPasswordField.value && this.value !== confirmPasswordField.value) {
+                confirmPasswordField.setCustomValidity('Passwords do not match');
+                confirmPasswordField.style.borderColor = 'var(--danger-color)';
+            } else {
+                confirmPasswordField.setCustomValidity('');
+                confirmPasswordField.style.borderColor = '';
+            }
+        });
+    }
+</script>
+{% endblock %}

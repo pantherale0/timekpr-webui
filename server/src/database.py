@@ -1,5 +1,6 @@
 from collections import defaultdict
 from datetime import datetime, timedelta
+import pytz
 import json
 
 import bcrypt
@@ -375,6 +376,43 @@ class ManagedUser(db.Model):
         except (TypeError, ValueError, json.JSONDecodeError):
             return None
 
+    def get_effective_time_left_seconds(self):
+        """Get the dynamically computed time left for today, using UTC dates.
+
+        This method uses UTC for all date comparisons, as the application operates in UTC.
+        If the user was last checked on a previous day or has never been checked,
+        it falls back to the effective daily limit for today (if configured) or the cached
+        TIME_LEFT_DAY value.
+        """
+        # Use UTC date for consistency
+        today = datetime.utcnow().date()
+        limit = self.get_effective_daily_limit_seconds(today)
+        last_checked = self.last_checked
+
+        if last_checked is None:
+            # No previous check; return limit if available, else cached value
+            if limit is not None:
+                return limit
+            return coerce_time_left_day(self.get_config_value('TIME_LEFT_DAY'))
+
+        # Ensure last_checked is timezone-aware UTC
+        if last_checked.tzinfo is None:
+            last_checked = last_checked.replace(tzinfo=pytz.UTC)
+        # Convert to UTC (no change) and compare dates
+        last_checked_utc = last_checked.astimezone(pytz.UTC)
+        if last_checked_utc.date() != today:
+            if limit is not None:
+                return limit
+            return coerce_time_left_day(self.get_config_value('TIME_LEFT_DAY'))
+
+        # Same day: return cached value or limit as fallback
+        val = self.get_config_value('TIME_LEFT_DAY')
+        if val is None:
+            return limit
+        return coerce_time_left_day(val)
+
+
+
     def get_daily_limit_adjustment_seconds(self, day=None):
         day = day or datetime.utcnow().date()
         if self.daily_limit_adjustment_date != day:
@@ -411,6 +449,7 @@ class ManagedUser(db.Model):
             return None
 
         base_limit = self.weekly_schedule.get_limit_seconds_for_day(day)
+
         if base_limit is None:
             return None
 

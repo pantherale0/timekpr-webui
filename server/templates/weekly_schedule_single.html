@@ -1,1034 +1,865 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Weekly Schedule - {{ user.username }} - TimeKpr webUI</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
-    <style>
-        .schedule-main {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: var(--space-6);
-        }
+{% extends "base.html" %}
 
-        .schedule-overview {
-            background: var(--bg-elevated);
-            border: 1px solid var(--border-primary);
-            border-radius: var(--radius-xl);
-            padding: var(--space-6);
-            margin-bottom: var(--space-6);
-        }
+{% block title %}Weekly Schedule - {{ user.username }} - TimeKpr WebUI{% endblock %}
 
-        .schedule-controls {
-            display: flex;
-            gap: var(--space-4);
-            margin-bottom: var(--space-6);
-            flex-wrap: wrap;
-        }
+{% block top_nav_extra %}
+<span class="badge sync-status-badge"
+    style="display: none; font-size: 0.75rem; padding: 0.25rem 0.5rem; height: fit-content; line-height: 1; align-items: center;">
+    <svg width="10" height="10" fill="currentColor" viewBox="0 0 16 16" style="margin-right: 4px; flex-shrink: 0;">
+        <path class="sync-status-icon"
+            d="M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767L8.982 1.566zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5zm.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2z" />
+    </svg>
+    <span class="sync-status-text" style="font-size: 0.7rem; font-weight: bold; line-height: 1;">Pending Sync</span>
+</span>
+{% endblock %}
 
-        .quick-control {
-            display: flex;
-            align-items: center;
-            gap: var(--space-2);
-            flex-wrap: wrap;
-            background: var(--bg-secondary);
-            padding: var(--space-3) var(--space-4);
-            border-radius: var(--radius-md);
-            border: 1px solid var(--border-primary);
-        }
-
-        .quick-control label {
-            font-size: var(--font-size-sm);
-            font-weight: 500;
-            color: var(--text-secondary);
-            white-space: nowrap;
-        }
-
-        .quick-input {
-            width: 80px;
-            padding: var(--space-2);
-            border: 1px solid var(--border-primary);
-            border-radius: var(--radius-sm);
-            background: var(--bg-elevated);
-            color: var(--text-primary);
-            font-size: var(--font-size-sm);
-            text-align: center;
-        }
-
-        .schedule-table {
-            background: var(--bg-elevated);
-            border: 1px solid var(--border-primary);
-            border-radius: var(--radius-xl);
-            overflow: hidden;
-        }
-
-        .schedule-header-row {
-            background: var(--bg-secondary);
-            border-bottom: 2px solid var(--border-primary);
-            padding: var(--space-4) var(--space-6);
-            display: grid;
-            grid-template-columns: 120px 1fr 1fr;
-            gap: var(--space-4);
-            align-items: center;
-            font-weight: 600;
-            color: var(--text-primary);
-        }
-
-        .schedule-row {
-            padding: var(--space-4) var(--space-6);
-            display: grid;
-            grid-template-columns: 120px 1fr 1fr;
-            gap: var(--space-4);
-            align-items: center;
-            border-bottom: 1px solid var(--border-primary);
-            transition: background-color var(--transition-fast);
-        }
-
-        .schedule-row:hover {
-            background: var(--bg-secondary);
-        }
-
-        .schedule-row:last-child {
-            border-bottom: none;
-        }
-
-        .day-name {
-            font-weight: 600;
-            color: var(--text-primary);
-            font-size: var(--font-size-base);
-        }
-
-        .weekend .day-name {
-            color: var(--warning);
-        }
-
-        .time-section {
-            display: flex;
-            align-items: center;
-            gap: var(--space-3);
-        }
-
-        .interval-section {
-            align-items: stretch;
-        }
-
-        .time-controls {
-            display: flex;
-            align-items: center;
-            gap: var(--space-2);
-        }
-
-        .time-input {
-            width: 80px;
-            padding: var(--space-2) var(--space-3);
-            border: 1px solid var(--border-primary);
-            border-radius: var(--radius-md);
-            background: var(--bg-primary);
-            color: var(--text-primary);
-            text-align: center;
-            font-size: var(--font-size-base);
-            font-weight: 500;
-        }
-
-        .time-input:focus,
-        .interval-time-input:focus {
-            outline: none;
-            border-color: var(--border-focus);
-            box-shadow: 0 0 0 3px rgb(59 130 246 / 0.1);
-        }
-
-        .time-btn {
-            width: 32px;
-            height: 32px;
-            border: 1px solid var(--border-primary);
-            background: var(--bg-elevated);
-            color: var(--text-primary);
-            border-radius: var(--radius-sm);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            font-weight: 600;
-            font-size: var(--font-size-base);
-            transition: all var(--transition-fast);
-        }
-
-        .time-btn:hover {
-            background: var(--bg-tertiary);
-            border-color: var(--border-secondary);
-        }
-
-        .time-unit {
-            font-size: var(--font-size-sm);
-            color: var(--text-tertiary);
-            min-width: 40px;
-        }
-
-        .interval-editor {
-            width: 100%;
-            display: flex;
-            flex-direction: column;
-            gap: var(--space-3);
-        }
-
-        .interval-list {
-            display: flex;
-            flex-direction: column;
-            gap: var(--space-2);
-        }
-
-        .interval-row {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: var(--space-3);
-            padding: var(--space-3);
-            border: 1px solid var(--border-primary);
-            border-radius: var(--radius-md);
-            background: var(--bg-primary);
-        }
-
-        .interval-row-controls {
-            display: flex;
-            align-items: center;
-            gap: var(--space-2);
-            flex-wrap: wrap;
-        }
-
-        .interval-row-index {
-            font-size: var(--font-size-sm);
-            font-weight: 600;
-            color: var(--text-secondary);
-            min-width: 56px;
-        }
-
-        .interval-time-input {
-            padding: var(--space-2);
-            border: 1px solid var(--border-primary);
-            border-radius: var(--radius-sm);
-            background: var(--bg-elevated);
-            color: var(--text-primary);
-            font-size: var(--font-size-sm);
-        }
-
-        .interval-empty {
-            padding: var(--space-3);
-            border: 1px dashed var(--border-primary);
-            border-radius: var(--radius-md);
-            color: var(--text-secondary);
-            font-size: var(--font-size-sm);
-            background: var(--bg-primary);
-        }
-
-        .interval-actions {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: var(--space-3);
-            flex-wrap: wrap;
-        }
-
-        .interval-summary {
-            color: var(--text-tertiary);
-            font-size: var(--font-size-sm);
-        }
-
-        .actions-section {
-            padding: var(--space-6);
-            background: var(--bg-elevated);
-            border: 1px solid var(--border-primary);
-            border-radius: var(--radius-xl);
-            margin-top: var(--space-6);
-            display: flex;
-            justify-content: center;
-            gap: var(--space-4);
-        }
-
-        .status-info {
-            display: flex;
-            align-items: center;
-            gap: var(--space-2);
-            font-size: var(--font-size-sm);
-        }
-
-        .policy-card {
-            background: var(--bg-elevated);
-            border: 1px solid var(--border-primary);
-            border-radius: var(--radius-xl);
-            padding: var(--space-6);
-            margin-bottom: var(--space-6);
-        }
-
-        .policy-source-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-            gap: var(--space-3);
-            margin: var(--space-4) 0;
-        }
-
-        .policy-source-option {
-            border: 1px solid var(--border-primary);
-            border-radius: var(--radius-md);
-            background: var(--bg-primary);
-            padding: var(--space-3);
-        }
-
-        .policy-source-option label {
-            display: flex;
-            align-items: flex-start;
-            gap: var(--space-2);
-            cursor: pointer;
-        }
-
-        .policy-mapping-list {
-            display: grid;
-            gap: var(--space-3);
-            margin-top: var(--space-4);
-        }
-
-        .policy-mapping-item {
-            border: 1px solid var(--border-primary);
-            border-radius: var(--radius-md);
-            background: var(--bg-primary);
-            padding: var(--space-3);
-        }
-
-        @media (max-width: 968px) {
-            .schedule-header-row,
-            .schedule-row {
-                grid-template-columns: 1fr;
-                gap: var(--space-3);
-            }
-
-            .time-section {
-                justify-content: space-between;
-                padding: var(--space-3);
-                background: var(--bg-secondary);
-                border-radius: var(--radius-md);
-            }
-
-            .interval-actions,
-            .interval-row {
-                align-items: flex-start;
-            }
-
-            .interval-row {
-                flex-direction: column;
-            }
-
-            .schedule-controls {
-                flex-direction: column;
-            }
-
-            .quick-control {
-                justify-content: space-between;
-            }
-        }
-    </style>
-</head>
-<body>
-    <div class="dashboard-container">
-        <header class="dashboard-header">
-            <div class="dashboard-title">
-                <h1>{{ user.username }} - Schedule</h1>
-                <p class="dashboard-subtitle">Manage time limits and allowed intervals</p>
-            </div>
-                {% if oidc_enabled and session_user %}
-                <div class="user-badge" style="display: flex; align-items: center; gap: var(--space-2); font-size: var(--font-size-sm); color: var(--text-secondary); background: var(--bg-elevated); padding: var(--space-1) var(--space-3); border-radius: var(--radius-full); border: 1px solid var(--border-primary);">
-                    <svg width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
-                        <path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm2-3a2 2 0 1 1-4 0 2 2 0 0 1 4 0zm4 8c0 1-1 1-1 1H3s-1 0-1-1 1-4 6-4 6 3 6 4zm-1-.004c-.001-.246-.154-.986-.832-1.664C11.516 10.68 10.289 10 8 10c-2.29 0-3.516.68-4.168 1.332-.678.678-.83 1.418-.832 1.664h10z"/>
-                    </svg>
-                    <span>{{ session_user.username }}</span>
-                </div>
-                {% endif %}
-                <a href="{{ url_for('dashboard') }}" class="btn btn-sm btn-secondary">
-                    <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16" style="margin-right: 4px;">
-                        <path fill-rule="evenodd" d="M15 8a.5.5 0 0 0-.5-.5H2.707l3.147-3.146a.5.5 0 1 0-.708-.708l-4 4a.5.5 0 0 0 0 .708l4 4a.5.5 0 0 0 .708-.708L2.707 8.5H14.5A.5.5 0 0 0 15 8z"/>
-                    </svg>
-                    Dashboard
-                </a>
-                <a href="{{ url_for('admin') }}" class="btn btn-sm btn-secondary">Admin</a>
-                <a href="{{ url_for('settings') }}" class="btn btn-sm btn-secondary">Settings</a>
-                {% if not oidc_enabled %}
-                <a href="{{ url_for('logout') }}" class="btn btn-sm btn-danger">Logout</a>
-                {% endif %}
-            </div>
-        </header>
-        
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                {% for category, message in messages %}
-                    <div class="alert alert-{{ category }}">
-                        <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-                            {% if category == 'success' %}
-                                <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zm-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.061L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z"/>
-                            {% elif category == 'danger' or category == 'error' %}
-                                <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zM5.354 4.646a.5.5 0 1 0-.708.708L7.293 8l-2.647 2.646a.5.5 0 0 0 .708.708L8 8.707l2.646 2.647a.5.5 0 0 0 .708-.708L8.707 8l2.647-2.646a.5.5 0 0 0-.708-.708L8 7.293 5.354 4.646z"/>
-                            {% elif category == 'warning' %}
-                                <path d="M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767L8.982 1.566zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5zm.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2z"/>
-                            {% else %}
-                                <path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16zm.93-9.412-1 4.705c-.07.34.029.533.304.533.194 0 .487-.07.686-.246l-.088.416c-.287.346-.92.598-1.465.598-.703 0-1.002-.422-.808-1.319l.738-3.468c.064-.293.006-.399-.287-.47l-.451-.081.082-.381 2.29-.287zM8 5.5a1 1 0 1 1 0-2 1 1 0 0 1 0 2z"/>
-                            {% endif %}
-                        </svg>
-                        {{ message }}
-                    </div>
-                {% endfor %}
-            {% endif %}
-        {% endwith %}
-        
-        <div class="schedule-main">
-            <!-- Status Overview -->
-            <div class="schedule-overview">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-4);">
-                    <div>
-                        <h2 style="margin: 0;">{{ user.username }}</h2>
-                        <p style="margin: 0; color: var(--text-secondary);">
-                            {{ user.device_mappings|length }} linked device mapping(s)
-                        </p>
-                    </div>
-                    <div class="status-info">
-                        <div id="sync-status-badge" class="badge" style="display: none;">
-                            <svg width="12" height="12" fill="currentColor" viewBox="0 0 16 16">
-                                <path id="sync-status-icon" d="M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767L8.982 1.566zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5zm.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2z"/>
-                            </svg>
-                            <span id="sync-status-text">Changes Pending Sync</span>
-                        </div>
-                    </div>
-                </div>
-                
-                {% if user.weekly_schedule %}
-                    {% set schedule = user.weekly_schedule.get_schedule_dict() %}
-                    {% set total_week = schedule['monday'] + schedule['tuesday'] + schedule['wednesday'] + schedule['thursday'] + schedule['friday'] %}
-                    {% set total_weekend = schedule['saturday'] + schedule['sunday'] %}
-                    {% set total_all = total_week + total_weekend %}
-                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--space-4); margin-bottom: var(--space-4);">
-                        <div style="text-align: center; padding: var(--space-3); background: var(--bg-secondary); border-radius: var(--radius-md);">
-                            <div style="font-size: var(--font-size-2xl); font-weight: 700; color: var(--accent-primary);">{{ total_all }}h</div>
-                            <div style="font-size: var(--font-size-sm); color: var(--text-tertiary);">Total per week</div>
-                        </div>
-                        <div style="text-align: center; padding: var(--space-3); background: var(--bg-secondary); border-radius: var(--radius-md);">
-                            <div style="font-size: var(--font-size-xl); font-weight: 600; color: var(--text-primary);">{{ total_week }}h</div>
-                            <div style="font-size: var(--font-size-sm); color: var(--text-tertiary);">Weekdays (Mon-Fri)</div>
-                        </div>
-                        <div style="text-align: center; padding: var(--space-3); background: var(--bg-secondary); border-radius: var(--radius-md);">
-                            <div style="font-size: var(--font-size-xl); font-weight: 600; color: var(--warning);">{{ total_weekend }}h</div>
-                            <div style="font-size: var(--font-size-sm); color: var(--text-tertiary);">Weekend (Sat-Sun)</div>
-                        </div>
-                    </div>
-                {% endif %}
-            </div>
-
-            <div class="policy-card">
-                <div style="display:flex; justify-content:space-between; gap: var(--space-4); align-items:flex-start; flex-wrap: wrap;">
-                    <div>
-                        <h2 style="margin: 0;">Internet Blocklists</h2>
-                        <p style="margin: var(--space-1) 0 0 0; color: var(--text-secondary);">
-                            Assign shared blocklists to {{ user.username }} across all mapped devices.
-                        </p>
-                    </div>
-                    <div class="status-info">
-                        <div id="blocklist-sync-badge" class="badge {% if blocklist_sync_status.needs_sync %}badge-warning{% elif blocklist_sync_status.assigned_source_count %}badge-success{% else %}badge-secondary{% endif %}">
-                            <span id="blocklist-sync-text">
-                                {% if blocklist_sync_status.assigned_source_count == 0 %}
-                                No blocklists assigned
-                                {% elif blocklist_sync_status.needs_sync %}
-                                Blocklist changes pending sync
-                                {% else %}
-                                Blocklists synchronized
-                                {% endif %}
-                            </span>
-                        </div>
-                    </div>
-                </div>
-
-                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: var(--space-4); margin-top: var(--space-4);">
-                    <div style="text-align:center; padding: var(--space-3); background: var(--bg-secondary); border-radius: var(--radius-md);">
-                        <div style="font-size: var(--font-size-xl); font-weight: 700;">{{ blocklist_sync_status.assigned_source_count }}</div>
-                        <div style="font-size: var(--font-size-sm); color: var(--text-tertiary);">Assigned lists</div>
-                    </div>
-                    <div style="text-align:center; padding: var(--space-3); background: var(--bg-secondary); border-radius: var(--radius-md);">
-                        <div style="font-size: var(--font-size-xl); font-weight: 700;">{{ blocklist_sync_status.effective_domain_count }}</div>
-                        <div style="font-size: var(--font-size-sm); color: var(--text-tertiary);">Effective domains</div>
-                    </div>
-                    <div style="text-align:center; padding: var(--space-3); background: var(--bg-secondary); border-radius: var(--radius-md);">
-                        <div style="font-size: var(--font-size-xl); font-weight: 700;"><span id="blocklist-synced-count">{{ blocklist_sync_status.synced_mapping_count }}</span>/{{ blocklist_sync_status.mapping_count }}</div>
-                        <div style="font-size: var(--font-size-sm); color: var(--text-tertiary);">Mapped accounts synced</div>
-                    </div>
-                </div>
-
-                <form action="{{ url_for('update_user_blocklists', user_id=user.id) }}" method="POST" style="margin-top: var(--space-5);">
-                    <div class="policy-source-grid">
-                        {% for source in blocklist_sources %}
-                        <div class="policy-source-option">
-                            <label>
-                                <input
-                                    type="checkbox"
-                                    name="source_ids"
-                                    value="{{ source.id }}"
-                                    {% if source.id in blocklist_sync_status.assigned_source_ids %}checked{% endif %}
-                                >
-                                <span>
-                                    <strong>{{ source.name }}</strong><br>
-                                    <span style="font-size: var(--font-size-sm); color: var(--text-tertiary);">
-                                        {{ source.domain_count }} domain(s), {{ source.source_type|replace('_', ' ')|title }}
-                                    </span>
-                                </span>
-                            </label>
-                        </div>
-                        {% endfor %}
-                    </div>
-                    {% if not blocklist_sources %}
-                    <div class="alert alert-info" style="margin-top: var(--space-4);">
-                        <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-                            <path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16zm.93-9.412-1 4.705c-.07.34.029.533.304.533.194 0 .487-.07.686-.246l-.088.416c-.287.346-.92.598-1.465.598-.703 0-1.002-.422-.808-1.319l.738-3.468c.064-.293.006-.399-.287-.47l-.451-.081.082-.381 2.29-.287zM8 5.5a1 1 0 1 1 0-2 1 1 0 0 1 0 2z"/>
-                        </svg>
-                        Create blocklists on the Settings page before assigning them here.
-                    </div>
-                    {% endif %}
-                    <div style="margin-top: var(--space-4); display:flex; gap: var(--space-3); flex-wrap: wrap;">
-                        <button type="submit" class="btn btn-secondary">Save Blocklist Assignments</button>
-                        <a href="{{ url_for('settings') }}" class="btn btn-ghost">Manage Catalog</a>
-                    </div>
-                </form>
-
-                {% if blocklist_sync_status.mappings %}
-                <div class="policy-mapping-list">
-                    {% for mapping in blocklist_sync_status.mappings %}
-                    <div class="policy-mapping-item">
-                        <div style="display:flex; justify-content:space-between; gap: var(--space-3); flex-wrap: wrap;">
-                            <div>
-                                <strong>{{ mapping.linux_username }}@{{ mapping.device_label }}</strong>
-                                <div style="font-size: var(--font-size-sm); color: var(--text-tertiary);">
-                                    UID: {{ mapping.linux_uid if mapping.linux_uid is not none else 'unknown' }}
-                                    {% if mapping.last_synced %}
-                                    , last synced {{ mapping.last_synced }}
-                                    {% endif %}
-                                </div>
-                            </div>
-                            <span class="badge {% if mapping.status == 'synced' %}badge-success{% elif mapping.status == 'awaiting_uid' %}badge-warning{% elif mapping.status == 'not_configured' %}badge-secondary{% else %}badge-warning{% endif %}">
-                                {{ mapping.status|replace('_', ' ')|title }}
-                            </span>
-                        </div>
-                        {% if mapping.last_error %}
-                        <div style="font-size: var(--font-size-sm); color: var(--danger); margin-top: var(--space-2);">
-                            {{ mapping.last_error }}
-                        </div>
-                        {% endif %}
-                    </div>
-                    {% endfor %}
-                </div>
-                {% endif %}
-            </div>
-            
-            <!-- Quick Controls -->
-            <div class="schedule-controls">
-                <div class="quick-control">
-                    <label>Quick set hours:</label>
-                    <button type="button" class="btn btn-sm btn-ghost" onclick="adjustBulkTime(-0.25)">-15min</button>
-                    <input type="number" id="bulk-hours" min="0" max="24" step="0.25" placeholder="2.5" class="quick-input">
-                    <button type="button" class="btn btn-sm btn-ghost" onclick="adjustBulkTime(0.25)">+15min</button>
-                    <button type="button" class="btn btn-sm btn-secondary" onclick="setWeekdays()">Weekdays</button>
-                    <button type="button" class="btn btn-sm btn-secondary" onclick="setWeekends()">Weekends</button>
-                    <button type="button" class="btn btn-sm btn-secondary" onclick="setAllDays()">All Days</button>
-                </div>
-                <div class="quick-control">
-                    <label>Quick set interval:</label>
-                    <input type="time" id="bulk-start" class="interval-time-input" step="900" value="09:00">
-                    <span>to</span>
-                    <input type="time" id="bulk-end" class="interval-time-input" step="900" value="17:00">
-                    <button type="button" class="btn btn-sm btn-secondary" onclick="setWeekdayIntervals()">Weekdays</button>
-                    <button type="button" class="btn btn-sm btn-secondary" onclick="setWeekendIntervals()">Weekends</button>
-                    <button type="button" class="btn btn-sm btn-secondary" onclick="setAllIntervals()">All Days</button>
-                </div>
-            </div>
-            
-            <!-- Schedule Table -->
-            <form id="schedule-form" method="POST" action="{{ url_for('update_weekly_schedule') }}">
-                <input type="hidden" name="user_id" value="{{ user.id }}">
-                
-                <div class="schedule-table">
-                    <div class="schedule-header-row">
-                        <div>Day</div>
-                        <div>Daily Time Limit</div>
-                        <div>Allowed Time Interval</div>
-                    </div>
-                    
-                    {% set days = [
-                        ('monday', 'Monday', 1),
-                        ('tuesday', 'Tuesday', 2), 
-                        ('wednesday', 'Wednesday', 3),
-                        ('thursday', 'Thursday', 4),
-                        ('friday', 'Friday', 5),
-                        ('saturday', 'Saturday', 6),
-                        ('sunday', 'Sunday', 7)
-                    ] %}
-                    
-                    {% for day_key, day_name, day_num in days %}
-                    <div class="schedule-row {% if day_num >= 6 %}weekend{% endif %}">
-                        <div class="day-name">{{ day_name }}</div>
-                        
-                        <!-- Daily Time Limit -->
-                        <div class="time-section">
-                            <div class="time-controls">
-                                <button type="button" class="time-btn" onclick="adjustTime('{{ day_key }}', -0.25)">−</button>
-                                <input type="number" 
-                                       id="{{ day_key }}" 
-                                       name="{{ day_key }}" 
-                                       min="0" 
-                                       max="24" 
-                                       step="0.25"
-                                       value="{% if user.weekly_schedule %}{{ user.weekly_schedule.get_schedule_dict()[day_key] }}{% else %}0{% endif %}"
-                                       class="time-input">
-                                <button type="button" class="time-btn" onclick="adjustTime('{{ day_key }}', 0.25)">+</button>
-                            </div>
-                            <span class="time-unit">hours</span>
-                        </div>
-                        
-                        <!-- Time Intervals -->
-                        <div class="time-section interval-section">
-                            <div class="interval-editor">
-                                <div id="interval-list-{{ day_num }}" class="interval-list"></div>
-                                <div class="interval-actions">
-                                    <button type="button" class="btn btn-sm btn-secondary" onclick="addInterval({{ day_num }})">Add Interval</button>
-                                    <span id="interval-summary-{{ day_num }}" class="interval-summary">No restrictions configured</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    {% endfor %}
-                </div>
-                
-                <!-- Actions -->
-                <div class="actions-section">
-                    <button type="button" class="btn btn-primary btn-lg" onclick="saveAll()">
-                        <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-                            <path d="M15.854 5.146a.5.5 0 0 1 0 .708l-3 3a.5.5 0 0 1-.708 0l-1.5-1.5a.5.5 0 0 1 .708-.708L12.5 7.793l2.646-2.647a.5.5 0 0 1 .708 0z"/>
-                        </svg>
-                        Save All Changes
-                    </button>
-                    <button type="button" class="btn btn-secondary btn-lg" onclick="resetForm()">
-                        <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-                            <path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2v1z"/>
-                            <path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z"/>
-                        </svg>
-                        Reset to Saved
-                    </button>
-                </div>
-            </form>
-        </div>
+{% block content %}
+<div class="schedule-header-title"
+    style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; flex-wrap: wrap; gap: 1rem;">
+    <div>
+        <h1 style="margin: 0; font-size: 2rem;">{{ user.username }} &mdash; Limits</h1>
+        <p style="margin: 0; color: var(--pico-muted-color); font-weight: 500;">Manage daily limits, allowed timelines,
+            and blocklists</p>
     </div>
-    
-    <!-- Notification Toast -->
-    <div id="notification-toast" class="notification-toast">
-        <div class="toast-content">
-            <svg class="toast-icon" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-                <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zm-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.061L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z"/>
+    <div>
+        <a href="{{ url_for('weekly_schedule') }}" class="btn btn-secondary btn-sm">
+            <svg width="14" height="14" fill="currentColor" viewBox="0 0 16 16" style="margin-right: 4px;">
+                <path fill-rule="evenodd"
+                    d="M15 8a.5.5 0 0 0-.5-.5H2.707l3.147-3.146a.5.5 0 1 0-.708-.708l-4 4a.5.5 0 0 0 0 .708l4 4a.5.5 0 0 0 .708-.708L2.707 8.5H14.5A.5.5 0 0 0 15 8z" />
             </svg>
-            <span class="toast-message">Changes saved successfully!</span>
-        </div>
+            Back to Users
+        </a>
     </div>
-    
-    <style>
-        .notification-toast {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            background: var(--bg-elevated);
-            border: 1px solid var(--border-primary);
-            border-radius: var(--radius-lg);
-            padding: var(--space-4);
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-            transform: translateX(calc(100% + 20px));
-            transition: transform 0.3s ease-in-out;
-            z-index: 1000;
-            max-width: 300px;
+</div>
+
+<div class="schedule-main">
+    <!-- Status Overview & Metrics -->
+    <article class="card schedule-overview" style="margin-bottom: 1.5rem;">
+        <div
+            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 0.5rem;">
+            <div>
+                <h2 style="margin: 0; font-size: 1.5rem;">Schedule Summary</h2>
+                <p style="margin: 0; color: var(--pico-muted-color); font-size: 0.9rem;">
+                    {{ user.device_mappings|length }} active device mapping(s) configured
+                </p>
+            </div>
+        </div>
+
+        {% if user.weekly_schedule %}
+        {% set schedule = user.weekly_schedule.get_schedule_dict() %}
+        {% set total_week = schedule['monday'] + schedule['tuesday'] + schedule['wednesday'] + schedule['thursday'] +
+        schedule['friday'] %}
+        {% set total_weekend = schedule['saturday'] + schedule['sunday'] %}
+        {% set total_all = total_week + total_weekend %}
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+            <div
+                style="text-align: center; padding: 1rem; background: var(--pico-background-color); border: 1px solid var(--pico-card-border-color); border-radius: 0.75rem;">
+                <div style="font-size: 2rem; font-weight: 700; color: var(--pico-primary); line-height: 1.1;">{{
+                    total_all }}h</div>
+                <div
+                    style="font-size: 0.8rem; color: var(--pico-muted-color); font-weight: bold; text-transform: uppercase; margin-top: 0.25rem;">
+                    Total per week</div>
+            </div>
+            <div
+                style="text-align: center; padding: 1rem; background: var(--pico-background-color); border: 1px solid var(--pico-card-border-color); border-radius: 0.75rem;">
+                <div style="font-size: 1.75rem; font-weight: 700; color: var(--pico-color); line-height: 1.1;">{{
+                    total_week }}h</div>
+                <div
+                    style="font-size: 0.8rem; color: var(--pico-muted-color); font-weight: bold; text-transform: uppercase; margin-top: 0.25rem;">
+                    Weekdays (Mon-Fri)</div>
+            </div>
+            <div
+                style="text-align: center; padding: 1rem; background: var(--pico-background-color); border: 1px solid var(--pico-card-border-color); border-radius: 0.75rem;">
+                <div style="font-size: 1.75rem; font-weight: 700; color: var(--warning-color); line-height: 1.1;">{{
+                    total_weekend }}h</div>
+                <div
+                    style="font-size: 0.8rem; color: var(--pico-muted-color); font-weight: bold; text-transform: uppercase; margin-top: 0.25rem;">
+                    Weekends (Sat-Sun)</div>
+            </div>
+        </div>
+        {% endif %}
+    </article>
+
+    <!-- Internet Blocklists Redesigned Section -->
+    <article class="card policy-card" style="margin-bottom: 1.5rem;">
+        <div
+            style="display:flex; justify-content:space-between; gap: 1rem; align-items:flex-start; flex-wrap: wrap; margin-bottom: 1.5rem;">
+            <div>
+                <h2 style="margin: 0; font-size: 1.5rem;">Internet Blocklists Assignment</h2>
+                <p style="margin: 0.25rem 0 0 0; color: var(--pico-muted-color); font-size: 0.9rem;">
+                    Enforce content filters and shared blocklists across all mapped accounts.
+                </p>
+            </div>
+            <div class="status-info">
+                <span id="blocklist-sync-badge" class="badge">
+                    <span id="blocklist-sync-text">Loading status...</span>
+                </span>
+            </div>
+        </div>
+
+        <div
+            style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+            <div
+                style="text-align:center; padding: 0.75rem; background: var(--pico-background-color); border: 1px solid var(--pico-card-border-color); border-radius: 0.75rem;">
+                <div style="font-size: 1.5rem; font-weight: 700;">{{ blocklist_sync_status.assigned_source_count }}
+                </div>
+                <div
+                    style="font-size: 0.8rem; color: var(--pico-muted-color); font-weight: bold; text-transform: uppercase;">
+                    Assigned catalogs</div>
+            </div>
+            <div
+                style="text-align:center; padding: 0.75rem; background: var(--pico-background-color); border: 1px solid var(--pico-card-border-color); border-radius: 0.75rem;">
+                <div style="font-size: 1.5rem; font-weight: 700;">{{ blocklist_sync_status.effective_domain_count }}
+                </div>
+                <div
+                    style="font-size: 0.8rem; color: var(--pico-muted-color); font-weight: bold; text-transform: uppercase;">
+                    Blocked domains</div>
+            </div>
+            <div
+                style="text-align:center; padding: 0.75rem; background: var(--pico-background-color); border: 1px solid var(--pico-card-border-color); border-radius: 0.75rem;">
+                <div style="font-size: 1.5rem; font-weight: 700;"><span id="blocklist-synced-count">{{
+                        blocklist_sync_status.synced_mapping_count }}</span>/{{ blocklist_sync_status.mapping_count }}
+                </div>
+                <div
+                    style="font-size: 0.8rem; color: var(--pico-muted-color); font-weight: bold; text-transform: uppercase;">
+                    Accounts synchronized</div>
+            </div>
+        </div>
+
+        <form action="{{ url_for('update_user_blocklists', user_id=user.id) }}" method="POST">
+            <div class="policy-source-grid"
+                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 0.75rem; margin-bottom: 1.25rem;">
+                {% for source in blocklist_sources %}
+                <div class="policy-source-option"
+                    style="border: 1px solid var(--pico-card-border-color); border-radius: 0.75rem; background: var(--pico-background-color); padding: 0.75rem;">
+                    <label style="display: flex; align-items: flex-start; gap: 0.75rem; cursor: pointer; margin: 0;">
+                        <input type="checkbox" name="source_ids" value="{{ source.id }}"
+                            style="margin-top: 0.25rem; flex-shrink: 0;" {% if source.id in
+                            blocklist_sync_status.assigned_source_ids %}checked{% endif %}>
+                        <span>
+                            <strong style="font-size: 0.95rem; color: var(--pico-color);">{{ source.name }}</strong><br>
+                            <span style="font-size: 0.75rem; color: var(--pico-muted-color); font-weight: bold;">
+                                {{ source.domain_count }} domain(s) &bull; {{ source.source_type|replace('_', ' ')|title
+                                }}
+                            </span>
+                        </span>
+                    </label>
+                </div>
+                {% endfor %}
+            </div>
+            {% if not blocklist_sources %}
+            <div class="flash-alert flash-alert-info">
+                <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                    <path
+                        d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16zm.93-9.412-1 4.705c-.07.34.029.533.304.533.194 0 .487-.07.686-.246l-.088.416c-.287.346-.92.598-1.465.598-.703 0-1.002-.422-.808-1.319l.738-3.468c.064-.293.006-.399-.287-.47l-.451-.081.082-.381 2.29-.287zM8 5.5a1 1 0 1 1 0-2 1 1 0 0 1 0 2z" />
+                </svg>
+                <span>Please define blocklists in Settings before assigning them here.</span>
+            </div>
+            {% endif %}
+            <div style="display:flex; gap: 0.5rem; flex-wrap: wrap;">
+                <button type="submit" class="btn btn-secondary btn-sm">Save blocklist assignments</button>
+                <a href="{{ url_for('settings') }}" class="btn btn-ghost btn-sm">Manage catalogs</a>
+            </div>
+        </form>
+
+        {% if blocklist_sync_status.mappings %}
+        <div class="policy-mapping-list"
+            style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--pico-card-border-color); display: grid; gap: 0.5rem;">
+            <h4
+                style="font-size: 0.85rem; font-weight: bold; color: var(--pico-muted-color); text-transform: uppercase; margin-bottom: 0.25rem;">
+                Linux Mappings Sync Details</h4>
+            {% for mapping in blocklist_sync_status.mappings %}
+            <div class="policy-mapping-item"
+                style="border: 1px solid var(--pico-card-border-color); border-radius: 0.75rem; background: var(--pico-background-color); padding: 0.75rem;">
+                <div
+                    style="display:flex; justify-content:space-between; gap: 0.5rem; flex-wrap: wrap; align-items: center;">
+                    <div>
+                        <strong style="font-size: 0.95rem;">{{ mapping.linux_username }}@{{ mapping.device_label
+                            }}</strong>
+                        <div style="font-size: 0.75rem; color: var(--pico-muted-color); font-weight: bold;">
+                            UID: {{ mapping.linux_uid if mapping.linux_uid is not none else 'unknown' }}
+                            {% if mapping.last_synced %}
+                            &bull; Synced: {{ mapping.last_synced }}
+                            {% endif %}
+                        </div>
+                    </div>
+                    <span
+                        class="badge {% if mapping.status == 'synced' %}badge-success{% elif mapping.status == 'awaiting_uid' %}badge-warning{% elif mapping.status == 'not_configured' %}badge-secondary{% else %}badge-warning{% endif %}">
+                        {{ mapping.status|replace('_', ' ')|title }}
+                    </span>
+                </div>
+                {% if mapping.last_error %}
+                <div style="font-size: 0.8rem; color: var(--danger-color); margin-top: 0.5rem; font-weight: bold;">
+                    Error: {{ mapping.last_error }}
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </article>
+
+    <!-- Bulk/Quick Time Controls Panel -->
+    <article class="card schedule-bulk-controls" style="margin-bottom: 1.5rem;">
+        <h3 style="margin-bottom: 1rem; font-size: 1.25rem;">Quick Time & Interval Actions</h3>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1rem;">
+            <!-- Bulk Hours -->
+            <div
+                style="background: var(--pico-background-color); border: 1px solid var(--pico-card-border-color); padding: 1rem; border-radius: 0.75rem;">
+                <label style="font-weight: bold; font-size: 0.85rem; color: var(--pico-muted-color);">BULK SET
+                    HOURS</label>
+                <div style="display: flex; align-items: center; gap: 0.25rem; margin: 0.5rem 0;">
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="adjustBulkTime(-0.25)">-15m</button>
+                    <input type="number" id="bulk-hours" min="0" max="24" step="0.25" placeholder="2.0"
+                        style="width: 70px; text-align: center; font-weight: bold; margin: 0; padding: 0.25rem;">
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="adjustBulkTime(0.25)">+15m</button>
+                </div>
+                <div style="display: flex; gap: 0.25rem; flex-wrap: wrap;">
+                    <button type="button" class="btn btn-secondary btn-sm" style="padding: 0.25rem 0.5rem;"
+                        onclick="setWeekdays()">Weekdays</button>
+                    <button type="button" class="btn btn-secondary btn-sm" style="padding: 0.25rem 0.5rem;"
+                        onclick="setWeekends()">Weekends</button>
+                    <button type="button" class="btn btn-secondary btn-sm" style="padding: 0.25rem 0.5rem;"
+                        onclick="setAllDays()">All Days</button>
+                </div>
+            </div>
+
+            <!-- Bulk Intervals -->
+            <div
+                style="background: var(--pico-background-color); border: 1px solid var(--pico-card-border-color); padding: 1rem; border-radius: 0.75rem;">
+                <label style="font-weight: bold; font-size: 0.85rem; color: var(--pico-muted-color);">BULK SET TIMELINE
+                    INTERVAL</label>
+                <div style="display: flex; align-items: center; gap: 0.5rem; margin: 0.5rem 0;">
+                    <input type="time" id="bulk-start" class="form-control"
+                        style="margin: 0; padding: 0.25rem; font-size: 0.85rem;" step="900" value="09:00">
+                    <span style="font-size: 0.85rem; font-weight: bold;">to</span>
+                    <input type="time" id="bulk-end" class="form-control"
+                        style="margin: 0; padding: 0.25rem; font-size: 0.85rem;" step="900" value="17:00">
+                </div>
+                <div style="display: flex; gap: 0.25rem; flex-wrap: wrap;">
+                    <button type="button" class="btn btn-secondary btn-sm" style="padding: 0.25rem 0.5rem;"
+                        onclick="setWeekdayIntervals()">Weekdays</button>
+                    <button type="button" class="btn btn-secondary btn-sm" style="padding: 0.25rem 0.5rem;"
+                        onclick="setWeekendIntervals()">Weekends</button>
+                    <button type="button" class="btn btn-secondary btn-sm" style="padding: 0.25rem 0.5rem;"
+                        onclick="setAllIntervals()">All Days</button>
+                </div>
+            </div>
+        </div>
+    </article>
+
+    <!-- Main Scheduler Form -->
+    <form id="schedule-form" method="POST" action="{{ url_for('update_weekly_schedule') }}">
+        <input type="hidden" name="user_id" value="{{ user.id }}">
+
+        <div class="days-schedules-container">
+            {% set days = [
+            ('monday', 'Monday', 1),
+            ('tuesday', 'Tuesday', 2),
+            ('wednesday', 'Wednesday', 3),
+            ('thursday', 'Thursday', 4),
+            ('friday', 'Friday', 5),
+            ('saturday', 'Saturday', 6),
+            ('sunday', 'Sunday', 7)
+            ] %}
+
+            {% for day_key, day_name, day_num in days %}
+            <article class="card day-schedule-card {% if day_num >= 6 %}weekend{% endif %}" id="day-card-{{ day_num }}"
+                style="padding: 1.25rem; margin-bottom: 1.25rem;">
+                <div class="day-card-header"
+                    style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--pico-card-border-color); padding-bottom: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">
+                    <h3 class="day-name"
+                        style="margin: 0; font-size: 1.25rem; font-weight: 700; color: {{ 'var(--warning-color)' if day_num >= 6 else 'var(--pico-color)' }};">
+                        {{ day_name }}</h3>
+
+                    <!-- Daily Time Limit input in header -->
+                    <div class="time-section" style="display: flex; align-items: center; gap: 0.5rem;">
+                        <label
+                            style="margin: 0; font-size: 0.85rem; font-weight: bold; color: var(--pico-muted-color);">Time
+                            Limit:</label>
+                        <div class="time-controls" style="display: flex; align-items: center; gap: 0.25rem;">
+                            <button type="button" class="btn btn-secondary btn-sm"
+                                style="padding: 0.2rem 0.5rem; margin: 0;"
+                                onclick="adjustTime('{{ day_key }}', -0.25)">−</button>
+                            <input type="number" id="{{ day_key }}" name="{{ day_key }}" min="0" max="24" step="0.25"
+                                value="{% if user.weekly_schedule %}{{ user.weekly_schedule.get_schedule_dict()[day_key] }}{% else %}0{% endif %}"
+                                class="time-input"
+                                style="width: 68px; text-align: center; padding: 0.25rem; font-size: 0.95rem; font-weight: 700; margin: 0; border-radius: 0.5rem;">
+                            <button type="button" class="btn btn-secondary btn-sm"
+                                style="padding: 0.2rem 0.5rem; margin: 0;"
+                                onclick="adjustTime('{{ day_key }}', 0.25)">+</button>
+                        </div>
+                        <span style="font-size: 0.8rem; color: var(--pico-muted-color); font-weight: bold;">hours</span>
+                    </div>
+                </div>
+
+                <!-- Interactive 24-Hour Visual Touch Grid -->
+                <div class="timeline-outer">
+                    <div class="timeline-header-info">
+                        <span style="color: var(--pico-color); font-weight: bold;">Visual Allowance Timeline</span>
+                        <span style="font-size: 0.75rem; color: var(--pico-muted-color);">Tap active blocks to
+                            block/allow login</span>
+                    </div>
+                    <div id="timeline-container-{{ day_num }}" class="timeline-container">
+                        <!-- Javascript will dynamically inject 24 blocks here -->
+                    </div>
+                    <div class="timeline-ticks">
+                        <span>12am</span>
+                        <span>3am</span>
+                        <span>6am</span>
+                        <span>9am</span>
+                        <span>12pm</span>
+                        <span>3pm</span>
+                        <span>6pm</span>
+                        <span>9pm</span>
+                        <span>12am</span>
+                    </div>
+                </div>
+
+                <!-- Precise Manual Editors below -->
+                <details class="interval-details"
+                    style="margin-top: 1rem; border: none; background: transparent; padding: 0;">
+                    <summary
+                        style="font-size: 0.85rem; font-weight: bold; color: var(--pico-primary); cursor: pointer; margin: 0;">
+                        Show Precise Allowed Clock Ranges (<span
+                            id="interval-summary-{{ day_num }}">Unrestricted</span>)
+                    </summary>
+                    <div class="interval-editor"
+                        style="margin-top: 1rem; background: var(--pico-background-color); border: 1px solid var(--pico-card-border-color); border-radius: 0.75rem; padding: 1rem;">
+                        <div id="interval-list-{{ day_num }}" class="interval-list"
+                            style="display: grid; gap: 0.5rem; margin-bottom: 1rem;"></div>
+                        <div class="interval-actions">
+                            <button type="button" class="btn btn-secondary btn-sm"
+                                onclick="addInterval({{ day_num }})">Add precise range</button>
+                        </div>
+                    </div>
+                </details>
+            </article>
+            {% endfor %}
+        </div>
+
+        <!-- Action buttons container sticky at page bottom -->
+        <div class="actions-section"
+            style="position: sticky; bottom: 0.5rem; background: var(--pico-card-background-color); border: 1px solid var(--pico-card-border-color); border-radius: 2rem; padding: 0.5rem 1.25rem; box-shadow: var(--shadow-hover); display: flex; justify-content: center; gap: 0.75rem; z-index: 50; margin-top: 2rem; width: fit-content; margin-left: auto; margin-right: auto; max-width: 90%;">
+            <button type="button" class="btn btn-primary btn-cta" style="margin: 0; padding: 0 1.5rem; font-size: 0.85rem; font-weight: bold; border-radius: 2rem; display: inline-flex; align-items: center; justify-content: center; gap: 0.35rem; height: 42px; width: auto;" onclick="saveAll()">
+                <svg width="14" height="14" fill="currentColor" viewBox="0 0 16 16" style="flex-shrink: 0;">
+                    <path
+                        d="M15.854 5.146a.5.5 0 0 1 0 .708l-3 3a.5.5 0 0 1-.708 0l-1.5-1.5a.5.5 0 0 1 .708-.708L12.5 7.793l2.646-2.647a.5.5 0 0 1 .708 0z" />
+                </svg>
+                <span>Save all changes</span>
+            </button>
+            <button type="button" class="btn btn-secondary" style="margin: 0; padding: 0 1.5rem; font-size: 0.85rem; font-weight: bold; border-radius: 2rem; display: inline-flex; align-items: center; justify-content: center; gap: 0.35rem; height: 42px; width: auto;" onclick="resetForm()">
+                <svg width="14" height="14" fill="currentColor" viewBox="0 0 16 16" style="flex-shrink: 0;">
+                    <path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2v1z" />
+                    <path
+                        d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z" />
+                </svg>
+                <span>Reset to saved</span>
+            </button>
+        </div>
+    </form>
+</div>
+
+<!-- Notification Toast for feedback -->
+<div id="notification-toast" class="notification-toast">
+    <div class="toast-content">
+        <svg class="toast-icon" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+            <path
+                d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zm-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.061L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z" />
+        </svg>
+        <span class="toast-message">Changes saved successfully!</span>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const DAY_NUMBERS = [1, 2, 3, 4, 5, 6, 7];
+    const WEEKDAY_NUMBERS = [1, 2, 3, 4, 5];
+    const WEEKEND_NUMBERS = [6, 7];
+    const INTERVAL_STEP_MINUTES = 15;
+    const INTERVAL_STEP_SECONDS = INTERVAL_STEP_MINUTES * 60;
+    const MAX_TIME_VALUE = '23:45';
+    const DEFAULT_INTERVAL = Object.freeze({ start_time: '09:00', end_time: '17:00' });
+    const DAY_LABELS = {
+        1: 'Monday',
+        2: 'Tuesday',
+        3: 'Wednesday',
+        4: 'Thursday',
+        5: 'Friday',
+        6: 'Saturday',
+        7: 'Sunday',
+    };
+
+    let intervals = initializeIntervals();
+
+    function showNotification(message, type = 'success') {
+        const toast = document.getElementById('notification-toast');
+        const messageEl = toast.querySelector('.toast-message');
+        const iconEl = toast.querySelector('.toast-icon path');
+
+        messageEl.textContent = message;
+        toast.className = `notification-toast ${type}`;
+
+        if (type === 'success') {
+            iconEl.setAttribute('d', 'M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zm-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.061L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z');
+        } else if (type === 'error') {
+            iconEl.setAttribute('d', 'M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zM5.354 4.646a.5.5 0 1 0-.708.708L7.293 8l-2.647 2.646a.5.5 0 0 0 .708.708L8 8.707l2.646 2.647a.5.5 0 0 0 .708-.708L8.707 8l2.647-2.646a.5.5 0 0 0-.708-.708L8 7.293 5.354 4.646z');
         }
-        
-        .notification-toast.show {
-            transform: translateX(0);
-        }
-        
-        .notification-toast.success {
-            border-left: 4px solid var(--success);
-        }
-        
-        .notification-toast.error {
-            border-left: 4px solid var(--danger);
-        }
-        
-        .toast-content {
-            display: flex;
-            align-items: center;
-            gap: var(--space-3);
-        }
-        
-        .toast-icon {
-            flex-shrink: 0;
-        }
-        
-        .notification-toast.success .toast-icon {
-            color: var(--success);
-        }
-        
-        .notification-toast.error .toast-icon {
-            color: var(--danger);
-        }
-        
-        .toast-message {
-            font-weight: 500;
-            color: var(--text-primary);
-            font-size: var(--font-size-sm);
-        }
-    </style>
-    
-    <script>
-        const DAY_NUMBERS = [1, 2, 3, 4, 5, 6, 7];
-        const WEEKDAY_NUMBERS = [1, 2, 3, 4, 5];
-        const WEEKEND_NUMBERS = [6, 7];
-        const INTERVAL_STEP_MINUTES = 15;
-        const INTERVAL_STEP_SECONDS = INTERVAL_STEP_MINUTES * 60;
-        const MAX_TIME_VALUE = '23:45';
-        const DEFAULT_INTERVAL = Object.freeze({ start_time: '09:00', end_time: '17:00' });
-        const DAY_LABELS = {
-            1: 'Monday',
-            2: 'Tuesday',
-            3: 'Wednesday',
-            4: 'Thursday',
-            5: 'Friday',
-            6: 'Saturday',
-            7: 'Sunday',
+
+        toast.classList.add('show');
+        setTimeout(() => {
+            toast.classList.remove('show');
+        }, 2000);
+    }
+
+    function initializeIntervals() {
+        return DAY_NUMBERS.reduce((map, day) => {
+            map[day] = [];
+            return map;
+        }, {});
+    }
+
+    function cloneInterval(interval) {
+        return {
+            start_time: interval.start_time,
+            end_time: interval.end_time,
         };
+    }
 
-        let intervals = initializeIntervals();
+    function pad(value) {
+        return String(value).padStart(2, '0');
+    }
 
-        function showNotification(message, type = 'success') {
-            const toast = document.getElementById('notification-toast');
-            const messageEl = toast.querySelector('.toast-message');
-            const iconEl = toast.querySelector('.toast-icon path');
+    function partsToTimeValue(hour, minute) {
+        return `${pad(hour)}:${pad(minute)}`;
+    }
 
-            messageEl.textContent = message;
-            toast.className = `notification-toast ${type}`;
-
-            if (type === 'success') {
-                iconEl.setAttribute('d', 'M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zm-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.061L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z');
-            } else if (type === 'error') {
-                iconEl.setAttribute('d', 'M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zM5.354 4.646a.5.5 0 1 0-.708.708L7.293 8l-2.647 2.646a.5.5 0 0 0 .708.708L8 8.707l2.646 2.647a.5.5 0 0 0 .708-.708L8.707 8l2.647-2.646a.5.5 0 0 0-.708-.708L8 7.293 5.354 4.646z');
-            }
-
-            toast.classList.add('show');
-            setTimeout(() => {
-                toast.classList.remove('show');
-            }, 2000);
+    function timeValueToMinutes(value) {
+        if (typeof value !== 'string' || !value.includes(':')) {
+            return NaN;
         }
 
-        function initializeIntervals() {
-            return DAY_NUMBERS.reduce((map, day) => {
-                map[day] = [];
-                return map;
-            }, {});
+        const [hours, minutes] = value.split(':').map(part => Number(part));
+        if (!Number.isInteger(hours) || !Number.isInteger(minutes)) {
+            return NaN;
         }
 
-        function cloneInterval(interval) {
-            return {
-                start_time: interval.start_time,
-                end_time: interval.end_time,
-            };
+        return (hours * 60) + minutes;
+    }
+
+    function timeValueToParts(value) {
+        const totalMinutes = timeValueToMinutes(value);
+        return {
+            start_hour: Math.floor(totalMinutes / 60),
+            start_minute: totalMinutes % 60,
+        };
+    }
+
+    function createDefaultInterval(day) {
+        const dayIntervals = intervals[day] || [];
+        if (!dayIntervals.length) {
+            return cloneInterval(DEFAULT_INTERVAL);
         }
 
-        function pad(value) {
-            return String(value).padStart(2, '0');
+        const lastInterval = dayIntervals[dayIntervals.length - 1];
+        const nextStartMinutes = timeValueToMinutes(lastInterval.end_time);
+        if (!Number.isFinite(nextStartMinutes)) {
+            return cloneInterval(DEFAULT_INTERVAL);
         }
 
-        function partsToTimeValue(hour, minute) {
-            return `${pad(hour)}:${pad(minute)}`;
+        const boundedStart = Math.min(nextStartMinutes, timeValueToMinutes(MAX_TIME_VALUE));
+        const boundedEnd = Math.min(boundedStart + 60, timeValueToMinutes(MAX_TIME_VALUE));
+        if (boundedEnd <= boundedStart) {
+            return cloneInterval(DEFAULT_INTERVAL);
         }
 
-        function timeValueToMinutes(value) {
-            if (typeof value !== 'string' || !value.includes(':')) {
-                return NaN;
-            }
+        return {
+            start_time: partsToTimeValue(Math.floor(boundedStart / 60), boundedStart % 60),
+            end_time: partsToTimeValue(Math.floor(boundedEnd / 60), boundedEnd % 60),
+        };
+    }
 
-            const [hours, minutes] = value.split(':').map(part => Number(part));
-            if (!Number.isInteger(hours) || !Number.isInteger(minutes)) {
-                return NaN;
-            }
-
-            return (hours * 60) + minutes;
+    function getDayIntervals(day) {
+        if (!intervals[day]) {
+            intervals[day] = [];
         }
+        return intervals[day];
+    }
 
-        function timeValueToParts(value) {
-            const totalMinutes = timeValueToMinutes(value);
-            return {
-                start_hour: Math.floor(totalMinutes / 60),
-                start_minute: totalMinutes % 60,
-            };
-        }
+    /* Helper: Merges overlapping or touching intervals to keep list clean */
+    function mergeIntervals(dayIntervals) {
+        if (!dayIntervals.length) return [];
 
-        function createDefaultInterval(day) {
-            const dayIntervals = intervals[day] || [];
-            if (!dayIntervals.length) {
-                return cloneInterval(DEFAULT_INTERVAL);
-            }
+        let ranges = dayIntervals.map(inter => ({
+            start: timeValueToMinutes(inter.start_time),
+            end: timeValueToMinutes(inter.end_time)
+        })).sort((a, b) => a.start - b.start);
 
-            const lastInterval = dayIntervals[dayIntervals.length - 1];
-            const nextStartMinutes = timeValueToMinutes(lastInterval.end_time);
-            if (!Number.isFinite(nextStartMinutes)) {
-                return cloneInterval(DEFAULT_INTERVAL);
-            }
+        let merged = [ranges[0]];
+        for (let i = 1; i < ranges.length; i++) {
+            let last = merged[merged.length - 1];
+            let curr = ranges[i];
 
-            const boundedStart = Math.min(nextStartMinutes, timeValueToMinutes(MAX_TIME_VALUE));
-            const boundedEnd = Math.min(boundedStart + 60, timeValueToMinutes(MAX_TIME_VALUE));
-            if (boundedEnd <= boundedStart) {
-                return cloneInterval(DEFAULT_INTERVAL);
-            }
-
-            return {
-                start_time: partsToTimeValue(Math.floor(boundedStart / 60), boundedStart % 60),
-                end_time: partsToTimeValue(Math.floor(boundedEnd / 60), boundedEnd % 60),
-            };
-        }
-
-        function getDayIntervals(day) {
-            if (!intervals[day]) {
-                intervals[day] = [];
-            }
-            return intervals[day];
-        }
-
-        function renderAllIntervals() {
-            DAY_NUMBERS.forEach(day => renderIntervalsForDay(day));
-        }
-
-        function renderIntervalsForDay(day) {
-            const listEl = document.getElementById(`interval-list-${day}`);
-            const summaryEl = document.getElementById(`interval-summary-${day}`);
-            const dayIntervals = getDayIntervals(day);
-
-            listEl.innerHTML = '';
-
-            if (!dayIntervals.length) {
-                const emptyState = document.createElement('div');
-                emptyState.className = 'interval-empty';
-                emptyState.textContent = 'No restrictions configured. This day stays unrestricted until you add an interval.';
-                listEl.appendChild(emptyState);
+            if (curr.start <= last.end) {
+                last.end = Math.max(last.end, curr.end);
             } else {
-                dayIntervals.forEach((interval, index) => {
-                    const row = document.createElement('div');
-                    row.className = 'interval-row';
+                merged.push(curr);
+            }
+        }
 
-                    const controls = document.createElement('div');
-                    controls.className = 'interval-row-controls';
-                    controls.innerHTML = `
-                        <span class="interval-row-index">#${index + 1}</span>
-                        <input type="time" class="interval-time-input" step="${INTERVAL_STEP_SECONDS}" value="${interval.start_time}">
-                        <span>to</span>
-                        <input type="time" class="interval-time-input" step="${INTERVAL_STEP_SECONDS}" value="${interval.end_time}">
-                    `;
+        return merged.map(r => ({
+            start_time: partsToTimeValue(Math.floor(r.start / 60), r.start % 60),
+            end_time: partsToTimeValue(Math.floor(r.end / 60), r.end % 60)
+        }));
+    }
 
-                    const [startInput, endInput] = controls.querySelectorAll('input');
-                    startInput.addEventListener('input', event => {
-                        dayIntervals[index].start_time = event.target.value;
-                    });
-                    endInput.addEventListener('input', event => {
-                        dayIntervals[index].end_time = event.target.value;
-                    });
+    /* Helper: Checks if specific hour has any allowed interval overlap */
+    function isHourAllowed(day, hour) {
+        const dayIntervals = getDayIntervals(day);
+        const slotMidpoint = (hour + 0.5) * 60; // test midpoint in minutes
 
-                    const removeButton = document.createElement('button');
-                    removeButton.type = 'button';
-                    removeButton.className = 'btn btn-sm btn-danger';
-                    removeButton.textContent = 'Remove';
-                    removeButton.addEventListener('click', () => removeInterval(day, index));
+        for (const interval of dayIntervals) {
+            const start = timeValueToMinutes(interval.start_time);
+            const end = timeValueToMinutes(interval.end_time);
+            if (slotMidpoint >= start && slotMidpoint <= end) {
+                return true;
+            }
+        }
+        return false;
+    }
 
-                    row.appendChild(controls);
-                    row.appendChild(removeButton);
-                    listEl.appendChild(row);
+    /* Toggle allowance for visual block grid slot */
+    function toggleVisualHour(day, hour) {
+        const allowed = isHourAllowed(day, hour);
+        const dayIntervals = getDayIntervals(day);
+        const targetStart = hour * 60;
+        const targetEnd = (hour + 1) * 60;
+
+        if (allowed) {
+            // Subtract hour from allowed intervals
+            let nextIntervals = [];
+            for (const interval of dayIntervals) {
+                const start = timeValueToMinutes(interval.start_time);
+                const end = timeValueToMinutes(interval.end_time);
+
+                if (start >= targetEnd || end <= targetStart) {
+                    nextIntervals.push(interval);
+                } else {
+                    if (start < targetStart) {
+                        nextIntervals.push({
+                            start_time: partsToTimeValue(Math.floor(start / 60), start % 60),
+                            end_time: partsToTimeValue(Math.floor(targetStart / 60), targetStart % 60)
+                        });
+                    }
+                    if (end > targetEnd) {
+                        nextIntervals.push({
+                            start_time: partsToTimeValue(Math.floor(targetEnd / 60), targetEnd % 60),
+                            end_time: partsToTimeValue(Math.floor(end / 60), end % 60)
+                        });
+                    }
+                }
+            }
+            intervals[day] = nextIntervals;
+        } else {
+            // Add allowed hour and merge adjacent
+            dayIntervals.push({
+                start_time: partsToTimeValue(hour, 0),
+                end_time: partsToTimeValue(hour + 1, 0)
+            });
+            intervals[day] = mergeIntervals(dayIntervals);
+        }
+
+        renderIntervalsForDay(day);
+    }
+
+    /* Render the visual 24-hour block timeline */
+    function renderVisualTimeline(day) {
+        const container = document.getElementById(`timeline-container-${day}`);
+        if (!container) return;
+
+        container.innerHTML = '';
+
+        for (let hour = 0; hour < 24; hour++) {
+            const allowed = isHourAllowed(day, hour);
+            const slot = document.createElement('div');
+
+            // Format hour label elegantly (e.g. "09" or "18")
+            const displayHour = pad(hour);
+
+            slot.className = `timeline-slot ${allowed ? 'allowed' : 'blocked'}`;
+            slot.title = `${displayHour}:00 - ${displayHour}:59: ${allowed ? 'Allowed login window' : 'Blocked'}`;
+            slot.innerHTML = `
+                <span class="slot-label">${displayHour}</span>
+                <span class="slot-indicator"></span>
+            `;
+
+            slot.addEventListener('click', () => {
+                toggleVisualHour(day, hour);
+            });
+
+            container.appendChild(slot);
+        }
+    }
+
+    function renderAllIntervals() {
+        DAY_NUMBERS.forEach(day => renderIntervalsForDay(day));
+    }
+
+    function renderIntervalsForDay(day) {
+        // First render the precise form rows
+        const listEl = document.getElementById(`interval-list-${day}`);
+        const summaryEl = document.getElementById(`interval-summary-${day}`);
+        const dayIntervals = getDayIntervals(day);
+
+        listEl.innerHTML = '';
+
+        if (!dayIntervals.length) {
+            const emptyState = document.createElement('div');
+            emptyState.className = 'interval-empty';
+            emptyState.style.padding = '0.5rem';
+            emptyState.style.border = '1px dashed var(--pico-card-border-color)';
+            emptyState.style.borderRadius = '0.5rem';
+            emptyState.style.fontSize = '0.8rem';
+            emptyState.style.color = 'var(--pico-muted-color)';
+            emptyState.textContent = 'No restrictions configured. Online logins allowed 24/7.';
+            listEl.appendChild(emptyState);
+        } else {
+            dayIntervals.forEach((interval, index) => {
+                const row = document.createElement('div');
+                row.className = 'interval-row';
+                row.style.display = 'flex';
+                row.style.alignItems = 'center';
+                row.style.gap = '0.5rem';
+                row.style.padding = '0.4rem 0.75rem';
+                row.style.border = '1px solid var(--pico-card-border-color)';
+                row.style.borderRadius = '0.5rem';
+                row.style.background = 'var(--pico-card-background-color)';
+                row.style.marginBottom = '0.25rem';
+                row.style.flexWrap = 'wrap';
+
+                const controls = document.createElement('div');
+                controls.className = 'interval-row-controls';
+                controls.style.display = 'flex';
+                controls.style.alignItems = 'center';
+                controls.style.gap = '0.5rem';
+                controls.style.flex = '1';
+                controls.innerHTML = `
+                    <span class="interval-row-index" style="font-size:0.75rem; font-weight:bold; color:var(--pico-muted-color);">#${index + 1}</span>
+                    <input type="time" class="interval-time-input form-control" style="margin:0; padding:0.25rem; font-size:0.85rem;" step="${INTERVAL_STEP_SECONDS}" value="${interval.start_time}">
+                    <span style="font-size:0.8rem; font-weight:bold;">to</span>
+                    <input type="time" class="interval-time-input form-control" style="margin:0; padding:0.25rem; font-size:0.85rem;" step="${INTERVAL_STEP_SECONDS}" value="${interval.end_time}">
+                `;
+
+                const [startInput, endInput] = controls.querySelectorAll('input');
+                startInput.addEventListener('input', event => {
+                    dayIntervals[index].start_time = event.target.value;
+                    renderVisualTimeline(day); // sync visual
                 });
+                endInput.addEventListener('input', event => {
+                    dayIntervals[index].end_time = event.target.value;
+                    renderVisualTimeline(day); // sync visual
+                });
+
+                const removeButton = document.createElement('button');
+                removeButton.type = 'button';
+                removeButton.className = 'btn btn-sm btn-danger';
+                removeButton.style.padding = '0.2rem 0.5rem';
+                removeButton.style.margin = '0';
+                removeButton.textContent = 'Remove';
+                removeButton.addEventListener('click', () => removeInterval(day, index));
+
+                row.appendChild(controls);
+                row.appendChild(removeButton);
+                listEl.appendChild(row);
+            });
+        }
+
+        summaryEl.textContent = dayIntervals.length
+            ? `${dayIntervals.length} interval${dayIntervals.length === 1 ? '' : 's'} active`
+            : 'Unrestricted (24/7 allowed)';
+
+        // Second render the visual 24-hour blocks
+        renderVisualTimeline(day);
+    }
+
+    function addInterval(day) {
+        getDayIntervals(day).push(createDefaultInterval(day));
+        renderIntervalsForDay(day);
+    }
+
+    function removeInterval(day, index) {
+        getDayIntervals(day).splice(index, 1);
+        renderIntervalsForDay(day);
+    }
+
+    function validateDayIntervals(day, dayIntervals) {
+        let previousEnd = null;
+
+        for (const interval of dayIntervals) {
+            const startMinutes = timeValueToMinutes(interval.start_time);
+            const endMinutes = timeValueToMinutes(interval.end_time);
+
+            if (!Number.isFinite(startMinutes) || !Number.isFinite(endMinutes)) {
+                return `Invalid time value for ${DAY_LABELS[day]}.`;
             }
 
-            summaryEl.textContent = dayIntervals.length
-                ? `${dayIntervals.length} interval${dayIntervals.length === 1 ? '' : 's'} configured`
-                : 'No restrictions configured';
+            if ((startMinutes % INTERVAL_STEP_MINUTES) !== 0 || (endMinutes % INTERVAL_STEP_MINUTES) !== 0) {
+                return `${DAY_LABELS[day]} intervals must use ${INTERVAL_STEP_MINUTES}-minute increments.`;
+            }
+
+            if (startMinutes >= endMinutes) {
+                return `${DAY_LABELS[day]} has an interval where the start time is not before the end time.`;
+            }
+
+            if (previousEnd !== null && startMinutes < previousEnd) {
+                return `${DAY_LABELS[day]} intervals cannot overlap.`;
+            }
+
+            previousEnd = endMinutes;
         }
 
-        function addInterval(day) {
-            getDayIntervals(day).push(createDefaultInterval(day));
-            renderIntervalsForDay(day);
-        }
+        return null;
+    }
 
-        function removeInterval(day, index) {
-            getDayIntervals(day).splice(index, 1);
-            renderIntervalsForDay(day);
-        }
+    function buildIntervalsPayload() {
+        const intervalData = {};
 
-        function validateDayIntervals(day, dayIntervals) {
-            let previousEnd = null;
+        for (const day of DAY_NUMBERS) {
+            const dayIntervals = getDayIntervals(day).map(cloneInterval);
+            const validationError = validateDayIntervals(day, dayIntervals);
+            if (validationError) {
+                throw new Error(validationError);
+            }
 
-            for (const interval of dayIntervals) {
+            intervalData[day] = dayIntervals.map((interval, index) => {
                 const startMinutes = timeValueToMinutes(interval.start_time);
                 const endMinutes = timeValueToMinutes(interval.end_time);
 
-                if (!Number.isFinite(startMinutes) || !Number.isFinite(endMinutes)) {
-                    return `Invalid time value for ${DAY_LABELS[day]}.`;
-                }
-
-                if ((startMinutes % INTERVAL_STEP_MINUTES) !== 0 || (endMinutes % INTERVAL_STEP_MINUTES) !== 0) {
-                    return `${DAY_LABELS[day]} intervals must use ${INTERVAL_STEP_MINUTES}-minute increments.`;
-                }
-
-                if (startMinutes >= endMinutes) {
-                    return `${DAY_LABELS[day]} has an interval where the start time is not before the end time.`;
-                }
-
-                if (previousEnd !== null && startMinutes < previousEnd) {
-                    return `${DAY_LABELS[day]} intervals cannot overlap.`;
-                }
-
-                previousEnd = endMinutes;
-            }
-
-            return null;
-        }
-
-        function buildIntervalsPayload() {
-            const intervalData = {};
-
-            for (const day of DAY_NUMBERS) {
-                const dayIntervals = getDayIntervals(day).map(cloneInterval);
-                const validationError = validateDayIntervals(day, dayIntervals);
-                if (validationError) {
-                    throw new Error(validationError);
-                }
-
-                intervalData[day] = dayIntervals.map((interval, index) => {
-                    const startMinutes = timeValueToMinutes(interval.start_time);
-                    const endMinutes = timeValueToMinutes(interval.end_time);
-
-                    return {
-                        sort_order: index,
-                        start_hour: Math.floor(startMinutes / 60),
-                        start_minute: startMinutes % 60,
-                        end_hour: Math.floor(endMinutes / 60),
-                        end_minute: endMinutes % 60,
-                        is_enabled: true,
-                    };
-                });
-            }
-
-            return intervalData;
-        }
-
-        function normalizeServerIntervals(serverIntervals) {
-            const normalized = initializeIntervals();
-
-            for (const day of DAY_NUMBERS) {
-                const rawIntervals = serverIntervals?.[day] ?? serverIntervals?.[String(day)] ?? [];
-                const intervalList = Array.isArray(rawIntervals)
-                    ? rawIntervals
-                    : (rawIntervals ? [rawIntervals] : []);
-
-                normalized[day] = intervalList.map(interval => ({
-                    start_time: partsToTimeValue(interval.start_hour, interval.start_minute),
-                    end_time: partsToTimeValue(interval.end_hour, interval.end_minute),
-                }));
-            }
-
-            return normalized;
-        }
-
-        function applyBulkIntervals(dayNumbers) {
-            const startValue = document.getElementById('bulk-start').value;
-            const endValue = document.getElementById('bulk-end').value;
-            const bulkIntervals = [{ start_time: startValue, end_time: endValue }];
-
-            const validationError = validateDayIntervals(dayNumbers[0], bulkIntervals);
-            if (validationError) {
-                showNotification(validationError, 'error');
-                return;
-            }
-
-            dayNumbers.forEach(day => {
-                intervals[day] = bulkIntervals.map(cloneInterval);
-                renderIntervalsForDay(day);
+                return {
+                    sort_order: index,
+                    start_hour: Math.floor(startMinutes / 60),
+                    start_minute: startMinutes % 60,
+                    end_hour: Math.floor(endMinutes / 60),
+                    end_minute: endMinutes % 60,
+                    is_enabled: true,
+                };
             });
         }
 
-        function adjustTime(dayId, change) {
-            const input = document.getElementById(dayId);
-            const currentValue = parseFloat(input.value) || 0;
-            const nextValue = Math.max(0, Math.min(24, currentValue + change));
-            input.value = (Math.round(nextValue * 100) / 100).toString();
+        return intervalData;
+    }
+
+    function normalizeServerIntervals(serverIntervals) {
+        const normalized = initializeIntervals();
+
+        for (const day of DAY_NUMBERS) {
+            const rawIntervals = serverIntervals?.[day] ?? serverIntervals?.[String(day)] ?? [];
+            const intervalList = Array.isArray(rawIntervals)
+                ? rawIntervals
+                : (rawIntervals ? [rawIntervals] : []);
+
+            normalized[day] = intervalList.map(interval => ({
+                start_time: partsToTimeValue(interval.start_hour, interval.start_minute),
+                end_time: partsToTimeValue(interval.end_hour, interval.end_minute),
+            }));
         }
 
-        function adjustBulkTime(change) {
-            const input = document.getElementById('bulk-hours');
-            const currentValue = parseFloat(input.value) || 0;
-            const nextValue = Math.max(0, Math.min(24, currentValue + change));
-            input.value = (Math.round(nextValue * 100) / 100).toString();
+        return normalized;
+    }
+
+    function applyBulkIntervals(dayNumbers) {
+        const startValue = document.getElementById('bulk-start').value;
+        const endValue = document.getElementById('bulk-end').value;
+        const bulkIntervals = [{ start_time: startValue, end_time: endValue }];
+
+        const validationError = validateDayIntervals(dayNumbers[0], bulkIntervals);
+        if (validationError) {
+            showNotification(validationError, 'error');
+            return;
         }
 
-        function setWeekdays() {
-            const hours = document.getElementById('bulk-hours').value;
-            if (!hours) return;
-            ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'].forEach(day => {
-                document.getElementById(day).value = hours;
-            });
-        }
+        dayNumbers.forEach(day => {
+            intervals[day] = bulkIntervals.map(cloneInterval);
+            renderIntervalsForDay(day);
+        });
+    }
 
-        function setWeekends() {
-            const hours = document.getElementById('bulk-hours').value;
-            if (!hours) return;
-            ['saturday', 'sunday'].forEach(day => {
-                document.getElementById(day).value = hours;
-            });
-        }
+    function adjustTime(dayId, change) {
+        const input = document.getElementById(dayId);
+        const currentValue = parseFloat(input.value) || 0;
+        const nextValue = Math.max(0, Math.min(24, currentValue + change));
+        input.value = (Math.round(nextValue * 100) / 100).toString();
+    }
 
-        function setAllDays() {
-            const hours = document.getElementById('bulk-hours').value;
-            if (!hours) return;
-            ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].forEach(day => {
-                document.getElementById(day).value = hours;
-            });
-        }
+    function adjustBulkTime(change) {
+        const input = document.getElementById('bulk-hours');
+        const currentValue = parseFloat(input.value) || 0;
+        const nextValue = Math.max(0, Math.min(24, currentValue + change));
+        input.value = (Math.round(nextValue * 100) / 100).toString();
+    }
 
-        function setWeekdayIntervals() {
-            applyBulkIntervals(WEEKDAY_NUMBERS);
-        }
+    function setWeekdays() {
+        const hours = document.getElementById('bulk-hours').value;
+        if (!hours) return;
+        ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'].forEach(day => {
+            document.getElementById(day).value = hours;
+        });
+    }
 
-        function setWeekendIntervals() {
-            applyBulkIntervals(WEEKEND_NUMBERS);
-        }
+    function setWeekends() {
+        const hours = document.getElementById('bulk-hours').value;
+        if (!hours) return;
+        ['saturday', 'sunday'].forEach(day => {
+            document.getElementById(day).value = hours;
+        });
+    }
 
-        function setAllIntervals() {
-            applyBulkIntervals(DAY_NUMBERS);
-        }
+    function setAllDays() {
+        const hours = document.getElementById('bulk-hours').value;
+        if (!hours) return;
+        ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].forEach(day => {
+            document.getElementById(day).value = hours;
+        });
+    }
 
-        function loadIntervals() {
-            return fetch(`/api/user/{{ user.id }}/intervals`)
-                .then(response => response.json())
-                .then(data => {
-                    if (!data.success) {
-                        throw new Error(data.message || 'Failed to load time intervals');
-                    }
+    function setWeekdayIntervals() {
+        applyBulkIntervals(WEEKDAY_NUMBERS);
+    }
 
-                    intervals = normalizeServerIntervals(data.intervals);
-                    renderAllIntervals();
-                })
-                .catch(error => {
-                    showNotification(`Error loading intervals: ${error.message}`, 'error');
-                    throw error;
-                });
-        }
+    function setWeekendIntervals() {
+        applyBulkIntervals(WEEKEND_NUMBERS);
+    }
 
-        function saveAll() {
-            const form = document.getElementById('schedule-form');
-            const formData = new FormData(form);
+    function setAllIntervals() {
+        applyBulkIntervals(DAY_NUMBERS);
+    }
 
-            fetch(form.action, {
-                method: 'POST',
-                body: formData
+    function loadIntervals() {
+        return fetch(`/api/user/{{ user.id }}/intervals`)
+            .then(response => response.json())
+            .then(data => {
+                if (!data.success) {
+                    throw new Error(data.message || 'Failed to load time intervals');
+                }
+
+                intervals = normalizeServerIntervals(data.intervals);
+                renderAllIntervals();
             })
+            .catch(error => {
+                showNotification(`Error loading intervals: ${error.message}`, 'error');
+                throw error;
+            });
+    }
+
+    function saveAll() {
+        const form = document.getElementById('schedule-form');
+        const formData = new FormData(form);
+
+        fetch(form.action, {
+            method: 'POST',
+            body: formData
+        })
             .then(response => {
                 if (!response.ok) {
                     throw new Error('Failed to save schedule');
@@ -1036,7 +867,7 @@
                 return saveIntervals(false);
             })
             .then(() => {
-                showNotification('All changes saved successfully!');
+                showNotification('All schedule changes saved successfully!');
                 setTimeout(() => {
                     updateSyncStatus();
                 }, 1000);
@@ -1044,26 +875,26 @@
             .catch(error => {
                 showNotification(`Error saving changes: ${error.message}`, 'error');
             });
-        }
+    }
 
-        function saveIntervals(showAlert = true) {
-            return new Promise((resolve, reject) => {
-                let intervalData;
-                try {
-                    intervalData = buildIntervalsPayload();
-                } catch (error) {
-                    if (showAlert) {
-                        showNotification(error.message, 'error');
-                    }
-                    reject(error);
-                    return;
+    function saveIntervals(showAlert = true) {
+        return new Promise((resolve, reject) => {
+            let intervalData;
+            try {
+                intervalData = buildIntervalsPayload();
+            } catch (error) {
+                if (showAlert) {
+                    showNotification(error.message, 'error');
                 }
+                reject(error);
+                return;
+            }
 
-                fetch(`/api/user/{{ user.id }}/intervals/update`, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ intervals: intervalData })
-                })
+            fetch(`/api/user/{{ user.id }}/intervals/update`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ intervals: intervalData })
+            })
                 .then(async response => {
                     const data = await response.json();
                     if (!response.ok || !data.success) {
@@ -1082,25 +913,25 @@
                     }
                     reject(error);
                 });
-            });
+        });
+    }
+
+    function resetForm() {
+        if (confirm('Reset to last saved values?')) {
+            location.reload();
         }
+    }
 
-        function resetForm() {
-            if (confirm('Reset to last saved values?')) {
-                location.reload();
-            }
-        }
+    function updateSyncStatus() {
+        const statusBadges = document.querySelectorAll('.sync-status-badge');
+        const statusIcons = document.querySelectorAll('.sync-status-icon');
+        const statusTexts = document.querySelectorAll('.sync-status-text');
 
-        function updateSyncStatus() {
-            const statusBadge = document.getElementById('sync-status-badge');
-            const statusIcon = document.getElementById('sync-status-icon');
-            const statusText = document.getElementById('sync-status-text');
-
-            Promise.all([
-                fetch('/api/schedule-sync-status/{{ user.id }}').then(response => response.json()),
-                fetch('/api/user/{{ user.id }}/intervals/sync-status').then(response => response.json()),
-                fetch('/api/user/{{ user.id }}/blocklists/sync-status').then(response => response.json()),
-            ])
+        Promise.all([
+            fetch('/api/schedule-sync-status/{{ user.id }}').then(response => response.json()),
+            fetch('/api/user/{{ user.id }}/intervals/sync-status').then(response => response.json()),
+            fetch('/api/user/{{ user.id }}/blocklists/sync-status').then(response => response.json()),
+        ])
             .then(([scheduleData, intervalData, blocklistData]) => {
                 const hasSchedule = Boolean(scheduleData?.schedule);
                 const hasIntervals = (intervalData?.total_intervals || 0) > 0;
@@ -1113,17 +944,17 @@
                 );
 
                 if (!hasConfig) {
-                    statusBadge.style.display = 'none';
+                    statusBadges.forEach(badge => badge.style.display = 'none');
                 } else {
-                    statusBadge.style.display = 'block';
+                    statusBadges.forEach(badge => badge.style.display = 'inline-flex');
                     if (needsSync) {
-                        statusBadge.className = 'badge badge-warning';
-                        statusIcon.setAttribute('d', 'M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767L8.982 1.566zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5zm.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2z');
-                        statusText.textContent = 'Changes Pending Sync';
+                        statusBadges.forEach(badge => badge.className = 'badge badge-warning sync-status-badge');
+                        statusIcons.forEach(icon => icon.setAttribute('d', 'M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767L8.982 1.566zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5zm.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2z'));
+                        statusTexts.forEach(text => text.textContent = 'Pending Sync');
                     } else {
-                        statusBadge.className = 'badge badge-success';
-                        statusIcon.setAttribute('d', 'M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zm-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.061L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z');
-                        statusText.textContent = 'Synchronized';
+                        statusBadges.forEach(badge => badge.className = 'badge badge-success sync-status-badge');
+                        statusIcons.forEach(icon => icon.setAttribute('d', 'M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zm-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.061L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z'));
+                        statusTexts.forEach(text => text.textContent = 'Synchronized');
                     }
                 }
 
@@ -1154,14 +985,13 @@
             .catch(error => {
                 console.error('Error fetching sync status:', error);
             });
-        }
+    }
 
-        document.addEventListener('DOMContentLoaded', function() {
-            renderAllIntervals();
-            loadIntervals().catch(() => {});
-            updateSyncStatus();
-            setInterval(updateSyncStatus, 5000);
-        });
-    </script>
-</body>
-</html>
+    document.addEventListener('DOMContentLoaded', function () {
+        renderAllIntervals();
+        loadIntervals().catch(() => { });
+        updateSyncStatus();
+        setInterval(updateSyncStatus, 15000);
+    });
+</script>
+{% endblock %}

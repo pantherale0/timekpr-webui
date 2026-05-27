@@ -2,6 +2,9 @@
 *.pem
 *.key
 
+# LLM Agents
+.agent/
+
 # Python
 venv/
 __pycache__/

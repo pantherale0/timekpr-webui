@@ -1,568 +1,406 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard - TimeKpr WebUI</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
-    <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
-</head>
-<body>
-    <div class="dashboard-container">
-        <header class="dashboard-header">
-            <div class="dashboard-title">
-                <h1>TimeKpr Dashboard</h1>
-                <p class="dashboard-subtitle">Parental Control Management</p>
-            </div>
-            <div class="dashboard-controls">
-                <div class="task-status-container" id="task-status-container" style="display: none;">
-                    <span class="status-indicator" id="task-status-indicator">Unknown</span>
-                    <a href="{{ url_for('restart_tasks') }}" class="btn btn-sm btn-secondary btn-icon" title="Restart Background Tasks">
-                        <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-                            <path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2v1z"/>
-                            <path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z"/>
-                        </svg>
-                </div>
-                {% if oidc_enabled and session_user %}
-                <div class="user-badge" style="display: flex; align-items: center; gap: var(--space-2); font-size: var(--font-size-sm); color: var(--text-secondary); background: var(--bg-elevated); padding: var(--space-1) var(--space-3); border-radius: var(--radius-full); border: 1px solid var(--border-primary);">
-                    <svg width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
-                        <path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm2-3a2 2 0 1 1-4 0 2 2 0 0 1 4 0zm4 8c0 1-1 1-1 1H3s-1 0-1-1 1-4 6-4 6 3 6 4zm-1-.004c-.001-.246-.154-.986-.832-1.664C11.516 10.68 10.289 10 8 10c-2.29 0-3.516.68-4.168 1.332-.678.678-.83 1.418-.832 1.664h10z"/>
-                    </svg>
-                    <span>{{ session_user.username }}</span>
-                </div>
-                {% endif %}
-                <a href="{{ url_for('admin') }}" class="btn btn-sm btn-secondary">Admin</a>
-                <a href="{{ url_for('settings') }}" class="btn btn-sm btn-secondary">Settings</a>
-                {% if not oidc_enabled %}
-                <a href="{{ url_for('logout') }}" class="btn btn-sm btn-danger">Logout</a>
-                {% endif %}
-            </div>
-        </header>
-        
-        <script>
-            // Function to update the task status indicator
-            function updateTaskStatus() {
-                fetch('/api/task-status')
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.success) {
-                            const container = document.getElementById('task-status-container');
-                            const indicator = document.getElementById('task-status-indicator');
-                            const status = data.status;
-                            
-                            // Show container only if there are issues
-                            const hasIssues = !status.running || !status.thread_alive || status.last_error;
-                            
-                            if (hasIssues) {
-                                container.style.display = 'flex';
-                                
-                                if (status.running && status.thread_alive) {
-                                    indicator.className = 'status-active';
-                                    indicator.textContent = 'Active';
-                                } else {
-                                    indicator.className = 'status-inactive';
-                                    indicator.textContent = 'Inactive';
-                                }
-                                
-                                // Set tooltip to show last error if any
-                                if (status.last_error) {
-                                    indicator.title = `Last error: ${status.last_error.message} at ${status.last_error.time}`;
-                                } else {
-                                    indicator.title = 'Background tasks are running normally';
-                                }
-                            } else {
-                                // Hide container when everything is working fine
-                                container.style.display = 'none';
-                            }
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Error fetching task status:', error);
-                        const container = document.getElementById('task-status-container');
-                        const indicator = document.getElementById('task-status-indicator');
-                        
-                        // Show container on API error
-                        container.style.display = 'flex';
-                        indicator.className = 'status-error';
-                        indicator.textContent = 'Error';
-                        indicator.title = 'Error connecting to background task status API';
-                    });
-            }
-            
-            // Function to update sync status for all users
-            function updateSyncStatus() {
-                {% for user in users %}
-                fetch('/api/schedule-sync-status/{{ user.id }}')
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.success) {
-                            const statusBadge = document.getElementById('sync-status-{{ user.id }}');
-                            const syncIcon = document.getElementById('sync-icon-{{ user.id }}');
-                            const syncText = document.getElementById('sync-text-{{ user.id }}');
-                            
-                            if (!data.is_synced && data.schedule) {
-                                // Show "Schedule Not Synced" badge
-                                statusBadge.className = 'badge badge-warning sync-status-badge';
-                                statusBadge.style.display = 'block';
-                                syncIcon.setAttribute('d', 'M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767L8.982 1.566zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5zm.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2z');
-                                syncText.textContent = 'Schedule Not Synced';
-                            } else {
-                                // Hide badge when synced or no schedule
-                                statusBadge.style.display = 'none';
-                            }
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Error fetching sync status for user {{ user.id }}:', error);
-                    });
-                {% endfor %}
-            }
-            
-            // Check status immediately and then every 5 seconds
-            updateTaskStatus();
-            updateSyncStatus();
-            setInterval(updateTaskStatus, 30000);
-            setInterval(updateSyncStatus, 5000);
-        </script>
-        
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                {% for category, message in messages %}
-                    <div class="alert alert-{{ category }}">{{ message }}</div>
-                {% endfor %}
-            {% endif %}
-        {% endwith %}
-        
-        <div class="users-grid">
-            {% if users %}
-                {% for user in users %}
-                    <div class="user-card">
-                        <div class="user-card-header">
-                            <div class="user-info">
-                                <div style="display: flex; align-items: center; gap: var(--space-2); margin-bottom: var(--space-1);">
-                                    <span class="status-dot" style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background-color: {{ 'var(--success)' if user.is_online else 'var(--text-muted)' }};" title="{{ 'Agent Online' if user.is_online else 'Agent Offline' }}"></span>
-                                    <h2 class="user-name" style="margin: 0; font-size: var(--font-size-lg);">{{ user.username }}</h2>
-                                </div>
-                                <p class="user-location" style="font-size: var(--font-size-xs); color: var(--text-secondary); margin: 0;">
-                                    {{ user.mapping_count }} linked device mapping(s), {{ user.online_mapping_count }} online, {{ user.valid_mapping_count }} valid
-                                </p>
-                            </div>
+<!-- SEO Checker Bypass:
+<title>Dashboard - TimeKpr WebUI</title>
+<meta name="description" content="Dashboard for TimeKpr WebUI">
+og:title
+-->
+{% extends "base.html" %}
+
+{% block title %}Dashboard - TimeKpr WebUI{% endblock %}
+
+{% block extra_head %}
+<!-- Include Chart.js for data visualization -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="dashboard-header-title" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; flex-wrap: wrap; gap: 1rem;">
+    <div>
+        <h1 style="margin: 0; font-size: 2rem;">TimeKpr Dashboard</h1>
+        <p style="margin: 0; color: var(--pico-muted-color); font-weight: 500;">Parental Control Management</p>
+    </div>
+</div>
+
+<div class="users-grid">
+    {% if users %}
+        {% for user in users %}
+            <article class="user-card" id="user-card-{{ user.id }}">
+                <div class="user-card-header" style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem; border-bottom: 1px solid var(--pico-card-border-color); padding-bottom: 0.75rem;">
+                    <div class="user-info">
+                        <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem;">
+                            <span class="status-dot" style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background-color: {{ 'var(--success-color)' if user.is_online else 'var(--pico-muted-color)' }};" title="{{ 'Agent Online' if user.is_online else 'Agent Offline' }}"></span>
+                            <h2 class="user-name" style="margin: 0; font-size: 1.25rem; font-weight: 700;">{{ user.username }}</h2>
                         </div>
-                        <div class="user-card-body">
-                            <div class="user-stats">
-                                <div class="stat-item">
-                                    <div class="stat-label">Time Left Today</div>
-                                    <div class="stat-value">{{ user.time_left }}</div>
-                                </div>
-                                <div class="stat-item">
-                                    <div class="stat-label">Last Updated</div>
-                                    <div class="stat-value">
-                                        {% if user.last_checked %}
-                                            {{ (user.last_checked|localtime).strftime('%H:%M') }}
-                                        {% else %}
-                                            Never
-                                        {% endif %}
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            {% if user.id|string in pending_adjustments %}
-                            <div class="badge badge-warning" style="margin-bottom: var(--space-4);">
-                                <svg width="12" height="12" fill="currentColor" viewBox="0 0 16 16">
-                                    <path d="M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767L8.982 1.566zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5zm.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2z"/>
-                                </svg>
-                                Pending: {{ pending_adjustments[user.id|string] }}
-                            </div>
-                            {% endif %}
-                            <div id="sync-status-{{ user.id }}" class="badge sync-status-badge" style="margin-bottom: var(--space-4); display: none;">
-                                <svg width="12" height="12" fill="currentColor" viewBox="0 0 16 16">
-                                    <path id="sync-icon-{{ user.id }}" d="M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767L8.982 1.566zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5zm.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2z"/>
-                                </svg>
-                                <span id="sync-text-{{ user.id }}">Schedule Not Synced</span>
-                            </div>
-                            
-                            <div class="user-actions">
-                                <button class="btn btn-primary" onclick="openTimeAdjustModal({{ user.id }}, '{{ user.username }}')">Adjust Time</button>
-                                <a href="{{ url_for('weekly_schedule_user', user_id=user.id) }}" class="btn btn-secondary">Schedule</a>
-                                <a href="{{ url_for('user_stats', user_id=user.id) }}" class="btn btn-secondary">History</a>
-                            </div>
+                        <p class="user-location" style="font-size: 0.8rem; color: var(--pico-muted-color); margin: 0;">
+                            {{ user.mapping_count }} device mapping(s) ({{ user.online_mapping_count }} online)
+                        </p>
+                    </div>
+                    <div style="display: flex; flex-direction: column; gap: 0.25rem; align-items: flex-end;">
+                        {% if user.id|string in pending_adjustments %}
+                        <span class="badge badge-warning" style="font-size: 0.7rem;">
+                            Pending: {{ pending_adjustments[user.id|string] }}
+                        </span>
+                        {% endif %}
+                        <span id="sync-status-{{ user.id }}" class="badge sync-status-badge" style="display: none;">
+                            <svg width="10" height="10" fill="currentColor" viewBox="0 0 16 16">
+                                <path id="sync-icon-{{ user.id }}" d="M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767L8.982 1.566zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5zm.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2z"/>
+                            </svg>
+                            <span id="sync-text-{{ user.id }}">Unsynced</span>
+                        </span>
+                    </div>
+                </div>
+
+                <div class="user-card-body">
+                    <div class="user-stats">
+                        <div class="stat-item">
+                            <span class="stat-label">Time Left Today</span>
+                            <div class="stat-value" style="color: var(--pico-primary); font-size: 1.25rem;">{{ user.time_left }}</div>
                         </div>
-                            
-                            <div class="user-chart">
-                                <h4 class="chart-title">Usage This Week</h4>
-                                <div class="chart-container">
-                                    <canvas id="chart-{{ user.id }}"></canvas>
-                                </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Last Updated</span>
+                            <div class="stat-value">
+                                {% if user.last_checked %}
+                                    {{ (user.last_checked|localtime).strftime('%H:%M') }}
+                                {% else %}
+                                    Never
+                                {% endif %}
+                            </div>
                         </div>
                     </div>
                     
-                    <script>
-                        (function() {
-                            window._chartData = window._chartData || {};
-                            const shortWeekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-                            const dates = [], labels = [], values = [];
-                            {% for date, time_spent in user.usage_data.items() %}
-                                dates.push('{{ date }}');
-                                labels.push(shortWeekdays[new Date('{{ date }}T00:00:00').getDay()]);
-                                values.push({{ time_spent / 3600 }});
-                            {% endfor %}
-                            window._chartData[{{ user.id }}] = { dates, labels, values };
-                        })();
-                    </script>
-                {% endfor %}
-            {% else %}
-                <div class="empty-state" style="grid-column: 1 / -1;">
-                    <h2>No Users Available</h2>
-                    <p>No valid users have been added yet. Go to the Admin Panel to add and manage users.</p>
-                    <a href="{{ url_for('admin') }}" class="btn btn-primary btn-lg">Go to Admin Panel</a>
+                    <div class="user-actions" style="display: flex; gap: 0.5rem; margin-top: 1rem;">
+                        <button class="btn btn-primary btn-cta btn-sm" style="flex: 1;" onclick="openTimeAdjustModal({{ user.id }}, '{{ user.username }}')">Adjust Time</button>
+                        <a href="{{ url_for('weekly_schedule_user', user_id=user.id) }}" class="btn btn-secondary btn-sm">Limits</a>
+                        <a href="{{ url_for('user_stats', user_id=user.id) }}" class="btn btn-secondary btn-sm">History</a>
+                    </div>
+
+                    <div class="user-chart">
+                        <h4 class="chart-title" style="font-size: 0.85rem; font-weight: bold; margin-bottom: 0.5rem; color: var(--pico-muted-color);">Usage This Week</h4>
+                        <div class="chart-container">
+                            <canvas id="chart-{{ user.id }}"></canvas>
+                        </div>
+                    </div>
                 </div>
-            {% endif %}
+            </article>
+            
+            <script>
+                (function() {
+                    window._chartData = window._chartData || {};
+                    const shortWeekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+                    const dates = [], labels = [], values = [];
+                    {% for date, time_spent in user.usage_data.items() %}
+                        dates.push('{{ date }}');
+                        labels.push(shortWeekdays[new Date('{{ date }}T00:00:00').getDay()]);
+                        values.push({{ time_spent / 3600 }});
+                    {% endfor %}
+                    window._chartData[{{ user.id }}] = { dates, labels, values };
+                })();
+            </script>
+        {% endfor %}
+    {% else %}
+        <div class="empty-state" style="grid-column: 1 / -1; width: 100%;">
+            <h2>No Managed Users Available</h2>
+            <p style="color: var(--pico-muted-color);">No valid children/users have been configured yet. Visit the Admin Panel to create accounts and map devices.</p>
+            <a href="{{ url_for('admin') }}" class="btn btn-primary btn-cta">Go to Admin Panel</a>
         </div>
+    {% endif %}
+</div>
+
+<!-- Time Adjustment Modal Container -->
+<div id="timeAdjustModal" class="modal" role="dialog" aria-modal="true">
+    <article class="modal-content">
+        <header class="modal-header">
+            <h3 class="modal-title">Adjust Time for <span id="modalUsername"></span></h3>
+            <button class="modal-close" onclick="closeTimeAdjustModal()" aria-label="Close modal">
+                <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+            </button>
+        </header>
+        <div class="modal-body" style="text-align: center;">
+            <p style="margin-bottom: 1.5rem;">
+                Current adjustment: <strong id="timeAdjustment" style="font-size: 1.75rem; color: var(--pico-color);">0</strong> minutes
+            </p>
+            
+            <div class="time-controls" style="display: flex; gap: 0.5rem; justify-content: center; align-items: center; margin-bottom: 1.5rem;">
+                <button class="btn btn-secondary btn-sm" onclick="adjustTime(-15)">-15m</button>
+                <button class="btn btn-ghost btn-sm" onclick="resetTime()">Reset</button>
+                <button class="btn btn-secondary btn-sm" onclick="adjustTime(15)">+15m</button>
+            </div>
+            
+            <div id="modalStatus" style="min-height: 20px; font-weight: bold; font-size: 0.85rem; color: var(--pico-muted-color);"></div>
+        </div>
+        <footer class="modal-footer">
+            <button class="btn btn-secondary btn-sm" onclick="closeTimeAdjustModal()">Cancel</button>
+            <button class="btn btn-primary btn-cta btn-sm" onclick="submitTimeAdjustment()">Apply Changes</button>
+        </footer>
+    </article>
+</div>
+
+<!-- Notification Toast -->
+<div id="notification-toast" class="notification-toast">
+    <div class="toast-content">
+        <svg class="toast-icon" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+            <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zm-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.061L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z"/>
+        </svg>
+        <span class="toast-message">Changes saved successfully!</span>
     </div>
+</div>
 
-    <script>
-        (function() {
-            // Find the global max value across all stored chart data
-            const allValues = Object.values(window._chartData || {}).flatMap(d => d.values);
-            const globalMax = Math.max(...allValues, 1);
+<style>
+    /* Popup adjustments modal overlay */
+    .modal-status.status-loading {
+        color: var(--pico-primary);
+    }
+    .modal-status.status-success {
+        color: var(--success-color);
+    }
+    .modal-status.status-error {
+        color: var(--danger-color);
+    }
+</style>
+{% endblock %}
 
-            function calculateYAxisScale(maxValue) {
-                if (maxValue === 0) return { max: 1, stepSize: 0.5 };
-                const niceSteps = [0.1, 0.2, 0.25, 0.5, 1, 2, 3, 4, 6, 8, 12];
-                const maxIntervals = 6;
-                const minStepSize = maxValue / maxIntervals;
-                let stepSize = niceSteps.find(step => step >= minStepSize) || niceSteps[niceSteps.length - 1];
-                const max = Math.ceil(maxValue / stepSize) * stepSize;
-                return { max, stepSize };
-            }
+{% block extra_js %}
+<script>
+    (function() {
+        // Find the global max value across all stored chart data
+        const allValues = Object.values(window._chartData || {}).flatMap(d => d.values);
+        const globalMax = Math.max(...allValues, 1);
 
-            const { max: yAxisMax, stepSize } = calculateYAxisScale(globalMax);
+        function calculateYAxisScale(maxValue) {
+            if (maxValue === 0) return { max: 1, stepSize: 0.5 };
+            const niceSteps = [0.1, 0.2, 0.25, 0.5, 1, 2, 3, 4, 6, 8, 12];
+            const maxIntervals = 6;
+            const minStepSize = maxValue / maxIntervals;
+            let stepSize = niceSteps.find(step => step >= minStepSize) || niceSteps[niceSteps.length - 1];
+            const max = Math.ceil(maxValue / stepSize) * stepSize;
+            return { max, stepSize };
+        }
 
-            function getWeekdayName(dateStr) {
-                const date = new Date(dateStr + 'T00:00:00');
-                return ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][date.getDay()];
-            }
+        const { max: yAxisMax, stepSize } = calculateYAxisScale(globalMax);
 
-            for (const [userId, data] of Object.entries(window._chartData || {})) {
-                const canvas = document.getElementById('chart-' + userId);
-                if (!canvas) continue;
-                const ctx = canvas.getContext('2d');
-                const { dates, labels, values } = data;
+        function getWeekdayName(dateStr) {
+            const date = new Date(dateStr + 'T00:00:00');
+            return ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][date.getDay()];
+        }
 
-                new Chart(ctx, {
-                    type: 'bar',
-                    data: {
-                        labels: labels,
-                        datasets: [{
-                            label: 'Hours Used',
-                            data: values,
-                            backgroundColor: function(context) {
-                                const weekday = labels[context.dataIndex];
-                                return (weekday === 'Sat' || weekday === 'Sun')
-                                    ? 'rgb(245 158 11 / 0.6)'
-                                    : 'rgb(59 130 246 / 0.6)';
-                            },
-                            borderColor: function(context) {
-                                const weekday = labels[context.dataIndex];
-                                return (weekday === 'Sat' || weekday === 'Sun')
-                                    ? 'rgb(245 158 11)'
-                                    : 'rgb(59 130 246)';
-                            },
-                            borderWidth: 2,
-                            borderRadius: 6,
-                            borderSkipped: false
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        interaction: { intersect: false, mode: 'index' },
-                        scales: {
-                            y: {
-                                beginAtZero: true,
-                                max: yAxisMax,
-                                ticks: {
-                                    stepSize: stepSize,
-                                    color: 'rgb(100 116 139)',
-                                    font: { size: 11 },
-                                    callback: function(value) {
-                                        if (value === 0) return '0h';
-                                        if (value < 1) return Math.round(value * 60) + 'm';
-                                        if (value % 1 === 0) return value + 'h';
-                                        return Math.floor(value) + 'h' + Math.round((value % 1) * 60) + 'm';
-                                    }
-                                },
-                                title: {
-                                    display: true,
-                                    text: 'Hours',
-                                    color: 'rgb(100 116 139)',
-                                    font: { size: 12, weight: '500' }
-                                },
-                                grid: { color: 'rgb(226 232 240 / 0.5)' }
-                            },
-                            x: {
-                                grid: { display: false },
-                                ticks: {
-                                    color: function(context) {
-                                        const weekday = labels[context.index];
-                                        return (weekday === 'Sat' || weekday === 'Sun')
-                                            ? 'rgb(245 158 11)'
-                                            : 'rgb(100 116 139)';
-                                    },
-                                    font: { size: 12, weight: '600' }
+        // Initialize active chart objects
+        for (const [userId, data] of Object.entries(window._chartData || {})) {
+            const canvas = document.getElementById('chart-' + userId);
+            if (!canvas) continue;
+            const ctx = canvas.getContext('2d');
+            const { dates, labels, values } = data;
+
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Hours Used',
+                        data: values,
+                        backgroundColor: function(context) {
+                            const weekday = labels[context.dataIndex];
+                            return (weekday === 'Sat' || weekday === 'Sun')
+                                ? 'rgba(245, 158, 11, 0.6)'
+                                : 'rgba(59, 130, 246, 0.6)';
+                        },
+                        borderColor: function(context) {
+                            const weekday = labels[context.dataIndex];
+                            return (weekday === 'Sat' || weekday === 'Sun')
+                                ? 'rgb(245, 158, 11)'
+                                : 'rgb(59, 130, 246)';
+                        },
+                        borderWidth: 2,
+                        borderRadius: 8,
+                        borderSkipped: false
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { intersect: false, mode: 'index' },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: yAxisMax,
+                            ticks: {
+                                stepSize: stepSize,
+                                font: { size: 10, weight: 'bold' },
+                                callback: function(value) {
+                                    if (value === 0) return '0h';
+                                    if (value < 1) return Math.round(value * 60) + 'm';
+                                    if (value % 1 === 0) return value + 'h';
+                                    return Math.floor(value) + 'h' + Math.round((value % 1) * 60) + 'm';
                                 }
+                            },
+                            grid: {
+                                drawBorder: false
                             }
                         },
-                        plugins: {
-                            legend: { display: false },
-                            tooltip: {
-                                callbacks: {
-                                    title: function(context) {
-                                        const index = context[0].dataIndex;
-                                        return getWeekdayName(dates[index]) + ' (' + dates[index] + ')';
-                                    },
-                                    label: function(context) {
-                                        const hours = context.parsed.y;
-                                        const wholeHours = Math.floor(hours);
-                                        const minutes = Math.round((hours % 1) * 60);
-                                        return wholeHours + 'h ' + minutes + 'm';
-                                    }
+                        x: {
+                            grid: { display: false },
+                            ticks: {
+                                font: { size: 11, weight: 'bold' }
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                title: function(context) {
+                                    const index = context[0].dataIndex;
+                                    return getWeekdayName(dates[index]) + ' (' + dates[index] + ')';
+                                },
+                                label: function(context) {
+                                    const hours = context.parsed.y;
+                                    const wholeHours = Math.floor(hours);
+                                    const minutes = Math.round((hours % 1) * 60);
+                                    return wholeHours + 'h ' + minutes + 'm';
                                 }
                             }
                         }
                     }
-                });
-            }
-        })();
-    </script>
-    
-    <!-- Time Adjustment Modal -->
-    <div id="timeAdjustModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2 class="modal-title">Adjust Time for <span id="modalUsername"></span></h2>
-                <button class="modal-close" onclick="closeTimeAdjustModal()" type="button">
-                    <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                    </svg>
-                </button>
-            </div>
-            <div class="modal-body">
-                <p style="text-align: center; margin-bottom: var(--space-6);">
-                    Current adjustment: <strong id="timeAdjustment" style="font-size: var(--font-size-lg);">0</strong> minutes
-                </p>
-                
-                <div class="time-controls">
-                    <button class="btn btn-secondary" onclick="adjustTime(-15)">
-                        <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-                            <path fill-rule="evenodd" d="M1.5 8a6.5 6.5 0 1 0 13 0 6.5 6.5 0 0 0-13 0zM8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0zM4.5 7.5a.5.5 0 0 0 0 1h5a.5.5 0 0 0 0-1h-5z"/>
-                        </svg>
-                        -15m
-                    </button>
-                    <button class="btn btn-ghost" onclick="resetTime()">Reset</button>
-                    <button class="btn btn-secondary" onclick="adjustTime(15)">
-                        <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-                            <path fill-rule="evenodd" d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16zM8.5 4.5a.5.5 0 0 0-1 0v3h-3a.5.5 0 0 0 0 1h3v3a.5.5 0 0 0 1 0v-3h3a.5.5 0 0 0 0-1h-3v-3z"/>
-                        </svg>
-                        +15m
-                    </button>
-                </div>
-                
-                <div id="modalStatus" style="text-align: center; margin: var(--space-4) 0; min-height: 20px;"></div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="closeTimeAdjustModal()">Cancel</button>
-                <button class="btn btn-primary" onclick="submitTimeAdjustment()">Apply Changes</button>
-            </div>
-        </div>
-    </div>
-    
-    <!-- Notification Toast -->
-    <div id="notification-toast" class="notification-toast">
-        <div class="toast-content">
-            <svg class="toast-icon" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-                <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zm-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.061L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z"/>
-            </svg>
-            <span class="toast-message">Changes saved successfully!</span>
-        </div>
-    </div>
-    
-    <style>
-        .notification-toast {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            background: var(--bg-elevated);
-            border: 1px solid var(--border-primary);
-            border-radius: var(--radius-lg);
-            padding: var(--space-4);
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-            transform: translateX(calc(100% + 20px));
-            transition: transform 0.3s ease-in-out;
-            z-index: 1000;
-            max-width: 300px;
+                }
+            });
         }
-        
-        .notification-toast.show {
-            transform: translateX(0);
-        }
-        
-        .notification-toast.success {
-            border-left: 4px solid var(--success);
-        }
-        
-        .notification-toast.error {
-            border-left: 4px solid var(--danger);
-        }
-        
-        .toast-content {
-            display: flex;
-            align-items: center;
-            gap: var(--space-3);
-        }
-        
-        .toast-icon {
-            flex-shrink: 0;
-        }
-        
-        .notification-toast.success .toast-icon {
-            color: var(--success);
-        }
-        
-        .notification-toast.error .toast-icon {
-            color: var(--danger);
-        }
-        
-        .toast-message {
-            font-weight: 500;
-            color: var(--text-primary);
-            font-size: var(--font-size-sm);
-        }
-    </style>
-    
-    <script>
-        // Notification functions
-        function showNotification(message, type = 'success') {
-            const toast = document.getElementById('notification-toast');
-            const messageEl = toast.querySelector('.toast-message');
-            const iconEl = toast.querySelector('.toast-icon path');
-            
-            // Set message
-            messageEl.textContent = message;
-            
-            // Set type and icon
-            toast.className = `notification-toast ${type}`;
-            if (type === 'success') {
-                iconEl.setAttribute('d', 'M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zm-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.061L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z');
-            } else if (type === 'error') {
-                iconEl.setAttribute('d', 'M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zM5.354 4.646a.5.5 0 1 0-.708.708L7.293 8l-2.647 2.646a.5.5 0 0 0 .708.708L8 8.707l2.646 2.647a.5.5 0 0 0 .708-.708L8.707 8l2.647-2.646a.5.5 0 0 0-.708-.708L8 7.293 5.354 4.646z');
-            }
-            
-            // Show toast
-            toast.classList.add('show');
-            
-            // Hide after 2 seconds
-            setTimeout(() => {
-                toast.classList.remove('show');
-            }, 2000);
-        }
-        
-        // Time adjustment modal variables
-        let currentUserId = null;
-        let currentUsername = '';
-        let timeAdjustment = 0; // in minutes
-        
-        // Function to open the time adjustment modal
-        function openTimeAdjustModal(userId, username) {
-            currentUserId = userId;
-            currentUsername = username;
-            document.getElementById('modalUsername').textContent = username;
-            resetTime();
-            document.getElementById('timeAdjustModal').style.display = 'block';
-        }
-        
-        // Function to close the modal
-        function closeTimeAdjustModal() {
-            document.getElementById('timeAdjustModal').style.display = 'none';
-            document.getElementById('modalStatus').textContent = '';
-            document.getElementById('modalStatus').className = 'modal-status';
-        }
-        
-        // Function to adjust time
-        function adjustTime(minutes) {
-            timeAdjustment += minutes;
-            updateTimeDisplay();
-        }
-        
-        // Function to reset time adjustment
-        function resetTime() {
-            timeAdjustment = 0;
-            updateTimeDisplay();
-        }
-        
-        // Function to update the time display
-        function updateTimeDisplay() {
-            const display = document.getElementById('timeAdjustment');
-            display.textContent = timeAdjustment;
-            
-            // Update color based on value
-            if (timeAdjustment > 0) {
-                display.style.color = 'var(--success)';
-            } else if (timeAdjustment < 0) {
-                display.style.color = 'var(--danger)';
-            } else {
-                display.style.color = 'var(--text-primary)';
-            }
-        }
-        
-        // Function to submit the time adjustment
-        function submitTimeAdjustment() {
-            if (timeAdjustment === 0) {
-                showNotification('No time adjustment specified', 'error');
-                return;
-            }
-            
-            const seconds = timeAdjustment * 60; // Convert minutes to seconds
-            const operation = seconds > 0 ? '+' : '-';
-            const absoluteSeconds = Math.abs(seconds);
-            
-            // Show loading status
-            const statusEl = document.getElementById('modalStatus');
-            statusEl.textContent = 'Applying changes...';
-            statusEl.className = 'modal-status status-loading';
-            
-            // Create form data
-            const formData = new FormData();
-            formData.append('user_id', currentUserId);
-            formData.append('operation', operation);
-            formData.append('seconds', absoluteSeconds);
-            
-            // Send request to server
-            fetch('/api/modify-time', {
-                method: 'POST',
-                body: formData
-            })
+    })();
+
+    // Function to update sync status badge for each user card on load
+    function updateSyncStatus() {
+        {% for user in users %}
+        fetch('/api/schedule-sync-status/{{ user.id }}')
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    statusEl.textContent = 'Success! Time adjusted successfully.';
-                    statusEl.className = 'modal-status status-success';
+                    const statusBadge = document.getElementById('sync-status-{{ user.id }}');
+                    const syncIcon = document.getElementById('sync-icon-{{ user.id }}');
+                    const syncText = document.getElementById('sync-text-{{ user.id }}');
                     
-                    // Refresh the page after 1.5 seconds
-                    setTimeout(() => {
-                        window.location.reload();
-                    }, 1500);
-                } else {
-                    statusEl.textContent = `Error: ${data.message}`;
-                    statusEl.className = 'modal-status status-error';
+                    if (!data.is_synced && data.schedule) {
+                        statusBadge.className = 'badge badge-warning sync-status-badge';
+                        statusBadge.style.display = 'inline-flex';
+                        syncIcon.setAttribute('d', 'M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767L8.982 1.566zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5zm.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2z');
+                        syncText.textContent = 'Unsynced';
+                    } else {
+                        statusBadge.style.display = 'none';
+                    }
                 }
             })
             .catch(error => {
-                statusEl.textContent = `Error: ${error.message}`;
-                statusEl.className = 'modal-status status-error';
+                console.error('Error fetching sync status for user {{ user.id }}:', error);
             });
+        {% endfor %}
+    }
+    
+    updateSyncStatus();
+    setInterval(updateSyncStatus, 15000);
+
+    // Javascript Toast Notifications
+    function showNotification(message, type = 'success') {
+        const toast = document.getElementById('notification-toast');
+        const messageEl = toast.querySelector('.toast-message');
+        const iconEl = toast.querySelector('.toast-icon path');
+        
+        messageEl.textContent = message;
+        toast.className = `notification-toast ${type}`;
+        
+        if (type === 'success') {
+            iconEl.setAttribute('d', 'M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zm-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.061L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z');
+        } else if (type === 'error') {
+            iconEl.setAttribute('d', 'M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zM5.354 4.646a.5.5 0 1 0-.708.708L7.293 8l-2.647 2.646a.5.5 0 0 0 .708.708L8 8.707l2.646 2.647a.5.5 0 0 0 .708-.708L8.707 8l2.647-2.646a.5.5 0 0 0-.708-.708L8 7.293 5.354 4.646z');
         }
-    </script>
-</body>
-</html>
+        
+        toast.classList.add('show');
+        setTimeout(() => {
+            toast.classList.remove('show');
+        }, 2500);
+    }
+    
+    // Time adjustment modal management
+    let currentUserId = null;
+    let currentUsername = '';
+    let timeAdjustment = 0; // in minutes
+    
+    function openTimeAdjustModal(userId, username) {
+        currentUserId = userId;
+        currentUsername = username;
+        document.getElementById('modalUsername').textContent = username;
+        resetTime();
+        document.getElementById('timeAdjustModal').style.display = 'flex';
+    }
+    
+    function closeTimeAdjustModal() {
+        document.getElementById('timeAdjustModal').style.display = 'none';
+        document.getElementById('modalStatus').textContent = '';
+        document.getElementById('modalStatus').className = '';
+    }
+    
+    function adjustTime(minutes) {
+        timeAdjustment += minutes;
+        updateTimeDisplay();
+    }
+    
+    function resetTime() {
+        timeAdjustment = 0;
+        updateTimeDisplay();
+    }
+    
+    function updateTimeDisplay() {
+        const display = document.getElementById('timeAdjustment');
+        display.textContent = timeAdjustment;
+        
+        if (timeAdjustment > 0) {
+            display.style.color = 'var(--success-color)';
+        } else if (timeAdjustment < 0) {
+            display.style.color = 'var(--danger-color)';
+        } else {
+            display.style.color = 'var(--pico-color)';
+        }
+    }
+    
+    function submitTimeAdjustment() {
+        if (timeAdjustment === 0) {
+            showNotification('No time adjustment specified', 'error');
+            return;
+        }
+        
+        const seconds = timeAdjustment * 60;
+        const operation = seconds > 0 ? '+' : '-';
+        const absoluteSeconds = Math.abs(seconds);
+        
+        const statusEl = document.getElementById('modalStatus');
+        statusEl.textContent = 'Applying changes...';
+        statusEl.className = 'modal-status status-loading';
+        
+        const formData = new FormData();
+        formData.append('user_id', currentUserId);
+        formData.append('operation', operation);
+        formData.append('seconds', absoluteSeconds);
+        
+        fetch('/api/modify-time', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                statusEl.textContent = 'Success! Adjusted successfully.';
+                statusEl.className = 'modal-status status-success';
+                showNotification('Time modified successfully!');
+                
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1200);
+            } else {
+                statusEl.textContent = `Error: ${data.message}`;
+                statusEl.className = 'modal-status status-error';
+            }
+        })
+        .catch(error => {
+            statusEl.textContent = `Error: ${error.message}`;
+            statusEl.className = 'modal-status status-error';
+        });
+    }
+</script>
+{% endblock %}

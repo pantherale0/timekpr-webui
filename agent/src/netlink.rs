@@ -1,5 +1,5 @@
 use serde_json::json;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::mem;
 use std::os::unix::io::{AsRawFd, RawFd};
 use tokio::sync::mpsc;
@@ -319,6 +319,9 @@ async fn run_monitor_inner(
                 guard.clear_ready();
                 continue;
             }
+            if err.raw_os_error() == Some(libc::EINTR) {
+                continue;
+            }
             eprintln!("netlink: recv error: {}", err);
             continue;
         }
@@ -331,6 +334,15 @@ async fn run_monitor_inner(
         // Parse the header to determine event type
         let hdr: NlmsghdrConnMsg =
             unsafe { std::ptr::read_unaligned(buf.as_ptr() as *const NlmsghdrConnMsg) };
+        let header_size = mem::size_of::<NlmsghdrConnMsg>();
+        let nlmsg_len = hdr.nlmsg_len as usize;
+        if nlmsg_len < header_size || nlmsg_len > n {
+            eprintln!(
+                "netlink: dropping malformed frame (nlmsg_len={}, recv_len={})",
+                nlmsg_len, n
+            );
+            continue;
+        }
 
         match hdr.what {
             PROC_EVENT_EXEC => {
@@ -344,32 +356,32 @@ async fn run_monitor_inner(
                 };
 
                 let pid = event.process_tgid;
-                let uid = match pid_to_uid(pid) {
-                    Some(uid) => uid,
-                    None => continue,
-                };
-
-                let username = match config.monitored_uids.get(&uid) {
-                    Some(name) => name.clone(),
-                    None => continue,
-                };
-
-                let comm = pid_to_comm(pid).unwrap_or_default();
+                let username = pid_to_uid(pid)
+                    .and_then(|uid| config.monitored_uids.get(&uid).cloned());
+                let comm = pid_to_comm(pid)
+                    .filter(|value| !value.is_empty())
+                    .unwrap_or_else(|| format!("pid-{}", pid));
                 let exe_path = pid_to_exe(pid).unwrap_or_default();
                 let argv = pid_to_cmdline(pid).unwrap_or_default();
                 let cwd = pid_to_cwd(pid);
+                let transient = username.is_none() || exe_path.is_empty();
 
-                if comm.is_empty() || exe_path.is_empty() {
-                    continue;
-                }
-
-                if let Some(decision) =
-                    apparmor::evaluate_exec_event(&username, &exe_path, &argv, cwd.as_deref()).await
-                {
+                if let Some(decision) = if let Some(ref username) = username {
+                    if exe_path.is_empty() {
+                        None
+                    } else {
+                        apparmor::evaluate_exec_event(username, &exe_path, &argv, cwd.as_deref())
+                            .await
+                    }
+                } else {
+                    None
+                } {
                     let blocked = decision.preset == "blocked";
                     let _ = alert_tx.send(AppAlert {
                         event_type: "app_blocked".to_string(),
-                        linux_username: username.clone(),
+                        linux_username: username
+                            .clone()
+                            .unwrap_or_else(|| "unknown".to_string()),
                         payload: json!({
                             "details": {
                                 "application_name": &comm,
@@ -393,26 +405,33 @@ async fn run_monitor_inner(
                 // Send app_launched alert
                 let _ = alert_tx.send(AppAlert {
                     event_type: "app_launched".to_string(),
-                    linux_username: username.clone(),
+                    linux_username: username
+                        .clone()
+                        .unwrap_or_else(|| "unknown".to_string()),
                     payload: json!({
                         "details": {
                             "application_name": &comm,
                             "executable_path": &exe_path,
                             "pid": pid,
+                            "transient": transient,
                         }
                     }),
                 });
 
-                tracked.insert(
-                    pid,
-                    TrackedProcess {
-                        pid,
-                        comm,
-                        exe_path,
-                        username,
-                        started: Instant::now(),
-                    },
-                );
+                if let Some(username) = username {
+                    if !exe_path.is_empty() {
+                        tracked.insert(
+                            pid,
+                            TrackedProcess {
+                                pid,
+                                comm,
+                                exe_path,
+                                username,
+                                started: Instant::now(),
+                            },
+                        );
+                    }
+                }
             }
             PROC_EVENT_EXIT => {
                 if n < mem::size_of::<NlmsghdrConnMsg>() + mem::size_of::<ProcEventExit>() {
@@ -430,7 +449,7 @@ async fn run_monitor_inner(
                     let duration_secs = duration.as_secs();
 
                     // Only report usage for processes that ran >1 second
-                    if duration_secs >= 1 {
+                    if duration_secs >= 1 && !process.exe_path.is_empty() {
                         let now = chrono::Utc::now();
                         let start_time = now - chrono::Duration::seconds(duration_secs as i64);
                         let _ = alert_tx.send(AppAlert {
@@ -457,9 +476,22 @@ async fn run_monitor_inner(
         if last_cleanup.elapsed() >= cleanup_interval {
             last_cleanup = Instant::now();
             let before = tracked.len();
-            tracked.retain(|&pid, _| {
-                std::path::Path::new(&format!("/proc/{}", pid)).exists()
-            });
+            let candidate_pids: Vec<u32> = tracked.keys().copied().collect();
+            let dead_pids = tokio::task::spawn_blocking(move || {
+                let mut dead = Vec::new();
+                for pid in candidate_pids {
+                    if !std::path::Path::new(&format!("/proc/{}", pid)).exists() {
+                        dead.push(pid);
+                    }
+                }
+                dead
+            })
+            .await
+            .unwrap_or_else(|_| Vec::new());
+            if !dead_pids.is_empty() {
+                let dead_pid_set: HashSet<u32> = dead_pids.into_iter().collect();
+                tracked.retain(|pid, _| !dead_pid_set.contains(pid));
+            }
             let cleaned = before - tracked.len();
             if cleaned > 0 {
                 println!(

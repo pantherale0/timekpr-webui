@@ -10,5 +10,7 @@
     "pylint.args": [
         "--rcfile=${workspaceFolder}/server/.pylintrc"
     ],
-    "pylint.cwd": "${workspaceFolder}/server"
+    "pylint.cwd": "${workspaceFolder}/server",
+    "rust-analyzer.testExplorer": true,
+    "debug.allowBreakpointsEverywhere": true
 }

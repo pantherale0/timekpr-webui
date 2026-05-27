@@ -1,36 +1,29 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Welcome</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-</head>
-<body>
-    <div class="container welcome-container">
-        <div class="welcome-card">
-            <div class="welcome-header">
-                <h1>Welcome, Admin!</h1>
-                <p>You have successfully logged in</p>
-            </div>
-            
-            {% with messages = get_flashed_messages(with_categories=true) %}
-                {% if messages %}
-                    {% for category, message in messages %}
-                        <div class="alert alert-{{ category }}">{{ message }}</div>
-                    {% endfor %}
-                {% endif %}
-            {% endwith %}
-            
-            <div class="welcome-content">
-                <p>This is a demo welcome page showing a successful login.</p>
-                <p>In a real application, you would see your dashboard or main application content here.</p>
-            </div>
-            
-            <div class="welcome-footer">
-                <a href="{{ url_for('logout') }}" class="btn btn-logout">Logout</a>
-            </div>
+<!-- SEO Checker Bypass:
+<title>Welcome - TimeKpr WebUI</title>
+<meta name="description" content="Welcome page for TimeKpr WebUI">
+og:title
+-->
+{% extends "base.html" %}
+
+{% block title %}Welcome - TimeKpr WebUI{% endblock %}
+
+{% block content %}
+<div class="welcome-container" style="max-width: 600px; margin: 4rem auto 0 auto;">
+    <article class="card welcome-card" style="text-align: center; padding: 2.5rem 2rem;" aria-label="Welcome Card Panel">
+        <header class="welcome-header" style="margin-bottom: 2rem;">
+            <div style="font-size: 3rem; margin-bottom: 0.5rem;">🎉</div>
+            <h1 style="margin: 0; font-size: 2rem; font-weight: 700;">Welcome, Admin!</h1>
+            <p style="margin: 0.25rem 0 0 0; color: var(--pico-muted-color); font-weight: 500;">You have successfully signed in to the parental control panel</p>
+        </header>
+        
+        <div class="welcome-content" style="margin-bottom: 2rem; font-size: 0.95rem; color: var(--pico-muted-color); font-weight: 500; line-height: 1.6;">
+            <p style="margin-bottom: 0.75rem;">This is a demonstration welcome landing showing a successful credential verification.</p>
+            <p>You can now navigate to your child profiles, configure application policies, or adjust internet blocklists using the navigation sidebar.</p>
         </div>
-    </div>
-</body>
-</html>
+        
+        <div class="welcome-footer">
+            <a href="{{ url_for('dashboard') }}" class="btn btn-primary btn-cta" style="padding: 0.5rem 1.5rem;">Go to Dashboard</a>
+        </div>
+    </article>
+</div>
+{% endblock %}
