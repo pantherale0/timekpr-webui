@@ -10,7 +10,7 @@ db = SQLAlchemy()
 
 
 def coerce_time_spent_day(value):
-    """Normalise TIME_SPENT_DAY (sortie timekpra) en entier pour la colonne time_spent."""
+    """Coerce TIME_SPENT_DAY (timekpra output) to an integer for the time_spent column."""
     if value is None:
         return 0
     if isinstance(value, bool):
@@ -26,7 +26,7 @@ def coerce_time_spent_day(value):
 
 
 def coerce_time_left_day(value):
-    """Normalise TIME_LEFT_DAY en entier, ou None si absent."""
+    """Coerce TIME_LEFT_DAY to an integer, or None if absent."""
     if value is None:
         return None
     if isinstance(value, bool):
