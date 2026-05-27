@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from src.database import (
     coerce_time_left_day,
     coerce_time_spent_day,
@@ -45,16 +45,16 @@ def test_get_mapping_time_spent_for_day_uses_same_day_snapshot(db_session):
         system_id=device.system_id,
         linux_username="same_day_user",
         is_valid=True,
-        last_checked=datetime.utcnow(),
+        last_checked=datetime.now(timezone.utc),
         last_config='{"TIME_SPENT_DAY": 900}',
     )
     db_session.add(mapping)
     db_session.commit()
 
-    today = datetime.utcnow().date()
+    today = datetime.now(timezone.utc).date()
     assert get_mapping_time_spent_for_day(mapping, today) == 900
 
-    mapping.last_checked = datetime.utcnow() - timedelta(days=1)
+    mapping.last_checked = datetime.now(timezone.utc) - timedelta(days=1)
     db_session.commit()
     assert get_mapping_time_spent_for_day(mapping, today) == 0
 
@@ -70,16 +70,16 @@ def test_get_mapping_time_left_for_day_uses_same_day_snapshot(db_session):
         system_id=device.system_id,
         linux_username="left_day_user",
         is_valid=True,
-        last_checked=datetime.utcnow(),
+        last_checked=datetime.now(timezone.utc),
         last_config='{"TIME_LEFT_DAY": 1500}',
     )
     db_session.add(mapping)
     db_session.commit()
 
-    today = datetime.utcnow().date()
+    today = datetime.now(timezone.utc).date()
     assert get_mapping_time_left_for_day(mapping, today) == 1500
 
-    mapping.last_checked = datetime.utcnow() - timedelta(days=1)
+    mapping.last_checked = datetime.now(timezone.utc) - timedelta(days=1)
     db_session.commit()
     assert get_mapping_time_left_for_day(mapping, today) is None
 
@@ -157,7 +157,7 @@ def test_agent_alert_model(db_session):
         system_id=device.system_id,
         event_type="system_startup",
         linux_username="alice",
-        occurred_at=datetime.utcnow(),
+        occurred_at=datetime.now(timezone.utc),
         payload_json='{"system_id":"dev-alert","event_type":"system_startup","details":{"source":"test"}}',
         webhook_enabled_snapshot=True,
         delivery_status=AgentAlert.DELIVERY_PENDING,
@@ -219,7 +219,7 @@ def test_managed_user_and_usage(db_session):
     assert user.get_config_value("TIME_SPENT_DAY") == 1800
     assert user.get_config_value("nonexistent") is None
 
-    today = datetime.utcnow().date()
+    today = datetime.now(timezone.utc).date()
     schedule = UserWeeklySchedule(user_id=user.id)
     weekday_columns = (
         'monday_hours',

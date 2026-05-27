@@ -4,7 +4,7 @@ import codecs
 import hashlib
 import json
 import re
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from urllib.parse import urlparse
 
 from sqlalchemy import func
@@ -349,7 +349,7 @@ def _retry_due(mapping, retry_hash, now=None):
     last_attempted = getattr(mapping, 'blocklist_last_attempted', None)
     if last_attempted is None:
         return True
-    reference_time = now or datetime.utcnow()
+    reference_time = now or datetime.now(timezone.utc)
     return (reference_time - last_attempted) >= BLOCKLIST_SYNC_RETRY_INTERVAL
 
 
@@ -428,5 +428,5 @@ def should_refresh_external_source(source, now=None):
     if getattr(source, 'last_sync_at', None) is None:
         return True
 
-    reference_time = now or datetime.utcnow()
+    reference_time = now or datetime.now(timezone.utc)
     return (reference_time - source.last_sync_at) >= EXTERNAL_SYNC_INTERVAL

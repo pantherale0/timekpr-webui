@@ -1,12 +1,25 @@
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import pytz
 import json
 
+import sqlite3
+from sqlalchemy import event
+from sqlalchemy.engine import Engine
 import bcrypt
 from flask_sqlalchemy import SQLAlchemy
 
 db = SQLAlchemy()
+
+
+@event.listens_for(Engine, "connect")
+def set_sqlite_pragma(dbapi_connection, connection_record):
+    if isinstance(dbapi_connection, sqlite3.Connection):
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA journal_mode=WAL")
+        cursor.execute("PRAGMA synchronous=NORMAL")
+        cursor.execute("PRAGMA busy_timeout=60000")
+        cursor.close()
 
 
 def coerce_time_spent_day(value):
@@ -46,7 +59,7 @@ def get_mapping_time_spent_for_day(mapping, day=None):
     if mapping is None:
         return 0
 
-    day = day or datetime.utcnow().date()
+    day = day or datetime.now(timezone.utc).date()
     last_checked = getattr(mapping, 'last_checked', None)
     if last_checked is None or last_checked.date() != day:
         return 0
@@ -59,7 +72,7 @@ def get_mapping_time_left_for_day(mapping, day=None):
     if mapping is None:
         return None
 
-    day = day or datetime.utcnow().date()
+    day = day or datetime.now(timezone.utc).date()
     last_checked = getattr(mapping, 'last_checked', None)
     if last_checked is None or last_checked.date() != day:
         return None
@@ -137,8 +150,8 @@ class AgentDevice(db.Model):
     system_ip = db.Column(db.String(50), nullable=True)     # Snapshotted connection IP
     status = db.Column(db.String(20), default='pending')    # pending, approved, rejected
     secure_token = db.Column(db.String(64), nullable=True)  # Dynamically generated token
-    date_added = db.Column(db.DateTime, default=datetime.utcnow)
-    last_seen = db.Column(db.DateTime, nullable=True)
+    date_added = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    last_seen = db.Column(db.DateTime(timezone=True), nullable=True)
     
     # Relationship to per-user Linux account mappings on this device
     user_mappings = db.relationship(
@@ -185,14 +198,14 @@ class AgentAlert(db.Model):
     system_id = db.Column(db.String(50), db.ForeignKey('agent_device.system_id'), nullable=False)
     event_type = db.Column(db.String(64), nullable=False)
     linux_username = db.Column(db.String(80), nullable=True)
-    occurred_at = db.Column(db.DateTime, nullable=False)
+    occurred_at = db.Column(db.DateTime(timezone=True), nullable=False)
     payload_json = db.Column(db.Text, nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    created_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
     webhook_enabled_snapshot = db.Column(db.Boolean, default=False, nullable=False)
     delivery_status = db.Column(db.String(20), default=DELIVERY_PENDING, nullable=False)
     delivery_attempts = db.Column(db.Integer, default=0, nullable=False)
-    last_delivery_attempt_at = db.Column(db.DateTime, nullable=True)
-    delivered_at = db.Column(db.DateTime, nullable=True)
+    last_delivery_attempt_at = db.Column(db.DateTime(timezone=True), nullable=True)
+    delivered_at = db.Column(db.DateTime(timezone=True), nullable=True)
     last_delivery_error = db.Column(db.Text, nullable=True)
 
     def __repr__(self):
@@ -214,11 +227,11 @@ class AgentAlert(db.Model):
 
     def mark_delivery_attempt(self):
         self.delivery_attempts += 1
-        self.last_delivery_attempt_at = datetime.utcnow()
+        self.last_delivery_attempt_at = datetime.now(timezone.utc)
 
     def mark_delivered(self):
         self.delivery_status = self.DELIVERY_DELIVERED
-        self.delivered_at = datetime.utcnow()
+        self.delivered_at = datetime.now(timezone.utc)
         self.last_delivery_error = None
 
     def mark_retry(self, error_message):
@@ -240,8 +253,8 @@ class ManagedUser(db.Model):
     system_id = db.Column(db.String(50), db.ForeignKey('agent_device.system_id'), nullable=True)
     system_ip = db.Column(db.String(50), nullable=False)
     is_valid = db.Column(db.Boolean, default=False)
-    date_added = db.Column(db.DateTime, default=datetime.utcnow)
-    last_checked = db.Column(db.DateTime, nullable=True)
+    date_added = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    last_checked = db.Column(db.DateTime(timezone=True), nullable=True)
     last_config = db.Column(db.Text, nullable=True) # Store the full config JSON
     pending_time_adjustment = db.Column(db.Integer, nullable=True) # Pending time adjustment in seconds
     pending_time_operation = db.Column(db.String(1), nullable=True) # + or -
@@ -269,7 +282,7 @@ class ManagedUser(db.Model):
     
     def get_recent_usage(self, days=7):
         """Get usage data for the last n days"""
-        today = datetime.utcnow().date()
+        today = datetime.now(timezone.utc).date()
         start_date = today - timedelta(days=days-1)
         
         # Get the usage records for the specified period
@@ -293,7 +306,7 @@ class ManagedUser(db.Model):
     
     def get_usage_weekly_grouped(self, weeks=13):
         """Get usage totals grouped by week (Monday-Sunday) for the last N weeks"""
-        today = datetime.utcnow().date()
+        today = datetime.now(timezone.utc).date()
         # Start from Monday of the week N-1 weeks ago
         days_since_monday = today.weekday()  # 0=Monday
         current_monday = today - timedelta(days=days_since_monday)
@@ -320,7 +333,7 @@ class ManagedUser(db.Model):
 
     def get_usage_monthly_grouped(self, months=12):
         """Get usage totals grouped by calendar month for the last N months"""
-        today = datetime.utcnow().date()
+        today = datetime.now(timezone.utc).date()
 
         result = []
         for i in range(months - 1, -1, -1):
@@ -385,7 +398,7 @@ class ManagedUser(db.Model):
         TIME_LEFT_DAY value.
         """
         # Use UTC date for consistency
-        today = datetime.utcnow().date()
+        today = datetime.now(timezone.utc).date()
         limit = self.get_effective_daily_limit_seconds(today)
         last_checked = self.last_checked
 
@@ -414,13 +427,13 @@ class ManagedUser(db.Model):
 
 
     def get_daily_limit_adjustment_seconds(self, day=None):
-        day = day or datetime.utcnow().date()
+        day = day or datetime.now(timezone.utc).date()
         if self.daily_limit_adjustment_date != day:
             return 0
         return int(self.daily_limit_adjustment_seconds or 0)
 
     def set_daily_limit_adjustment_seconds(self, seconds, day=None):
-        day = day or datetime.utcnow().date()
+        day = day or datetime.now(timezone.utc).date()
         seconds = int(seconds or 0)
         if seconds:
             self.daily_limit_adjustment_date = day
@@ -436,7 +449,7 @@ class ManagedUser(db.Model):
         if seconds < 0:
             raise ValueError('seconds must be non-negative')
 
-        day = day or datetime.utcnow().date()
+        day = day or datetime.now(timezone.utc).date()
         current = self.get_daily_limit_adjustment_seconds(day)
         delta = seconds if operation == '+' else -seconds
         updated = current + delta
@@ -444,7 +457,7 @@ class ManagedUser(db.Model):
         return updated
 
     def get_effective_daily_limit_seconds(self, day=None):
-        day = day or datetime.utcnow().date()
+        day = day or datetime.now(timezone.utc).date()
         if not self.weekly_schedule:
             return None
 
@@ -474,14 +487,14 @@ class ManagedUserDeviceMap(db.Model):
     linux_username = db.Column(db.String(50), nullable=False)
     linux_uid = db.Column(db.Integer, nullable=True)
     is_valid = db.Column(db.Boolean, default=False)
-    last_checked = db.Column(db.DateTime, nullable=True)
+    last_checked = db.Column(db.DateTime(timezone=True), nullable=True)
     last_config = db.Column(db.Text, nullable=True)
-    date_added = db.Column(db.DateTime, default=datetime.utcnow)
-    last_modified = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    date_added = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    last_modified = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     blocklist_policy_hash = db.Column(db.String(64), nullable=True)
     blocklist_is_synced = db.Column(db.Boolean, default=False, nullable=False)
-    blocklist_last_synced = db.Column(db.DateTime, nullable=True)
-    blocklist_last_attempted = db.Column(db.DateTime, nullable=True)
+    blocklist_last_synced = db.Column(db.DateTime(timezone=True), nullable=True)
+    blocklist_last_attempted = db.Column(db.DateTime(timezone=True), nullable=True)
     blocklist_last_attempt_hash = db.Column(db.String(64), nullable=True)
     blocklist_last_error = db.Column(db.Text, nullable=True)
 
@@ -507,14 +520,14 @@ class ManagedUserDeviceMap(db.Model):
     def mark_blocklist_synced(self, policy_hash):
         self.blocklist_policy_hash = policy_hash
         self.blocklist_is_synced = True
-        self.blocklist_last_synced = datetime.utcnow()
+        self.blocklist_last_synced = datetime.now(timezone.utc)
         self.blocklist_last_attempted = self.blocklist_last_synced
         self.blocklist_last_attempt_hash = policy_hash
         self.blocklist_last_error = None
 
     def mark_blocklist_sync_failed(self, error_message, attempt_hash=None):
         self.blocklist_is_synced = False
-        self.blocklist_last_attempted = datetime.utcnow()
+        self.blocklist_last_attempted = datetime.now(timezone.utc)
         self.blocklist_last_attempt_hash = attempt_hash
         self.blocklist_last_error = error_message
 
@@ -534,17 +547,17 @@ class BlocklistSource(db.Model):
     source_type = db.Column(db.String(32), nullable=False, default=TYPE_MANUAL)
     source_url = db.Column(db.Text, nullable=True)
     is_enabled = db.Column(db.Boolean, default=True, nullable=False)
-    last_sync_at = db.Column(db.DateTime, nullable=True)
+    last_sync_at = db.Column(db.DateTime(timezone=True), nullable=True)
     last_sync_status = db.Column(db.String(32), default=SYNC_NEVER, nullable=False)
     last_sync_error = db.Column(db.Text, nullable=True)
     etag = db.Column(db.String(255), nullable=True)
     source_last_modified = db.Column(db.String(255), nullable=True)
     content_revision = db.Column(db.String(64), nullable=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    created_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
     updated_at = db.Column(
-        db.DateTime,
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow,
+        db.DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
         nullable=False,
     )
 
@@ -570,16 +583,16 @@ class BlocklistSource(db.Model):
         return len(self.domains)
 
     def mark_sync_ok(self):
-        self.last_sync_at = datetime.utcnow()
+        self.last_sync_at = datetime.now(timezone.utc)
         self.last_sync_status = self.SYNC_OK
         self.last_sync_error = None
-        self.updated_at = datetime.utcnow()
+        self.updated_at = datetime.now(timezone.utc)
 
     def mark_sync_error(self, error_message):
-        self.last_sync_at = datetime.utcnow()
+        self.last_sync_at = datetime.now(timezone.utc)
         self.last_sync_status = self.SYNC_ERROR
         self.last_sync_error = error_message
-        self.updated_at = datetime.utcnow()
+        self.updated_at = datetime.now(timezone.utc)
 
 
 class BlocklistDomain(db.Model):
@@ -588,7 +601,7 @@ class BlocklistDomain(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     source_id = db.Column(db.Integer, db.ForeignKey('blocklist_source.id'), nullable=False)
     domain = db.Column(db.String(255), nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    created_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
 
     __table_args__ = (
         db.UniqueConstraint('source_id', 'domain', name='blocklist_source_domain_uc'),
@@ -604,7 +617,7 @@ class ManagedUserBlocklistAssignment(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     managed_user_id = db.Column(db.Integer, db.ForeignKey('managed_user.id'), nullable=False)
     source_id = db.Column(db.Integer, db.ForeignKey('blocklist_source.id'), nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    created_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
 
     __table_args__ = (
         db.UniqueConstraint('managed_user_id', 'source_id', name='managed_user_blocklist_uc'),
@@ -643,8 +656,8 @@ class UserWeeklySchedule(db.Model):
     
     # Sync status and timestamps
     is_synced = db.Column(db.Boolean, default=False)
-    last_synced = db.Column(db.DateTime, nullable=True)
-    last_modified = db.Column(db.DateTime, default=datetime.utcnow)
+    last_synced = db.Column(db.DateTime(timezone=True), nullable=True)
+    last_modified = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     
     def __repr__(self):
         return f'<UserWeeklySchedule {self.user.username}>'
@@ -662,7 +675,7 @@ class UserWeeklySchedule(db.Model):
         }
 
     def get_limit_hours_for_day(self, day=None):
-        day = day or datetime.utcnow().date()
+        day = day or datetime.now(timezone.utc).date()
         day_names = (
             'monday',
             'tuesday',
@@ -689,7 +702,7 @@ class UserWeeklySchedule(db.Model):
         self.friday_hours = schedule_dict.get('friday', 0)
         self.saturday_hours = schedule_dict.get('saturday', 0)
         self.sunday_hours = schedule_dict.get('sunday', 0)
-        self.last_modified = datetime.utcnow()
+        self.last_modified = datetime.now(timezone.utc)
         self.is_synced = False
     
     def set_weekdays_hours(self, hours):
@@ -699,7 +712,7 @@ class UserWeeklySchedule(db.Model):
         self.wednesday_hours = hours
         self.thursday_hours = hours
         self.friday_hours = hours
-        self.last_modified = datetime.utcnow()
+        self.last_modified = datetime.now(timezone.utc)
         self.is_synced = False
     
     def has_pending_changes(self):
@@ -709,7 +722,7 @@ class UserWeeklySchedule(db.Model):
     def mark_synced(self):
         """Mark the schedule as synced with the remote system"""
         self.is_synced = True
-        self.last_synced = datetime.utcnow()
+        self.last_synced = datetime.now(timezone.utc)
 
 class UserDailyTimeInterval(db.Model):
     __tablename__ = 'user_daily_time_interval'
@@ -731,8 +744,8 @@ class UserDailyTimeInterval(db.Model):
     
     # Sync status and timestamps
     is_synced = db.Column(db.Boolean, default=False)
-    last_synced = db.Column(db.DateTime, nullable=True)
-    last_modified = db.Column(db.DateTime, default=datetime.utcnow)
+    last_synced = db.Column(db.DateTime(timezone=True), nullable=True)
+    last_modified = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     
     # Relationship back to user
     user = db.relationship('ManagedUser', backref=db.backref('time_intervals', cascade='all, delete-orphan'))
@@ -814,12 +827,12 @@ class UserDailyTimeInterval(db.Model):
     def mark_synced(self):
         """Mark the interval as synced with the remote system"""
         self.is_synced = True
-        self.last_synced = datetime.utcnow()
+        self.last_synced = datetime.now(timezone.utc)
     
     def mark_modified(self):
         """Mark the interval as modified (needs sync)"""
         self.is_synced = False
-        self.last_modified = datetime.utcnow()
+        self.last_modified = datetime.now(timezone.utc)
     
     def to_timekpr_format(self):
         """Convert interval to timekpr hour specification format"""
@@ -888,11 +901,11 @@ class AppArmorRule(db.Model):
     )
     preset = db.Column(db.String(32), nullable=False, default=PRESET_ALLOWED)
     is_custom = db.Column(db.Boolean, default=False, nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    created_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
     updated_at = db.Column(
-        db.DateTime,
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow,
+        db.DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
         nullable=False,
     )
 
@@ -944,10 +957,10 @@ class AppUsageHistory(db.Model):
     )
     application_name = db.Column(db.String(120), nullable=False)
     executable_path = db.Column(db.String(255), nullable=False)
-    start_time = db.Column(db.DateTime, nullable=False)
-    end_time = db.Column(db.DateTime, nullable=False)
+    start_time = db.Column(db.DateTime(timezone=True), nullable=False)
+    end_time = db.Column(db.DateTime(timezone=True), nullable=False)
     duration_seconds = db.Column(db.Integer, nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    created_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
 
     device_map = db.relationship(
         'ManagedUserDeviceMap',

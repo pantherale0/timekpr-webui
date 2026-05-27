@@ -6,7 +6,7 @@ import logging
 import os
 import secrets
 import threading
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 import pytz
 from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify, abort
@@ -349,7 +349,7 @@ def _refresh_managed_user_summary(user):
     effective_daily_limit_seconds = user.get_effective_daily_limit_seconds(today)
 
     if not valid_mappings:
-        user.last_checked = datetime.utcnow()
+        user.last_checked = datetime.now(timezone.utc)
         user.last_config = json.dumps({
             "TIME_SPENT_DAY": 0,
             "TIME_LEFT_DAY": effective_daily_limit_seconds,
@@ -374,7 +374,7 @@ def _refresh_managed_user_summary(user):
 
     user.last_checked = max(
         (mapping.last_checked for mapping in valid_mappings if mapping.last_checked),
-        default=datetime.utcnow(),
+        default=lambda: datetime.now(timezone.utc).replace(tzinfo=None)(),
     )
     user.last_config = json.dumps({
         "TIME_SPENT_DAY": shared_spent,
@@ -661,7 +661,7 @@ def _store_agent_alert(system_id, payload):
 
     device = AgentDevice.query.get(system_id)
     if device:
-        device.last_seen = datetime.utcnow()
+        device.last_seen = datetime.now(timezone.utc)
 
     db.session.commit()
     return alert
@@ -840,7 +840,7 @@ def ws_agent_handler(ws):
                     AgentConnectionManager.register(system_id, ws, remote_ip)
                     ws.send(json.dumps({"type": "auth_result", "success": True, "message": "Authenticated successfully"}))
                     
-                    device.last_seen = datetime.utcnow()
+                    device.last_seen = datetime.now(timezone.utc)
                     db.session.commit()
                     logging.info(
                         "Device %s authenticated successfully. Updated device IP snapshot to %s.",
@@ -1306,7 +1306,7 @@ def toggle_blocklist_source(source_id):
 
     source = BlocklistSource.query.get_or_404(source_id)
     source.is_enabled = request.form.get('is_enabled') == 'on'
-    source.updated_at = datetime.utcnow()
+    source.updated_at = datetime.now(timezone.utc)
     db.session.commit()
     task_manager.notify_domain_policy_hint(reason='blocklist_catalog_updated')
     flash(f'Blocklist "{source.name}" {"enabled" if source.is_enabled else "disabled"}', 'success')
@@ -1342,7 +1342,7 @@ def add_blocklist_domain(source_id):
             source_id=source.id
         )
     )
-    source.updated_at = datetime.utcnow()
+    source.updated_at = datetime.now(timezone.utc)
     db.session.commit()
     task_manager.notify_domain_policy_hint(reason='blocklist_catalog_updated')
     flash(f'Added {domain} to "{source.name}"', 'success')
@@ -1365,7 +1365,7 @@ def delete_blocklist_domain(source_id, domain_id):
             source_id=source.id
         )
     )
-    source.updated_at = datetime.utcnow()
+    source.updated_at = datetime.now(timezone.utc)
     db.session.commit()
     task_manager.notify_domain_policy_hint(reason='blocklist_catalog_updated')
     flash(f'Removed {domain_text} from "{source.name}"', 'success')
@@ -1594,7 +1594,7 @@ def validate_user(user_id):
         previous_linux_uid = mapping.linux_uid
         agent_client = AgentClient(system_id=mapping.system_id)
         is_valid, message, config_dict = agent_client.validate_user(mapping.linux_username)
-        mapping.last_checked = datetime.utcnow()
+        mapping.last_checked = datetime.now(timezone.utc)
         mapping.is_valid = is_valid
         if is_valid and config_dict:
             mapping.last_config = json.dumps(config_dict)
@@ -1635,7 +1635,7 @@ def validate_mapping(user_id, mapping_id):
     is_valid, message, config_dict = agent_client.validate_user(mapping.linux_username)
 
     previous_linux_uid = mapping.linux_uid
-    mapping.last_checked = datetime.utcnow()
+    mapping.last_checked = datetime.now(timezone.utc)
     mapping.is_valid = is_valid
     if is_valid and config_dict:
         mapping.last_config = json.dumps(config_dict)
@@ -2112,7 +2112,7 @@ def modify_time():
     
     # Get user from database
     user = ManagedUser.query.get_or_404(user_id)
-    today = datetime.utcnow().date()
+    today = datetime.now(timezone.utc).date()
 
     mappings = list(user.device_mappings)
     if not mappings:
@@ -2123,7 +2123,7 @@ def modify_time():
     user.apply_daily_limit_adjustment(operation, seconds, today)
     user.pending_time_adjustment = None
     user.pending_time_operation = None
-    user.last_checked = datetime.utcnow()
+    user.last_checked = datetime.now(timezone.utc)
     db.session.commit()
 
     online_mappings = [mapping for mapping in mappings if AgentConnectionManager.is_online(mapping.system_id)]
@@ -2299,7 +2299,7 @@ def _store_app_usage_from_alert(system_id, normalized_alert):
         start_time = datetime.fromisoformat(start_iso.replace('Z', '+00:00')).replace(tzinfo=None)
         end_time = datetime.fromisoformat(end_iso.replace('Z', '+00:00')).replace(tzinfo=None)
     except (TypeError, ValueError):
-        end_time = datetime.utcnow()
+        end_time = datetime.now(timezone.utc)
         start_time = end_time - timedelta(seconds=duration_seconds)
 
     record = AppUsageHistory(
@@ -2320,7 +2320,7 @@ def _store_app_usage_from_alert(system_id, normalized_alert):
 
 def _get_apparmor_usage_summary(mapping_id, days=7):
     """Build an aggregate app-usage summary for a mapping over the last N days."""
-    cutoff = datetime.utcnow() - timedelta(days=days)
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
     records = AppUsageHistory.query.filter(
         AppUsageHistory.device_map_id == mapping_id,
         AppUsageHistory.start_time >= cutoff,
@@ -2705,7 +2705,7 @@ def run_schema_migrations():
 
     legacy_sources = BlocklistSource.query.filter(BlocklistSource.content_revision.is_(None)).all()
     for source in legacy_sources:
-        basis = source.updated_at or source.created_at or datetime.utcnow()
+        basis = source.updated_at or source.created_at or datetime.now(timezone.utc)
         source.content_revision = hashlib.sha256(
             f'legacy:{source.id}:{basis.isoformat()}'.encode('utf-8')
         ).hexdigest()

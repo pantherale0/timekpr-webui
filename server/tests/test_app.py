@@ -3,7 +3,7 @@
 import json
 import hmac
 import hashlib
-from datetime import datetime
+from datetime import datetime, timezone
 from unittest.mock import patch
 from sqlalchemy import text
 from app import ws_agent_handler, run_schema_migrations, _get_blocklist_sources, task_manager
@@ -906,7 +906,7 @@ def test_new_endpoints(client, db_session):
     assert user.pending_time_adjustment is None
     assert user.pending_time_operation is None
     assert user.daily_limit_adjustment_seconds == -300
-    assert user.daily_limit_adjustment_date == datetime.utcnow().date()
+    assert user.daily_limit_adjustment_date == datetime.now(timezone.utc).date()
 
     res = client.post('/api/modify-time', data={
         'user_id': user.id,
@@ -953,7 +953,7 @@ def test_alert_pages_for_user_and_device(client, db_session):
             system_id=device.system_id,
             event_type='user_signed_in',
             linux_username='jack',
-            occurred_at=datetime.utcnow(),
+            occurred_at=datetime.now(timezone.utc),
             payload_json=json.dumps({
                 'system_id': device.system_id,
                 'event_type': 'user_signed_in',
@@ -967,7 +967,7 @@ def test_alert_pages_for_user_and_device(client, db_session):
             system_id=device.system_id,
             event_type='system_sleep',
             linux_username=None,
-            occurred_at=datetime.utcnow(),
+            occurred_at=datetime.now(timezone.utc),
             payload_json=json.dumps({
                 'system_id': device.system_id,
                 'event_type': 'system_sleep',
@@ -980,7 +980,7 @@ def test_alert_pages_for_user_and_device(client, db_session):
             system_id=device.system_id,
             event_type='user_signed_out',
             linux_username='other-user',
-            occurred_at=datetime.utcnow(),
+            occurred_at=datetime.now(timezone.utc),
             payload_json=json.dumps({
                 'system_id': device.system_id,
                 'event_type': 'user_signed_out',
@@ -1196,7 +1196,7 @@ def test_modify_time_tracks_server_daily_adjustment_for_scheduled_users(client, 
         'saturday_hours',
         'sunday_hours',
     )
-    setattr(schedule, weekday_columns[datetime.utcnow().date().weekday()], 2.0)
+    setattr(schedule, weekday_columns[datetime.now(timezone.utc).date().weekday()], 2.0)
     db_session.add(schedule)
     db_session.commit()
 
@@ -1219,7 +1219,7 @@ def test_modify_time_tracks_server_daily_adjustment_for_scheduled_users(client, 
     assert data['success']
     assert data['pending']
     assert user.daily_limit_adjustment_seconds == 300
-    assert user.daily_limit_adjustment_date == datetime.utcnow().date()
+    assert user.daily_limit_adjustment_date == datetime.now(timezone.utc).date()
     assert user.pending_time_adjustment is None
     assert user.pending_time_operation is None
     assert mock_modify.call_count == 1

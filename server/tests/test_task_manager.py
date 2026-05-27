@@ -3,7 +3,7 @@
 # pylint: disable=protected-access,unused-argument
 
 import json
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from unittest.mock import MagicMock, patch
 
 from src.agent_helper import AgentConnectionManager
@@ -308,7 +308,7 @@ def test_task_manager_retains_same_day_usage_for_offline_mappings(app, db_sessio
         system_id="sys-cached",
         linux_username="shared_user",
         is_valid=True,
-        last_checked=datetime.utcnow(),
+        last_checked=datetime.now(timezone.utc),
         last_config='{"TIME_SPENT_DAY": 1800, "TIME_LEFT_DAY": 1200}',
     )
     online_mapping = ManagedUserDeviceMap(
@@ -373,7 +373,7 @@ def test_task_manager_rebalances_shared_time_left_across_devices(app, db_session
         system_id="sys-offline-balance",
         linux_username="shared_limit_user",
         is_valid=True,
-        last_checked=datetime.utcnow(),
+        last_checked=datetime.now(timezone.utc),
         last_config='{"TIME_SPENT_DAY": 1200, "TIME_LEFT_DAY": 2400}',
     )
     online_mapping = ManagedUserDeviceMap(
@@ -721,7 +721,7 @@ def test_task_manager_backoffs_repeated_domain_policy_failures(app, db_session):
     assert len(ws.sent_messages) == first_sent_count
 
     db_session.refresh(mapping)
-    mapping.blocklist_last_attempted = datetime.utcnow() - timedelta(hours=5)
+    mapping.blocklist_last_attempted = datetime.now(timezone.utc) - timedelta(hours=5)
     db_session.commit()
 
     with app.app_context():
@@ -857,7 +857,7 @@ def test_task_manager_delivers_pending_alerts(app, db_session):
         system_id=device.system_id,
         event_type="system_startup",
         linux_username="alice",
-        occurred_at=datetime.utcnow(),
+        occurred_at=datetime.now(timezone.utc),
         payload_json='{"system_id":"alert-device","event_type":"system_startup","details":{"source":"test"}}',
         webhook_enabled_snapshot=True,
         delivery_status=AgentAlert.DELIVERY_PENDING,
@@ -896,7 +896,7 @@ def test_task_manager_retries_failed_alert_deliveries(app, db_session):
     retry_alert = AgentAlert(
         system_id=device.system_id,
         event_type="system_restart",
-        occurred_at=datetime.utcnow(),
+        occurred_at=datetime.now(timezone.utc),
         payload_json='{"system_id":"alert-retry-device","event_type":"system_restart","details":{}}',
         webhook_enabled_snapshot=True,
         delivery_status=AgentAlert.DELIVERY_PENDING,
@@ -904,7 +904,7 @@ def test_task_manager_retries_failed_alert_deliveries(app, db_session):
     disabled_alert = AgentAlert(
         system_id=device.system_id,
         event_type="system_sleep",
-        occurred_at=datetime.utcnow(),
+        occurred_at=datetime.now(timezone.utc),
         payload_json='{"system_id":"alert-retry-device","event_type":"system_sleep","details":{}}',
         webhook_enabled_snapshot=False,
         delivery_status=AgentAlert.DELIVERY_DISABLED,

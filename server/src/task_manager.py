@@ -13,6 +13,7 @@ from datetime import date, datetime, timezone
 
 import requests
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.exc import SQLAlchemyError
 
 from src.database import (
@@ -620,20 +621,56 @@ class BackgroundTaskManager:
                 return False, f'Failed to refresh "{source.name}": HTTP {response.status_code}'
 
             parser = BlocklistStreamParser()
-            BlocklistDomain.query.filter_by(source_id=source.id).delete(synchronize_session=False)
+            dialect_name = db.engine.dialect.name
 
+            # Commit the initial deletion so it doesn't hold an exclusive lock
+            # across the entire multi-million domain insert process.
+            BlocklistDomain.query.filter_by(source_id=source.id).delete(synchronize_session=False)
+            db.session.commit()
+
+            inserted_in_transaction = 0
             for batch in parser.iter_domain_batches(
                 response.iter_content(chunk_size=BLOCKLIST_STREAM_CHUNK_SIZE),
                 encoding=response.encoding or 'utf-8',
             ):
-                db.session.execute(
-                    sqlite_insert(BlocklistDomain).prefix_with('OR IGNORE'),
-                    [
-                        {'source_id': source.id, 'domain': domain}
-                        for domain in batch
-                    ],
-                )
+                if dialect_name == 'sqlite':
+                    db.session.execute(
+                        sqlite_insert(BlocklistDomain).prefix_with('OR IGNORE'),
+                        [
+                            {'source_id': source.id, 'domain': domain}
+                            for domain in batch
+                        ],
+                    )
+                elif dialect_name == 'postgresql':
+                    db.session.execute(
+                        pg_insert(BlocklistDomain).values([
+                            {'source_id': source.id, 'domain': domain}
+                            for domain in batch
+                        ]).on_conflict_do_nothing(constraint='blocklist_source_domain_uc')
+                    )
+                else:
+                    db.session.bulk_insert_mappings(
+                        BlocklistDomain,
+                        [
+                            {'source_id': source.id, 'domain': domain}
+                            for domain in batch
+                        ]
+                    )
 
+                inserted_in_transaction += len(batch)
+
+                # To prevent SQLite over NFS from starving other requests/worker threads,
+                # periodically commit and yield the database lock.
+                if inserted_in_transaction >= 25000:
+                    db.session.commit()
+                    inserted_in_transaction = 0
+                    if dialect_name == 'sqlite':
+                        time.sleep(0.05)  # Yield lock to other processes
+
+            if inserted_in_transaction > 0:
+                db.session.commit()
+
+            source = BlocklistSource.query.get(source.id)  # Refresh source object after commits
             source.etag = response.headers.get('ETag')
             source.source_last_modified = response.headers.get('Last-Modified')
             source.mark_sync_ok()
