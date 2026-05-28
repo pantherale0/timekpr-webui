@@ -6,6 +6,8 @@ from src.blueprints.api.apparmor import api_apparmor_bp
 from src.blueprints.api.time import api_time_bp
 from src.blueprints.api.tasks import api_tasks_bp
 
+from src.blueprints.api.alerts import api_alerts_bp
+
 __all__ = [
     'api_devices_bp',
     'api_users_bp',
@@ -14,4 +16,5 @@ __all__ = [
     'api_apparmor_bp',
     'api_time_bp',
     'api_tasks_bp',
+    'api_alerts_bp',
 ]

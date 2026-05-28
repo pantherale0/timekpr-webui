@@ -78,6 +78,7 @@ from src.blueprints import (
     api_apparmor_bp,
     api_time_bp,
     api_tasks_bp,
+    api_alerts_bp,
     websocket_bp,
 )
 
@@ -92,6 +93,7 @@ app.register_blueprint(api_blocklists_bp)
 app.register_blueprint(api_apparmor_bp)
 app.register_blueprint(api_time_bp)
 app.register_blueprint(api_tasks_bp)
+app.register_blueprint(api_alerts_bp)
 app.register_blueprint(websocket_bp)
 
 # Register WebSocket endpoint via Flask-Sock

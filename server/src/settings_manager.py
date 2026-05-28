@@ -30,3 +30,12 @@ def _get_time_sync_tolerance():
         return max(0, int(raw_value))
     except (TypeError, ValueError):
         return 15
+
+
+def _get_alert_retention_days():
+    """Get the alert retention period in days (default: 30)."""
+    raw_value = Settings.get_value('alert_retention_days', '30')
+    try:
+        return max(1, int(raw_value))
+    except (TypeError, ValueError):
+        return 30

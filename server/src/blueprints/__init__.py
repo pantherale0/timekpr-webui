@@ -12,6 +12,7 @@ from src.blueprints.api import (
     api_apparmor_bp,
     api_time_bp,
     api_tasks_bp,
+    api_alerts_bp,
 )
 from src.blueprints.websocket import websocket_bp
 
@@ -27,5 +28,6 @@ __all__ = [
     'api_apparmor_bp',
     'api_time_bp',
     'api_tasks_bp',
+    'api_alerts_bp',
     'websocket_bp',
 ]

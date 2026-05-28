@@ -176,6 +176,23 @@
                         </small>
                     </div>
 
+                    <div class="form-group" style="margin-top: 1.5rem;">
+                        <label for="alert_retention_days" class="form-label">Alert Retention (days)</label>
+                        <input
+                            type="number"
+                            id="alert_retention_days"
+                            name="alert_retention_days"
+                            class="form-control"
+                            min="1"
+                            step="1"
+                            placeholder="30"
+                            value="{{ alert_retention_days }}"
+                        >
+                        <small style="display: block; margin-top: 0.25rem; color: var(--pico-muted-color); font-weight: 500;">
+                            Number of days to keep alert logs before automatic pruning (default: 30 days).
+                        </small>
+                    </div>
+
                     <button type="submit" class="btn btn-secondary btn-sm" style="width: 100%; margin-top: 1rem;">Save application settings</button>
                 </form>
             </div>

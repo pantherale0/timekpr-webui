@@ -98,58 +98,45 @@
             <div>
                 <h2 style="margin: 0; font-size: 1.5rem;">Alert Audit Trail</h2>
                 <p style="margin: 0.25rem 0 0 0; color: var(--pico-muted-color); font-size: 0.9rem; font-weight: 500;">
-                    Log of parent alerts, locklist violations, and local device events
+                    Log of parent alerts, blocklist violations, and local device events
                 </p>
             </div>
-            <div style="display:flex; gap: 0.5rem; flex-wrap: wrap;">
-                <div style="text-align: center; padding: 0.4rem 0.75rem; background: var(--pico-background-color); border: 1px solid var(--pico-card-border-color); border-radius: 0.5rem; min-width: 100px;">
-                    <div style="font-size: 0.7rem; font-weight: bold; color: var(--pico-muted-color); text-transform: uppercase;">Total</div>
-                    <div style="font-size: 1.1rem; font-weight: 700;">{{ alert_summary.total }}</div>
-                </div>
-                <div style="text-align: center; padding: 0.4rem 0.75rem; background: var(--pico-background-color); border: 1px solid var(--pico-card-border-color); border-radius: 0.5rem; min-width: 100px;">
-                    <div style="font-size: 0.7rem; font-weight: bold; color: var(--pico-muted-color); text-transform: uppercase;">Account</div>
-                    <div style="font-size: 1.1rem; font-weight: 700;">{{ alert_summary.account_specific }}</div>
-                </div>
-                <div style="text-align: center; padding: 0.4rem 0.75rem; background: var(--pico-background-color); border: 1px solid var(--pico-card-border-color); border-radius: 0.5rem; min-width: 100px;">
-                    <div style="font-size: 0.7rem; font-weight: bold; color: var(--pico-muted-color); text-transform: uppercase;">Device</div>
-                    <div style="font-size: 1.1rem; font-weight: 700;">{{ alert_summary.device_wide }}</div>
-                </div>
+            <div style="display:flex; gap: 0.5rem; flex-wrap: wrap;" id="alert-summary-stats">
+                <!-- Injected by JS -->
             </div>
         </div>
 
-        <div class="alerts-toolbar" style="margin-bottom: 1.25rem;">
-            <form method="GET" style="display: flex; gap: 0.5rem; align-items: end; flex-wrap: wrap; margin: 0;">
-                <div class="form-group" style="margin: 0; flex: 1 1 300px;">
-                    <input
-                        type="text"
-                        id="alert_search"
-                        name="alert_search"
-                        class="form-control"
-                        placeholder="Search event, device, scope, account, status..."
-                        value="{{ alert_search }}"
-                        style="margin: 0;"
-                    >
-                </div>
-                <button type="submit" class="btn btn-secondary btn-sm" style="margin: 0;">Search Logs</button>
-                {% if alert_search %}
-                <a href="{{ url_for('user_stats', user_id=user.id) }}" class="btn btn-ghost btn-sm" style="margin: 0;">Clear Filter</a>
-                {% endif %}
-            </form>
-        </div>
-
-        {% if alert_groups %}
-        <div class="alerts-group-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.75rem; margin-bottom: 1.25rem;">
-            {% for group in alert_groups %}
-            <div class="alerts-group-card" style="background: var(--pico-background-color); border: 1px solid var(--pico-card-border-color); border-radius: 0.5rem; padding: 0.5rem 0.75rem;">
-                <div class="alerts-group-card-title" style="font-weight: bold; font-size: 0.9rem;">{{ group.title }}</div>
-                <div class="alerts-group-card-sub" style="font-size: 0.75rem; color: var(--pico-muted-color); font-weight: bold;">{{ group.count }} match(es)</div>
+        <div class="alerts-toolbar" style="margin-bottom: 1.25rem; display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; justify-content: space-between;">
+            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; flex: 1;">
+                <input
+                    type="text"
+                    id="alert-search-input"
+                    class="form-control"
+                    placeholder="Search events, details..."
+                    style="margin: 0; max-width: 300px;"
+                >
+                <select id="alert-type-filter" style="margin: 0; max-width: 200px; padding: 0.3rem 0.5rem; height: auto;">
+                    <option value="">All Event Types</option>
+                </select>
+                <select id="alert-sort-by" style="margin: 0; max-width: 150px; padding: 0.3rem 0.5rem; height: auto;">
+                    <option value="date">Sort by Date</option>
+                    <option value="type">Sort by Type</option>
+                </select>
+                <select id="alert-sort-dir" style="margin: 0; max-width: 100px; padding: 0.3rem 0.5rem; height: auto;">
+                    <option value="desc">Desc</option>
+                    <option value="asc">Asc</option>
+                </select>
             </div>
-            {% endfor %}
+            <div style="display: flex; gap: 0.5rem;">
+                <button id="alert-prune-btn" class="btn btn-ghost btn-sm" style="margin: 0; color: var(--danger-color); border-color: var(--danger-color);">Prune Old Alerts</button>
+            </div>
         </div>
-        {% endif %}
 
-        {% if alert_entries %}
-        <div class="alerts-table-wrapper" style="overflow-x: auto;">
+        <div id="alerts-loading" style="text-align: center; padding: 2rem 0; display: none;">
+            <div aria-busy="true">Loading alert history...</div>
+        </div>
+
+        <div id="alerts-table-container" class="alerts-table-wrapper" style="overflow-x: auto;">
             <table class="striped alerts-table" style="width: 100%; border-collapse: collapse; margin: 0;">
                 <thead>
                     <tr>
@@ -161,48 +148,25 @@
                         <th>Diagnostic Details</th>
                     </tr>
                 </thead>
-                <tbody>
-                    {% for alert in alert_entries %}
-                    <tr>
-                        <td style="font-size: 0.8rem; font-weight: bold; color: var(--pico-muted-color); white-space: nowrap;">
-                            {% if alert.occurred_at %}
-                            {{ (alert.occurred_at|localtime).strftime('%Y-%m-%d %H:%M') }}
-                            {% else %}
-                            Unknown
-                            {% endif %}
-                        </td>
-                        <td>
-                            <strong style="font-size: 0.9rem;">{{ alert.event_label }}</strong>
-                            <div style="font-size: 0.7rem; color: var(--pico-muted-color); font-weight: bold;">ID: #{{ alert.id }}</div>
-                        </td>
-                        <td><span class="badge badge-secondary" style="font-weight: bold;">{{ alert.scope_label }}</span></td>
-                        <td>
-                            <a href="{{ url_for('device_detail', system_id=alert.system_id) }}" style="font-weight: bold;">{{ alert.device_label }}</a>
-                        </td>
-                        <td>
-                            <div style="font-weight: bold; font-size: 0.85rem;">{{ alert.delivery_status|replace('_', ' ')|title }}</div>
-                            <div style="font-size: 0.7rem; color: var(--pico-muted-color); font-weight: bold;">
-                                {{ alert.delivery_attempts }} attempt(s)
-                                {% if alert.last_delivery_error %}
-                                <br><span style="color: var(--danger-color);">Error: {{ alert.last_delivery_error }}</span>
-                                {% endif %}
-                            </div>
-                        </td>
-                        <td class="alerts-details" style="font-size: 0.75rem; color: var(--pico-muted-color); font-family: monospace; max-width: 280px; overflow-wrap: break-word;">{{ alert.details_text }}</td>
-                    </tr>
-                    {% endfor %}
+                <tbody id="alerts-tbody">
+                    <!-- Injected by JS -->
                 </tbody>
             </table>
         </div>
-        {% else %}
-        <div class="alerts-empty" style="text-align: center; color: var(--pico-muted-color); padding: 2rem 0; font-weight: 500;">
-            {% if alert_search %}
-            No audit records matched search filter "{{ alert_search }}".
-            {% else %}
-            No alert logs found for this child account's mapped clients.
-            {% endif %}
+
+        <div id="alerts-empty" style="text-align: center; color: var(--pico-muted-color); padding: 3rem 0; font-weight: 500; display: none;">
+            No audit records found matching the current filters.
         </div>
-        {% endif %}
+
+        <div id="alerts-pagination" style="display: flex; justify-content: space-between; align-items: center; margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--pico-card-border-color);">
+            <div style="font-size: 0.85rem; color: var(--pico-muted-color); font-weight: 500;" id="pagination-info">
+                Showing 0-0 of 0 alerts
+            </div>
+            <div style="display: flex; gap: 0.5rem;">
+                <button id="prev-page" class="btn btn-secondary btn-sm" style="margin: 0;" disabled>Previous</button>
+                <button id="next-page" class="btn btn-secondary btn-sm" style="margin: 0;" disabled>Next</button>
+            </div>
+        </div>
     </article>
 </div>
 {% endblock %}
@@ -408,6 +372,223 @@
 
     // Start with default daily
     switchPeriod('daily');
+
+    // ── Dynamic Alerts Logic ────────────────────────────────────────────────
+    const alertConfig = {
+        managedUserId: {{ user.id }},
+        systemId: null,
+        page: 1,
+        perPage: 50,
+        search: '',
+        eventType: '',
+        sortBy: 'date',
+        sortDir: 'desc'
+    };
+
+    const elements = {
+        tbody: document.getElementById('alerts-tbody'),
+        loading: document.getElementById('alerts-loading'),
+        empty: document.getElementById('alerts-empty'),
+        table: document.getElementById('alerts-table-container'),
+        summary: document.getElementById('alert-summary-stats'),
+        paginationInfo: document.getElementById('pagination-info'),
+        prevBtn: document.getElementById('prev-page'),
+        nextBtn: document.getElementById('next-page'),
+        searchInput: document.getElementById('alert-search-input'),
+        typeFilter: document.getElementById('alert-type-filter'),
+        sortBySelect: document.getElementById('alert-sort-by'),
+        sortDirSelect: document.getElementById('alert-sort-dir'),
+        pruneBtn: document.getElementById('alert-prune-btn')
+    };
+
+    let searchTimeout = null;
+
+    async function fetchAlerts() {
+        elements.loading.style.display = 'block';
+        elements.table.style.display = 'none';
+        elements.empty.style.display = 'none';
+
+        const params = new URLSearchParams({
+            page: alertConfig.page,
+            per_page: alertConfig.perPage,
+            search: alertConfig.search,
+            event_type: alertConfig.eventType,
+            sort_by: alertConfig.sortBy,
+            sort_dir: alertConfig.sortDir
+        });
+        if (alertConfig.managedUserId) params.append('managed_user_id', alertConfig.managedUserId);
+        if (alertConfig.systemId) params.append('system_id', alertConfig.systemId);
+
+        try {
+            const response = await fetch(`/api/alerts?${params.toString()}`);
+            const result = await response.json();
+            
+            if (result.success) {
+                renderAlerts(result.data.alerts);
+                updatePagination(result.data.pagination);
+                updateFilters(result.data.filters);
+                updateSummaryStats(result.data.pagination.total_items);
+            }
+        } catch (error) {
+            console.error('Failed to fetch alerts:', error);
+        } finally {
+            elements.loading.style.display = 'none';
+        }
+    }
+
+    function renderAlerts(alerts) {
+        if (!alerts || alerts.length === 0) {
+            elements.empty.style.display = 'block';
+            return;
+        }
+
+        elements.table.style.display = 'block';
+        elements.tbody.innerHTML = alerts.map(alert => `
+            <tr>
+                <td style="font-size: 0.8rem; font-weight: bold; color: var(--pico-muted-color); white-space: nowrap;">
+                    ${alert.occurred_at ? formatDate(alert.occurred_at) : 'Unknown'}
+                </td>
+                <td>
+                    <strong style="font-size: 0.9rem;">${alert.event_label}</strong>
+                    <div style="font-size: 0.7rem; color: var(--pico-muted-color); font-weight: bold;">ID: #${alert.id}</div>
+                </td>
+                <td><span class="badge badge-secondary" style="font-weight: bold;">${alert.scope_label}</span></td>
+                <td>
+                    <a href="/devices/${alert.system_id}" style="font-weight: bold;">${alert.device_label}</a>
+                </td>
+                <td>
+                    <div style="font-weight: bold; font-size: 0.85rem;">${formatStatus(alert.delivery_status)}</div>
+                    <div style="font-size: 0.7rem; color: var(--pico-muted-color); font-weight: bold;">
+                        ${alert.delivery_attempts} attempt(s)
+                        ${alert.last_delivery_error ? `<br><span style="color: var(--danger-color);">Error: ${alert.last_delivery_error}</span>` : ''}
+                    </div>
+                </td>
+                <td class="alerts-details" style="font-size: 0.75rem; color: var(--pico-muted-color); font-family: monospace; max-width: 280px; overflow-wrap: break-word;">${alert.details_text}</td>
+            </tr>
+        `).join('');
+    }
+
+    function formatDate(dateStr) {
+        const date = new Date(dateStr);
+        return date.getFullYear() + '-' + 
+               String(date.getMonth() + 1).padStart(2, '0') + '-' + 
+               String(date.getDate()).padStart(2, '0') + ' ' + 
+               String(date.getHours()).padStart(2, '0') + ':' + 
+               String(date.getMinutes()).padStart(2, '0');
+    }
+
+    function formatStatus(status) {
+        if (!status) return 'Unknown';
+        return status.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+    }
+
+    function updatePagination(pagination) {
+        const start = (pagination.page - 1) * pagination.per_page + 1;
+        const end = Math.min(pagination.page * pagination.per_page, pagination.total_items);
+        
+        elements.paginationInfo.textContent = pagination.total_items > 0 
+            ? `Showing ${start}-${end} of ${pagination.total_items} alerts`
+            : 'No alerts found';
+            
+        elements.prevBtn.disabled = !pagination.has_prev;
+        elements.nextBtn.disabled = !pagination.has_next;
+    }
+
+    function updateFilters(filters) {
+        const currentType = elements.typeFilter.value;
+        const options = ['<option value="">All Event Types</option>'];
+        filters.event_types.forEach(et => {
+            options.push(`<option value="${et.value}" ${et.value === currentType ? 'selected' : ''}>${et.label}</option>`);
+        });
+        elements.typeFilter.innerHTML = options.join('');
+    }
+
+    function updateSummaryStats(total) {
+        elements.summary.innerHTML = `
+            <div style="text-align: center; padding: 0.4rem 0.75rem; background: var(--pico-background-color); border: 1px solid var(--pico-card-border-color); border-radius: 0.5rem; min-width: 100px;">
+                <div style="font-size: 0.7rem; font-weight: bold; color: var(--pico-muted-color); text-transform: uppercase;">Filtered Results</div>
+                <div style="font-size: 1.1rem; font-weight: 700;">${total}</div>
+            </div>
+        `;
+    }
+
+    // Event Listeners
+    elements.prevBtn.addEventListener('click', () => {
+        if (alertConfig.page > 1) {
+            alertConfig.page--;
+            fetchAlerts();
+        }
+    });
+
+    elements.nextBtn.addEventListener('click', () => {
+        alertConfig.page++;
+        fetchAlerts();
+    });
+
+    elements.searchInput.addEventListener('input', (e) => {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => {
+            alertConfig.search = e.target.value;
+            alertConfig.page = 1;
+            fetchAlerts();
+        }, 400);
+    });
+
+    elements.typeFilter.addEventListener('change', (e) => {
+        alertConfig.eventType = e.target.value;
+        alertConfig.page = 1;
+        fetchAlerts();
+    });
+
+    elements.sortBySelect.addEventListener('change', (e) => {
+        alertConfig.sortBy = e.target.value;
+        alertConfig.page = 1;
+        fetchAlerts();
+    });
+
+    elements.sortDirSelect.addEventListener('change', (e) => {
+        alertConfig.sortDir = e.target.value;
+        alertConfig.page = 1;
+        fetchAlerts();
+    });
+
+    elements.pruneBtn.addEventListener('click', async () => {
+        const days = prompt('Prune alerts older than how many days?', '30');
+        if (days === null) return;
+        
+        const daysInt = parseInt(days);
+        if (isNaN(daysInt) || daysInt < 0) {
+            alert('Please enter a valid number of days.');
+            return;
+        }
+
+        if (!confirm(`Are you sure you want to permanently delete all alerts older than ${daysInt} days for this user?`)) {
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/alerts/prune', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    older_than_days: daysInt,
+                    managed_user_id: alertConfig.managedUserId
+                })
+            });
+            const result = await response.json();
+            if (result.success) {
+                alert(result.message);
+                alertConfig.page = 1;
+                fetchAlerts();
+            }
+        } catch (error) {
+            alert('Failed to prune alerts.');
+        }
+    });
+
+    // Initial load
+    fetchAlerts();
+
 })();
 </script>
 {% endblock %}

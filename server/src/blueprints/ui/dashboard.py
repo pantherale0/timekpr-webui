@@ -10,7 +10,7 @@ from src.blocklists_manager import (
     _build_user_blocklist_sync_status,
     _get_blocklist_sources,
 )
-from src.settings_manager import _get_alert_webhook_settings, _get_time_sync_tolerance
+from src.settings_manager import _get_alert_webhook_settings, _get_time_sync_tolerance, _get_alert_retention_days
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -150,6 +150,7 @@ def settings():
 
     alert_webhook_settings = _get_alert_webhook_settings()
     time_sync_tolerance = _get_time_sync_tolerance()
+    alert_retention_days = _get_alert_retention_days()
 
     if request.method == 'POST':
         form_name = (request.form.get('form_name') or 'password').strip()
@@ -176,16 +177,22 @@ def settings():
             }
         elif form_name == 'application_settings':
             tolerance = request.form.get('time_sync_tolerance')
+            retention = request.form.get('alert_retention_days')
             try:
                 tolerance_val = int(tolerance)
+                retention_val = int(retention)
+                
                 if tolerance_val < 0:
                     flash('Tolerance must be a non-negative number', 'danger')
+                elif retention_val < 1:
+                    flash('Retention must be at least 1 day', 'danger')
                 else:
                     Settings.set_value('time_sync_tolerance', str(tolerance_val))
+                    Settings.set_value('alert_retention_days', str(retention_val))
                     flash('Application settings updated successfully', 'success')
                     return redirect(url_for('ui_dashboard.settings'))
             except (TypeError, ValueError):
-                flash('Invalid tolerance value provided', 'danger')
+                flash('Invalid setting values provided', 'danger')
         else:
             current_password = request.form.get('current_password')
             new_password = request.form.get('new_password')
@@ -208,6 +215,7 @@ def settings():
         'settings.html',
         alert_webhook_settings=alert_webhook_settings,
         time_sync_tolerance=time_sync_tolerance,
+        alert_retention_days=alert_retention_days,
     )
 
 

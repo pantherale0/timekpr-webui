@@ -301,7 +301,28 @@ class BackgroundTaskManager:
         if self.deliver_pending_alerts_enabled:
             logger.info("Delivering alert webhooks")
             self._deliver_pending_alerts()
+            
+        # Automatic alert pruning
+        self._prune_old_alerts()
     
+    def _prune_old_alerts(self):
+        """Automatically prune alerts older than the configured threshold."""
+        try:
+            from src.settings_manager import _get_alert_retention_days
+            retention_days = _get_alert_retention_days()
+            cutoff_date = datetime.now(timezone.utc) - timedelta(days=retention_days)
+            
+            deleted_count = AgentAlert.query.filter(
+                AgentAlert.occurred_at < cutoff_date
+            ).delete(synchronize_session=False)
+            
+            if deleted_count > 0:
+                db.session.commit()
+                logger.info("Automatically pruned %d alerts older than %d days", deleted_count, retention_days)
+        except Exception as exc:
+            logger.warning("Failed to automatically prune alerts: %s", exc)
+            db.session.rollback()
+
     def _update_user_data(self):
         """Update data for all managed users and their device mappings."""
         try:
