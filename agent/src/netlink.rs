@@ -366,6 +366,7 @@ async fn run_monitor_inner(
                 let cwd = pid_to_cwd(pid);
                 let transient = username.is_none() || exe_path.is_empty();
 
+                // 1. AppArmor / Enforcement Check
                 if let Some(decision) = if let Some(ref username) = username {
                     if exe_path.is_empty() {
                         None
@@ -402,24 +403,24 @@ async fn run_monitor_inner(
                     }
                 }
 
-                // Send app_launched alert
-                let _ = alert_tx.send(AppAlert {
-                    event_type: "app_launched".to_string(),
-                    linux_username: username
-                        .clone()
-                        .unwrap_or_else(|| "unknown".to_string()),
-                    payload: json!({
-                        "details": {
-                            "application_name": &comm,
-                            "executable_path": &exe_path,
-                            "pid": pid,
-                            "transient": transient,
-                        }
-                    }),
-                });
-
+                // 2. Alert & Tracking for Monitored Processes
                 if let Some(username) = username {
+                    // Only send "app_launched" for processes with a concrete executable path
+                    // to avoid spamming the server with transient pid-0/unknown alerts.
                     if !exe_path.is_empty() {
+                        let _ = alert_tx.send(AppAlert {
+                            event_type: "app_launched".to_string(),
+                            linux_username: username.clone(),
+                            payload: json!({
+                                "details": {
+                                    "application_name": &comm,
+                                    "executable_path": &exe_path,
+                                    "pid": pid,
+                                    "transient": transient,
+                                }
+                            }),
+                        });
+
                         tracked.insert(
                             pid,
                             TrackedProcess {

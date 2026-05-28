@@ -213,7 +213,6 @@ def migrate_data_sqlite_to_pg(sqlite_db_path):
 def initialize_runtime(start_background_tasks=False):
     """Initialize the database and start background tasks."""
     from flask_migrate import stamp, upgrade
-    from sqlalchemy import inspect
 
     if os.environ.get('TESTING'):
         return
@@ -223,6 +222,10 @@ def initialize_runtime(start_background_tasks=False):
             with app.app_context():
                 db_uri = app.config.get('SQLALCHEMY_DATABASE_URI', '')
                 is_pg = db_uri.startswith('postgresql://') or db_uri.startswith('postgresql+psycopg2://')
+                
+                # Use absolute path for migrations directory to avoid CWD issues
+                migrations_dir = os.path.join(app.root_path, 'migrations')
+                migrations_exist = os.path.isdir(migrations_dir)
                 
                 sqlite_migrated = False
                 if is_pg:
@@ -239,48 +242,42 @@ def initialize_runtime(start_background_tasks=False):
                             try:
                                 migrate_data_sqlite_to_pg(path)
                                 sqlite_migrated = True
-                                try:
-                                    stamp(directory='migrations')
-                                    _LOGGER.info("Stamped PostgreSQL database migration state as head.")
-                                except Exception as stamp_err:
-                                    _LOGGER.warning(f"Warning: Failed to stamp PostgreSQL: {stamp_err}")
+                                if migrations_exist:
+                                    try:
+                                        stamp(directory=migrations_dir)
+                                        _LOGGER.info("Stamped PostgreSQL database migration state as head.")
+                                    except Exception as stamp_err:
+                                        _LOGGER.warning(f"Warning: Failed to stamp PostgreSQL: {stamp_err}")
                             except Exception as mig_err:
                                 _LOGGER.error(f"Error during SQLite to PostgreSQL migration: {mig_err}")
                             break
 
                 if not sqlite_migrated:
-                    migrations_exist = os.path.isdir('migrations')
                     if migrations_exist:
+                        _LOGGER.info(f"Ensuring database is up to date (dir: {migrations_dir})...")
                         try:
-                            inspector = inspect(db.engine)
-                            tables = inspector.get_table_names()
-                            if 'settings' in tables and 'alembic_version' not in tables:
-                                _LOGGER.info("Existing database detected without migration tracking. Stamping as head...")
-                                try:
-                                    stamp(directory='migrations')
-                                except Exception as e:
-                                    _LOGGER.warning(f"Warning: Failed to stamp existing database: {e}")
-                            elif 'settings' not in tables:
-                                _LOGGER.info("Database is missing core tables. Ensuring they are created...")
-                                db.create_all()
-                                if 'alembic_version' not in tables:
-                                    try:
-                                        stamp(directory='migrations')
-                                    except Exception as e:
-                                        _LOGGER.warning(f"Warning: Failed to stamp new database: {e}")
-                        except Exception as e:
-                            _LOGGER.warning(f"Warning: Failed to inspect database: {e}")
-
-                        _LOGGER.info("Running database migrations...")
-                        try:
-                            upgrade(directory='migrations')
+                            # Try to upgrade first (handles existing databases with migrations)
+                            upgrade(directory=migrations_dir)
                             _LOGGER.info("Database migrations applied successfully")
                         except Exception as e:
-                            _LOGGER.error(f"Error applying migrations: {e}. Falling back to create_all().")
-                            db.create_all()
+                            _LOGGER.info(f"Database upgrade() failed or database is new: {e}")
+                            # Fallback: ensure tables exist and stamp as head
+                            try:
+                                db.create_all()
+                                try:
+                                    stamp(directory=migrations_dir)
+                                    _LOGGER.info("Database stamped as head revision after create_all()")
+                                except Exception as stamp_err:
+                                    _LOGGER.warning(f"Could not stamp database: {stamp_err}")
+                            except Exception as create_err:
+                                _LOGGER.error(f"Failure during db.create_all() fallback: {create_err}")
                     else:
-                        _LOGGER.info("Migrations directory does not exist. Creating database tables directly...")
+                        _LOGGER.info("Migrations directory missing. Creating database tables directly...")
                         db.create_all()
+
+                # Final safety measure: Ensure all tables defined in models exist.
+                # This catches cases where migrations are 'current' but tables are missing.
+                db.create_all()
 
                 try:
                     if not Settings.get_value('admin_password_hash', None) and not Settings.get_value('admin_password', None):
@@ -301,4 +298,5 @@ if not os.environ.get('TESTING'):
 
 if __name__ == '__main__':
     initialize_runtime(start_background_tasks=True)
-    app.run(host='0.0.0.0', port=5000, debug=False, use_reloader=False)
+    debug = bool(int(os.environ.get("DEBUG", "0")))
+    app.run(host='0.0.0.0', port=5000, debug=debug, use_reloader=debug)

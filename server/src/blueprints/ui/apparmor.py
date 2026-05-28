@@ -174,7 +174,7 @@ def delete_app_policy(policy_id):
     policy_name = policy.name
 
     # Collect affected users for compilation & sync
-    affected_users = [assignment.managed_user for assignment in policy.assignments]
+    affected_users = [assignment.managed_user for assignment in policy.assignments if assignment.managed_user]
 
     db.session.delete(policy)
     db.session.commit()

@@ -192,7 +192,8 @@ def _get_apparmor_usage_summary(mapping_id, days=7):
 
 def compile_user_apparmor_rules(user):
     """Compile assigned AppPolicies and rules into AppArmorRule records for all user mappings."""
-    assigned_policies = [assignment.policy for assignment in user.app_policy_assignments]
+    # Ensure user assignments and policies are fresh
+    assigned_policies = [assignment.policy for assignment in user.app_policy_assignments if assignment.policy]
     
     preset_priority = {
         'blocked': 4,
@@ -228,7 +229,8 @@ def compile_user_apparmor_rules(user):
                 }
                 
     for mapping in user.device_mappings:
-        AppArmorRule.query.filter_by(device_map_id=mapping.id).delete()
+        # Clear existing rules via relationship to ensure session consistency and proper cascade deletion
+        mapping.apparmor_rules = []
         
         for path, rule_data in compiled.items():
             db_rule = AppArmorRule(

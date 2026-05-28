@@ -13,7 +13,9 @@
             "env": {
                 "FLASK_ENV": "development",
                 "FLASK_DEBUG": "1",
-                "TZ": "UTC"
+                "TZ": "UTC",
+                "DATABASE_URL": "sqlite:///timekpr.db",
+                "DEBUG": "1"
             }
         },
         {
