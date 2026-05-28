@@ -7,39 +7,48 @@ It's automatically handled in the Settings.check_admin_password() method,
 but this script can be run manually if needed.
 """
 
+import logging
+import os
 from flask import Flask
 
 from src.database import Settings, db
 
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+_LOGGER = logging.getLogger(__name__)
+
 def create_app():
     """Create Flask app for migration context"""
     app = Flask(__name__)
-    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///timekpr.db'
+    app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL') or os.environ.get('SQLALCHEMY_DATABASE_URI') or 'sqlite:///timekpr.db'
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     db.init_app(app)
     return app
 
 def migrate_passwords():
     """Migrate plain text passwords to bcrypt hashes"""
-    print("Starting password migration...")
+    _LOGGER.info("Starting password migration...")
 
     # Check if we have an old plain text password
     old_password = Settings.get_value('admin_password')
     hashed_password = Settings.get_value('admin_password_hash')
 
     if old_password and not hashed_password:
-        print("Found plain text password, migrating to bcrypt hash...")
+        _LOGGER.info("Found plain text password, migrating to bcrypt hash...")
         Settings.set_admin_password(old_password)
-        print("✅ Password migrated successfully!")
-        print("🔐 Old plain text password has been removed from database")
+        _LOGGER.info("✅ Password migrated successfully!")
+        _LOGGER.info("🔐 Old plain text password has been removed from database")
     elif hashed_password:
-        print("✅ Password already migrated to bcrypt hash")
+        _LOGGER.info("✅ Password already migrated to bcrypt hash")
     else:
-        print("🔧 No password found, initializing with default 'admin'")
+        _LOGGER.info("🔧 No password found, initializing with default 'admin'")
         Settings.set_admin_password('admin')
-        print("✅ Default password initialized with bcrypt hash")
+        _LOGGER.info("✅ Default password initialized with bcrypt hash")
 
-    print("Migration completed!")
+    _LOGGER.info("Migration completed!")
 
 if __name__ == '__main__':
     migration_app = create_app()

@@ -32,7 +32,6 @@ if os.path.isdir(venv_site_packages):
 
 app_module = importlib.import_module('app')
 flask_app = app_module.app
-run_schema_migrations = app_module.run_schema_migrations
 db = importlib.import_module('src.database').db
 
 @pytest.fixture(scope='session')
@@ -51,7 +50,6 @@ def db_session(app):
     """Provide a clean database session for each test function."""
     with app.app_context():
         db.create_all()
-        run_schema_migrations()
         yield db.session
         db.session.remove()
         db.drop_all()

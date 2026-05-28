@@ -99,7 +99,9 @@ class Settings(db.Model):
         if setting:
             setting.value = value
         else:
-            setting = cls(key=key, value=value)
+            setting = cls()
+            setting.key = key
+            setting.value = value
             db.session.add(setting)
         db.session.commit()
         return setting
@@ -470,7 +472,7 @@ class ManagedUser(db.Model):
 
     def get_device_online_summary(self, online_checker):
         """Return tuple of (online_count, total_count) for mapped devices."""
-        total = len(self.device_mappings)
+        total = len(self.device_mappings)  # type: ignore
         online = 0
         for mapping in self.device_mappings:
             if online_checker(mapping.system_id):
@@ -580,7 +582,7 @@ class BlocklistSource(db.Model):
 
     @property
     def domain_count(self):
-        return len(self.domains)
+        return len(self.domains)  # type: ignore
 
     def mark_sync_ok(self):
         self.last_sync_at = datetime.now(timezone.utc)
@@ -638,7 +640,7 @@ class UserTimeUsage(db.Model):
     )
     
     def __repr__(self):
-        return f'<UserTimeUsage {self.user.username} {self.date}: {self.time_spent}>'
+        return f'<UserTimeUsage {self.user.username} {self.date}: {self.time_spent}>'  # type: ignore
 
 class UserWeeklySchedule(db.Model):
     __tablename__ = 'user_weekly_schedule'
@@ -660,7 +662,7 @@ class UserWeeklySchedule(db.Model):
     last_modified = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     
     def __repr__(self):
-        return f'<UserWeeklySchedule {self.user.username}>'
+        return f'<UserWeeklySchedule {self.user.username}>'  # type: ignore
     
     def get_schedule_dict(self):
         """Get schedule as a dictionary for easy template rendering"""

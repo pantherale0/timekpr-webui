@@ -11,8 +11,9 @@ from datetime import date, datetime, timedelta, timezone
 import pytz
 from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify, abort
 from flask_sock import Sock
-from sqlalchemy import func, text
+from sqlalchemy import func, text, inspect
 from sqlalchemy.exc import SQLAlchemyError
+from flask_migrate import Migrate, upgrade, stamp
 
 from src.database import (
     db,
@@ -53,6 +54,7 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
+_LOGGER = logging.getLogger(__name__)
 
 def _resolve_local_timezone(timezone_name):
     """Resolve the configured timezone, falling back to UTC when needed."""
@@ -72,11 +74,12 @@ LOCAL_TIMEZONE, TIMEZONE_STR = _resolve_local_timezone(TIMEZONE_STR)
 
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///timekpr.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL') or os.environ.get('SQLALCHEMY_DATABASE_URI') or 'sqlite:///timekpr.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # Initialize the database
 db.init_app(app)
+migrate = Migrate(app, db)
 
 # Initialize WebSocket support
 sock = Sock(app)
@@ -374,7 +377,7 @@ def _refresh_managed_user_summary(user):
 
     user.last_checked = max(
         (mapping.last_checked for mapping in valid_mappings if mapping.last_checked),
-        default=lambda: datetime.now(timezone.utc).replace(tzinfo=None)(),
+        default=datetime.now(timezone.utc).replace(tzinfo=None),
     )
     user.last_config = json.dumps({
         "TIME_SPENT_DAY": shared_spent,
@@ -495,8 +498,8 @@ def _build_user_blocklist_sync_status(user):
     for mapping in sorted(
         user.device_mappings,
         key=lambda item: (
-            _device_display_label(item.system_id).lower(),
-            item.linux_username.lower(),
+            (_device_display_label(item.system_id) or '').lower(),
+            (item.linux_username or '').lower(),
             item.id,
         ),
     ):
@@ -685,8 +688,9 @@ def ws_agent_handler(ws):
     Handles dynamic pairing, manual approval review, and HMAC challenge-response handshake.
     """
     remote_ip = request.remote_addr or "127.0.0.1"
-    if request.headers.get("X-Forwarded-For"):
-        remote_ip = request.headers.get("X-Forwarded-For").split(",")[0].strip()
+    x_forwarded_for = request.headers.get("X-Forwarded-For")
+    if x_forwarded_for:
+        remote_ip = x_forwarded_for.split(",")[0].strip()
         
     logging.info("WebSocket connection attempt from %s", remote_ip)
     
@@ -1381,7 +1385,7 @@ def update_user_blocklists(user_id):
     selected_ids = {
         int(raw_id)
         for raw_id in request.form.getlist('source_ids')
-        if str(raw_id).strip().isdigit()
+        if raw_id.strip().isdigit()
     }
 
     valid_sources = {
@@ -2560,278 +2564,95 @@ def delete_apparmor_rule(rule_id):
     return redirect(url_for('apparmor_policy', mapping_id=mapping_id))
 
 
-def run_schema_migrations():
-    """Run lightweight SQLite migrations and backfill mapping table."""
-    agent_device_columns = {
-        row[1]
-        for row in db.session.execute(text("PRAGMA table_info(agent_device)")).fetchall()
-    }
-    if agent_device_columns and 'system_hostname' not in agent_device_columns:
-        db.session.execute(text("""
-            ALTER TABLE agent_device
-            ADD COLUMN system_hostname VARCHAR(255) NULL
-        """))
-        db.session.commit()
 
-    managed_user_columns = {
-        row[1]
-        for row in db.session.execute(text("PRAGMA table_info(managed_user)")).fetchall()
-    }
-    if managed_user_columns and 'daily_limit_adjustment_date' not in managed_user_columns:
-        db.session.execute(text("""
-            ALTER TABLE managed_user
-            ADD COLUMN daily_limit_adjustment_date DATE NULL
-        """))
-    if managed_user_columns and 'daily_limit_adjustment_seconds' not in managed_user_columns:
-        db.session.execute(text("""
-            ALTER TABLE managed_user
-            ADD COLUMN daily_limit_adjustment_seconds INTEGER NULL
-        """))
-    db.session.commit()
 
-    db.session.execute(text("""
-        CREATE TABLE IF NOT EXISTS managed_user_device_map (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            managed_user_id INTEGER NOT NULL,
-            system_id VARCHAR(50) NOT NULL,
-            linux_username VARCHAR(50) NOT NULL,
-            linux_uid INTEGER NULL,
-            is_valid BOOLEAN DEFAULT 0,
-            last_checked DATETIME NULL,
-            last_config TEXT NULL,
-            date_added DATETIME NULL,
-            last_modified DATETIME NULL,
-            blocklist_policy_hash VARCHAR(64) NULL,
-            blocklist_is_synced BOOLEAN NOT NULL DEFAULT 0,
-            blocklist_last_synced DATETIME NULL,
-            blocklist_last_attempted DATETIME NULL,
-            blocklist_last_attempt_hash VARCHAR(64) NULL,
-            blocklist_last_error TEXT NULL,
-            FOREIGN KEY(managed_user_id) REFERENCES managed_user(id),
-            FOREIGN KEY(system_id) REFERENCES agent_device(system_id),
-            UNIQUE(managed_user_id, system_id),
-            UNIQUE(system_id, linux_username),
-            UNIQUE(system_id, linux_uid)
-        )
-    """))
-    db.session.commit()
 
-    mapping_columns = {
-        row[1]
-        for row in db.session.execute(text("PRAGMA table_info(managed_user_device_map)")).fetchall()
-    }
-    if mapping_columns and 'blocklist_policy_hash' not in mapping_columns:
-        db.session.execute(text("""
-            ALTER TABLE managed_user_device_map
-            ADD COLUMN blocklist_policy_hash VARCHAR(64) NULL
-        """))
-    if mapping_columns and 'blocklist_is_synced' not in mapping_columns:
-        db.session.execute(text("""
-            ALTER TABLE managed_user_device_map
-            ADD COLUMN blocklist_is_synced BOOLEAN NOT NULL DEFAULT 0
-        """))
-    if mapping_columns and 'blocklist_last_synced' not in mapping_columns:
-        db.session.execute(text("""
-            ALTER TABLE managed_user_device_map
-            ADD COLUMN blocklist_last_synced DATETIME NULL
-        """))
-    if mapping_columns and 'blocklist_last_attempted' not in mapping_columns:
-        db.session.execute(text("""
-            ALTER TABLE managed_user_device_map
-            ADD COLUMN blocklist_last_attempted DATETIME NULL
-        """))
-    if mapping_columns and 'blocklist_last_attempt_hash' not in mapping_columns:
-        db.session.execute(text("""
-            ALTER TABLE managed_user_device_map
-            ADD COLUMN blocklist_last_attempt_hash VARCHAR(64) NULL
-        """))
-    if mapping_columns and 'blocklist_last_error' not in mapping_columns:
-        db.session.execute(text("""
-            ALTER TABLE managed_user_device_map
-            ADD COLUMN blocklist_last_error TEXT NULL
-        """))
-    db.session.commit()
-
-    db.session.execute(text("""
-        CREATE TABLE IF NOT EXISTS blocklist_source (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name VARCHAR(120) NOT NULL UNIQUE,
-            source_type VARCHAR(32) NOT NULL,
-            source_url TEXT NULL,
-            is_enabled BOOLEAN NOT NULL DEFAULT 1,
-            last_sync_at DATETIME NULL,
-            last_sync_status VARCHAR(32) NOT NULL DEFAULT 'never',
-            last_sync_error TEXT NULL,
-            etag VARCHAR(255) NULL,
-            source_last_modified VARCHAR(255) NULL,
-            content_revision VARCHAR(64) NULL,
-            created_at DATETIME NOT NULL,
-            updated_at DATETIME NOT NULL
-        )
-    """))
-    db.session.execute(text("""
-        CREATE TABLE IF NOT EXISTS blocklist_domain (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            source_id INTEGER NOT NULL,
-            domain VARCHAR(255) NOT NULL,
-            created_at DATETIME NOT NULL,
-            FOREIGN KEY(source_id) REFERENCES blocklist_source(id),
-            UNIQUE(source_id, domain)
-        )
-    """))
-    db.session.execute(text("""
-        CREATE TABLE IF NOT EXISTS managed_user_blocklist_assignment (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            managed_user_id INTEGER NOT NULL,
-            source_id INTEGER NOT NULL,
-            created_at DATETIME NOT NULL,
-            FOREIGN KEY(managed_user_id) REFERENCES managed_user(id),
-            FOREIGN KEY(source_id) REFERENCES blocklist_source(id),
-            UNIQUE(managed_user_id, source_id)
-        )
-    """))
-    db.session.commit()
-
-    blocklist_source_columns = {
-        row[1]
-        for row in db.session.execute(text("PRAGMA table_info(blocklist_source)")).fetchall()
-    }
-    if blocklist_source_columns and 'content_revision' not in blocklist_source_columns:
-        db.session.execute(text("""
-            ALTER TABLE blocklist_source
-            ADD COLUMN content_revision VARCHAR(64) NULL
-        """))
-        db.session.commit()
-
-    legacy_sources = BlocklistSource.query.filter(BlocklistSource.content_revision.is_(None)).all()
-    for source in legacy_sources:
-        basis = source.updated_at or source.created_at or datetime.now(timezone.utc)
-        source.content_revision = hashlib.sha256(
-            f'legacy:{source.id}:{basis.isoformat()}'.encode('utf-8')
-        ).hexdigest()
-    if legacy_sources:
-        db.session.commit()
-
-    users = ManagedUser.query.filter(ManagedUser.system_id.isnot(None)).all()
-    for user in users:
-        if not user.system_id:
-            continue
-        existing = ManagedUserDeviceMap.query.filter_by(
-            managed_user_id=user.id,
-            system_id=user.system_id,
-        ).first()
-        if existing:
-            continue
-
-        linux_uid = None
-        if user.last_config:
-            try:
-                parsed = json.loads(user.last_config)
-                if parsed.get("LINUX_UID") is not None:
-                    linux_uid = int(parsed.get("LINUX_UID"))
-            except (TypeError, ValueError):
-                linux_uid = None
-
-        mapping = ManagedUserDeviceMap(
-            managed_user_id=user.id,
-            system_id=user.system_id,
-            linux_username=user.username,
-            linux_uid=linux_uid,
-            is_valid=user.is_valid,
-            last_checked=user.last_checked,
-            last_config=user.last_config,
-        )
-        db.session.add(mapping)
-    db.session.commit()
-
-    interval_columns = {
-        row[1]
-        for row in db.session.execute(text("PRAGMA table_info(user_daily_time_interval)")).fetchall()
-    }
-    if interval_columns and 'sort_order' not in interval_columns:
-        db.session.execute(text("""
-            CREATE TABLE user_daily_time_interval_new (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER NOT NULL,
-                day_of_week INTEGER NOT NULL,
-                sort_order INTEGER NOT NULL DEFAULT 0,
-                start_hour INTEGER NOT NULL,
-                start_minute INTEGER DEFAULT 0,
-                end_hour INTEGER NOT NULL,
-                end_minute INTEGER DEFAULT 0,
-                is_enabled BOOLEAN DEFAULT 1,
-                is_synced BOOLEAN DEFAULT 0,
-                last_synced DATETIME NULL,
-                last_modified DATETIME NULL,
-                FOREIGN KEY(user_id) REFERENCES managed_user(id),
-                UNIQUE(user_id, day_of_week, sort_order)
-            )
-        """))
-        db.session.execute(text("""
-            INSERT INTO user_daily_time_interval_new (
-                id,
-                user_id,
-                day_of_week,
-                sort_order,
-                start_hour,
-                start_minute,
-                end_hour,
-                end_minute,
-                is_enabled,
-                is_synced,
-                last_synced,
-                last_modified
-            )
-            SELECT
-                id,
-                user_id,
-                day_of_week,
-                0,
-                start_hour,
-                start_minute,
-                end_hour,
-                end_minute,
-                1,
-                is_synced,
-                last_synced,
-                last_modified
-            FROM user_daily_time_interval
-            WHERE COALESCE(is_enabled, 1) = 1
-        """))
-        db.session.execute(text("DROP TABLE user_daily_time_interval"))
-        db.session.execute(text("ALTER TABLE user_daily_time_interval_new RENAME TO user_daily_time_interval"))
-        db.session.commit()
-
-    db.session.execute(text("""
-        CREATE TABLE IF NOT EXISTS agent_alert (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            system_id VARCHAR(50) NOT NULL,
-            event_type VARCHAR(64) NOT NULL,
-            linux_username VARCHAR(80) NULL,
-            occurred_at DATETIME NOT NULL,
-            payload_json TEXT NOT NULL,
-            created_at DATETIME NOT NULL,
-            webhook_enabled_snapshot BOOLEAN NOT NULL DEFAULT 0,
-            delivery_status VARCHAR(20) NOT NULL DEFAULT 'pending',
-            delivery_attempts INTEGER NOT NULL DEFAULT 0,
-            last_delivery_attempt_at DATETIME NULL,
-            delivered_at DATETIME NULL,
-            last_delivery_error TEXT NULL,
-            FOREIGN KEY(system_id) REFERENCES agent_device(system_id)
-        )
-    """))
-    db.session.commit()
-
-    apparmor_rule_columns = {
-        row[1]
-        for row in db.session.execute(text("PRAGMA table_info(apparmor_rule)")).fetchall()
-    }
-    if apparmor_rule_columns and 'match_type' not in apparmor_rule_columns:
-        db.session.execute(text("""
-            ALTER TABLE apparmor_rule
-            ADD COLUMN match_type VARCHAR(32) NOT NULL DEFAULT 'executable'
-        """))
-        db.session.commit()
+def migrate_data_sqlite_to_pg(sqlite_db_path):
+    """Migrates all data from an existing SQLite database to the current PostgreSQL database."""
+    from sqlalchemy import create_engine, select
+    from sqlalchemy import inspect as sqla_inspect
+    
+    _LOGGER.info(f"Starting database migration from SQLite ({sqlite_db_path}) to PostgreSQL...")
+    
+    # 1. Create a direct engine for the SQLite database
+    sqlite_uri = f"sqlite:///{sqlite_db_path}"
+    sqlite_engine = create_engine(sqlite_uri)
+    
+    try:
+        # Check if the SQLite database has any tables to migrate
+        sqlite_inspector = sqla_inspect(sqlite_engine)
+        sqlite_tables = sqlite_inspector.get_table_names()
+        if not sqlite_tables:
+            _LOGGER.info("SQLite database is empty or has no tables. Skipping data migration.")
+            sqlite_engine.dispose()
+            return
+            
+        # 2. Ordered list of models to migrate to satisfy foreign keys
+        models_to_migrate = [
+            Settings,
+            AgentDevice,
+            ManagedUser,
+            ManagedUserDeviceMap,
+            UserWeeklySchedule,
+            UserDailyTimeInterval,
+            UserTimeUsage,
+            BlocklistSource,
+            BlocklistDomain,
+            ManagedUserBlocklistAssignment,
+            AgentAlert,
+            AppArmorRule,
+            AppUsageHistory
+        ]
+        
+        # We perform the migration table-by-table inside a Postgres transaction
+        with db.session.begin():
+            for model in models_to_migrate:
+                table_name = model.__tablename__
+                if table_name not in sqlite_tables:
+                    _LOGGER.info(f"Table '{table_name}' does not exist in SQLite database. Skipping.")
+                    continue
+                    
+                _LOGGER.info(f"Migrating table '{table_name}'...")
+                
+                # Retrieve and insert rows in batches to prevent memory bloat/OOM
+                batch_size = 10000
+                total_inserted = 0
+                
+                with sqlite_engine.connect() as sqlite_conn:
+                    columns = [c for c in model.__table__.columns]
+                    query = select(*columns)
+                    result = sqlite_conn.execute(query)
+                    
+                    while True:
+                        rows_chunk = result.fetchmany(batch_size)
+                        if not rows_chunk:
+                            break
+                        
+                        rows = [dict(row._mapping) for row in rows_chunk]
+                        db.session.execute(model.__table__.insert(), rows)
+                        total_inserted += len(rows)
+                        
+                if total_inserted == 0:
+                    _LOGGER.info(f"Table '{table_name}' is empty. Skipping.")
+                else:
+                    _LOGGER.info(f"Successfully migrated {total_inserted} rows for '{table_name}'.")
+                
+        _LOGGER.info("Database migration completed successfully!")
+        
+        # 3. Clean up the SQLite database file
+        try:
+            sqlite_engine.dispose()
+            if os.path.exists(sqlite_db_path):
+                os.remove(sqlite_db_path)
+                _LOGGER.info(f"Deleted old SQLite database file: {sqlite_db_path}")
+        except Exception as e:
+            _LOGGER.warning(f"Warning: Failed to delete old SQLite database file: {e}")
+            
+    except Exception as e:
+        _LOGGER.error(f"CRITICAL: SQLite to PostgreSQL migration failed: {e}")
+        db.session.rollback()
+        sqlite_engine.dispose()
+        raise e
 
 
 def initialize_runtime(start_background_tasks=False):
@@ -2843,20 +2664,79 @@ def initialize_runtime(start_background_tasks=False):
     with _runtime_init_lock:
         if not RUNTIME_STATE['initialized']:
             with app.app_context():
-                db.create_all()
-                run_schema_migrations()
-                print("Database tables verified")
+                # Check if we are running on PostgreSQL
+                db_uri = app.config.get('SQLALCHEMY_DATABASE_URI', '')
+                is_pg = db_uri.startswith('postgresql://') or db_uri.startswith('postgresql+psycopg2://')
+                
+                sqlite_migrated = False
+                if is_pg:
+                    # Look for existing SQLite databases to migrate
+                    possible_sqlite_paths = [
+                        os.path.join(app.instance_path, 'timekpr.db'),
+                        os.path.join(app.root_path, 'timekpr.db'),
+                        'instance/timekpr.db',
+                        'timekpr.db'
+                    ]
+                    for path in possible_sqlite_paths:
+                        if os.path.exists(path):
+                            _LOGGER.info(f"Found existing SQLite database at {path}. Pre-creating PostgreSQL tables and initiating migration...")
+                            # 1. First ensure all tables are created in PostgreSQL
+                            db.create_all()
+                            # 2. Perform the migration
+                            try:
+                                migrate_data_sqlite_to_pg(path)
+                                sqlite_migrated = True
+                                # Stamp the PostgreSQL database as the head migration state
+                                try:
+                                    stamp(directory='migrations')
+                                    _LOGGER.info("Stamped PostgreSQL database migration state as head.")
+                                except Exception as stamp_err:
+                                    _LOGGER.warning(f"Warning: Failed to stamp PostgreSQL migration state: {stamp_err}")
+                            except Exception as mig_err:
+                                _LOGGER.error(f"Error during SQLite to PostgreSQL migration: {mig_err}")
+                            break
+
+                if not sqlite_migrated:
+                    # 1. Handle existing databases without Alembic tracking if migrations exist
+                    migrations_exist = os.path.isdir('migrations')
+                    if migrations_exist:
+                        try:
+                            inspector = inspect(db.engine)
+                            tables = inspector.get_table_names()
+                            if 'settings' in tables and 'alembic_version' not in tables:
+                                _LOGGER.info("Existing database detected without migration tracking. Stamping as head...")
+                                try:
+                                    stamp(directory='migrations')
+                                except Exception as e:
+                                    _LOGGER.warning(f"Warning: Failed to stamp existing database: {e}")
+                        except Exception as e:
+                            _LOGGER.warning(f"Warning: Failed to inspect database: {e}")
+
+                        # 2. Programmatically apply all pending migrations cleanly on boot
+                        _LOGGER.info("Running database migrations...")
+                        try:
+                            upgrade(directory='migrations')
+                            _LOGGER.info("Database migrations applied successfully")
+                        except Exception as e:
+                            _LOGGER.error(f"Error applying migrations: {e}. Falling back to create_all().")
+                            db.create_all()
+                    else:
+                        _LOGGER.info("Migrations directory does not exist. Creating database tables directly...")
+                        db.create_all()
 
                 # Initialize admin password if it doesn't exist
-                if not Settings.get_value('admin_password_hash', None) and not Settings.get_value('admin_password', None):
-                    Settings.set_admin_password('admin')
-                    print("Admin password initialized")
+                try:
+                    if not Settings.get_value('admin_password_hash', None) and not Settings.get_value('admin_password', None):
+                        Settings.set_admin_password('admin')
+                        _LOGGER.info("Admin password initialized")
+                except Exception as e:
+                    _LOGGER.warning(f"Warning: Could not initialize admin password (tables might not exist yet): {e}")
 
             RUNTIME_STATE['initialized'] = True
 
     if start_background_tasks:
         task_manager.start()
-        print("Background tasks started automatically")
+        _LOGGER.info("Background tasks started automatically")
 
 
 if not os.environ.get('TESTING'):
