@@ -1,0 +1,217 @@
+{% extends "base.html" %}
+
+{% block title %}App Locks & Policies - TimeKpr WebUI{% endblock %}
+
+{% block content %}
+<div class="admin-header-title" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; flex-wrap: wrap; gap: 1.5rem;">
+    <div>
+        <h1 style="margin: 0; font-size: 2.25rem; font-weight: 800; letter-spacing: -0.025em;">App Locks & Policies</h1>
+        <p style="margin: 0.25rem 0 0 0; color: var(--pico-muted-color); font-weight: 500; font-size: 1rem;">Create reusable application lock profiles and enforce them across child accounts.</p>
+    </div>
+    
+    <!-- Real-time search/filter bar -->
+    <div style="position: relative; min-width: 280px; width: 100%; max-width: 360px;">
+        <input type="text" id="policies-search" placeholder="Search app policies..." style="margin: 0; padding-left: 2.5rem; border-radius: 2rem; box-shadow: var(--shadow-soft); font-weight: 500;">
+        <svg style="position: absolute; left: 0.9rem; top: 50%; transform: translateY(-50%); color: var(--pico-muted-color);" width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+        </svg>
+    </div>
+</div>
+
+<div style="display: grid; grid-template-columns: 1fr; gap: 2rem;">
+    <!-- Create Policy Card -->
+    <article class="card" style="margin-bottom: 0; border: 1px solid var(--pico-card-border-color); box-shadow: var(--shadow-soft);">
+        <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1.25rem; border-bottom: 1px solid var(--pico-muted-border-color); padding-bottom: 0.75rem;">
+            <div style="background: var(--success-bg, rgba(16, 185, 129, 0.1)); color: var(--success-color, #10b981); padding: 0.5rem; border-radius: 0.75rem; display: flex; align-items: center; justify-content: center;">
+                <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                </svg>
+            </div>
+            <h2 style="font-size: 1.25rem; font-weight: 800; margin: 0;">Create New App Policy Profile</h2>
+        </div>
+
+        <form action="{{ url_for('ui_apparmor.create_app_policy') }}" method="POST" style="display: flex; gap: 1rem; flex-wrap: wrap; align-items: flex-end; margin: 0;">
+            <div style="flex: 1 1 300px;">
+                <label for="policy_name" class="form-label" style="font-size: 0.8rem; font-weight: 700; color: var(--pico-muted-color); text-transform: uppercase;">Policy Name</label>
+                <input type="text" id="policy_name" name="name" class="form-control" placeholder="e.g. Study Time Locks, Gaming Lockout" required style="margin: 0; border-radius: 0.5rem;">
+            </div>
+            <div>
+                <button type="submit" class="btn btn-primary btn-cta" style="margin: 0; border-radius: 0.5rem; height: 42px; font-weight: 700;">Create Policy</button>
+            </div>
+        </form>
+    </article>
+
+    <!-- Policies Loop -->
+    <div>
+        <h2 style="font-size: 1.35rem; font-weight: 800; margin-bottom: 1.25rem; display: flex; align-items: center; gap: 0.5rem;">
+            <span>Active Policies</span>
+            <span class="badge badge-secondary" id="policies-count-badge" style="font-size: 0.8rem; padding: 0.2rem 0.6rem;">{{ policies|length }} profiles</span>
+        </h2>
+
+        <div id="policies-cards-container" style="display:grid; grid-template-columns: 1fr; gap: 1.5rem;">
+            {% if policies %}
+                {% for policy in policies %}
+                    <div class="policy-card-item" data-name="{{ policy.name|lower }}" style="border: 1px solid var(--pico-card-border-color); border-radius: 1rem; padding: 1.5rem; background: var(--pico-card-background-color); box-shadow: var(--shadow-soft); transition: transform 0.2s, box-shadow 0.2s;">
+                        <!-- Header -->
+                        <div style="display:flex; justify-content:space-between; gap: 1rem; flex-wrap: wrap; align-items: center; border-bottom: 1px solid var(--pico-muted-border-color); padding-bottom: 1rem; margin-bottom: 1.25rem;">
+                            <div>
+                                <div style="display:flex; gap: 0.5rem; align-items:center; flex-wrap: wrap;">
+                                    <h3 style="font-size: 1.25rem; font-weight: 800; margin: 0; letter-spacing: -0.015em; color: var(--pico-color);">{{ policy.name }}</h3>
+                                    <span class="badge badge-secondary" style="font-weight: 700; border-radius: 0.5rem;">{{ policy.rules|length }} rules configured</span>
+                                </div>
+                                <div style="font-size: 0.8rem; color: var(--pico-muted-color); font-weight: 600; margin-top: 0.4rem;">
+                                    Assigned to:
+                                    {% if policy.assignments %}
+                                        {% for assignment in policy.assignments %}
+                                            <strong style="color: var(--pico-primary);">{{ assignment.managed_user.username }}</strong>{% if not loop.last %}, {% endif %}
+                                        {% endfor %}
+                                    {% else %}
+                                        <span style="font-style: italic;">No children currently assigned</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div>
+                                <form action="{{ url_for('ui_apparmor.delete_app_policy', policy_id=policy.id) }}" method="POST" onsubmit="return confirm('Delete app policy profile {{ policy.name }}? This will remove all its rules and unassign it from all children.');" style="margin: 0;">
+                                    <button type="submit" class="btn btn-danger btn-sm" style="margin: 0; padding: 0.4rem 0.8rem; border-radius: 0.5rem; font-weight: 700;">Delete Policy</button>
+                                </form>
+                            </div>
+                        </div>
+
+                        <!-- Rule Adder Form inside policy -->
+                        <div style="background: var(--pico-background-color); border: 1px solid var(--pico-card-border-color); border-radius: 0.75rem; padding: 1.25rem; margin-bottom: 1.25rem;">
+                            <h4 style="font-size: 0.85rem; font-weight: 800; color: var(--pico-muted-color); text-transform: uppercase; margin-bottom: 0.75rem; border-bottom: 1px dashed var(--pico-muted-border-color); padding-bottom: 0.25rem;">Add App Lock Rule</h4>
+                            
+                            <form action="{{ url_for('ui_apparmor.add_app_policy_rule', policy_id=policy.id) }}" method="POST" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.75rem; margin: 0; align-items: flex-end;">
+                                <div class="form-group" style="margin: 0;">
+                                    <label class="form-label" style="font-size: 0.75rem; font-weight: 700; color: var(--pico-muted-color);">Select Curated App</label>
+                                    <select name="curated_app_choice" class="form-control" style="margin: 0; border-radius: 0.5rem; font-size: 0.85rem; padding: 0.35rem 1.75rem 0.35rem 0.5rem; height: 38px;" onchange="toggleCustomFields(this, '{{ policy.id }}')">
+                                        <option value="">-- Custom Executable / Path --</option>
+                                        {% for option in curated_options %}
+                                            <option value="{{ option.path }}">{{ option.icon }} {{ option.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="form-group custom-field-{{ policy.id }}" style="margin: 0;">
+                                    <label class="form-label" style="font-size: 0.75rem; font-weight: 700; color: var(--pico-muted-color);">App Label Name</label>
+                                    <input type="text" name="application_name" class="form-control" placeholder="e.g. Chrome, Steam" style="margin: 0; border-radius: 0.5rem; font-size: 0.85rem; padding: 0.35rem 0.5rem; height: 38px;">
+                                </div>
+                                <div class="form-group custom-field-{{ policy.id }}" style="margin: 0;">
+                                    <label class="form-label" style="font-size: 0.75rem; font-weight: 700; color: var(--pico-muted-color);">Match Type</label>
+                                    <select name="match_type" class="form-control" style="margin: 0; border-radius: 0.5rem; font-size: 0.85rem; padding: 0.35rem 1.75rem 0.35rem 0.5rem; height: 38px;">
+                                        <option value="executable">Single Executable</option>
+                                        <option value="path_pattern">Path Subtree ($HOME/...)</option>
+                                    </select>
+                                </div>
+                                <div class="form-group custom-field-{{ policy.id }}" style="margin: 0; grid-column: span 1;">
+                                    <label class="form-label" style="font-size: 0.75rem; font-weight: 700; color: var(--pico-muted-color);">Executable Path / Pattern</label>
+                                    <input type="text" name="executable_path" class="form-control" placeholder="/usr/bin/name or $HOME/Downloads/**" style="margin: 0; border-radius: 0.5rem; font-size: 0.85rem; padding: 0.35rem 0.5rem; height: 38px;">
+                                </div>
+                                <div class="form-group" style="margin: 0;">
+                                    <label class="form-label" style="font-size: 0.75rem; font-weight: 700; color: var(--pico-muted-color);">Preset Action</label>
+                                    <select name="preset" class="form-control" style="margin: 0; border-radius: 0.5rem; font-size: 0.85rem; padding: 0.35rem 1.75rem 0.35rem 0.5rem; height: 38px;">
+                                        <option value="blocked" style="color:var(--danger-color); font-weight:700;">Blocked (Kill Executable)</option>
+                                        <option value="no_internet">No Internet (Block Outbound)</option>
+                                        <option value="complain">Audited (Complain Mode)</option>
+                                        <option value="allowed">Allowed (Run Freely)</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <button type="submit" class="btn btn-secondary btn-sm" style="margin: 0; border-radius: 0.5rem; height: 38px; width: 100%; font-weight: 700;">Add Lock Rule</button>
+                                </div>
+                            </form>
+                        </div>
+
+                        <!-- Configured Rules Grid -->
+                        {% if policy.rules %}
+                            <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 0.75rem;">
+                                {% for rule in policy.rules %}
+                                    <div style="display:flex; justify-content:space-between; gap: 0.5rem; align-items:center; padding: 0.5rem 0.75rem; border: 1px solid var(--pico-card-border-color); border-radius: 0.75rem; background: var(--pico-card-background-color); box-shadow: var(--shadow-soft);">
+                                        <div style="display:flex; flex-direction:column; gap: 0.15rem; min-width: 0; flex: 1;">
+                                            <div style="display:flex; align-items:center; gap: 0.35rem;">
+                                                <strong style="font-size: 0.9rem; color: var(--pico-color);">{{ rule.application_name }}</strong>
+                                                <span class="badge {% if rule.preset == 'blocked' %}badge-danger{% elif rule.preset == 'no_internet' %}badge-warning{% elif rule.preset == 'complain' %}badge-secondary{% else %}badge-success{% endif %}" style="font-size: 0.7rem; padding: 0.1rem 0.35rem; font-weight: 800; border-radius: 0.35rem;">
+                                                    {{ rule.preset|title }}
+                                                </span>
+                                            </div>
+                                            <code style="font-size: 0.75rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; background: transparent; padding: 0;" title="{{ rule.executable_path }}">
+                                                {{ rule.executable_path }}
+                                            </code>
+                                        </div>
+                                        <form action="{{ url_for('ui_apparmor.delete_app_policy_rule', rule_id=rule.id) }}" method="POST" style="margin: 0; flex-shrink: 0;">
+                                            <button type="submit" class="btn btn-danger btn-sm" style="margin: 0; padding: 0.15rem 0.45rem; font-size: 0.8rem; border-radius: 0.35rem; line-height: 1; height: 24px; width: 24px; display: flex; align-items: center; justify-content: center;" title="Remove this rule">×</button>
+                                        </form>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            <p style="font-size: 0.85rem; color: var(--pico-muted-color); font-weight: 500; margin: 0; font-style: italic; text-align: center; padding: 1.5rem 0;">No application locks configured for this policy. Define one above to get started.</p>
+                        {% endif %}
+                    </div>
+                {% endfor %}
+            {% else %}
+                <div class="empty-state" style="padding: 4rem 2rem; border-radius: 1rem; border: 2px dashed var(--pico-card-border-color); text-align: center; background: var(--pico-card-background-color);">
+                    <div style="background: var(--pico-background-color); color: var(--pico-muted-color); width: 64px; height: 64px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.5rem auto;">
+                        <svg width="32" height="32" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                        </svg>
+                    </div>
+                    <h3 style="font-weight: 800; margin-bottom: 0.5rem; font-size: 1.35rem;">No App Policies Configured</h3>
+                    <p style="color: var(--pico-muted-color); max-width: 420px; margin: 0 auto 1.5rem auto; font-weight: 500; font-size: 0.95rem;">Create App Lock policies and define block/restrict rules for applications to protect your children.</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function toggleCustomFields(select, policyId) {
+        const customFields = document.querySelectorAll(`.custom-field-${policyId}`);
+        if (select.value !== "") {
+            customFields.forEach(field => {
+                field.style.opacity = "0.4";
+                field.style.pointerEvents = "none";
+                const input = field.querySelector('input, select');
+                if (input) input.required = false;
+            });
+        } else {
+            customFields.forEach(field => {
+                field.style.opacity = "1";
+                field.style.pointerEvents = "auto";
+                const input = field.querySelector('input, select');
+                if (input && input.name === "application_name") input.required = true;
+                if (input && input.name === "executable_path") input.required = true;
+            });
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        // Live client-side searching of policies
+        const searchInput = document.getElementById('policies-search');
+        const policyCards = document.querySelectorAll('.policy-card-item');
+        const countBadge = document.getElementById('policies-count-badge');
+
+        if (searchInput) {
+            searchInput.addEventListener('input', (e) => {
+                const query = e.target.value.toLowerCase().trim();
+                let visibleCount = 0;
+
+                policyCards.forEach(card => {
+                    const name = card.getAttribute('data-name') || '';
+                    if (name.includes(query)) {
+                        card.style.display = 'block';
+                        visibleCount++;
+                    } else {
+                        card.style.display = 'none';
+                    }
+                });
+
+                if (countBadge) {
+                    countBadge.textContent = `${visibleCount} found`;
+                }
+            });
+        }
+    });
+</script>
+{% endblock %}

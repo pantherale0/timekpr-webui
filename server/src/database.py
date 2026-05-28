@@ -278,6 +278,12 @@ class ManagedUser(db.Model):
         lazy=True,
         cascade="all, delete-orphan",
     )
+    app_policy_assignments = db.relationship(
+        'ManagedUserAppPolicyAssignment',
+        backref='managed_user',
+        lazy=True,
+        cascade="all, delete-orphan",
+    )
     
     def __repr__(self):
         return f'<ManagedUser {self.username}>'
@@ -974,3 +980,91 @@ class AppUsageHistory(db.Model):
             f'<AppUsageHistory {self.application_name} '
             f'{self.duration_seconds}s>'
         )
+
+
+class AppPolicy(db.Model):
+    __tablename__ = 'app_policy'
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(120), unique=True, nullable=False)
+    created_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+    updated_at = db.Column(
+        db.DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+    rules = db.relationship(
+        'AppPolicyRule',
+        backref='policy',
+        lazy=True,
+        cascade="all, delete-orphan",
+        order_by='AppPolicyRule.application_name.asc()',
+    )
+    assignments = db.relationship(
+        'ManagedUserAppPolicyAssignment',
+        backref='policy',
+        lazy=True,
+        cascade="all, delete-orphan",
+    )
+
+    def __repr__(self):
+        return f'<AppPolicy {self.name}>'
+
+
+class AppPolicyRule(db.Model):
+    __tablename__ = 'app_policy_rule'
+
+    PRESET_ALLOWED = 'allowed'
+    PRESET_NO_INTERNET = 'no_internet'
+    PRESET_BLOCKED = 'blocked'
+    PRESET_COMPLAIN = 'complain'
+    MATCH_TYPE_EXECUTABLE = 'executable'
+    MATCH_TYPE_PATH_PATTERN = 'path_pattern'
+
+    id = db.Column(db.Integer, primary_key=True)
+    policy_id = db.Column(db.Integer, db.ForeignKey('app_policy.id'), nullable=False)
+    application_name = db.Column(db.String(120), nullable=False)
+    executable_path = db.Column(db.String(255), nullable=False)
+    match_type = db.Column(
+        db.String(32),
+        nullable=False,
+        default=MATCH_TYPE_EXECUTABLE,
+    )
+    preset = db.Column(db.String(32), nullable=False, default=PRESET_ALLOWED)
+    is_custom = db.Column(db.Boolean, default=False, nullable=False)
+    created_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+    updated_at = db.Column(
+        db.DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+    __table_args__ = (
+        db.UniqueConstraint(
+            'policy_id',
+            'executable_path',
+            name='apparmor_policy_rule_exec_uc',
+        ),
+    )
+
+    def __repr__(self):
+        return f'<AppPolicyRule {self.application_name} [{self.preset}]>'
+
+
+class ManagedUserAppPolicyAssignment(db.Model):
+    __tablename__ = 'managed_user_app_policy_assignment'
+
+    id = db.Column(db.Integer, primary_key=True)
+    managed_user_id = db.Column(db.Integer, db.ForeignKey('managed_user.id'), nullable=False)
+    policy_id = db.Column(db.Integer, db.ForeignKey('app_policy.id'), nullable=False)
+    created_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+
+    __table_args__ = (
+        db.UniqueConstraint('managed_user_id', 'policy_id', name='managed_user_app_policy_uc'),
+    )
+
+    def __repr__(self):
+        return f'<ManagedUserAppPolicyAssignment user={self.managed_user_id} policy={self.policy_id}>'

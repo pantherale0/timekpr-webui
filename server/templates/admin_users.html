@@ -1,0 +1,215 @@
+{% extends "base.html" %}
+
+{% block title %}Manage Users - TimeKpr WebUI{% endblock %}
+
+{% block content %}
+<div class="admin-header-title" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; flex-wrap: wrap; gap: 1.5rem;">
+    <div>
+        <h1 style="margin: 0; font-size: 2.25rem; font-weight: 800; letter-spacing: -0.025em;">Child Accounts</h1>
+        <p style="margin: 0.25rem 0 0 0; color: var(--pico-muted-color); font-weight: 500; font-size: 1rem;">Create and manage managed user profiles and link them to local Linux user accounts.</p>
+    </div>
+    
+    <!-- User Search Filter Bar -->
+    <div style="position: relative; min-width: 280px; width: 100%; max-width: 360px;">
+        <input type="text" id="user-search" placeholder="Search child accounts..." style="margin: 0; padding-left: 2.5rem; border-radius: 2rem; box-shadow: var(--shadow-soft); font-weight: 500;">
+        <svg style="position: absolute; left: 0.9rem; top: 50%; transform: translateY(-50%); color: var(--pico-muted-color);" width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+        </svg>
+    </div>
+</div>
+
+<div style="display: grid; grid-template-columns: 1fr; gap: 2rem;">
+    <!-- Create Managed User -->
+    <article class="card" style="margin-bottom: 0; border: 1px solid var(--pico-card-border-color); box-shadow: var(--shadow-soft); transition: transform 0.2s;">
+        <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1.25rem;">
+            <div style="background: var(--success-bg); color: var(--success-color); padding: 0.5rem; border-radius: 0.75rem; display: flex; align-items: center; justify-content: center;">
+                <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/>
+                </svg>
+            </div>
+            <h2 style="font-size: 1.25rem; font-weight: 800; margin: 0;">Create Managed Child Account</h2>
+        </div>
+        <form action="{{ url_for('create_managed_user') }}" method="POST" style="display: grid; grid-template-columns: 1fr auto; gap: 1rem; align-items: end; margin: 0;">
+            <div class="form-group" style="margin-bottom: 0;">
+                <label for="username" class="form-label" style="font-weight: 700; font-size: 0.8rem; color: var(--pico-muted-color); text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 0.5rem;">MANAGED PROFILE NAME</label>
+                <input type="text" id="username" name="username" class="form-control" placeholder="e.g. Jordan" required style="margin: 0; border-radius: 0.75rem;">
+            </div>
+            <button type="submit" class="btn btn-primary btn-cta" style="margin: 0; height: 46px; border-radius: 0.75rem;">Create Account</button>
+        </form>
+    </article>
+
+    <!-- Managed Users & Account Mappings -->
+    <div>
+        <h2 style="font-size: 1.35rem; font-weight: 800; margin-bottom: 1.25rem; display: flex; align-items: center; gap: 0.5rem;">
+            <span>Configure Mappings</span>
+            <span class="badge badge-secondary" id="user-count-badge" style="font-size: 0.8rem; padding: 0.2rem 0.6rem;">{{ users|length }} active</span>
+        </h2>
+        
+        <div id="users-cards-container" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(100%, 1fr)); gap: 1.5rem;">
+            {% if users %}
+                {% for user in users %}
+                    <div class="user-card-item" data-username="{{ user.username|lower }}" style="border: 1px solid var(--pico-card-border-color); border-radius: 1rem; padding: 1.5rem; background: var(--pico-card-background-color); box-shadow: var(--shadow-soft); transition: transform 0.2s, box-shadow 0.2s;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; gap:1rem; flex-wrap: wrap; border-bottom: 1px solid var(--pico-muted-border-color); padding-bottom: 1rem; margin-bottom: 1.5rem;">
+                            <div style="display: flex; align-items: center; gap: 1rem;">
+                                <!-- Initials Avatar Circle -->
+                                <div style="width: 48px; height: 48px; border-radius: 50%; background: linear-gradient(135deg, var(--pico-primary) 0%, #1d4ed8 100%); color: white; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 1.25rem; box-shadow: 0 4px 10px rgba(59, 130, 246, 0.25);">
+                                    {{ user.username[:2]|upper }}
+                                </div>
+                                <div>
+                                    <h3 style="margin:0; font-size: 1.35rem; font-weight: 800; letter-spacing: -0.01em;">{{ user.username }}</h3>
+                                    <p style="margin:0; color: var(--pico-muted-color); font-size: 0.85rem; font-weight: 600; display: flex; align-items: center; gap: 0.35rem; margin-top: 0.15rem;">
+                                        <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/>
+                                        </svg>
+                                        <span>{{ user.device_mappings|length }} linked Linux users ({{ user.device_mappings|selectattr('is_valid')|list|length }} verified)</span>
+                                    </p>
+                                </div>
+                            </div>
+                            <div style="display:flex; gap: 0.5rem; flex-wrap: wrap;">
+                                <a href="{{ url_for('ui_dashboard.edit_user_profile', user_id=user.id) }}" class="btn btn-sm btn-primary" style="margin: 0; font-weight: 700; border-radius: 0.5rem; background: var(--pico-primary); border-color: var(--pico-primary);">Edit Profile</a>
+                                <a href="{{ url_for('validate_user', user_id=user.id) }}" class="btn btn-sm btn-secondary" style="margin: 0; font-weight: 700; border-radius: 0.5rem;">Verify connections</a>
+                                <form action="{{ url_for('delete_user', user_id=user.id) }}" method="POST" onsubmit="return confirm('Delete managed user {{ user.username }} and all account mappings?')" style="margin: 0;">
+                                    <button type="submit" class="btn btn-sm btn-danger" style="margin: 0; font-weight: 700; border-radius: 0.5rem;">Delete Profile</button>
+                                </form>
+                            </div>
+                        </div>
+
+                        <!-- Create Mapping Block -->
+                        <div style="background: var(--pico-background-color); border: 1px solid var(--pico-card-border-color); border-radius: 0.75rem; padding: 1.25rem; margin-bottom: 1.25rem;">
+                            <h4 style="font-size: 0.8rem; font-weight: 800; color: var(--pico-muted-color); text-transform: uppercase; margin-bottom: 0.75rem; letter-spacing: 0.05em; display: flex; align-items: center; gap: 0.35rem;">
+                                <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/>
+                                </svg>
+                                <span>Link New Hardware Account Mapping</span>
+                            </h4>
+                            <form action="{{ url_for('add_user_mapping', user_id=user.id) }}" method="POST" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)) auto; gap: 1rem; align-items:end; margin: 0;">
+                                <div class="form-group" style="margin-bottom:0;">
+                                    <label class="form-label" style="font-size: 0.75rem; font-weight: 700; color: var(--pico-muted-color); text-transform: uppercase; margin-bottom: 0.35rem; display: block;">Select Target Device</label>
+                                    <select name="system_id" class="form-control form-select" required style="margin: 0; padding: 0.5rem; font-size: 0.85rem; border-radius: 0.5rem;">
+                                        <option value="" disabled selected>Select approved hardware</option>
+                                        {% for device in approved_devices %}
+                                            <option value="{{ device.system_id }}">{{ device_labels.get(device.system_id, device.display_name) }} ({{ device.system_ip }})</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="form-group" style="margin-bottom:0;">
+                                    <label class="form-label" style="font-size: 0.75rem; font-weight: 700; color: var(--pico-muted-color); text-transform: uppercase; margin-bottom: 0.35rem; display: block;">Linux OS Username</label>
+                                    <input type="text" name="linux_username" class="form-control" placeholder="e.g. jordan" required style="margin: 0; padding: 0.5rem; font-size: 0.85rem; border-radius: 0.5rem;">
+                                </div>
+                                <div class="form-group" style="margin-bottom:0;">
+                                    <label class="form-label" style="font-size: 0.75rem; font-weight: 700; color: var(--pico-muted-color); text-transform: uppercase; margin-bottom: 0.35rem; display: block;">Linux UID (Optional)</label>
+                                    <input type="text" name="linux_uid" class="form-control" placeholder="e.g. 1000" style="margin: 0; padding: 0.5rem; font-size: 0.85rem; border-radius: 0.5rem;">
+                                </div>
+                                <button type="submit" class="btn btn-sm btn-primary btn-cta" style="margin: 0; height: 38px; border-radius: 0.5rem;">Link Mapping</button>
+                            </form>
+                        </div>
+
+                        {% if user.device_mappings %}
+                            <div style="overflow-x: auto;">
+                                <table class="striped" style="width: 100%; border-collapse: collapse; margin: 0; font-size: 0.9rem;">
+                                    <thead>
+                                        <tr style="border-bottom: 2px solid var(--pico-muted-border-color);">
+                                            <th style="padding: 0.75rem 0.5rem; color: var(--pico-muted-color); font-weight: 700; text-transform: uppercase; font-size: 0.75rem;">Linux OS User</th>
+                                            <th style="padding: 0.75rem 0.5rem; color: var(--pico-muted-color); font-weight: 700; text-transform: uppercase; font-size: 0.75rem;">Target Device</th>
+                                            <th style="padding: 0.75rem 0.5rem; color: var(--pico-muted-color); font-weight: 700; text-transform: uppercase; font-size: 0.75rem; text-align: center;">UID</th>
+                                            <th style="padding: 0.75rem 0.5rem; color: var(--pico-muted-color); font-weight: 700; text-transform: uppercase; font-size: 0.75rem; text-align: center;">Status</th>
+                                            <th style="padding: 0.75rem 0.5rem; color: var(--pico-muted-color); font-weight: 700; text-transform: uppercase; font-size: 0.75rem;">Last Connection Check</th>
+                                            <th style="padding: 0.75rem 0.5rem; color: var(--pico-muted-color); font-weight: 700; text-transform: uppercase; font-size: 0.75rem; text-align: right;">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for mapping in user.device_mappings %}
+                                            <tr style="border-bottom: 1px solid var(--pico-muted-border-color);">
+                                                <td style="padding: 0.75rem 0.5rem; font-weight: 700;">
+                                                    <code style="background: var(--pico-background-color); padding: 0.2rem 0.4rem; border-radius: 0.35rem; font-size: 0.85rem;">{{ mapping.linux_username }}</code>
+                                                </td>
+                                                <td style="padding: 0.75rem 0.5rem;">
+                                                    <a href="{{ url_for('device_detail', system_id=mapping.system_id) }}" style="font-weight: 700; display: inline-flex; align-items: center; gap: 0.35rem;">
+                                                        <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                                                        </svg>
+                                                        <span>{{ device_labels.get(mapping.system_id, mapping.system_id) }}</span>
+                                                    </a>
+                                                </td>
+                                                <td style="padding: 0.75rem 0.5rem; text-align: center;">
+                                                    <span class="badge badge-secondary" style="font-weight: 700;">{{ mapping.linux_uid if mapping.linux_uid is not none else '-' }}</span>
+                                                </td>
+                                                <td style="padding: 0.75rem 0.5rem; text-align: center;">
+                                                    {% if mapping.is_valid %}
+                                                        <span class="badge badge-success" style="box-shadow: 0 2px 6px rgba(16, 185, 129, 0.15);">Verified</span>
+                                                    {% else %}
+                                                        <span class="badge badge-warning" style="box-shadow: 0 2px 6px rgba(245, 158, 11, 0.15);">Unverified</span>
+                                                    {% endif %}
+                                                </td>
+                                                <td style="padding: 0.75rem 0.5rem; font-size: 0.8rem; color: var(--pico-muted-color); font-weight: 600;">
+                                                    {% if mapping.last_checked %}
+                                                        {{ (mapping.last_checked|localtime).strftime('%Y-%m-%d %H:%M') }}
+                                                    {% else %}
+                                                        Never checked
+                                                    {% endif %}
+                                                </td>
+                                                <td style="padding: 0.75rem 0.5rem; text-align: right;">
+                                                    <div style="display:inline-flex; gap: 0.35rem;">
+                                                        <a href="{{ url_for('validate_mapping', user_id=user.id, mapping_id=mapping.id) }}" class="btn btn-sm btn-secondary" style="margin: 0; padding: 0.25rem 0.5rem; font-size: 0.75rem;" title="Run verification check now">Verify</a>
+                                                        <a href="{{ url_for('apparmor_policy', mapping_id=mapping.id) }}" class="btn btn-sm btn-secondary" style="margin: 0; padding: 0.25rem 0.5rem; font-size: 0.75rem;" title="Configure security policy blocks">🛡️ Shield</a>
+                                                        <form action="{{ url_for('delete_mapping', user_id=user.id, mapping_id=mapping.id) }}" method="POST" onsubmit="return confirm('Revoke account mapping for {{ mapping.linux_username }}?')" style="margin: 0;">
+                                                            <button type="submit" class="btn btn-sm btn-danger" style="margin: 0; padding: 0.25rem 0.5rem; font-size: 0.75rem;">Remove</button>
+                                                        </form>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        {% else %}
+                            <p style="margin: 0.5rem 0 0 0; color: var(--pico-muted-color); font-size: 0.85rem; font-weight: 500; font-style: italic;">No active device mappings linked to this profile. Link one above to activate parental controls.</p>
+                        {% endif %}
+                    </div>
+                {% endfor %}
+            {% else %}
+                <div class="empty-state" style="padding: 4rem 2rem; border-radius: 1rem; border: 2px dashed var(--pico-card-border-color); text-align: center; background: var(--pico-card-background-color);">
+                    <div style="background: var(--pico-background-color); color: var(--pico-muted-color); width: 64px; height: 64px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.5rem auto;">
+                        <svg width="32" height="32" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>
+                        </svg>
+                    </div>
+                    <h3 style="font-weight: 800; margin-bottom: 0.5rem; font-size: 1.35rem;">No Child Profiles Configured</h3>
+                    <p style="color: var(--pico-muted-color); max-width: 420px; margin: 0 auto 1.5rem auto; font-weight: 500; font-size: 0.95rem;">Create your first child profile above to start managing schedules, time limits, and security restrictions.</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const searchInput = document.getElementById('user-search');
+        const userCards = document.querySelectorAll('.user-card-item');
+        const userCountBadge = document.getElementById('user-count-badge');
+
+        if (searchInput) {
+            searchInput.addEventListener('input', (e) => {
+                const query = e.target.value.toLowerCase().trim();
+                let visibleCount = 0;
+
+                userCards.forEach(card => {
+                    const username = card.getAttribute('data-username') || '';
+                    if (username.includes(query)) {
+                        card.style.display = 'block';
+                        visibleCount++;
+                    } else {
+                        card.style.display = 'none';
+                    }
+                });
+
+                if (userCountBadge) {
+                    userCountBadge.textContent = `${visibleCount} found`;
+                }
+            });
+        }
+    });
+</script>
+{% endblock %}

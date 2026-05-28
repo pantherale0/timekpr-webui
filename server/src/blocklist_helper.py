@@ -350,6 +350,8 @@ def _retry_due(mapping, retry_hash, now=None):
     if last_attempted is None:
         return True
     reference_time = now or datetime.now(timezone.utc)
+    if last_attempted.tzinfo is None and reference_time.tzinfo is not None:
+        reference_time = reference_time.replace(tzinfo=None)
     return (reference_time - last_attempted) >= BLOCKLIST_SYNC_RETRY_INTERVAL
 
 

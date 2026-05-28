@@ -1,0 +1,344 @@
+import logging
+from flask import Blueprint, session, redirect, url_for, flash, render_template, request
+from src.database import (
+    db,
+    ManagedUserDeviceMap,
+    AppArmorRule,
+    ManagedUser,
+    AppPolicy,
+    AppPolicyRule,
+    ManagedUserAppPolicyAssignment,
+)
+from src.agent_helper import AgentConnectionManager, AgentClient
+from src.helpers import _get_device_label_map
+from src.apparmor_manager import (
+    CURATED_APPARMOR_APPS,
+    CURATED_APPARMOR_PATHS,
+    _get_apparmor_usage_summary,
+    compile_user_apparmor_rules,
+    _validate_apparmor_rule_target,
+    _is_valid_preset_for_match_type,
+    _build_apparmor_policy_sync_payload,
+)
+
+_LOGGER = logging.getLogger(__name__)
+
+ui_apparmor_bp = Blueprint('ui_apparmor', __name__)
+
+
+def sync_policy_to_all_assigned_users(policy):
+    """Compile rules and sync to all managed users assigned to this policy."""
+    device_labels = _get_device_label_map()
+    
+    for assignment in policy.assignments:
+        user = assignment.managed_user
+        # Compile rules first
+        compile_user_apparmor_rules(user)
+        
+        # Now sync down to all linked devices of this user
+        for mapping in user.device_mappings:
+            policies_list, skipped_rule_names = _build_apparmor_policy_sync_payload(mapping)
+            if AgentConnectionManager.is_online(mapping.system_id):
+                agent = AgentClient(system_id=mapping.system_id)
+                device_label = device_labels.get(mapping.system_id, mapping.system_id)
+                success, sync_msg = agent.sync_apparmor_policy(
+                    mapping.linux_username,
+                    policies_list,
+                )
+                if success:
+                    _LOGGER.info("Synced AppArmor policy to %s on %s", mapping.linux_username, device_label)
+                else:
+                    _LOGGER.warning("Failed to sync AppArmor policy to %s on %s: %s", mapping.linux_username, device_label, sync_msg)
+
+
+@ui_apparmor_bp.route('/apparmor/policy/<int:mapping_id>', methods=['GET'])
+def apparmor_policy(mapping_id):
+    """Visual AppArmor policy management for a single device mapping (GET)."""
+    if not session.get('logged_in'):
+        flash('Please login first', 'warning')
+        return redirect(url_for('ui_auth.login'))
+
+    mapping = ManagedUserDeviceMap.query.get_or_404(mapping_id)
+    user = mapping.managed_user
+    device_labels = _get_device_label_map()
+    device_label = device_labels.get(mapping.system_id, mapping.system_id)
+
+    # GET: Build template data
+    existing_rules = {
+        (rule.match_type, rule.executable_path): rule
+        for rule in AppArmorRule.query.filter_by(device_map_id=mapping.id).all()
+    }
+
+    curated_apps = []
+    for app_template in CURATED_APPARMOR_APPS:
+        rule = existing_rules.get((AppArmorRule.MATCH_TYPE_EXECUTABLE, app_template['path']))
+        curated_apps.append({
+            'name': app_template['name'],
+            'path': app_template['path'],
+            'icon': app_template['icon'],
+            'preset': rule.preset if rule else AppArmorRule.PRESET_ALLOWED,
+        })
+
+    custom_rules = [
+        {
+            'name': rule.application_name,
+            'path': rule.executable_path,
+            'match_type': rule.match_type,
+            'supports_network_controls': rule.supports_network_controls,
+            'target_label': (
+                'Path subtree'
+                if rule.match_type == AppArmorRule.MATCH_TYPE_PATH_PATTERN
+                else 'Executable'
+            ),
+            'preset': rule.preset,
+            'id': rule.id,
+        }
+        for rule in sorted(
+            existing_rules.values(),
+            key=lambda r: (r.match_type, r.application_name.lower(), r.id),
+        )
+        if not (
+            rule.match_type == AppArmorRule.MATCH_TYPE_EXECUTABLE
+            and rule.executable_path in CURATED_APPARMOR_PATHS
+        )
+    ]
+
+    usage_summary = _get_apparmor_usage_summary(mapping.id)
+    is_online = AgentConnectionManager.is_online(mapping.system_id)
+    restrictive_count = sum(1 for app in curated_apps if app['preset'] != 'allowed') + \
+        sum(1 for rule in custom_rules if rule['preset'] != 'allowed')
+
+    return render_template(
+        'apparmor_policy.html',
+        mapping=mapping,
+        user=user,
+        device_label=device_label,
+        curated_apps=curated_apps,
+        custom_rules=custom_rules,
+        usage_summary=usage_summary,
+        is_online=is_online,
+        restrictive_count=restrictive_count,
+    )
+
+
+@ui_apparmor_bp.route('/admin/app-policies', methods=['GET'])
+def admin_app_policies():
+    """Visual admin panel for reusable App Policies."""
+    if not session.get('logged_in'):
+        flash('Please login first', 'warning')
+        return redirect(url_for('ui_auth.login'))
+
+    policies = AppPolicy.query.order_by(AppPolicy.name.asc()).all()
+    managed_users = ManagedUser.query.order_by(ManagedUser.username.asc()).all()
+    curated_options = CURATED_APPARMOR_APPS
+
+    return render_template(
+        'restrictions_app.html',
+        policies=policies,
+        managed_users=managed_users,
+        curated_options=curated_options,
+    )
+
+
+@ui_apparmor_bp.route('/admin/app-policies/create', methods=['POST'])
+def create_app_policy():
+    if not session.get('logged_in'):
+        flash('Please login first', 'warning')
+        return redirect(url_for('ui_auth.login'))
+
+    name = (request.form.get('name') or '').strip()
+    if not name:
+        flash('Policy name is required', 'danger')
+        return redirect(url_for('ui_apparmor.admin_app_policies'))
+
+    existing = AppPolicy.query.filter_by(name=name).first()
+    if existing:
+        flash(f'Policy "{name}" already exists', 'warning')
+        return redirect(url_for('ui_apparmor.admin_app_policies'))
+
+    policy = AppPolicy(name=name)
+    db.session.add(policy)
+    db.session.commit()
+
+    flash(f'App Policy "{name}" created successfully', 'success')
+    return redirect(url_for('ui_apparmor.admin_app_policies'))
+
+
+@ui_apparmor_bp.route('/admin/app-policies/<int:policy_id>/delete', methods=['POST'])
+def delete_app_policy(policy_id):
+    if not session.get('logged_in'):
+        flash('Please login first', 'warning')
+        return redirect(url_for('ui_auth.login'))
+
+    policy = AppPolicy.query.get_or_404(policy_id)
+    policy_name = policy.name
+
+    # Collect affected users for compilation & sync
+    affected_users = [assignment.managed_user for assignment in policy.assignments]
+
+    db.session.delete(policy)
+    db.session.commit()
+
+    # Sync changes to affected users
+    for user in affected_users:
+        compile_user_apparmor_rules(user)
+        for mapping in user.device_mappings:
+            policies_list, _ = _build_apparmor_policy_sync_payload(mapping)
+            if AgentConnectionManager.is_online(mapping.system_id):
+                agent = AgentClient(system_id=mapping.system_id)
+                agent.sync_apparmor_policy(mapping.linux_username, policies_list)
+
+    flash(f'App Policy "{policy_name}" deleted successfully', 'success')
+    return redirect(url_for('ui_apparmor.admin_app_policies'))
+
+
+@ui_apparmor_bp.route('/admin/app-policies/<int:policy_id>/rule/add', methods=['POST'])
+def add_app_policy_rule(policy_id):
+    if not session.get('logged_in'):
+        flash('Please login first', 'warning')
+        return redirect(url_for('ui_auth.login'))
+
+    policy = AppPolicy.query.get_or_404(policy_id)
+
+    app_name = (request.form.get('application_name') or '').strip()
+    match_type = (request.form.get('match_type') or AppPolicyRule.MATCH_TYPE_EXECUTABLE).strip()
+    path = (request.form.get('executable_path') or '').strip()
+    preset = (request.form.get('preset') or AppPolicyRule.PRESET_ALLOWED).strip()
+
+    # Prepopulate if curated app option chosen
+    curated_path = request.form.get('curated_app_choice')
+    if curated_path:
+        for app in CURATED_APPARMOR_APPS:
+            if app['path'] == curated_path:
+                app_name = app['name']
+                path = app['path']
+                match_type = AppArmorRule.MATCH_TYPE_EXECUTABLE
+                break
+
+    if not app_name or not path:
+        flash('Application name and executable path are required', 'danger')
+        return redirect(url_for('ui_apparmor.admin_app_policies'))
+
+    if match_type not in AppArmorRule.VALID_MATCH_TYPES:
+        match_type = AppArmorRule.MATCH_TYPE_EXECUTABLE
+
+    try:
+        # Validate path pattern using generic placeholder username 'user'
+        path = _validate_apparmor_rule_target(match_type, path, 'user')
+    except ValueError as exc:
+        flash(str(exc), 'danger')
+        return redirect(url_for('ui_apparmor.admin_app_policies'))
+
+    if not _is_valid_preset_for_match_type(match_type, preset):
+        preset = AppPolicyRule.PRESET_ALLOWED
+
+    # Duplicate or update rule check
+    existing = AppPolicyRule.query.filter_by(policy_id=policy.id, executable_path=path).first()
+    if existing:
+        existing.preset = preset
+        existing.application_name = app_name
+        existing.match_type = match_type
+    else:
+        rule = AppPolicyRule(
+            policy_id=policy.id,
+            application_name=app_name,
+            executable_path=path,
+            match_type=match_type,
+            preset=preset,
+            is_custom=True
+        )
+        db.session.add(rule)
+
+    db.session.commit()
+
+    # Sync changes to all assigned users
+    sync_policy_to_all_assigned_users(policy)
+
+    flash(f'Added rule for "{app_name}" to policy "{policy.name}"', 'success')
+    return redirect(url_for('ui_apparmor.admin_app_policies'))
+
+
+@ui_apparmor_bp.route('/admin/app-policies/rule/<int:rule_id>/delete', methods=['POST'])
+def delete_app_policy_rule(rule_id):
+    if not session.get('logged_in'):
+        flash('Please login first', 'warning')
+        return redirect(url_for('ui_auth.login'))
+
+    rule = AppPolicyRule.query.get_or_404(rule_id)
+    policy = rule.policy
+    app_name = rule.application_name
+
+    db.session.delete(rule)
+    db.session.commit()
+
+    # Sync changes to all assigned users
+    sync_policy_to_all_assigned_users(policy)
+
+    flash(f'Removed rule for "{app_name}" from policy "{policy.name}"', 'success')
+    return redirect(url_for('ui_apparmor.admin_app_policies'))
+
+
+@ui_apparmor_bp.route('/managed-users/<int:user_id>/app-policies/update', methods=['POST'])
+def update_user_app_policies(user_id):
+    if not session.get('logged_in'):
+        flash('Please login first', 'warning')
+        return redirect(url_for('ui_auth.login'))
+
+    user = ManagedUser.query.get_or_404(user_id)
+    selected_ids = {
+        int(raw_id)
+        for raw_id in request.form.getlist('policy_ids')
+        if raw_id.strip().isdigit()
+    }
+
+    valid_policies = {
+        policy.id: policy
+        for policy in AppPolicy.query.filter(AppPolicy.id.in_(selected_ids)).all()
+    } if selected_ids else {}
+
+    if selected_ids and len(valid_policies) != len(selected_ids):
+        flash('One or more selected app policies no longer exist', 'danger')
+        return redirect(url_for('ui_dashboard.edit_user_profile', user_id=user.id))
+
+    current_ids = {assignment.policy_id for assignment in user.app_policy_assignments}
+    for assignment in list(user.app_policy_assignments):
+        if assignment.policy_id not in selected_ids:
+            db.session.delete(assignment)
+
+    for policy_id in sorted(selected_ids - current_ids):
+        db.session.add(ManagedUserAppPolicyAssignment(managed_user_id=user.id, policy_id=policy_id))
+
+    db.session.commit()
+
+    # Compile rules for this user now
+    compile_user_apparmor_rules(user)
+
+    # Sync down to all linked devices of this user
+    from src.agent_helper import AgentConnectionManager, AgentClient
+    from src.helpers import _get_device_label_map
+    device_labels = _get_device_label_map()
+
+    sync_count = 0
+    fail_count = 0
+    for mapping in user.device_mappings:
+        policies_list, _ = _build_apparmor_policy_sync_payload(mapping)
+        if AgentConnectionManager.is_online(mapping.system_id):
+            agent = AgentClient(system_id=mapping.system_id)
+            device_label = device_labels.get(mapping.system_id, mapping.system_id)
+            success, sync_msg = agent.sync_apparmor_policy(
+                mapping.linux_username,
+                policies_list,
+            )
+            if success:
+                sync_count += 1
+            else:
+                fail_count += 1
+
+    if sync_count > 0 and fail_count == 0:
+        flash(f'Updated app policies for {user.username} and synced to online devices', 'success')
+    elif fail_count > 0:
+        flash(f'Updated app policies for {user.username}, but sync failed for some devices', 'warning')
+    else:
+        flash(f'Updated app policies for {user.username}. Will sync when devices reconnect.', 'success')
+
+    return redirect(url_for('ui_dashboard.edit_user_profile', user_id=user.id))

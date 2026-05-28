@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+
+{% block title %}Manage Devices - TimeKpr WebUI{% endblock %}
+
+{% block content %}
+<div class="admin-header-title" style="margin-bottom: 2rem;">
+    <h1 style="margin: 0; font-size: 2.25rem; font-weight: 800; letter-spacing: -0.025em;">Agent Devices</h1>
+    <p style="margin: 0.25rem 0 0 0; color: var(--pico-muted-color); font-weight: 500; font-size: 1rem;">Approve and monitor active Linux hardware hosts running the Timekpr daemon client.</p>
+</div>
+
+<!-- Visual Quick-Stats Widget Rows -->
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
+    <div style="border: 1px solid var(--pico-card-border-color); border-radius: 1rem; padding: 1.25rem; background: var(--pico-card-background-color); box-shadow: var(--shadow-soft); display: flex; align-items: center; gap: 1rem;">
+        <div style="background: var(--success-bg); color: var(--success-color); width: 44px; height: 44px; border-radius: 0.75rem; display: flex; align-items: center; justify-content: center; font-weight: bold;">
+            <svg width="22" height="22" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+            </svg>
+        </div>
+        <div>
+            <span style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--pico-muted-color); letter-spacing: 0.05em; display: block;">Trusted Hardware</span>
+            <span style="font-size: 1.5rem; font-weight: 800; display: block; line-height: 1;">{{ approved_devices|length }} Active</span>
+        </div>
+    </div>
+    
+    <div style="border: 1px solid var(--pico-card-border-color); border-radius: 1rem; padding: 1.25rem; background: var(--pico-card-background-color); box-shadow: var(--shadow-soft); display: flex; align-items: center; gap: 1rem;">
+        <div style="background: {% if pending_devices %}var(--warning-bg){% else %}var(--pico-background-color){% endif %}; color: {% if pending_devices %}var(--warning-color){% else %}var(--pico-muted-color){% endif %}; width: 44px; height: 44px; border-radius: 0.75rem; display: flex; align-items: center; justify-content: center; font-weight: bold; transition: all 0.2s;">
+            <svg width="22" height="22" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+            </svg>
+        </div>
+        <div>
+            <span style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--pico-muted-color); letter-spacing: 0.05em; display: block;">Pending Registrations</span>
+            <span style="font-size: 1.5rem; font-weight: 800; display: block; line-height: 1; color: {% if pending_devices %}var(--warning-color){% else %}inherit{% endif %};">{{ pending_devices|length }} Pending</span>
+        </div>
+    </div>
+</div>
+
+<div style="display: grid; grid-template-columns: 1fr; gap: 2rem;">
+    <!-- Pending Device Approvals -->
+    <article class="card" style="margin-bottom: 0; border: 1px solid var(--pico-card-border-color); box-shadow: var(--shadow-soft);">
+        <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1.25rem;">
+            <div style="background: var(--warning-bg); color: var(--warning-color); padding: 0.5rem; border-radius: 0.75rem; display: flex; align-items: center; justify-content: center;">
+                <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+            </div>
+            <h2 style="font-size: 1.25rem; font-weight: 800; margin: 0;">Pending Device Connections</h2>
+        </div>
+        {% if pending_devices %}
+            <div style="overflow-x: auto;">
+                <table class="striped" style="width: 100%; border-collapse: collapse; margin: 0; font-size: 0.95rem;">
+                    <thead>
+                        <tr style="border-bottom: 2px solid var(--pico-muted-border-color);">
+                            <th style="padding: 0.75rem 0.5rem; color: var(--pico-muted-color); font-weight: 700; text-transform: uppercase; font-size: 0.75rem;">Device Label / Hostname</th>
+                            <th style="padding: 0.75rem 0.5rem; color: var(--pico-muted-color); font-weight: 700; text-transform: uppercase; font-size: 0.75rem;">Current IP Address</th>
+                            <th style="padding: 0.75rem 0.5rem; color: var(--pico-muted-color); font-weight: 700; text-transform: uppercase; font-size: 0.75rem; text-align: right;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for device in pending_devices %}
+                            <tr style="border-bottom: 1px solid var(--pico-muted-border-color);">
+                                <td style="padding: 0.75rem 0.5rem; font-weight: 700;">
+                                    <a href="{{ url_for('device_detail', system_id=device.system_id) }}" style="display: inline-flex; align-items: center; gap: 0.35rem;">
+                                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                                        </svg>
+                                        <span>{{ device_labels.get(device.system_id, device.display_name) }}</span>
+                                    </a>
+                                </td>
+                                <td style="padding: 0.75rem 0.5rem;">
+                                    <code style="background: var(--pico-background-color); padding: 0.2rem 0.4rem; border-radius: 0.35rem; font-size: 0.85rem;">{{ device.system_ip }}</code>
+                                </td>
+                                <td style="padding: 0.75rem 0.5rem; text-align: right;">
+                                    <div style="display: inline-flex; gap: 0.35rem;">
+                                        <button onclick="approveDevice('{{ device.system_id }}')" class="btn btn-sm btn-success" style="margin: 0; font-weight: 700;">Approve</button>
+                                        <button onclick="rejectDevice('{{ device.system_id }}')" class="btn btn-sm btn-danger" style="margin: 0; font-weight: 700;">Reject</button>
+                                    </div>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <p style="color: var(--pico-muted-color); margin: 0; font-weight: 500; font-style: italic;">No new connection or registration requests pending at this time.</p>
+        {% endif %}
+    </article>
+
+    <!-- Approved Devices -->
+    <article class="card" style="margin-bottom: 0; border: 1px solid var(--pico-card-border-color); box-shadow: var(--shadow-soft);">
+        <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1.25rem;">
+            <div style="background: var(--success-bg); color: var(--success-color); padding: 0.5rem; border-radius: 0.75rem; display: flex; align-items: center; justify-content: center;">
+                <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+                </svg>
+            </div>
+            <h2 style="font-size: 1.25rem; font-weight: 800; margin: 0;">Registered Devices</h2>
+        </div>
+        {% if approved_devices %}
+            <div style="overflow-x: auto;">
+                <table class="striped" style="width: 100%; border-collapse: collapse; margin: 0; font-size: 0.95rem;">
+                    <thead>
+                        <tr style="border-bottom: 2px solid var(--pico-muted-border-color);">
+                            <th style="padding: 0.75rem 0.5rem; color: var(--pico-muted-color); font-weight: 700; text-transform: uppercase; font-size: 0.75rem;">Device Label / Hostname</th>
+                            <th style="padding: 0.75rem 0.5rem; color: var(--pico-muted-color); font-weight: 700; text-transform: uppercase; font-size: 0.75rem;">Current IP Address</th>
+                            <th style="padding: 0.75rem 0.5rem; color: var(--pico-muted-color); font-weight: 700; text-transform: uppercase; font-size: 0.75rem; text-align: center;">Active Mappings</th>
+                            <th style="padding: 0.75rem 0.5rem; color: var(--pico-muted-color); font-weight: 700; text-transform: uppercase; font-size: 0.75rem; text-align: right;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for device in approved_devices %}
+                            <tr style="border-bottom: 1px solid var(--pico-muted-border-color);">
+                                <td style="padding: 0.75rem 0.5rem; font-weight: 700;">
+                                    <a href="{{ url_for('device_detail', system_id=device.system_id) }}" style="display: inline-flex; align-items: center; gap: 0.35rem;">
+                                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                                        </svg>
+                                        <span>{{ device_labels.get(device.system_id, device.display_name) }}</span>
+                                    </a>
+                                </td>
+                                <td style="padding: 0.75rem 0.5rem;">
+                                    <code style="background: var(--pico-background-color); padding: 0.2rem 0.4rem; border-radius: 0.35rem; font-size: 0.85rem;">{{ device.system_ip }}</code>
+                                </td>
+                                <td style="padding: 0.75rem 0.5rem; text-align: center;">
+                                    <span class="badge badge-secondary" style="font-weight: 700; padding: 0.25rem 0.60rem; border-radius: 2rem;">{{ device.user_mappings|length }} linked account(s)</span>
+                                </td>
+                                <td style="padding: 0.75rem 0.5rem; text-align: right;">
+                                    <button onclick="rejectDevice('{{ device.system_id }}')" class="btn btn-sm btn-danger" style="margin: 0; font-weight: 700;">Revoke Trust</button>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <p style="color: var(--pico-muted-color); margin: 0; font-weight: 500; font-style: italic;">No approved agent devices connected yet. Launch the Timekpr client agent on your target hardware to connect.</p>
+        {% endif %}
+    </article>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function approveDevice(systemId) {
+        if (!confirm('Approve registrations for this device?')) return;
+        fetch(`/api/device/approve/${systemId}`, { method: 'POST' })
+            .then(response => response.json())
+            .then(data => {
+                if (!data.success) {
+                    alert(data.message || 'Failed to approve device');
+                }
+                window.location.reload();
+            })
+            .catch(() => alert('Failed to approve device'));
+    }
+
+    function rejectDevice(systemId) {
+        if (!confirm('Reject or revoke trust for this device?')) return;
+        fetch(`/api/device/reject/${systemId}`, { method: 'POST' })
+            .then(response => response.json())
+            .then(data => {
+                if (!data.success) {
+                    alert(data.message || 'Failed to reject device');
+                }
+                window.location.reload();
+            })
+            .catch(() => alert('Failed to reject device'));
+    }
+</script>
+{% endblock %}

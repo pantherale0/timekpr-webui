@@ -19,6 +19,9 @@ from src.database import (
     Settings,
     UserDailyTimeInterval,
     UserWeeklySchedule,
+    AppPolicy,
+    AppPolicyRule,
+    ManagedUserAppPolicyAssignment,
     db,
 )
 from src.agent_helper import AgentConnectionManager
@@ -131,11 +134,23 @@ def test_admin_panel(client, db_session):
     ))
     db_session.commit()
 
+    # Try `/admin` redirect
     res = client.get('/admin')
-    assert res.status_code == 200
-    assert b"Admin Panel" in res.data
-    assert b"family-pc (aa)" in res.data
-    assert b"family-pc (bb)" in res.data
+    assert res.status_code == 302
+    assert "/admin/users" in res.headers['Location']
+
+    # Fetch users admin page
+    res_users = client.get('/admin/users')
+    assert res_users.status_code == 200
+    assert b"Child Accounts" in res_users.data
+    assert b"alice" in res_users.data
+
+    # Fetch devices admin page
+    res_devices = client.get('/admin/devices')
+    assert res_devices.status_code == 200
+    assert b"Agent Devices" in res_devices.data
+    assert b"family-pc (aa)" in res_devices.data
+    assert b"family-pc (bb)" in res_devices.data
 
 def test_settings_page(client, db_session):
     Settings.set_admin_password("admin")
@@ -334,7 +349,7 @@ def test_blocklist_source_catalog_uses_capped_preview(client, db_session):
     assert external_payload['domain_count'] == 30
     assert external_payload.get('domains') is None
 
-    page = client.get('/settings')
+    page = client.get('/admin/restrictions')
     assert page.status_code == 200
     assert b'manual-000.example.com' in page.data
     assert b'manual-024.example.com' in page.data
@@ -1017,7 +1032,7 @@ def test_alert_pages_for_user_and_device(client, db_session):
     assert b'other-user' in device_filtered.data
     assert b'User Signed In' not in device_filtered.data
 
-    admin_res = client.get('/admin')
+    admin_res = client.get('/admin/devices')
     assert admin_res.status_code == 200
     assert f'/devices/{device.system_id}'.encode() in admin_res.data
 
@@ -1225,3 +1240,66 @@ def test_modify_time_tracks_server_daily_adjustment_for_scheduled_users(client, 
     assert mock_modify.call_count == 1
 
     AgentConnectionManager.unregister("sched-online")
+
+
+def test_app_policies_compiles_and_resolves_precedence(client, db_session):
+    Settings.set_admin_password("admin")
+    client.post('/', data={'username': 'admin', 'password': 'admin'})
+
+    device = AgentDevice(
+        system_id="device-apparmor-policy",
+        system_hostname="family-pc",
+        system_ip="10.0.0.50",
+        status="approved",
+        secure_token="tok",
+    )
+    user = ManagedUser(username="elena", system_ip="Unassigned", is_valid=True)
+    db_session.add_all([device, user])
+    db_session.flush()
+
+    mapping = ManagedUserDeviceMap(
+        managed_user_id=user.id,
+        system_id=device.system_id,
+        linux_username="elena",
+        is_valid=True,
+    )
+    db_session.add(mapping)
+    db_session.flush()
+
+    policy_allow = AppPolicy(name="Allow Browse")
+    policy_block = AppPolicy(name="Block Browse")
+    db_session.add_all([policy_allow, policy_block])
+    db_session.flush()
+
+    rule_allow = AppPolicyRule(
+        policy_id=policy_allow.id,
+        application_name="Firefox",
+        executable_path="/usr/bin/firefox",
+        match_type=AppPolicyRule.MATCH_TYPE_EXECUTABLE,
+        preset=AppPolicyRule.PRESET_ALLOWED,
+        is_custom=True
+    )
+    rule_block = AppPolicyRule(
+        policy_id=policy_block.id,
+        application_name="Firefox",
+        executable_path="/usr/bin/firefox",
+        match_type=AppPolicyRule.MATCH_TYPE_EXECUTABLE,
+        preset=AppPolicyRule.PRESET_BLOCKED,
+        is_custom=True
+    )
+    db_session.add_all([rule_allow, rule_block])
+    db_session.flush()
+
+    assign_allow = ManagedUserAppPolicyAssignment(managed_user_id=user.id, policy_id=policy_allow.id)
+    assign_block = ManagedUserAppPolicyAssignment(managed_user_id=user.id, policy_id=policy_block.id)
+    db_session.add_all([assign_allow, assign_block])
+    db_session.commit()
+
+    from src.apparmor_manager import compile_user_apparmor_rules
+    compile_user_apparmor_rules(user)
+
+    active_rules = AppArmorRule.query.filter_by(device_map_id=mapping.id).all()
+    assert len(active_rules) == 1
+    assert active_rules[0].executable_path == "/usr/bin/firefox"
+    assert active_rules[0].preset == AppArmorRule.PRESET_BLOCKED
+
