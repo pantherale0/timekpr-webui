@@ -2709,6 +2709,14 @@ def initialize_runtime(start_background_tasks=False):
                                     stamp(directory='migrations')
                                 except Exception as e:
                                     _LOGGER.warning(f"Warning: Failed to stamp existing database: {e}")
+                            elif 'settings' not in tables:
+                                _LOGGER.info("Database is missing core tables. Ensuring they are created...")
+                                db.create_all()
+                                if 'alembic_version' not in tables:
+                                    try:
+                                        stamp(directory='migrations')
+                                    except Exception as e:
+                                        _LOGGER.warning(f"Warning: Failed to stamp new database: {e}")
                         except Exception as e:
                             _LOGGER.warning(f"Warning: Failed to inspect database: {e}")
 

@@ -22,11 +22,13 @@ services:
       - TIMEKPR_TASKS_UPDATE_USER_DATA=1
       - TIMEKPR_TASKS_SYNC_DOMAIN_POLICIES=1
       - TIMEKPR_TASKS_DELIVER_ALERTS=0
+      # - DATABASE_URL=postgresql+psycopg2://postgres:postgres@db:5432/postgres
+      - DATABASE_URL=sqlite:///../instance/timekpr.db
     restart: unless-stopped
 
   tasks:
     image: ghcr.io/pantherale0/timekpr-webui-server:latest
-    command: ["python", "task_worker.py"]
+    command: [ "python", "task_worker.py" ]
     volumes:
       - timekpr_data:/app/instance
     environment:
@@ -42,6 +44,8 @@ services:
       - TIMEKPR_TASKS_UPDATE_USER_DATA=0
       - TIMEKPR_TASKS_SYNC_DOMAIN_POLICIES=0
       - TIMEKPR_TASKS_DELIVER_ALERTS=1
+      # - DATABASE_URL=postgresql+psycopg2://postgres:postgres@db:5432/postgres
+      - DATABASE_URL=sqlite:///../instance/timekpr.db
     restart: unless-stopped
 
 volumes:
