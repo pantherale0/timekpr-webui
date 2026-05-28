@@ -623,7 +623,7 @@ fn write_and_load_profile(profile_name: &str, profile_content: &str) -> Result<(
         .map_err(|e| format!("failed to write profile {}: {}", profile_name, e))?;
 
     let output = Command::new("apparmor_parser")
-        .args(["-r", &profile_path.to_string_lossy()])
+        .args(["-r", "-I", PROFILE_DIR, &profile_path.to_string_lossy()])
         .output()
         .map_err(|e| format!("failed to run apparmor_parser -r: {}", e))?;
     if !output.status.success() {
@@ -647,7 +647,7 @@ fn unload_profiles_with_prefix(prefix: &str) -> Result<(), String> {
             if file_name.starts_with(prefix) {
                 let profile_path = entry.path();
                 let output = Command::new("apparmor_parser")
-                    .args(["-R", &profile_path.to_string_lossy()])
+                    .args(["-R", "-I", PROFILE_DIR, &profile_path.to_string_lossy()])
                     .output();
 
                 match output {
@@ -690,7 +690,7 @@ fn generate_global_exec_profile(
     format!(
         r#"# Timekpr managed global path-exec baseline
 profile {profile_name} {attachment_path} flags=(default_allow) {{
-  #include <abstractions/base>
+#include <abstractions/base>
 {path_rule_lines}}}
 "#,
         profile_name = profile_name,
@@ -723,9 +723,9 @@ profile {profile_name} {executable_path} {{
             r#"# Timekpr managed profile – NO INTERNET
 profile {profile_name} {executable_path} {{
   # Allow standard file access
-  #include <abstractions/base>
-  #include <abstractions/fonts>
-  #include <abstractions/X>
+#include <abstractions/base>
+#include <abstractions/fonts>
+#include <abstractions/X>
 
   # Allow reading own binary and libraries
   {executable_path} mr,

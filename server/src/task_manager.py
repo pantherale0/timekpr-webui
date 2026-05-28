@@ -502,7 +502,10 @@ class BackgroundTaskManager:
                                 continue
 
                             delta = shared_time_left - current_time_left
-                            if delta == 0:
+                            
+                            # Use configurable tolerance to avoid notification spam
+                            tolerance = _safe_int(Settings.get_value('time_sync_tolerance', '15'), 15)
+                            if abs(delta) < tolerance:
                                 continue
 
                             operation = "+" if delta > 0 else "-"

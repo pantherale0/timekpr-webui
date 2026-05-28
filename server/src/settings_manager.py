@@ -21,3 +21,12 @@ def _get_alert_webhook_settings():
         'secret': secret,
         'is_active': enabled and bool(url),
     }
+
+
+def _get_time_sync_tolerance():
+    """Get the time sync tolerance in seconds (default: 15)."""
+    raw_value = Settings.get_value('time_sync_tolerance', '15')
+    try:
+        return max(0, int(raw_value))
+    except (TypeError, ValueError):
+        return 15

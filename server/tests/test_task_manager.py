@@ -463,6 +463,71 @@ def test_task_manager_uses_server_daily_adjustment_when_rebalancing(app, db_sess
     AgentConnectionManager.unregister("sys-adjusted-balance")
 
 
+def test_task_manager_ignores_small_time_drift_within_tolerance(app, db_session):
+    manager = BackgroundTaskManager(app)
+
+    user = ManagedUser(
+        username="tolerant_user",
+        system_ip="Unassigned",
+        is_valid=True,
+    )
+    device = AgentDevice(system_id="sys-tolerant", status="approved", secure_token="tok")
+    db_session.add_all([user, device])
+    db_session.flush()
+
+    schedule = UserWeeklySchedule(user_id=user.id, is_synced=True)
+    weekday_columns = (
+        'monday_hours',
+        'tuesday_hours',
+        'wednesday_hours',
+        'thursday_hours',
+        'friday_hours',
+        'saturday_hours',
+        'sunday_hours',
+    )
+    setattr(schedule, weekday_columns[date.today().weekday()], 1.0)
+    db_session.add(schedule)
+
+    mapping = ManagedUserDeviceMap(
+        managed_user_id=user.id,
+        system_id="sys-tolerant",
+        linux_username="tolerant_user",
+        is_valid=True,
+    )
+    db_session.add(mapping)
+    db_session.commit()
+
+    # Case A: 10 second drift (within 15s tolerance)
+    ws = StatefulTimeWS(time_spent=600, time_left=3010) # 3600 - 600 = 3000 expected, 3010 reported
+    AgentConnectionManager.register("sys-tolerant", ws, "10.0.0.7")
+
+    with app.app_context():
+        manager._update_user_data()
+
+    rebalance_calls = [
+        json.loads(message)
+        for message in ws.sent_messages
+        if json.loads(message).get("action") == "modify_time_left"
+    ]
+    assert not rebalance_calls, "Should not rebalance for 10s drift"
+
+    # Case B: 20 second drift (outside 15s tolerance)
+    ws.time_left = 3020
+    ws.sent_messages = []
+    with app.app_context():
+        manager._update_user_data()
+
+    rebalance_calls = [
+        json.loads(message)
+        for message in ws.sent_messages
+        if json.loads(message).get("action") == "modify_time_left"
+    ]
+    assert rebalance_calls, "Should rebalance for 20s drift"
+    assert rebalance_calls[-1]["args"] == {"operation": "-", "seconds": 20}
+
+    AgentConnectionManager.unregister("sys-tolerant")
+
+
 def test_task_manager_failures_and_threads(app, db_session):
     manager = BackgroundTaskManager(app)
 

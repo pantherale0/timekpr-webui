@@ -10,7 +10,7 @@ from src.blocklists_manager import (
     _build_user_blocklist_sync_status,
     _get_blocklist_sources,
 )
-from src.settings_manager import _get_alert_webhook_settings
+from src.settings_manager import _get_alert_webhook_settings, _get_time_sync_tolerance
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -149,6 +149,7 @@ def settings():
         return redirect(url_for('ui_auth.login'))
 
     alert_webhook_settings = _get_alert_webhook_settings()
+    time_sync_tolerance = _get_time_sync_tolerance()
 
     if request.method == 'POST':
         form_name = (request.form.get('form_name') or 'password').strip()
@@ -173,6 +174,18 @@ def settings():
                 'secret': webhook_secret,
                 'is_active': webhook_enabled and bool(webhook_url),
             }
+        elif form_name == 'application_settings':
+            tolerance = request.form.get('time_sync_tolerance')
+            try:
+                tolerance_val = int(tolerance)
+                if tolerance_val < 0:
+                    flash('Tolerance must be a non-negative number', 'danger')
+                else:
+                    Settings.set_value('time_sync_tolerance', str(tolerance_val))
+                    flash('Application settings updated successfully', 'success')
+                    return redirect(url_for('ui_dashboard.settings'))
+            except (TypeError, ValueError):
+                flash('Invalid tolerance value provided', 'danger')
         else:
             current_password = request.form.get('current_password')
             new_password = request.form.get('new_password')
@@ -194,6 +207,7 @@ def settings():
     return render_template(
         'settings.html',
         alert_webhook_settings=alert_webhook_settings,
+        time_sync_tolerance=time_sync_tolerance,
     )
 
 
