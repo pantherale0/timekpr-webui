@@ -147,6 +147,18 @@ def test_agent_device_model(db_session):
     assert fallback_device.display_name == "dev-456"
     assert fallback_device.format_display_name(include_suffix=True) == "dev-456"
 
+    # Test linux_users property
+    assert device.linux_users == []
+    device.linux_users_json = '[{"username": "jordan", "uid": 1000}, {"username": "alice", "uid": 1001}]'
+    db_session.commit()
+    assert len(device.linux_users) == 2
+    assert device.linux_users[0]['username'] == 'jordan'
+    assert device.linux_users[1]['uid'] == 1001
+
+    # Test invalid JSON
+    device.linux_users_json = '{invalid}'
+    assert device.linux_users == []
+
 
 def test_agent_alert_model(db_session):
     device = AgentDevice(system_id="dev-alert", status="approved", secure_token="token")

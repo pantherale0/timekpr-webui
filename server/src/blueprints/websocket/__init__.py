@@ -108,7 +108,6 @@ def ws_agent_handler(ws):
                         status='pending',
                     )
                     db.session.add(device)
-                    db.session.commit()
                     _LOGGER.info(
                         "New pending device registered: %s from %s",
                         system_id,
@@ -118,7 +117,13 @@ def ws_agent_handler(ws):
                     if "system_hostname" in hello_msg:
                         device.system_hostname = system_hostname
                     device.system_ip = remote_ip
-                    db.session.commit()
+
+                # Update synced linux users list for all connections
+                linux_users = hello_msg.get("linux_users")
+                if linux_users is not None:
+                    device.linux_users_json = json.dumps(linux_users)
+                
+                db.session.commit()
     
                 if device.status == 'pending':
                     _LOGGER.info("Device %s is PENDING approval. Waiting...", system_id)

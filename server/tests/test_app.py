@@ -26,6 +26,25 @@ from src.database import (
 )
 from src.agent_helper import AgentConnectionManager
 
+class MockWS:
+    def __init__(self, messages):
+        self.messages = messages
+        self.sent_messages = []
+        self.closed = False
+        self.timeout = None
+
+    def receive(self, timeout=None):
+        self.timeout = timeout
+        if self.messages:
+            return self.messages.pop(0)
+        return None
+
+    def send(self, data):
+        self.sent_messages.append(data)
+
+    def close(self):
+        self.closed = True
+
 def test_login_routes(client, db_session):
     # 1. GET login page when not logged in
     res = client.get('/')
@@ -466,25 +485,6 @@ def test_rest_apis(client, db_session):
     assert b"restarted" in res.data
 
 def test_websocket_handler(app, db_session):
-    class MockWS:
-        def __init__(self, messages):
-            self.messages = messages
-            self.sent_messages = []
-            self.closed = False
-            self.timeout = None
-
-        def receive(self, timeout=None):
-            self.timeout = timeout
-            if self.messages:
-                return self.messages.pop(0)
-            return None
-
-        def send(self, data):
-            self.sent_messages.append(data)
-
-        def close(self):
-            self.closed = True
-
     # 1. Connection attempt timeout (empty hello)
     ws_timeout = MockWS([])
     with app.test_request_context('/ws', environ_base={'REMOTE_ADDR': '127.0.0.1'}):
@@ -529,6 +529,33 @@ def test_websocket_handler(app, db_session):
     assert json.loads(ws_pending_new.sent_messages[0])['status'] == "pending"
     pending_device = AgentDevice.query.get("sys-new-pending")
     assert pending_device.system_hostname == "kids-pc"
+
+
+def test_websocket_handshake_saves_linux_users(app, db_session):
+    from app import ws_agent_handler
+    
+    users_payload = [
+        {"username": "child1", "uid": 1001},
+        {"username": "child2", "uid": 1002}
+    ]
+    
+    ws = MockWS([json.dumps({
+        "type": "hello",
+        "system_id": "sys-users-test",
+        "system_hostname": "test-pc",
+        "agent_version": "v0.10",
+        "linux_users": users_payload
+    })])
+    
+    with app.test_request_context('/ws', environ_base={'REMOTE_ADDR': '1.2.3.4'}):
+        ws_agent_handler(ws)
+        
+    device = AgentDevice.query.get("sys-users-test")
+    assert device is not None
+    assert len(device.linux_users) == 2
+    assert device.linux_users[0]['username'] == "child1"
+    assert device.linux_users[1]['uid'] == 1002
+
 
     # 6. Approved Device authentication flow (HMAC challenge-response)
     system_id = "approved-system-id"
@@ -649,23 +676,6 @@ def test_websocket_handler(app, db_session):
 
 def test_websocket_handler_version_checking(app, db_session):
     from app import __version__, ws_agent_handler
-
-    class MockWS:
-        def __init__(self, messages):
-            self.messages = messages
-            self.sent_messages = []
-            self.closed = False
-
-        def receive(self, timeout=None):
-            if self.messages:
-                return self.messages.pop(0)
-            return None
-
-        def send(self, data):
-            self.sent_messages.append(data)
-
-        def close(self):
-            self.closed = True
 
     # 1. Test mismatched agent version
     ws_mismatch = MockWS([json.dumps({

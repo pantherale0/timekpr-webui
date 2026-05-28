@@ -154,7 +154,8 @@ class AgentDevice(db.Model):
     secure_token = db.Column(db.String(64), nullable=True)  # Dynamically generated token
     date_added = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     last_seen = db.Column(db.DateTime(timezone=True), nullable=True)
-    
+    linux_users_json = db.Column(db.Text(), nullable=True)  # JSON list of standard system users
+
     # Relationship to per-user Linux account mappings on this device
     user_mappings = db.relationship(
         'ManagedUserDeviceMap',
@@ -170,7 +171,18 @@ class AgentDevice(db.Model):
     )
 
     @property
+    def linux_users(self):
+        """Parse stored JSON user list into a list of dictionaries."""
+        if not self.linux_users_json:
+            return []
+        try:
+            return json.loads(self.linux_users_json)
+        except (TypeError, ValueError, json.JSONDecodeError):
+            return []
+
+    @property
     def display_name(self):
+
         hostname = (self.system_hostname or '').strip()
         return hostname or self.system_id
 

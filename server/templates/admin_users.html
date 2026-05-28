@@ -85,20 +85,32 @@
                             <form action="{{ url_for('add_user_mapping', user_id=user.id) }}" method="POST" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)) auto; gap: 1rem; align-items:end; margin: 0;">
                                 <div class="form-group" style="margin-bottom:0;">
                                     <label class="form-label" style="font-size: 0.75rem; font-weight: 700; color: var(--pico-muted-color); text-transform: uppercase; margin-bottom: 0.35rem; display: block;">Select Target Device</label>
-                                    <select name="system_id" class="form-control form-select" required style="margin: 0; padding: 0.5rem; font-size: 0.85rem; border-radius: 0.5rem;">
+                                    <select name="system_id" class="form-control form-select target-device-select" required style="margin: 0; padding: 0.5rem; font-size: 0.85rem; border-radius: 0.5rem;">
                                         <option value="" disabled selected>Select approved hardware</option>
                                         {% for device in approved_devices %}
-                                            <option value="{{ device.system_id }}">{{ device_labels.get(device.system_id, device.display_name) }} ({{ device.system_ip }})</option>
+                                            <option value="{{ device.system_id }}" data-linux-users="{{ device.linux_users|tojson|forceescape }}">
+                                                {{ device_labels.get(device.system_id, device.display_name) }} ({{ device.system_ip }})
+                                            </option>
                                         {% endfor %}
                                     </select>
                                 </div>
                                 <div class="form-group" style="margin-bottom:0;">
                                     <label class="form-label" style="font-size: 0.75rem; font-weight: 700; color: var(--pico-muted-color); text-transform: uppercase; margin-bottom: 0.35rem; display: block;">Linux OS Username</label>
-                                    <input type="text" name="linux_username" class="form-control" placeholder="e.g. jordan" required style="margin: 0; padding: 0.5rem; font-size: 0.85rem; border-radius: 0.5rem;">
+                                    <input 
+                                        type="text" 
+                                        name="linux_username" 
+                                        class="form-control linux-username-input" 
+                                        placeholder="e.g. jordan" 
+                                        required 
+                                        style="margin: 0; padding: 0.5rem; font-size: 0.85rem; border-radius: 0.5rem;"
+                                        list="linux-users-list-{{ user.id }}"
+                                        autocomplete="off"
+                                    >
+                                    <datalist id="linux-users-list-{{ user.id }}"></datalist>
                                 </div>
                                 <div class="form-group" style="margin-bottom:0;">
                                     <label class="form-label" style="font-size: 0.75rem; font-weight: 700; color: var(--pico-muted-color); text-transform: uppercase; margin-bottom: 0.35rem; display: block;">Linux UID (Optional)</label>
-                                    <input type="text" name="linux_uid" class="form-control" placeholder="e.g. 1000" style="margin: 0; padding: 0.5rem; font-size: 0.85rem; border-radius: 0.5rem;">
+                                    <input type="text" name="linux_uid" class="form-control linux-uid-input" placeholder="e.g. 1000" style="margin: 0; padding: 0.5rem; font-size: 0.85rem; border-radius: 0.5rem;">
                                 </div>
                                 <button type="submit" class="btn btn-sm btn-primary btn-cta" style="margin: 0; height: 38px; border-radius: 0.5rem;">Link Mapping</button>
                             </form>
@@ -210,6 +222,46 @@
                 }
             });
         }
+
+        // ── Linux User Sync Logic ──────────────────────────────────────────
+        const deviceSelects = document.querySelectorAll('.target-device-select');
+        
+        deviceSelects.forEach(select => {
+            select.addEventListener('change', (e) => {
+                const selectedOption = e.target.options[e.target.selectedIndex];
+                const usersJson = selectedOption.getAttribute('data-linux-users');
+                const form = e.target.closest('form');
+                const datalist = form.querySelector('datalist');
+                const usernameInput = form.querySelector('.linux-username-input');
+                const uidInput = form.querySelector('.linux-uid-input');
+                
+                // Clear existing options
+                datalist.innerHTML = '';
+                
+                if (usersJson) {
+                    try {
+                        const users = JSON.parse(usersJson);
+                        users.forEach(user => {
+                            const option = document.createElement('option');
+                            option.value = user.username;
+                            option.setAttribute('data-uid', user.uid);
+                            datalist.appendChild(option);
+                        });
+
+                        // Listener to auto-fill UID when username is selected from list or typed
+                        usernameInput.addEventListener('input', () => {
+                            const val = usernameInput.value;
+                            const matchedUser = users.find(u => u.username === val);
+                            if (matchedUser) {
+                                uidInput.value = matchedUser.uid;
+                            }
+                        });
+                    } catch (err) {
+                        console.error('Failed to parse linux users data', err);
+                    }
+                }
+            });
+        });
     });
 </script>
 {% endblock %}

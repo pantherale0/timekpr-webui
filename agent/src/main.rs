@@ -95,6 +95,12 @@ enum ServerMessage {
 }
 
 #[derive(Serialize, Debug, Clone)]
+pub struct LinuxUser {
+    pub username: String,
+    pub uid: u32,
+}
+
+#[derive(Serialize, Debug, Clone)]
 #[serde(tag = "type")]
 enum ClientMessage {
     #[serde(rename = "hello")]
@@ -103,6 +109,7 @@ enum ClientMessage {
         system_hostname: Option<String>,
         registration_token: Option<String>,
         agent_version: String,
+        linux_users: Option<Vec<LinuxUser>>,
     },
     #[serde(rename = "register")]
     Register {
@@ -1040,6 +1047,11 @@ async fn main() {
             Ok((mut ws_stream, _)) => {
                 println!("WebSocket connected! Starting handshake...");
 
+                let users_vec: Vec<LinuxUser> = get_system_users_map()
+                    .into_iter()
+                    .map(|(uid, username)| LinuxUser { username, uid })
+                    .collect();
+
                 let hello_msg = ClientMessage::Hello {
                     system_id: system_id.clone(),
                     system_hostname: system_hostname.clone(),
@@ -1049,6 +1061,7 @@ async fn main() {
                     } else {
                         format!("v{}", AGENT_VERSION)
                     },
+                    linux_users: Some(users_vec),
                 };
                 let hello_json = serde_json::to_string(&hello_msg).unwrap();
                 if let Err(e) = ws_stream.send(Message::Text(hello_json.into())).await {
