@@ -16,6 +16,11 @@ This project uses a server-agent architecture: the Flask server hosts the Web UI
 - **Pending-device approval flow**: New devices can remain in a pending state until an administrator approves them in the Web UI.
 - **Offline-safe command queueing**: The server can queue changes for offline systems and apply them when the agent reconnects.
 - **D-Bus-backed client control**: The agent maps a fixed set of TimeKpr-related actions onto the upstream TimeKpr D-Bus API instead of executing `timekpra` commands.
+- **Flask-Migrate & Alembic Migrations**: Structured migrations folder with auto-generated Python schema version scripts. Auto-detects, stamps, and programmatically upgrades database schema states seamlessly on application boot.
+- **PostgreSQL & Dialect-Agnosticism**: Native compatibility for both SQLite and PostgreSQL, fully resolving standard `DATABASE_URL` environment variables passed in at runtime (ideal for Kubernetes and advanced Docker deployments).
+- **SQLite-to-PostgreSQL Zero-Downtime Data Migration**: Automatically detects existing local SQLite database files, bulk-migrates all tables in strict topological dependency order in memory-efficient, chunked batches of 10,000 (OOM-safe) into PostgreSQL, stamps Alembic versioning as head, and securely removes old SQLite files from disk.
+- **Timezone-Aware Consistency**: Native timezone-aware date/time tracking (`DateTime(timezone=True)`) across all database columns to eliminate Python 3.12+ `datetime.utcnow()` deprecation warnings and ensure absolute database engine alignment.
+- **Standardized Production Logging**: Comprehensive logging using Python's standard `logging` library with a global `_LOGGER = logging.getLogger(__name__)` configured across all core components, replacing all standard `print()` statements for modular production-grade log streaming.
 
 ---
 
@@ -53,11 +58,13 @@ graph TD
    ```
 
 2. **Configure the environment:**
-   Set a strong bootstrap token and timezone. You can also enable an optional registration firewall token to stop unknown clients from creating pending device records.
+   Set a strong bootstrap token, timezone, and database URL. You can configure `DATABASE_URL` to point to a PostgreSQL server to enable native high-performance PostgreSQL backend execution. You can also enable an optional registration firewall token to stop unknown clients from creating pending device records.
    ```yaml
    environment:
      - TZ=Europe/London
      - AGENT_TOKEN=replace-with-a-long-random-bootstrap-token
+     # Optional: configure PostgreSQL connection at runtime
+     # - DATABASE_URL=postgresql://user:password@postgres-host:5432/dbname
      # Optional: require new clients to know this extra pairing token
      # - REGISTRATION_TOKEN=replace-with-a-second-random-token
    ```
