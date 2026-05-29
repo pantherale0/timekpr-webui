@@ -47,23 +47,23 @@ sock = Sock(app)
 
 # Configure logging
 
-root_logger = logging.getLogger()
-root_logger.setLevel(logging.DEBUG)
-
-file_handler = logging.FileHandler("debug.log")
-file_handler.setLevel(logging.DEBUG)
-
-stream_handler = logging.StreamHandler()
-stream_handler.setLevel(logging.INFO)
-
 formatter = logging.Formatter(
     '%(asctime)s %(levelname)s: %(message)s '
     '[in %(pathname)s:%(lineno)d]'
     )
-file_handler.setFormatter(formatter)
-stream_handler.setFormatter(formatter)
 
-root_logger.addHandler(file_handler)
+root_logger = logging.getLogger()
+root_logger.setLevel(logging.DEBUG)
+
+if os.environ.get("DEBUG", "0") == "1":
+    file_handler = logging.FileHandler(os.path.join(app.instance_path, "debug.log"))
+    file_handler.setLevel(logging.DEBUG)
+    file_handler.setFormatter(formatter)
+    root_logger.addHandler(file_handler)
+
+stream_handler = logging.StreamHandler()
+stream_handler.setLevel(logging.INFO)
+stream_handler.setFormatter(formatter)
 root_logger.addHandler(stream_handler)
 
 # Initialize background task manager
