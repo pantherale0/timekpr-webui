@@ -45,6 +45,27 @@ db.init_app(app)
 migrate = Migrate(app, db)
 sock = Sock(app)
 
+# Configure logging
+
+root_logger = logging.getLogger()
+root_logger.setLevel(logging.DEBUG)
+
+file_handler = logging.FileHandler("debug.log")
+file_handler.setLevel(logging.DEBUG)
+
+stream_handler = logging.StreamHandler()
+stream_handler.setLevel(logging.INFO)
+
+formatter = logging.Formatter(
+    '%(asctime)s %(levelname)s: %(message)s '
+    '[in %(pathname)s:%(lineno)d]'
+    )
+file_handler.setFormatter(formatter)
+stream_handler.setFormatter(formatter)
+
+root_logger.addHandler(file_handler)
+root_logger.addHandler(stream_handler)
+
 # Initialize background task manager
 task_manager = BackgroundTaskManager(
     refresh_external_blocklists=_env_flag_enabled('TIMEKPR_TASKS_REFRESH_EXTERNAL', True),
@@ -215,7 +236,7 @@ def migrate_data_sqlite_to_pg(sqlite_db_path):
 def initialize_runtime(start_background_tasks=False):
     """Initialize the database and start background tasks."""
     from flask_migrate import stamp, upgrade
-
+    _LOGGER.info("Runtime initialization started")
     if os.environ.get('TESTING'):
         return
 
@@ -289,6 +310,7 @@ def initialize_runtime(start_background_tasks=False):
                     _LOGGER.warning(f"Warning: Could not initialize admin password: {e}")
 
             RUNTIME_STATE['initialized'] = True
+            _LOGGER.info("Runtime initialization completed")
 
     if start_background_tasks:
         task_manager.start()
