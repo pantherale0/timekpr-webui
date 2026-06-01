@@ -4,16 +4,20 @@ Kotlin/Android port of the TimeKpr Rust Linux agent. See [docs/android-agent.md]
 
 ## Quick start
 
-1. Build: `./gradlew assembleDebug`
-2. Install the APK on a test device.
-3. Scan the pairing QR from the server **Settings** page.
-4. Approve the device in the WebUI **Admin → Devices** screen.
-5. Grant Device Admin, Usage Access, and VPN permissions from the main activity.
+1. Copy `app/google-services.json.example` → `app/google-services.json` (Firebase console).
+2. Set server `FCM_SERVER_KEY` or `FIREBASE_CREDENTIALS_JSON`.
+3. Build: `./gradlew assembleDebug`
+4. Install the APK, scan the server Settings QR, approve in Admin → Devices.
+5. Grant Device Admin, Usage Access, and VPN on the phone.
+
+Connectivity uses **FCM + short WebSocket sessions**, not a 24/7 socket. See `docs/android-agent.md`.
 
 ## Project layout
 
-- `protocol/` — WebSocket JSON messages and command dispatch
-- `service/` — Foreground WebSocket agent service
+- `protocol/` — WebSocket JSON messages and ephemeral `AgentWebSocketClient`
+- `push/` — FCM (`TimeKprMessagingService`) and token registration
+- `work/` — WorkManager periodic sync and pairing poll
+- `service/` — `AgentSessionCoordinator` (schedules sync sessions)
 - `policy/` — Time limits, domain blocklists, app rules
 - `vpn/` — Domain filtering VPN tunnel
 - `monitor/` — Usage stats and alert generation
