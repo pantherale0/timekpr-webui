@@ -90,3 +90,35 @@ Environment (observed):
 4) `python task_worker.py` (terminal 2)
 5) Optionally run: `python debug_agent.py --server-url "ws://127.0.0.1:5000/ws" --agent-version "v0.0.0-dev"`
 6) Run tests: `pytest`
+
+## Cursor Cloud specific instructions
+
+### Toolchain versions
+
+- **Python**: system Python 3.12 works for local dev (`python3 app.py`). Production Docker images use Python 3.14.
+- **Rust**: the agent crate uses **edition 2024** (`agent/Cargo.toml`). Ensure `rustup default stable` points at a recent stable toolchain (1.85+); the VM may ship with an older default (1.83) that cannot parse the manifest.
+- **pip scripts**: `pip install --user` puts `flask`, `gunicorn`, etc. under `~/.local/bin`. Prefer `python3 -m pytest` / `python3 app.py` if that directory is not on `PATH`.
+
+### Services for end-to-end local dev
+
+| Service | Required? | Command (from repo root) |
+|---------|-----------|--------------------------|
+| Flask web app | **Yes** | `cd server && export AGENT_TOKEN=... TZ=UTC TIMEKPR_SERVER_VERSION=v0.0.0-dev && python3 app.py` |
+| Background worker | Optional for UI/agent testing | `cd server && python3 task_worker.py` (separate terminal; `app.py` also starts in-process tasks) |
+| Python debug agent | Optional (simulates Rust agent) | `cd server && python3 debug_agent.py --server-url "ws://127.0.0.1:5000/ws" --agent-version "v0.0.0-dev"` |
+| Rust agent binary | Optional | `cd agent && cargo build --release` → `target/release/timekpr-agent` (Linux-only; needs D-Bus/TimeKpr-nExT at runtime) |
+
+Default admin login: `admin` / `admin`. Approve new debug-agent devices at `/admin/devices`.
+
+### Lint / test / build commands
+
+- **Python tests**: `cd server && python3 -m pytest` (uses in-memory SQLite; no running server required).
+- **Rust compile check (matches CI)**: `cargo check --manifest-path agent/Cargo.toml`
+- **Rust release build**: `cargo build --release --manifest-path agent/Cargo.toml`
+- **Pyright**: config in `pyrightconfig.json` (`typeCheckingMode: off`); no repo lint script.
+
+### Gotchas
+
+- Match `--agent-version` / `TIMEKPR_SERVER_VERSION` between server and debug agent (default `v0.0.0-dev`).
+- `debug_agent.py` writes state to `server/debug-agent.json`; delete it to simulate a fresh client.
+- Six pytest failures were observed in this environment (AppArmor UI routes + one task-manager thread test) with 72 passing — treat as pre-existing unless you are working on those areas.
