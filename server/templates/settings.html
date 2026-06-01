@@ -11,6 +11,27 @@
 </div>
 
 <div class="users-grid" style="grid-template-columns: 1fr; max-width: 1200px; margin: 0 auto;">
+    <article class="card" style="margin-bottom: 1.5rem;">
+        <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem; border-bottom: 1px solid var(--pico-card-border-color); padding-bottom: 0.5rem;">
+            <h2 style="font-size: 1.25rem; font-weight: 700; margin: 0;">Agent pairing (Android &amp; Linux)</h2>
+        </div>
+        <p style="color: var(--pico-muted-color); margin-top: 0;">
+            Scan this QR code from the TimeKpr Android app during setup or from the main screen. It encodes the WebSocket URL required for device enrollment.
+        </p>
+        <div style="display: flex; flex-wrap: wrap; gap: 2rem; align-items: flex-start; margin-top: 1.25rem;">
+            <img src="{{ pairing_qr_data_uri }}" alt="TimeKpr pairing QR code" width="220" height="220" style="border: 1px solid var(--pico-card-border-color); border-radius: 0.75rem; background: #fff; padding: 0.5rem;" />
+            <div style="flex: 1; min-width: 260px;">
+                <p style="margin: 0 0 0.5rem 0; font-size: 0.85rem; color: var(--pico-muted-color); text-transform: uppercase; font-weight: 700;">WebSocket URL</p>
+                <code style="display: block; word-break: break-all; padding: 0.75rem; border-radius: 0.5rem; background: var(--pico-background-color);">{{ pairing_server_url }}</code>
+                <p style="margin: 1rem 0 0.5rem 0; font-size: 0.85rem; color: var(--pico-muted-color); text-transform: uppercase; font-weight: 700;">Payload</p>
+                <code style="display: block; word-break: break-all; padding: 0.75rem; border-radius: 0.5rem; background: var(--pico-background-color); font-size: 0.8rem;">{{ pairing_payload }}</code>
+                <p style="margin-top: 1rem;">
+                    <a href="{{ url_for('api_pairing.pairing_qr_png') }}" class="btn btn-secondary btn-sm">Download QR PNG</a>
+                </p>
+            </div>
+        </div>
+    </article>
+
     <!-- Authentication & Security Cards -->
     <article class="card">
         <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem; border-bottom: 1px solid var(--pico-card-border-color); padding-bottom: 0.5rem;">

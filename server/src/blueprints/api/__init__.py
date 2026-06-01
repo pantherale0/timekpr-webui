@@ -7,6 +7,7 @@ from src.blueprints.api.time import api_time_bp
 from src.blueprints.api.tasks import api_tasks_bp
 
 from src.blueprints.api.alerts import api_alerts_bp
+from src.blueprints.api.pairing import api_pairing_bp
 
 __all__ = [
     'api_devices_bp',
@@ -17,4 +18,5 @@ __all__ = [
     'api_time_bp',
     'api_tasks_bp',
     'api_alerts_bp',
+    'api_pairing_bp',
 ]

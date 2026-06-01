@@ -1,0 +1,13 @@
+#!/bin/sh
+# Minimal Gradle wrapper launcher. Run `gradle wrapper` locally to regenerate full wrapper jars.
+set -e
+GRADLE_VERSION=8.9
+GRADLE_HOME="${GRADLE_USER_HOME:-$HOME/.gradle}/wrapper/dists/gradle-${GRADLE_VERSION}-bin"
+if [ -x "./gradle/wrapper/gradle-wrapper.jar" ]; then
+  exec java -jar "./gradle/wrapper/gradle-wrapper.jar" "$@"
+fi
+if command -v gradle >/dev/null 2>&1; then
+  exec gradle "$@"
+fi
+echo "Install Gradle ${GRADLE_VERSION} or add gradle/wrapper/gradle-wrapper.jar" >&2
+exit 1

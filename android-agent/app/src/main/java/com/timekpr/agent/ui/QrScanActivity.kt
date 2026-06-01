@@ -1,0 +1,48 @@
+package com.timekpr.agent.ui
+
+import android.app.Activity
+import android.content.Intent
+import android.os.Bundle
+import androidx.appcompat.app.AppCompatActivity
+import com.journeyapps.barcodescanner.ScanContract
+import com.journeyapps.barcodescanner.ScanOptions
+import com.timekpr.agent.protocol.PairingQrPayload
+
+class QrScanActivity : AppCompatActivity() {
+    private val scanner = registerForActivityResult(ScanContract()) { result ->
+        if (result.contents == null) {
+            setResult(Activity.RESULT_CANCELED)
+            finish()
+            return
+        }
+        val payload = PairingQrPayload.parse(result.contents)
+        if (payload == null) {
+            setResult(Activity.RESULT_CANCELED)
+            finish()
+            return
+        }
+        val data = Intent()
+            .putExtra(EXTRA_SERVER_URL, payload.serverUrl)
+        if (!payload.registrationToken.isNullOrBlank()) {
+            data.putExtra(EXTRA_REGISTRATION_TOKEN, payload.registrationToken)
+        }
+        setResult(Activity.RESULT_OK, data)
+        finish()
+    }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        val options = ScanOptions().apply {
+            setDesiredBarcodeFormats(ScanOptions.QR_CODE)
+            setPrompt("Scan the TimeKpr server pairing QR code")
+            setBeepEnabled(false)
+            setOrientationLocked(true)
+        }
+        scanner.launch(options)
+    }
+
+    companion object {
+        const val EXTRA_SERVER_URL = "server_url"
+        const val EXTRA_REGISTRATION_TOKEN = "registration_token"
+    }
+}

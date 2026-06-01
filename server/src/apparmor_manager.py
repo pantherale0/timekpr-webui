@@ -29,6 +29,18 @@ CURATED_APPARMOR_APPS = [
 CURATED_APPARMOR_PATHS = {app['path'] for app in CURATED_APPARMOR_APPS}
 
 
+def _validate_android_package_name(package_name):
+    """Validate Android application IDs used by the mobile agent."""
+    normalized = (package_name or '').strip()
+    if not normalized:
+        raise ValueError('Package name is required')
+    if not all(part and part[0].isalpha() for part in normalized.split('.')):
+        raise ValueError('Package name must look like com.example.app')
+    if any(char.isspace() for char in normalized):
+        raise ValueError('Package names with spaces are not supported')
+    return normalized
+
+
 def _validate_apparmor_executable_path(executable_path):
     """Allow only concrete absolute executable paths, not AppArmor globs."""
     normalized = (executable_path or '').strip()
@@ -79,6 +91,10 @@ def _validate_apparmor_path_pattern(path_pattern, linux_username):
 def _validate_apparmor_rule_target(match_type, target_value, linux_username):
     if match_type == AppArmorRule.MATCH_TYPE_PATH_PATTERN:
         return _validate_apparmor_path_pattern(target_value, linux_username)
+    if match_type == AppArmorRule.MATCH_TYPE_PACKAGE:
+        return _validate_android_package_name(target_value)
+    if (target_value or '').strip().startswith('/android/package/'):
+        return _validate_android_package_name(target_value.strip().removeprefix('/android/package/'))
     return _validate_apparmor_executable_path(target_value)
 
 

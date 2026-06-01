@@ -14,6 +14,9 @@ This repository implements a server–agent system for managing TimeKpr‑nExT a
   - `python debug_agent.py --server-url "ws://127.0.0.1:5000/ws" --agent-version "vX.Y"`
 - Rust agent (from `agent/`):
   - Build: `cargo build --release`
+- Android agent (from `android-agent/`):
+  - Build: `./gradlew assembleDebug`
+  - See `docs/android-agent.md` for pairing QR, permissions, and policy mapping.
 - Tests (from `server/`):
   - `pytest` (project includes tests under `server/tests/`)
 
@@ -44,6 +47,7 @@ Environment (observed):
 - `server/templates/` — Jinja2 templates for UI (admin, schedules, settings, etc.).
 - `server/tests/` — pytest suite with route, helper, and manager coverage.
 - `agent/` — Rust client agent (`Cargo.toml`, `src/`).
+- `android-agent/` — Kotlin Android agent (WebSocket protocol parity, Device Admin, VPN domain policies).
 - `scripts/install-agent.sh` — installer for released agent binaries (systemd setup, config management).
 
 ## Patterns and conventions
