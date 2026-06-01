@@ -11,6 +11,7 @@ object AgentMessages {
         agentVersion: String,
         linuxUsers: List<Map<String, Any>>,
         platform: String = "android",
+        fcmToken: String? = null,
     ): String {
         val payload = JSONObject()
             .put("type", "hello")
@@ -21,6 +22,9 @@ object AgentMessages {
             .put("linux_users", JSONArray(linuxUsers.map { JSONObject(it) }))
         if (!registrationToken.isNullOrBlank()) {
             payload.put("registration_token", registrationToken)
+        }
+        if (!fcmToken.isNullOrBlank()) {
+            payload.put("fcm_token", fcmToken)
         }
         return payload.toString()
     }

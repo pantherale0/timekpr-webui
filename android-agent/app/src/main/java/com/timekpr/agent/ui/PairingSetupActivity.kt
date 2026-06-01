@@ -8,7 +8,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import com.timekpr.agent.R
 import com.timekpr.agent.TimeKprApplication
-import com.timekpr.agent.service.AgentWebSocketService
+import com.timekpr.agent.service.AgentSessionCoordinator
 
 class PairingSetupActivity : AppCompatActivity() {
     private val qrLauncher = registerForActivityResult(
@@ -38,7 +38,7 @@ class PairingSetupActivity : AppCompatActivity() {
         if (serverUrl.isBlank()) return
         val store = TimeKprApplication.from(this).configStore
         store.applyPairingPayload(serverUrl, registrationToken)
-        AgentWebSocketService.start(this)
+        AgentSessionCoordinator.startMobileAgent(this)
         startActivity(Intent(this, MainActivity::class.java))
         finish()
     }

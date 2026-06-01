@@ -6,6 +6,7 @@ import json
 import logging
 import os
 import re
+import time
 import uuid
 from datetime import datetime, timezone
 from queue import Queue, Empty
@@ -211,6 +212,19 @@ class AgentConnectionManager(metaclass=AgentConnectionManagerMeta):
             return False, "No system ID associated with this user", None
 
         ws = cls.get_connection(system_id)
+        if not ws:
+            from src.agent_push import device_prefers_push, wake_android_for_command
+            from src.database import AgentDevice
+
+            device = AgentDevice.query.get(system_id)
+            if device_prefers_push(device):
+                wake_android_for_command(system_id, action)
+                wait_seconds = max(timeout, 45)
+                for _ in range(wait_seconds):
+                    ws = cls.get_connection(system_id)
+                    if ws:
+                        break
+                    time.sleep(1)
         if not ws:
             return False, f"Agent for system ID '{system_id}' is offline", None
 

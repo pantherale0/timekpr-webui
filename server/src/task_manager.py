@@ -740,18 +740,24 @@ class BackgroundTaskManager:
         if not self.sync_domain_policies_enabled:
             return 0
 
-        target_system_ids = system_ids or AgentConnectionManager.get_online_system_ids()
+        from src.agent_push import notify_policy_sync_hint
+
+        if system_ids is None:
+            online_ids = set(AgentConnectionManager.get_online_system_ids())
+            from src.database import AgentDevice
+
+            push_ids = {
+                device.system_id
+                for device in AgentDevice.query.filter(AgentDevice.fcm_token.isnot(None)).all()
+                if (device.fcm_token or '').strip()
+            }
+            target_system_ids = sorted(online_ids | push_ids)
+        else:
+            target_system_ids = sorted(set(system_ids))
+
         notified = 0
-        for system_id in sorted(set(target_system_ids)):
-            if not AgentConnectionManager.is_online(system_id):
-                continue
-            success, _message = AgentConnectionManager.send_message(
-                system_id,
-                {
-                    "type": "policy_sync_hint",
-                    "reason": reason,
-                },
-            )
+        for system_id in target_system_ids:
+            success, _message = notify_policy_sync_hint(system_id, reason=reason)
             if success:
                 notified += 1
         return notified

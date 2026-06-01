@@ -23,6 +23,7 @@ This repository implements a server–agent system for managing TimeKpr‑nExT a
 Environment (observed):
 - `AGENT_TOKEN` bootstrap token (server)
 - `REGISTRATION_TOKEN` optional pairing firewall (server and agent)
+- `FCM_SERVER_KEY` or `FIREBASE_CREDENTIALS_JSON` optional FCM push for Android agents
 - `DATABASE_URL` optional PostgreSQL URL; defaults to SQLite file when unset
 - `TZ` timezone
 - `TIMEKPR_SERVER_VERSION` server version string used in UI/protocol checks

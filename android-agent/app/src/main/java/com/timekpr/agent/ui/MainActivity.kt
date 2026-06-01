@@ -16,7 +16,7 @@ import com.timekpr.agent.TimeKprApplication
 import com.timekpr.agent.admin.DeviceAdminActivationActivity
 import com.timekpr.agent.service.AgentConnectionState
 import com.timekpr.agent.service.AgentConnectionStatus
-import com.timekpr.agent.service.AgentWebSocketService
+import com.timekpr.agent.service.AgentSessionCoordinator
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
@@ -29,7 +29,7 @@ class MainActivity : AppCompatActivity() {
         val serverUrl = data.getStringExtra(QrScanActivity.EXTRA_SERVER_URL) ?: return@registerForActivityResult
         val registrationToken = data.getStringExtra(QrScanActivity.EXTRA_REGISTRATION_TOKEN)
         TimeKprApplication.from(this).configStore.applyPairingPayload(serverUrl, registrationToken)
-        AgentWebSocketService.start(this)
+        AgentSessionCoordinator.startMobileAgent(this)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -62,7 +62,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
         findViewById<Button>(R.id.reconnectButton).setOnClickListener {
-            AgentWebSocketService.start(this)
+            AgentSessionCoordinator.scheduleSync(this, reason = "manual")
         }
 
         lifecycleScope.launch {
@@ -77,7 +77,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        AgentWebSocketService.start(this)
+        AgentSessionCoordinator.startMobileAgent(this)
     }
 
     companion object {

@@ -6,6 +6,7 @@ from flask import Blueprint, request
 from sqlalchemy.exc import SQLAlchemyError
 from src.database import db, AgentDevice
 from src.agent_helper import AgentConnectionManager, normalize_agent_alert_payload
+from src.agent_push import update_device_push_metadata
 from src.alerts_manager import _store_agent_alert
 from src.apparmor_manager import _store_app_usage_from_alert
 
@@ -122,6 +123,8 @@ def ws_agent_handler(ws):
                 linux_users = hello_msg.get("linux_users")
                 if linux_users is not None:
                     device.linux_users_json = json.dumps(linux_users)
+
+                update_device_push_metadata(device, hello_msg)
                 
                 db.session.commit()
     

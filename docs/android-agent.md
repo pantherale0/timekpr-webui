@@ -2,6 +2,30 @@
 
 The Android agent (`android-agent/`) is a Kotlin port of the Rust Linux client. It connects to the same Flask WebSocket hub (`/ws`), uses the identical JSON protocol, and enforces policies using Android-native APIs.
 
+## Battery-efficient connectivity (FCM)
+
+Android does **not** keep a WebSocket open 24/7. That would drain the battery quickly.
+
+| Trigger | Behavior |
+|---------|----------|
+| **FCM data message** | Server pushes `sync_policies`, `command_wake`, or `pairing_approved` → app runs a **short WebSocket session** (connect, sync, disconnect) |
+| **WorkManager** | Periodic sync every 4 hours (matches Linux agent policy timer) |
+| **Pairing poll** | Every 15 minutes while unpaired (replaces holding WS open during approval) |
+| **User / boot** | Manual reconnect or startup schedules an expedited sync |
+
+Linux agents remain on a persistent WebSocket. Android registers `fcm_token` + `platform: android` in `hello`; the server stores the token and uses FCM when the device is offline.
+
+### Server FCM configuration
+
+Set one of:
+
+- `FCM_SERVER_KEY` — legacy HTTP API server key
+- `FIREBASE_CREDENTIALS_JSON` — path or inline JSON for a Firebase service account (HTTP v1 API)
+
+Optional: `FIREBASE_PROJECT_ID` when using service account JSON without `project_id`.
+
+Copy `android-agent/app/google-services.json.example` → `google-services.json` from the Firebase console.
+
 ## Architecture mapping
 
 | Linux Rust agent | Android agent |
@@ -12,6 +36,7 @@ The Android agent (`android-agent/`) is a Kotlin port of the Rust Linux client. 
 | Netlink process monitor (`netlink.rs`) | `UsageStatsManager` event stream |
 | `/etc/timekpr-agent/config.json` | `AgentConfigStore` (EncryptedSharedPreferences-ready SharedPreferences) |
 | logind session alerts | `user_signed_in` / `app_usage` alerts via usage events |
+| Persistent WebSocket loop | FCM wake + ephemeral `AgentWebSocketClient` sessions |
 
 ## Pairing flow
 

@@ -68,12 +68,11 @@
         </receiver>
 
         <service
-            android:name=".service.AgentWebSocketService"
-            android:exported="false"
-            android:foregroundServiceType="connectedDevice|specialUse">
-            <property
-                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="timekpr_agent_connection" />
+            android:name=".push.TimeKprMessagingService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
         </service>
 
         <service

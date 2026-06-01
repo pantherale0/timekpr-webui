@@ -48,6 +48,14 @@ class AgentConfigStore(context: Context) {
         prefs.edit().putBoolean(KEY_PAIRING_COMPLETE, complete).apply()
     }
 
+    fun saveFcmToken(token: String) {
+        prefs.edit().putString(KEY_FCM_TOKEN, token.trim()).apply()
+    }
+
+    fun cachedFcmToken(): String? {
+        return prefs.getString(KEY_FCM_TOKEN, null)?.takeIf { it.isNotBlank() }
+    }
+
     fun applyPairingPayload(serverUrl: String, registrationToken: String?) {
         prefs.edit()
             .putString(KEY_SERVER_URL, serverUrl.trim())
@@ -73,6 +81,7 @@ class AgentConfigStore(context: Context) {
         private const val KEY_AGENT_TOKEN = "agent_token"
         private const val KEY_AGENT_VERSION = "agent_version"
         private const val KEY_PAIRING_COMPLETE = "pairing_complete"
+        private const val KEY_FCM_TOKEN = "fcm_token"
         private const val DEFAULT_VERSION = "v0.1.0-android"
     }
 }
