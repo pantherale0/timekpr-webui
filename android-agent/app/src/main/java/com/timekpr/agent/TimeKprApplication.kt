@@ -18,7 +18,7 @@ class TimeKprApplication : Application() {
         super.onCreate()
         configStore = AgentConfigStore(this)
         timeLimitStore = TimeLimitStore(this)
-        domainPolicyStore = DomainPolicyStore(this)
+        domainPolicyStore = DomainPolicyStore(this).also { it.restore() }
         DeviceOwnerProvisioner.applyIfDeviceOwner(this)
     }
 

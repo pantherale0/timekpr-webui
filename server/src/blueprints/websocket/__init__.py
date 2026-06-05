@@ -13,6 +13,7 @@ from src.agent_helper import (
 from src.agent_push import update_device_push_metadata
 from src.alerts_manager import _store_agent_alert
 from src.apparmor_manager import _store_app_usage_from_alert
+from src.installed_apps_manager import handle_app_icon_report, handle_installed_apps_report
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -250,6 +251,59 @@ def ws_agent_handler(ws):
                         db.session.rollback()
                         _LOGGER.error(
                             "Failed to store alert payload from %s: %s",
+                            system_id,
+                            exc,
+                        )
+                elif msg_type == "installed_apps_report":
+                    try:
+                        result = handle_installed_apps_report(system_id, msg)
+                        ws.send(json.dumps({
+                            "type": "installed_apps_report_ack",
+                            "report_id": msg.get("report_id"),
+                            "success": result.get("success", True),
+                            "apps_upserted": result.get("apps_upserted", 0),
+                            "apps_removed": result.get("apps_removed", 0),
+                            "apps_total": result.get("apps_total"),
+                            "pending": result.get("pending", False),
+                        }))
+                    except ValueError as exc:
+                        _LOGGER.warning(
+                            "Rejected invalid installed apps report from %s: %s",
+                            system_id,
+                            exc,
+                        )
+                        ws.send(json.dumps({
+                            "type": "installed_apps_report_ack",
+                            "report_id": msg.get("report_id"),
+                            "success": False,
+                            "message": str(exc),
+                        }))
+                    except SQLAlchemyError as exc:
+                        db.session.rollback()
+                        _LOGGER.error(
+                            "Failed to store installed apps report from %s: %s",
+                            system_id,
+                            exc,
+                        )
+                        ws.send(json.dumps({
+                            "type": "installed_apps_report_ack",
+                            "report_id": msg.get("report_id"),
+                            "success": False,
+                            "message": "Database error",
+                        }))
+                elif msg_type == "app_icon_report":
+                    try:
+                        handle_app_icon_report(msg)
+                    except ValueError as exc:
+                        _LOGGER.warning(
+                            "Rejected invalid app icon report from %s: %s",
+                            system_id,
+                            exc,
+                        )
+                    except SQLAlchemyError as exc:
+                        db.session.rollback()
+                        _LOGGER.error(
+                            "Failed to store app icon from %s: %s",
                             system_id,
                             exc,
                         )

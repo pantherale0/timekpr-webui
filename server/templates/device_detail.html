@@ -1,214 +1,355 @@
 {% extends "base.html" %}
 
-{% block title %}{{ device_label }} - Device Details - TimeKpr WebUI{% endblock %}
+{% block title %}{{ device_label }} - Device Details - Guardian{% endblock %}
 
 {% block content %}
-<div class="device-header-title" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; flex-wrap: wrap; gap: 1rem;">
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
     <div>
-        <h1 style="margin: 0; font-size: 2rem;">{{ device_label }}</h1>
-        <p style="margin: 0; color: var(--pico-muted-color); font-weight: 500;">
-            Device details, linked accounts, and alert history
+        <h1 class="fw-bold mb-1" style="font-size: 2.25rem; font-weight: 800; letter-spacing: -0.025em;">
+            {% if device.platform == 'android' %}
+                <i class="fab fa-android text-success me-1"></i>
+            {% else %}
+                <i class="fab fa-linux text-secondary me-1"></i>
+            {% endif %}
+            {{ device_label }}
+        </h1>
+        <p class="text-secondary mb-0 fw-medium">
+            Device details, account mappings, application inventory, and alert logs.
         </p>
     </div>
     <div>
-        <a href="{{ url_for('admin') }}" class="btn btn-secondary btn-sm">
-            <svg width="14" height="14" fill="currentColor" viewBox="0 0 16 16" style="margin-right: 4px;">
-                <path fill-rule="evenodd" d="M15 8a.5.5 0 0 0-.5-.5H2.707l3.147-3.146a.5.5 0 1 0-.708-.708l-4 4a.5.5 0 0 0 0 .708l4 4a.5.5 0 0 0 .708-.708L2.707 8.5H14.5A.5.5 0 0 0 15 8z"/>
-            </svg>
-            Back to Admin
+        <a href="{{ url_for('ui_dashboard.admin_devices') }}" class="btn btn-secondary btn-sm fw-bold">
+            <i class="fas fa-arrow-left me-1"></i> Back to Devices
         </a>
     </div>
 </div>
 
 <div class="device-main">
-    <!-- Meta metrics cards grid -->
-    <div class="device-meta-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
-        <div class="device-card" style="margin: 0; padding: 1rem; text-align: center;">
-            <div class="meta-label" style="font-size: 0.75rem; font-weight: bold; color: var(--pico-muted-color); text-transform: uppercase;">System ID</div>
-            <div class="meta-value" style="font-size: 0.95rem; font-weight: bold; overflow-wrap: anywhere;">{{ device.system_id }}</div>
+    <!-- Meta metrics info-boxes row -->
+    <div class="row g-3 mb-4">
+        <!-- System ID -->
+        <div class="col-12 col-sm-6 col-md-3">
+            <div class="card border shadow-sm h-100 text-center p-3">
+                <span class="text-secondary small fw-bold text-uppercase d-block mb-1" style="font-size: 0.7rem; letter-spacing: 0.05em;">System ID</span>
+                <strong class="small text-body font-monospace text-truncate d-block" title="{{ device.system_id }}">{{ device.system_id }}</strong>
+            </div>
         </div>
-        <div class="device-card" style="margin: 0; padding: 1rem; text-align: center;">
-            <div class="meta-label" style="font-size: 0.75rem; font-weight: bold; color: var(--pico-muted-color); text-transform: uppercase;">Trust Status</div>
-            <div class="meta-value" style="font-size: 1.25rem; font-weight: 700; color: var(--pico-primary);">{{ device.status|title }}</div>
+        <!-- Trust Status -->
+        <div class="col-12 col-sm-6 col-md-3">
+            <div class="card border shadow-sm h-100 text-center p-3">
+                <span class="text-secondary small fw-bold text-uppercase d-block mb-1" style="font-size: 0.7rem; letter-spacing: 0.05em;">Trust Status</span>
+                <strong class="fs-4 text-success d-block lh-1 fw-bold">{{ device.status|title }}</strong>
+            </div>
         </div>
-        <div class="device-card" style="margin: 0; padding: 1rem; text-align: center;">
-            <div class="meta-label" style="font-size: 0.75rem; font-weight: bold; color: var(--pico-muted-color); text-transform: uppercase;">Last IP Address</div>
-            <div class="meta-value" style="font-size: 1.25rem; font-weight: 700;"><code>{{ device.system_ip or 'Offline' }}</code></div>
+        <!-- IP Address -->
+        <div class="col-12 col-sm-6 col-md-3">
+            <div class="card border shadow-sm h-100 text-center p-3">
+                <span class="text-secondary small fw-bold text-uppercase d-block mb-1" style="font-size: 0.7rem; letter-spacing: 0.05em;">Last IP Address</span>
+                <code class="fs-4 text-body d-block lh-1 fw-bold" style="font-family: monospace;">{{ device.system_ip or 'Offline' }}</code>
+            </div>
         </div>
-        <div class="device-card" style="margin: 0; padding: 1rem; text-align: center;">
-            <div class="meta-label" style="font-size: 0.75rem; font-weight: bold; color: var(--pico-muted-color); text-transform: uppercase;">Host Logs</div>
-            <div class="meta-value" style="font-size: 1.25rem; font-weight: 700; color: var(--warning-color);">{{ alert_summary.total }} alerts</div>
+        <!-- Host Logs Alert count -->
+        <div class="col-12 col-sm-6 col-md-3">
+            <div class="card border shadow-sm h-100 text-center p-3">
+                <span class="text-secondary small fw-bold text-uppercase d-block mb-1" style="font-size: 0.7rem; letter-spacing: 0.05em;">Host Logs</span>
+                <strong class="fs-4 text-warning d-block lh-1 fw-bold">{{ alert_summary.total }} alerts</strong>
+            </div>
         </div>
     </div>
 
-    <!-- Mapped accounts lists -->
-    <article class="card">
-        <h2 style="font-size: 1.25rem; font-weight: 700; margin-bottom: 1rem; border-bottom: 1px solid var(--pico-card-border-color); padding-bottom: 0.5rem;">Linked Managed Accounts</h2>
-        {% if mapped_accounts %}
-        <div class="mapped-accounts-list" style="display: grid; gap: 0.5rem;">
-            {% for mapping in mapped_accounts %}
-            <div class="mapped-account-item" style="display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap; border: 1px solid var(--pico-card-border-color); border-radius: 0.75rem; padding: 0.75rem 1rem; background: var(--pico-background-color);">
-                <div>
-                    <div style="font-weight: 700; font-size: 1.05rem; color: var(--pico-color);">{{ mapping.managed_user.username }} &rarr; {{ mapping.linux_username }}</div>
-                    <div style="font-size: 0.75rem; color: var(--pico-muted-color); font-weight: bold; margin-top: 0.15rem;">
-                        Linux UID: {{ mapping.linux_uid if mapping.linux_uid is not none else 'Unassigned' }}
-                        <span class="badge {% if mapping.is_valid %}badge-success{% else %}badge-warning{% endif %}" style="margin-left: 0.5rem; font-size: 0.7rem;">
-                            {{ 'Verified' if mapping.is_valid else 'Pending Check' }}
-                        </span>
+    <div class="row g-4">
+        <!-- Left Column: Linked accounts, installed apps, usage history -->
+        <div class="col-12 col-lg-8">
+            <!-- Linked Accounts -->
+            <div class="card shadow-sm border mb-4">
+                <div class="card-header bg-body-secondary py-3 d-flex align-items-center gap-2">
+                    <div class="bg-primary-subtle text-primary p-2 rounded d-flex align-items-center justify-content-center" style="width: 38px; height: 38px;">
+                        <i class="fas fa-users-cog fs-5"></i>
                     </div>
+                    <h5 class="mb-0 fw-bold">Linked Managed Accounts</h5>
                 </div>
-                <div>
-                    <a href="{{ url_for('ui_dashboard.edit_user_profile', user_id=mapping.managed_user.id) }}" class="btn btn-sm btn-secondary" style="margin: 0; padding: 0.25rem 0.5rem; font-size: 0.8rem;">🛡️ Application policies</a>
-                </div>
-            </div>
-            {% endfor %}
-        </div>
-        {% else %}
-        <p style="margin: 0; color: var(--pico-muted-color); font-weight: 500;">No accounts mapped to this device yet.</p>
-        {% endif %}
-    </article>
-
-    <!-- Application Runtime Activity Redesigned -->
-    <article class="card">
-        <h2 style="font-size: 1.25rem; font-weight: 700; margin-bottom: 0.25rem;">📊 Application Runtime Tracker (Last 7 Days)</h2>
-        <p style="color: var(--pico-muted-color); font-size: 0.85rem; font-weight: 500; margin-bottom: 1.5rem;">
-            Real-time usage history of active applications tracked on the child profile client.
-        </p>
-        {% if mapped_accounts %}
-            {% set ns = namespace(has_any_usage=false) %}
-            {% for mapping in mapped_accounts %}
-                {% set usage = usage_summaries.get(mapping.id) %}
-                {% if usage %}
-                    {% set ns.has_any_usage = true %}
-                    <div style="margin-bottom: 1rem; border: 1px solid var(--pico-card-border-color); border-radius: 0.75rem; padding: 1rem; background: var(--pico-background-color);">
-                        <h3 style="margin-top: 0; margin-bottom: 0.75rem; font-size: 1rem; font-weight: 700; color: var(--pico-color);">
-                            👤 {{ mapping.managed_user.username }} (<code>{{ mapping.linux_username }}</code>)
-                        </h3>
-                        <div class="aa-usage-list" style="display: grid; gap: 0.4rem;">
-                            {% set max_seconds = usage[0].total_seconds if usage else 1 %}
-                            {% for item in usage %}
-                            <div class="aa-usage-row" style="display: flex; align-items: center; gap: 1rem; padding: 0.25rem 0; border-bottom: 1px solid var(--pico-card-border-color);">
-                                <div class="aa-usage-label" style="min-width: 140px; font-weight: bold; font-size: 0.85rem;">{{ item.application_name }}</div>
-                                <div class="aa-usage-bar-container" style="flex: 1; height: 16px; background: var(--pico-card-background-color); border: 1px solid var(--pico-card-border-color); border-radius: 0.5rem; overflow: hidden; position: relative;">
-                                    <div class="aa-usage-bar"
-                                         style="width: {{ (item.total_seconds / max_seconds * 100)|round(1) }}%; height: 100%; border-radius: 0.5rem; background: linear-gradient(90deg, var(--pico-primary-background), var(--pico-primary-hover)); transition: width 0.3s; min-width: 2px;">
+                <div class="card-body">
+                    {% if mapped_accounts %}
+                        <div class="d-flex flex-column gap-2">
+                            {% for mapping in mapped_accounts %}
+                                <div class="border rounded p-3 bg-body-secondary d-flex justify-content-between align-items-center flex-wrap gap-3">
+                                    <div>
+                                        <div class="fw-bold fs-5 text-body">
+                                            {{ mapping.managed_user.username }} &rarr; {{ mapping.linux_username }}
+                                        </div>
+                                        <div class="text-secondary small fw-semibold mt-1">
+                                            Linux UID: {{ mapping.linux_uid if mapping.linux_uid is not none else 'Unassigned' }}
+                                            <span class="badge {% if mapping.is_valid %}bg-success-subtle text-success border border-success-subtle{% else %}bg-warning-subtle text-warning border border-warning-subtle{% endif %} ms-2 px-2 py-0.5" style="font-size: 0.7rem;">
+                                                {{ 'Verified' if mapping.is_valid else 'Pending Check' }}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <a href="{{ url_for('ui_dashboard.edit_user_profile', user_id=mapping.managed_user.id) }}" class="btn btn-sm btn-outline-primary fw-bold">
+                                            <i class="fas fa-shield-alt me-1"></i> Application Policies
+                                        </a>
                                     </div>
                                 </div>
-                                <div class="aa-usage-time" style="min-width: 80px; text-align: right; font-size: 0.85rem; font-weight: bold; color: var(--pico-color);">{{ item.formatted }}</div>
-                                <div class="aa-usage-sessions" style="min-width: 70px; text-align: right; font-size: 0.75rem; color: var(--pico-muted-color); font-weight: bold;">{{ item.session_count }} session{{ 's' if item.session_count != 1 }}</div>
-                            </div>
                             {% endfor %}
                         </div>
-                    </div>
-                {% endif %}
-            {% endfor %}
-            {% if not ns.has_any_usage %}
-                <p style="margin: 0; color: var(--pico-muted-color); font-weight: 500;">No application runtime usage recorded for mapped accounts on this device.</p>
-            {% endif %}
-        {% else %}
-            <p style="margin: 0; color: var(--pico-muted-color); font-weight: 500;">No mapped accounts available to audit.</p>
-        {% endif %}
-    </article>
-
-    <!-- Blocklist Contributors Redesigned -->
-    <article class="card">
-        <h2 style="font-size: 1.25rem; font-weight: 700; margin-bottom: 1rem; border-bottom: 1px solid var(--pico-card-border-color); padding-bottom: 0.5rem;">Domain Policy Contributors</h2>
-        {% if blocklist_contributors %}
-        <div class="mapped-accounts-list" style="display: grid; gap: 0.5rem;">
-            {% for contributor in blocklist_contributors %}
-            <div class="mapped-account-item" style="border: 1px solid var(--pico-card-border-color); border-radius: 0.75rem; padding: 0.75rem 1rem; background: var(--pico-background-color);">
-                <div style="font-weight: 700; font-size: 0.95rem; color: var(--pico-color);">{{ contributor.managed_user }} &rarr; <code>{{ contributor.linux_username }}</code></div>
-                <div style="font-size: 0.75rem; color: var(--pico-muted-color); font-weight: bold; margin-top: 0.25rem; display: flex; gap: 0.75rem; flex-wrap: wrap;">
-                    <span>Linux UID: {{ contributor.linux_uid if contributor.linux_uid is not none else '-' }}</span>
-                    <span>Lists: {{ contributor.assigned_source_count }}</span>
-                    <span>Blocked Hosts: {{ contributor.effective_domain_count }}</span>
-                    <span class="badge {% if contributor.sync_status == 'synced' %}badge-success{% else %}badge-warning{% endif %}">
-                        Sync: {{ contributor.sync_status|replace('_', ' ')|title }}
-                    </span>
+                    {% else %}
+                        <div class="text-center text-secondary py-3">
+                            <i class="fas fa-user-slash fs-4 mb-2"></i>
+                            <p class="mb-0 small fw-semibold">No accounts mapped to this device yet.</p>
+                        </div>
+                    {% endif %}
                 </div>
             </div>
-            {% endfor %}
-        </div>
-        {% else %}
-        <p style="margin: 0; color: var(--pico-muted-color); font-weight: 500;">No blocklist filtering profiles are contributing to this device.</p>
-        {% endif %}
-    </article>
 
-    <!-- Alert History for this host -->
-    <article class="card">
-        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap: 1rem; flex-wrap: wrap; border-bottom: 1px solid var(--pico-card-border-color); padding-bottom: 1rem; margin-bottom: 1.25rem;">
-            <div>
-                <h2 style="margin: 0; font-size: 1.5rem;">Diagnostic Alert History</h2>
-                <p style="margin: 0.25rem 0 0 0; color: var(--pico-muted-color); font-size: 0.9rem; font-weight: 500;">
-                    Outbound connection alerts and system exceptions generated by this client
-                </p>
+            <!-- Installed Applications -->
+            <div class="card shadow-sm border mb-4">
+                <div class="card-header bg-body-secondary py-3 d-flex justify-content-between align-items-center flex-wrap gap-3">
+                    <div class="d-flex align-items-center gap-2">
+                        <div class="bg-info-subtle text-info p-2 rounded d-flex align-items-center justify-content-center" style="width: 38px; height: 38px;">
+                            <i class="fas fa-th-list fs-5"></i>
+                        </div>
+                        <div>
+                            <h5 class="mb-0 fw-bold">Installed Applications</h5>
+                            <span class="text-secondary small fw-semibold">
+                                {% if device.installed_apps_last_reported %}
+                                    Last inventory: {{ device.installed_apps_last_reported|localtime }} ({{ device.installed_apps_count or 0 }} apps)
+                                {% else %}
+                                    No inventory reported yet.
+                                {% endif %}
+                            </span>
+                        </div>
+                    </div>
+                    {% if mapped_accounts and agent_online %}
+                        <form action="{{ url_for('ui_dashboard.refresh_device_installed_apps_ui', system_id=device.system_id) }}" method="POST" class="m-0">
+                            <input type="hidden" name="linux_username" value="{{ mapped_accounts[0].linux_username }}">
+                            <button type="submit" class="btn btn-sm btn-primary fw-bold">
+                                <i class="fas fa-sync-alt me-1"></i> Refresh Inventory
+                            </button>
+                        </form>
+                    {% elif mapped_accounts %}
+                        <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle px-3 py-1.5 fw-bold">Agent Offline</span>
+                    {% endif %}
+                </div>
+                <div class="card-body">
+                    {% if mapped_accounts %}
+                        {% for mapping in mapped_accounts %}
+                            {% set apps = installed_apps_by_mapping.get(mapping.id, []) %}
+                            <div class="mb-4">
+                                <h6 class="fw-bold text-secondary text-uppercase mb-3 pb-1 border-bottom" style="font-size: 0.75rem; letter-spacing: 0.05em;">
+                                    <i class="fas fa-user me-1 text-primary"></i> {{ mapping.managed_user.username }} &rarr; {{ mapping.linux_username }}
+                                </h6>
+                                {% if apps %}
+                                    <div class="row g-2">
+                                        {% for app in apps %}
+                                            <div class="col-12 col-sm-6">
+                                                <div class="d-flex align-items-center p-2 border rounded bg-body shadow-sm h-100">
+                                                    <div class="flex-shrink-0 d-flex align-items-center justify-content-center bg-white border rounded p-1 me-2" style="width: 38px; height: 38px;">
+                                                        {% if app.icon_hash %}
+                                                            <img src="{{ url_for('api_installed_apps.get_application_icon', content_hash=app.icon_hash) }}" alt="" class="rounded" style="width: 30px; height: 30px; object-fit: contain;">
+                                                        {% else %}
+                                                            <span class="fs-5">{% if app.platform == 'android' %}📱{% else %}🖥️{% endif %}</span>
+                                                        {% endif %}
+                                                    </div>
+                                                    <div class="min-width-0 flex-grow-1" style="min-width: 0;">
+                                                        <strong class="d-block text-body text-truncate small">{{ app.application_name }}</strong>
+                                                        <code class="d-block text-secondary text-truncate" style="font-size: 0.65rem;" title="{{ app.identifier }}">{{ app.identifier }}</code>
+                                                        {% if app.version_name %}
+                                                            <span class="text-secondary d-block" style="font-size: 0.65rem;">Version: v{{ app.version_name }}</span>
+                                                        {% endif %}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        {% endfor %}
+                                    </div>
+                                {% else %}
+                                    <p class="small text-secondary fst-italic mb-0 py-2"><i class="fas fa-info-circle me-1"></i>No applications reported for this account yet.</p>
+                                {% endif %}
+                            </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="text-center text-secondary py-3">
+                            <i class="fas fa-link-slash fs-4 mb-2"></i>
+                            <p class="mb-0 small fw-semibold">Link a child profile to collect application inventory.</p>
+                        </div>
+                    {% endif %}
+                </div>
             </div>
-            <div style="display:flex; gap: 0.5rem; flex-wrap: wrap;" id="alert-summary-stats">
-                <!-- Injected by JS -->
+
+            <!-- Application Runtime Tracker -->
+            <div class="card shadow-sm border mb-4">
+                <div class="card-header bg-body-secondary py-3 d-flex align-items-center gap-2">
+                    <div class="bg-success-subtle text-success p-2 rounded d-flex align-items-center justify-content-center" style="width: 38px; height: 38px;">
+                        <i class="fas fa-chart-line fs-5"></i>
+                    </div>
+                    <div>
+                        <h5 class="mb-0 fw-bold">Application Runtime Tracker (Last 7 Days)</h5>
+                    </div>
+                </div>
+                <div class="card-body">
+                    {% if mapped_accounts %}
+                        {% set ns = namespace(has_any_usage=false) %}
+                        {% for mapping in mapped_accounts %}
+                            {% set usage = usage_summaries.get(mapping.id) %}
+                            {% if usage %}
+                                {% set ns.has_any_usage = true %}
+                                <div class="mb-4">
+                                    <h6 class="fw-bold text-secondary text-uppercase mb-3 pb-1 border-bottom" style="font-size: 0.75rem; letter-spacing: 0.05em;">
+                                        👤 {{ mapping.managed_user.username }} &rarr; <code>{{ mapping.linux_username }}</code>
+                                    </h6>
+                                    <div class="d-flex flex-column gap-2">
+                                        {% set max_seconds = usage[0].total_seconds if usage else 1 %}
+                                        {% for item in usage %}
+                                            <div class="d-flex align-items-center gap-2 py-2 border-bottom flex-wrap flex-md-nowrap">
+                                                <div class="fw-bold small text-body text-truncate" style="min-width: 140px; max-width: 180px;">{{ item.application_name }}</div>
+                                                <div class="flex-grow-1 mx-2" style="height: 16px; background-color: var(--bs-secondary-bg); border-radius: 0.5rem; overflow: hidden; min-width: 100px;">
+                                                    <div class="bg-primary h-100" style="width: {{ (item.total_seconds / max_seconds * 100)|round(1) }}%; border-radius: 0.5rem; min-width: 2px;"></div>
+                                                </div>
+                                                <div class="d-flex gap-3 ms-auto text-end" style="font-size: 0.85rem;">
+                                                    <span class="fw-bold text-body" style="min-width: 80px;">{{ item.formatted }}</span>
+                                                    <span class="text-secondary small fw-bold" style="min-width: 80px;">{{ item.session_count }} session{{ 's' if item.session_count != 1 }}</span>
+                                                </div>
+                                            </div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                            {% endif %}
+                        {% endfor %}
+                        {% if not ns.has_any_usage %}
+                            <div class="text-center text-secondary py-3">
+                                <i class="fas fa-history fs-4 mb-2"></i>
+                                <p class="mb-0 small fw-semibold">No application usage recorded for mapped accounts on this device.</p>
+                            </div>
+                        {% endif %}
+                    {% else %}
+                        <div class="text-center text-secondary py-3">
+                            <i class="fas fa-lock-open fs-4 mb-2"></i>
+                            <p class="mb-0 small fw-semibold">No mapped accounts available to audit.</p>
+                        </div>
+                    {% endif %}
+                </div>
             </div>
         </div>
 
-        <div class="alerts-toolbar" style="margin-bottom: 1.25rem; display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; justify-content: space-between;">
-            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; flex: 1;">
-                <input
-                    type="text"
-                    id="alert-search-input"
-                    class="form-control"
-                    placeholder="Search events, details..."
-                    style="margin: 0; max-width: 300px;"
-                >
-                <select id="alert-type-filter" style="margin: 0; max-width: 200px; padding: 0.3rem 0.5rem; height: auto;">
-                    <option value="">All Event Types</option>
-                </select>
-                <select id="alert-sort-by" style="margin: 0; max-width: 150px; padding: 0.3rem 0.5rem; height: auto;">
-                    <option value="date">Sort by Date</option>
-                    <option value="type">Sort by Type</option>
-                </select>
-                <select id="alert-sort-dir" style="margin: 0; max-width: 100px; padding: 0.3rem 0.5rem; height: auto;">
-                    <option value="desc">Desc</option>
-                    <option value="asc">Asc</option>
-                </select>
-            </div>
-            <div style="display: flex; gap: 0.5rem;">
-                <button id="alert-prune-btn" class="btn btn-ghost btn-sm" style="margin: 0; color: var(--danger-color); border-color: var(--danger-color);">Prune Old Alerts</button>
-            </div>
-        </div>
-
-        <div id="alerts-loading" style="text-align: center; padding: 2rem 0; display: none;">
-            <div aria-busy="true">Loading alert history...</div>
-        </div>
-
-        <div id="alerts-table-container" class="alerts-table-wrapper" style="overflow-x: auto;">
-            <table class="striped alerts-table" style="width: 100%; border-collapse: collapse; margin: 0;">
-                <thead>
-                    <tr>
-                        <th>Date & Time</th>
-                        <th>Event Type</th>
-                        <th>Scope</th>
-                        <th>Delivery Status</th>
-                        <th>Diagnostic Details</th>
-                    </tr>
-                </thead>
-                <tbody id="alerts-tbody">
-                    <!-- Injected by JS -->
-                </tbody>
-            </table>
-        </div>
-
-        <div id="alerts-empty" style="text-align: center; color: var(--pico-muted-color); padding: 3rem 0; font-weight: 500; display: none;">
-            No audit records found matching the current filters.
-        </div>
-
-        <div id="alerts-pagination" style="display: flex; justify-content: space-between; align-items: center; margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--pico-card-border-color);">
-            <div style="font-size: 0.85rem; color: var(--pico-muted-color); font-weight: 500;" id="pagination-info">
-                Showing 0-0 of 0 alerts
-            </div>
-            <div style="display: flex; gap: 0.5rem;">
-                <button id="prev-page" class="btn btn-secondary btn-sm" style="margin: 0;" disabled>Previous</button>
-                <button id="next-page" class="btn btn-secondary btn-sm" style="margin: 0;" disabled>Next</button>
+        <!-- Right Column: Filtering profiles, diagnostic logs -->
+        <div class="col-12 col-lg-4">
+            <!-- Domain Policy Contributors -->
+            <div class="card shadow-sm border mb-4">
+                <div class="card-header bg-body-secondary py-3 d-flex align-items-center gap-2">
+                    <div class="bg-warning-subtle text-warning p-2 rounded d-flex align-items-center justify-content-center" style="width: 38px; height: 38px;">
+                        <i class="fas fa-globe fs-5"></i>
+                    </div>
+                    <h5 class="mb-0 fw-bold">Domain Policy Contributors</h5>
+                </div>
+                <div class="card-body">
+                    {% if blocklist_contributors %}
+                        <div class="d-flex flex-column gap-2">
+                            {% for contributor in blocklist_contributors %}
+                                <div class="border rounded p-3 bg-body-secondary">
+                                    <div class="fw-bold text-body fs-6">{{ contributor.managed_user }} &rarr; <code>{{ contributor.linux_username }}</code></div>
+                                    <div class="text-secondary small fw-semibold mt-2 d-flex flex-wrap gap-2 align-items-center">
+                                        <span class="badge bg-body border text-body">UID: {{ contributor.linux_uid if contributor.linux_uid is not none else '-' }}</span>
+                                        <span class="badge bg-body border text-body">Lists: {{ contributor.assigned_source_count }}</span>
+                                        <span class="badge bg-body border text-body">Hosts: {{ contributor.effective_domain_count }}</span>
+                                        <span class="badge {% if contributor.sync_status == 'synced' %}bg-success{% else %}bg-warning text-dark{% endif %}">
+                                            Sync: {{ contributor.sync_status|replace('_', ' ')|title }}
+                                        </span>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="text-center text-secondary py-3">
+                            <i class="fas fa-shield-alt fs-4 mb-2"></i>
+                            <p class="mb-0 small fw-semibold">No blocklist filtering profiles are contributing to this device.</p>
+                        </div>
+                    {% endif %}
+                </div>
             </div>
         </div>
-    </article>
+    </div>
+
+    <!-- Diagnostic Alert History -->
+    <div class="row g-4 mt-1">
+        <div class="col-12">
+            <div class="card shadow-sm border mb-4">
+                <div class="card-header bg-body-secondary py-3 d-flex justify-content-between align-items-center flex-wrap gap-3">
+                    <div class="d-flex align-items-center gap-2">
+                        <div class="bg-danger-subtle text-danger p-2 rounded d-flex align-items-center justify-content-center" style="width: 38px; height: 38px;">
+                            <i class="fas fa-bug fs-5"></i>
+                        </div>
+                        <div>
+                            <h5 class="mb-0 fw-bold">Diagnostic Alert History</h5>
+                            <span class="text-secondary small fw-medium">Outbound connection alerts and system exceptions generated by this client</span>
+                        </div>
+                    </div>
+                    <div id="alert-summary-stats">
+                        <!-- Injected by JS -->
+                    </div>
+                </div>
+                <div class="card-body">
+                    <!-- toolbar -->
+                    <div class="d-flex gap-2 mb-3 flex-wrap align-items-center justify-content-between">
+                        <div class="d-flex gap-2 flex-wrap flex-grow-1">
+                            <input type="text" id="alert-search-input" class="form-control form-control-sm" placeholder="Search events, details..." style="max-width: 250px;">
+                            <select id="alert-type-filter" class="form-select form-select-sm" style="max-width: 180px;">
+                                <option value="">All Event Types</option>
+                            </select>
+                            <select id="alert-sort-by" class="form-select form-select-sm" style="max-width: 140px;">
+                                <option value="date">Sort by Date</option>
+                                <option value="type">Sort by Type</option>
+                            </select>
+                            <select id="alert-sort-dir" class="form-select form-select-sm" style="max-width: 100px;">
+                                <option value="desc">Desc</option>
+                                <option value="asc">Asc</option>
+                            </select>
+                        </div>
+                        <div>
+                            <button id="alert-prune-btn" class="btn btn-sm btn-outline-danger fw-bold"><i class="fas fa-trash-alt me-1"></i> Prune Old Alerts</button>
+                        </div>
+                    </div>
+
+                    <div id="alerts-loading" class="text-center py-5" style="display: none;">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading alert history...</span>
+                        </div>
+                        <p class="text-muted mt-2 mb-0">Loading alert history...</p>
+                    </div>
+
+                    <div id="alerts-table-container" class="table-responsive" style="display: none;">
+                        <table class="table table-striped align-middle mb-0" style="font-size: 0.9rem;">
+                            <thead>
+                                <tr class="table-light">
+                                    <th class="ps-3 text-secondary fw-bold" style="font-size: 0.75rem; text-transform: uppercase;">Date &amp; Time</th>
+                                    <th class="text-secondary fw-bold" style="font-size: 0.75rem; text-transform: uppercase;">Event Type</th>
+                                    <th class="text-secondary fw-bold" style="font-size: 0.75rem; text-transform: uppercase;">Scope</th>
+                                    <th class="text-secondary fw-bold" style="font-size: 0.75rem; text-transform: uppercase;">Delivery Status</th>
+                                    <th class="pe-3 text-secondary fw-bold" style="font-size: 0.75rem; text-transform: uppercase;">Diagnostic Details</th>
+                                </tr>
+                            </thead>
+                            <tbody id="alerts-tbody">
+                                <!-- Injected by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div id="alerts-empty" class="text-center text-secondary py-5" style="display: none;">
+                        <i class="far fa-check-circle fs-3 mb-2 text-success"></i>
+                        <p class="mb-0 fw-semibold">No audit records found matching the current filters.</p>
+                    </div>
+
+                    <div id="alerts-pagination" class="d-flex justify-content-between align-items-center mt-3 pt-3 border-top" style="display: none;">
+                        <div id="pagination-info" class="text-secondary small fw-bold">
+                            Showing 0-0 of 0 alerts
+                        </div>
+                        <div class="d-inline-flex gap-2">
+                            <button id="prev-page" class="btn btn-secondary btn-sm fw-bold" disabled>Previous</button>
+                            <button id="next-page" class="btn btn-secondary btn-sm fw-bold" disabled>Next</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 {% endblock %}
 
@@ -286,22 +427,22 @@
         elements.table.style.display = 'block';
         elements.tbody.innerHTML = alerts.map(alert => `
             <tr>
-                <td style="font-size: 0.8rem; font-weight: bold; color: var(--pico-muted-color); white-space: nowrap;">
+                <td class="ps-3 small fw-bold text-secondary text-nowrap">
                     ${alert.occurred_at ? formatDate(alert.occurred_at) : 'Unknown'}
                 </td>
                 <td>
-                    <strong style="font-size: 0.9rem;">${alert.event_label}</strong>
-                    <div style="font-size: 0.7rem; color: var(--pico-muted-color); font-weight: bold;">ID: #${alert.id}</div>
+                    <strong class="text-body small">${alert.event_label}</strong>
+                    <div class="text-secondary small fw-bold" style="font-size: 0.7rem;">ID: #${alert.id}</div>
                 </td>
-                <td><span class="badge badge-secondary" style="font-weight: bold;">${alert.scope_label}</span></td>
+                <td><span class="badge bg-secondary">${alert.scope_label}</span></td>
                 <td>
-                    <div style="font-weight: bold; font-size: 0.85rem;">${formatStatus(alert.delivery_status)}</div>
-                    <div style="font-size: 0.7rem; color: var(--pico-muted-color); font-weight: bold;">
+                    <div class="fw-bold small text-body">${formatStatus(alert.delivery_status)}</div>
+                    <div class="text-secondary small fw-bold" style="font-size: 0.7rem;">
                         ${alert.delivery_attempts} attempt(s)
-                        ${alert.last_delivery_error ? `<br><span style="color: var(--danger-color);">Error: ${alert.last_delivery_error}</span>` : ''}
+                        ${alert.last_delivery_error ? `<br><span class="text-danger">Error: ${alert.last_delivery_error}</span>` : ''}
                     </div>
                 </td>
-                <td class="alerts-details" style="font-size: 0.75rem; color: var(--pico-muted-color); font-family: monospace; max-width: 320px; overflow-wrap: break-word;">${alert.details_text}</td>
+                <td class="pe-3 font-monospace text-secondary small" style="font-size: 0.75rem; max-width: 320px; overflow-wrap: break-word;">${alert.details_text}</td>
             </tr>
         `).join('');
     }
@@ -343,9 +484,9 @@
 
     function updateSummaryStats(total) {
         elements.summary.innerHTML = `
-            <div style="text-align: center; padding: 0.4rem 0.75rem; background: var(--pico-background-color); border: 1px solid var(--pico-card-border-color); border-radius: 0.5rem; min-width: 100px;">
-                <div style="font-size: 0.7rem; font-weight: bold; color: var(--pico-muted-color); text-transform: uppercase;">Filtered Results</div>
-                <div style="font-size: 1.1rem; font-weight: 700;">${total}</div>
+            <div class="text-center px-3 py-1 bg-body border rounded shadow-sm" style="min-width: 100px;">
+                <div class="text-secondary small fw-bold text-uppercase" style="font-size: 0.65rem; letter-spacing: 0.05em;">Filtered Results</div>
+                <div class="fs-5 fw-bold text-body">${total}</div>
             </div>
         `;
     }

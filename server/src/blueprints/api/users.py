@@ -181,6 +181,8 @@ def validate_user(user_id):
     _refresh_managed_user_summary(user)
 
     db.session.commit()
+    from src.dashboard_events import notify_dashboard_changed
+    notify_dashboard_changed('mapping_changed')
     if policy_hint_system_ids:
         from app import task_manager
         task_manager.notify_domain_policy_hint(
@@ -217,6 +219,8 @@ def validate_mapping(user_id, mapping_id):
 
     _refresh_managed_user_summary(user)
     db.session.commit()
+    from src.dashboard_events import notify_dashboard_changed
+    notify_dashboard_changed('mapping_changed')
     if mapping.linux_uid != previous_linux_uid:
         from app import task_manager
         task_manager.notify_domain_policy_hint(
@@ -245,7 +249,9 @@ def delete_mapping(user_id, mapping_id):
     db.session.flush()
     _refresh_managed_user_summary(user)
     db.session.commit()
-    
+    from src.dashboard_events import notify_dashboard_changed
+    notify_dashboard_changed('mapping_changed')
+
     from app import task_manager
     task_manager.notify_domain_policy_hint(system_ids={affected_system_id}, reason='mapping_updated')
     flash(f'Mapping removed: {mapping_label}', 'success')
@@ -295,3 +301,46 @@ def get_user_usage(user_id):
         'values': values_hours,
         'username': user.username
     })
+
+
+@api_users_bp.route('/api/users', methods=['GET'])
+def get_all_users():
+    """Return all child profiles in JSON format for the onboarding wizard."""
+    if not session.get('logged_in'):
+        return jsonify({'success': False, 'message': 'Not authenticated'}), 401
+    
+    users = ManagedUser.query.order_by(ManagedUser.username.asc()).all()
+    return jsonify({
+        'success': True,
+        'users': [{'id': u.id, 'username': u.username} for u in users]
+    })
+
+
+@api_users_bp.route('/api/user/create', methods=['POST'])
+def api_create_user():
+    """Create a new child profile and return its JSON details for the wizard."""
+    if not session.get('logged_in'):
+        return jsonify({'success': False, 'message': 'Not authenticated'}), 401
+    
+    if request.is_json:
+        data = request.json or {}
+        username = (data.get('username') or '').strip()
+    else:
+        username = (request.form.get('username') or '').strip()
+        
+    if not username:
+        return jsonify({'success': False, 'message': 'Profile name is required'}), 400
+        
+    existing = ManagedUser.query.filter_by(username=username).first()
+    if existing:
+        return jsonify({'success': False, 'message': f'Child profile "{username}" already exists'}), 400
+        
+    user = ManagedUser(username=username, is_valid=False, system_ip='Unassigned')
+    db.session.add(user)
+    db.session.commit()
+    return jsonify({
+        'success': True,
+        'user': {'id': user.id, 'username': user.username}
+    })
+
+

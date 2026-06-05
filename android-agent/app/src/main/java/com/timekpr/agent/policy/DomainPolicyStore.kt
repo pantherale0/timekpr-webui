@@ -10,12 +10,15 @@ data class UidPolicy(
 )
 
 class DomainPolicyStore(context: Context) {
-    private val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    private val persistence = DomainPolicyPersistence(context.applicationContext)
 
     val sources = ConcurrentHashMap<String, MutableSet<String>>()
     val sourceRevisions = ConcurrentHashMap<String, String>()
     val policies = ConcurrentHashMap<String, UidPolicy>()
     val syncSessions = ConcurrentHashMap<String, SyncSession>()
+
+    @Volatile
+    private var blockedMatcher: BlockedDomainMatcher = BlockedDomainMatcher.EMPTY
 
     data class SyncSession(
         val sources: MutableMap<String, SourceEntry>,
@@ -27,6 +30,10 @@ class DomainPolicyStore(context: Context) {
         val domains: MutableSet<String>,
     )
 
+    fun blockedMatcher(): BlockedDomainMatcher = blockedMatcher
+
+    fun blockedDomainCount(): Int = blockedMatcher.domainCount
+
     fun getStatePayload(): JSONObject {
         val revisions = JSONObject()
         sourceRevisions.forEach { (id, revision) -> revisions.put(id, revision) }
@@ -34,23 +41,19 @@ class DomainPolicyStore(context: Context) {
             .put("source_revisions", revisions)
             .put("policy_count", policies.size)
             .put("source_count", sources.size)
+            .put("blocked_domain_count", blockedMatcher.domainCount)
     }
 
     fun blockedDomainsForUid(linuxUid: String): Set<String> {
         val policy = policies[linuxUid] ?: return emptySet()
-        val blocked = mutableSetOf<String>()
+        val blocked = HashSet<String>()
         policy.sourceIds.forEach { sourceId ->
             sources[sourceId]?.let { blocked.addAll(it) }
         }
         return blocked
     }
 
-    fun allBlockedDomains(): Set<String> {
-        if (policies.isEmpty()) {
-            return sources.values.flatten().toSet()
-        }
-        return policies.keys.flatMap { blockedDomainsForUid(it) }.toSet()
-    }
+    fun allBlockedDomains(): Set<String> = collectEffectiveDomains()
 
     fun applyFullSync(payload: JSONObject) {
         sources.clear()
@@ -60,7 +63,7 @@ class DomainPolicyStore(context: Context) {
         val sourcesObj = payload.optJSONObject("sources") ?: JSONObject()
         sourcesObj.keys().forEach { sourceId ->
             val domains = sourcesObj.optJSONArray(sourceId) ?: return@forEach
-            val normalized = mutableSetOf<String>()
+            val normalized = HashSet<String>(domains.length())
             for (index in 0 until domains.length()) {
                 val domain = domains.optString(index).trim().lowercase().trimEnd('.')
                 if (domain.isNotEmpty()) normalized.add(domain)
@@ -79,6 +82,7 @@ class DomainPolicyStore(context: Context) {
                 } ?: emptyList(),
             )
         }
+        rebuildBlockedMatcher()
         persist()
     }
 
@@ -105,43 +109,37 @@ class DomainPolicyStore(context: Context) {
         }
         policies.clear()
         policies.putAll(session.policies)
+        rebuildBlockedMatcher()
         persist()
         return true
     }
 
     fun persist() {
-        val snapshot = JSONObject()
-            .put("sources", JSONObject(sources.mapValues { (_, domains) ->
-                org.json.JSONArray(domains.toList())
-            }))
-            .put("source_revisions", JSONObject(sourceRevisions.toMap()))
-            .put(
-                "policies",
-                JSONObject(policies.mapValues { (_, policy) ->
-                    JSONObject()
-                        .put("linux_username", policy.linuxUsername)
-                        .put("source_ids", org.json.JSONArray(policy.sourceIds))
-                }),
-            )
-        prefs.edit().putString(KEY_SNAPSHOT, snapshot.toString()).apply()
+        persistence.persist(
+            sources = sources.mapValues { it.value.toSet() },
+            sourceRevisions = sourceRevisions.toMap(),
+            policies = policies.toMap(),
+        )
     }
 
     fun restore() {
-        val raw = prefs.getString(KEY_SNAPSHOT, null) ?: return
-        try {
-            val json = JSONObject(raw)
-            val payload = JSONObject()
-                .put("sources", json.optJSONObject("sources") ?: JSONObject())
-                .put("policies", json.optJSONObject("policies") ?: JSONObject())
-            applyFullSync(payload)
-            json.optJSONObject("source_revisions")?.let { revisions ->
-                revisions.keys().forEach { sourceId ->
-                    sourceRevisions[sourceId] = revisions.optString(sourceId)
-                }
-            }
-        } catch (_: Exception) {
-            // Ignore corrupt snapshots.
+        if (!persistence.restore(
+            onSources = { loaded ->
+                sources.clear()
+                sources.putAll(loaded)
+            },
+            onRevisions = { loaded ->
+                sourceRevisions.clear()
+                sourceRevisions.putAll(loaded)
+            },
+            onPolicies = { loaded ->
+                policies.clear()
+                policies.putAll(loaded)
+            },
+        )) {
+            return
         }
+        rebuildBlockedMatcher()
     }
 
     fun isDomainBlocked(domain: String, blockedSet: Set<String>): Boolean {
@@ -157,14 +155,40 @@ class DomainPolicyStore(context: Context) {
         return false
     }
 
-    private fun stableRevision(domains: Set<String>): String {
-        val digest = java.security.MessageDigest.getInstance("SHA-256")
-        val payload = domains.sorted().joinToString("\n")
-        return digest.digest(payload.toByteArray()).joinToString("") { "%02x".format(it) }
+    private fun rebuildBlockedMatcher() {
+        blockedMatcher = BlockedDomainMatcher.from(collectEffectiveDomains())
     }
 
-    companion object {
-        private const val PREFS_NAME = "timekpr_domain_policy"
-        private const val KEY_SNAPSHOT = "snapshot"
+    private fun collectEffectiveDomains(): Set<String> {
+        if (policies.isEmpty()) {
+            if (sources.isEmpty()) return emptySet()
+            val merged = HashSet<String>()
+            sources.values.forEach { merged.addAll(it) }
+            return merged
+        }
+        val merged = HashSet<String>()
+        policies.values.forEach { policy ->
+            policy.sourceIds.forEach { sourceId ->
+                sources[sourceId]?.let { merged.addAll(it) }
+            }
+        }
+        return merged
+    }
+
+    private fun stableRevision(domains: Collection<String>): String {
+        val digest = java.security.MessageDigest.getInstance("SHA-256")
+        digest.update(domains.size.toString().toByteArray())
+        if (domains.size <= 10_000) {
+            domains.sorted().forEach { domain ->
+                digest.update(domain.toByteArray())
+                digest.update(0)
+            }
+        } else {
+            domains.forEach { domain ->
+                digest.update(domain.toByteArray())
+                digest.update(0)
+            }
+        }
+        return digest.digest().joinToString("") { "%02x".format(it) }
     }
 }

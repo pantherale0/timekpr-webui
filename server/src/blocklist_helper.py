@@ -431,4 +431,7 @@ def should_refresh_external_source(source, now=None):
         return True
 
     reference_time = now or datetime.now(timezone.utc)
-    return (reference_time - source.last_sync_at) >= EXTERNAL_SYNC_INTERVAL
+    last_sync_at = source.last_sync_at
+    if last_sync_at.tzinfo is None:
+        last_sync_at = last_sync_at.replace(tzinfo=timezone.utc)
+    return (reference_time - last_sync_at) >= EXTERNAL_SYNC_INTERVAL

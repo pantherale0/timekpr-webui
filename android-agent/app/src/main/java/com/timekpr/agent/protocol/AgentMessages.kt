@@ -75,4 +75,34 @@ object AgentMessages {
             .put("source_revisions", revisions)
             .toString()
     }
+
+    fun installedAppsReport(
+        reportId: String,
+        linuxUsername: String,
+        chunkIndex: Int,
+        chunkTotal: Int,
+        isFinal: Boolean,
+        reportedAt: String,
+        apps: List<JSONObject>,
+    ): String {
+        return JSONObject()
+            .put("type", "installed_apps_report")
+            .put("report_id", reportId)
+            .put("linux_username", linuxUsername)
+            .put("chunk_index", chunkIndex)
+            .put("chunk_total", chunkTotal)
+            .put("is_final", isFinal)
+            .put("reported_at", reportedAt)
+            .put("apps", org.json.JSONArray(apps))
+            .toString()
+    }
+
+    fun appIconReport(contentHash: String, mimeType: String, dataBase64: String): String {
+        return JSONObject()
+            .put("type", "app_icon_report")
+            .put("content_hash", contentHash)
+            .put("mime_type", mimeType)
+            .put("data_base64", dataBase64)
+            .toString()
+    }
 }

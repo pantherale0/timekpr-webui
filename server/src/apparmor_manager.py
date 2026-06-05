@@ -92,9 +92,15 @@ def _validate_apparmor_rule_target(match_type, target_value, linux_username):
     if match_type == AppArmorRule.MATCH_TYPE_PATH_PATTERN:
         return _validate_apparmor_path_pattern(target_value, linux_username)
     if match_type == AppArmorRule.MATCH_TYPE_PACKAGE:
-        return _validate_android_package_name(target_value)
+        if (target_value or '').strip().startswith('/android/package/'):
+            package_name = target_value.strip().removeprefix('/android/package/')
+        else:
+            package_name = target_value
+        package_name = _validate_android_package_name(package_name)
+        return f'/android/package/{package_name}'
     if (target_value or '').strip().startswith('/android/package/'):
-        return _validate_android_package_name(target_value.strip().removeprefix('/android/package/'))
+        package_name = _validate_android_package_name(target_value.strip().removeprefix('/android/package/'))
+        return f'/android/package/{package_name}'
     return _validate_apparmor_executable_path(target_value)
 
 
@@ -108,6 +114,75 @@ def _is_valid_preset_for_match_type(match_type, preset):
     return preset in AppArmorRule.VALID_PRESETS
 
 
+def _normalize_policy_platform(platform):
+    normalized = (platform or AppPolicy.PLATFORM_LINUX).strip().lower()
+    if normalized not in AppPolicy.VALID_PLATFORMS:
+        raise ValueError('Platform must be linux or android')
+    return normalized
+
+
+def _device_platform(device):
+    if device is None:
+        return AppPolicy.PLATFORM_LINUX
+    platform = (device.platform or AppPolicy.PLATFORM_LINUX).strip().lower()
+    if platform == AppPolicy.PLATFORM_ANDROID:
+        return AppPolicy.PLATFORM_ANDROID
+    return AppPolicy.PLATFORM_LINUX
+
+
+def _allowed_match_types_for_platform(platform):
+    if platform == AppPolicy.PLATFORM_ANDROID:
+        return {AppPolicyRule.MATCH_TYPE_PACKAGE}
+    return {AppPolicyRule.MATCH_TYPE_EXECUTABLE, AppPolicyRule.MATCH_TYPE_PATH_PATTERN}
+
+
+def _allowed_presets_for_platform(platform, match_type):
+    if platform == AppPolicy.PLATFORM_ANDROID:
+        return {
+            AppPolicyRule.PRESET_ALLOWED,
+            AppPolicyRule.PRESET_BLOCKED,
+            AppPolicyRule.PRESET_COMPLAIN,
+        }
+    if match_type == AppPolicyRule.MATCH_TYPE_PATH_PATTERN:
+        return {
+            AppPolicyRule.PRESET_ALLOWED,
+            AppPolicyRule.PRESET_BLOCKED,
+            AppPolicyRule.PRESET_COMPLAIN,
+        }
+    return AppArmorRule.VALID_PRESETS
+
+
+def validate_policy_rule_for_platform(platform, match_type, preset, target_value, linux_username='user'):
+    platform = _normalize_policy_platform(platform)
+    match_type = (match_type or '').strip().lower()
+    preset = (preset or AppPolicyRule.PRESET_ALLOWED).strip().lower()
+
+    if match_type not in _allowed_match_types_for_platform(platform):
+        if platform == AppPolicy.PLATFORM_ANDROID:
+            raise ValueError('Android policies only support package rules')
+        raise ValueError('Linux policies only support executable or path pattern rules')
+
+    if preset not in _allowed_presets_for_platform(platform, match_type):
+        if platform == AppPolicy.PLATFORM_ANDROID:
+            raise ValueError('Android policies do not support the no_internet preset')
+        raise ValueError(f'Preset "{preset}" is not supported for this rule type')
+
+    normalized_target = _validate_apparmor_rule_target(match_type, target_value, linux_username)
+    if not _is_valid_preset_for_match_type(match_type, preset):
+        raise ValueError(f'Preset "{preset}" is not supported for match type "{match_type}"')
+
+    return platform, match_type, preset, normalized_target
+
+
+def _rule_compatible_with_device_platform(rule, device_platform):
+    if device_platform == AppPolicy.PLATFORM_ANDROID:
+        return rule.match_type == AppArmorRule.MATCH_TYPE_PACKAGE
+    return rule.match_type in {
+        AppArmorRule.MATCH_TYPE_EXECUTABLE,
+        AppArmorRule.MATCH_TYPE_PATH_PATTERN,
+    }
+
+
 def _build_apparmor_policy_sync_payload(mapping):
     """Collect restrictive AppArmor rules for a mapping and sanitize them for sync."""
     all_rules = AppArmorRule.query.filter_by(device_map_id=mapping.id).all()
@@ -115,6 +190,10 @@ def _build_apparmor_policy_sync_payload(mapping):
     skipped_rule_names = []
     for rule in all_rules:
         if not rule.is_restrictive:
+            continue
+        device_platform = _device_platform(mapping.device)
+        if not _rule_compatible_with_device_platform(rule, device_platform):
+            skipped_rule_names.append(rule.application_name or rule.executable_path)
             continue
         try:
             _validate_apparmor_rule_target(rule.match_type, rule.executable_path, mapping.linux_username)
@@ -208,46 +287,52 @@ def _get_apparmor_usage_summary(mapping_id, days=7):
 
 def compile_user_apparmor_rules(user):
     """Compile assigned AppPolicies and rules into AppArmorRule records for all user mappings."""
-    # Ensure user assignments and policies are fresh
-    assigned_policies = [assignment.policy for assignment in user.app_policy_assignments if assignment.policy]
-    
+    assigned_policies = [
+        assignment.policy
+        for assignment in user.app_policy_assignments
+        if assignment.policy
+    ]
+
     preset_priority = {
         'blocked': 4,
         'no_internet': 3,
         'complain': 2,
         'allowed': 1
     }
-    
-    compiled = {}
-    
-    for policy in assigned_policies:
-        if not policy.rules:
-            continue
-        for rule in policy.rules:
-            path = rule.executable_path
-            current_priority = preset_priority.get(rule.preset, 0)
-            
-            if path in compiled:
-                existing_priority = preset_priority.get(compiled[path]['preset'], 0)
-                if current_priority > existing_priority:
+
+    for mapping in user.device_mappings:
+        device_platform = _device_platform(mapping.device)
+        compiled = {}
+
+        for policy in assigned_policies:
+            if _normalize_policy_platform(policy.platform) != device_platform:
+                continue
+            if not policy.rules:
+                continue
+            for rule in policy.rules:
+                path = rule.executable_path
+                current_priority = preset_priority.get(rule.preset, 0)
+
+                if path in compiled:
+                    existing_priority = preset_priority.get(compiled[path]['preset'], 0)
+                    if current_priority > existing_priority:
+                        compiled[path] = {
+                            'application_name': rule.application_name,
+                            'match_type': rule.match_type,
+                            'preset': rule.preset,
+                            'is_custom': rule.is_custom
+                        }
+                else:
                     compiled[path] = {
                         'application_name': rule.application_name,
                         'match_type': rule.match_type,
                         'preset': rule.preset,
                         'is_custom': rule.is_custom
                     }
-            else:
-                compiled[path] = {
-                    'application_name': rule.application_name,
-                    'match_type': rule.match_type,
-                    'preset': rule.preset,
-                    'is_custom': rule.is_custom
-                }
-                
-    for mapping in user.device_mappings:
-        # Clear existing rules via relationship to ensure session consistency and proper cascade deletion
+
         mapping.apparmor_rules = []
-        
+        db.session.flush()
+
         for path, rule_data in compiled.items():
             db_rule = AppArmorRule(
                 device_map_id=mapping.id,
@@ -258,7 +343,7 @@ def compile_user_apparmor_rules(user):
                 is_custom=rule_data['is_custom']
             )
             db.session.add(db_rule)
-            
+
     db.session.commit()
-    _LOGGER.info("Successfully compiled %d app policy rules for child %s", len(compiled), user.username)
+    _LOGGER.info("Successfully compiled app policy rules for child %s", user.username)
 

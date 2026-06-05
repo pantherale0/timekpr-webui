@@ -44,6 +44,8 @@ def modify_time():
     user.pending_time_operation = None
     user.last_checked = datetime.now(timezone.utc)
     db.session.commit()
+    from src.dashboard_events import notify_dashboard_changed
+    notify_dashboard_changed('time_adjusted')
 
     online_mappings = [mapping for mapping in mappings if AgentConnectionManager.is_online(mapping.system_id)]
     device_labels = _get_device_label_map()

@@ -4,6 +4,8 @@ import android.content.Context
 import com.timekpr.agent.BuildConfig
 import com.timekpr.agent.TimeKprApplication
 import com.timekpr.agent.config.AgentConfig
+import com.timekpr.agent.discovery.InstalledAppsDiscovery
+import com.timekpr.agent.discovery.InstalledAppsReporter
 import com.timekpr.agent.enforcement.EnforcementController
 import com.timekpr.agent.monitor.AlertEventBus
 import com.timekpr.agent.policy.AppPolicyStore
@@ -167,6 +169,10 @@ class AgentWebSocketClient(
                     sendAlert(webSocket, pending.eventType, pending.details)
                 }
 
+                val linuxUsername = AndroidUsers.currentLinuxUsername(context)
+                val discoveredApps = InstalledAppsDiscovery.discover(context)
+                InstalledAppsReporter.sendInventory(webSocket, linuxUsername, discoveredApps)
+
                 onComplete(SessionResult(success = true, reason = "sync_complete"))
             }
             "command_request" -> {
@@ -183,6 +189,11 @@ class AgentWebSocketClient(
                         data = result.data,
                     ),
                 )
+                val followUpApps = result.followUpApps
+                val followUpUsername = result.followUpUsername
+                if (!followUpApps.isNullOrEmpty() && !followUpUsername.isNullOrBlank()) {
+                    InstalledAppsReporter.sendInventory(webSocket, followUpUsername, followUpApps)
+                }
             }
             "policy_sync_hint" -> sendPolicySyncCheck(webSocket)
         }

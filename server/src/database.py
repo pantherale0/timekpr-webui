@@ -158,6 +158,9 @@ class AgentDevice(db.Model):
     platform = db.Column(db.String(20), nullable=True)  # linux, android
     fcm_token = db.Column(db.String(512), nullable=True)
     fcm_token_updated_at = db.Column(db.DateTime(timezone=True), nullable=True)
+    installed_apps_report_hash = db.Column(db.String(64), nullable=True)
+    installed_apps_last_reported = db.Column(db.DateTime(timezone=True), nullable=True)
+    installed_apps_count = db.Column(db.Integer, nullable=True)
 
     # Relationship to per-user Linux account mappings on this device
     user_mappings = db.relationship(
@@ -168,6 +171,12 @@ class AgentDevice(db.Model):
     )
     alerts = db.relationship(
         'AgentAlert',
+        backref='device',
+        lazy=True,
+        cascade="all, delete-orphan",
+    )
+    installed_applications = db.relationship(
+        'DeviceInstalledApplication',
         backref='device',
         lazy=True,
         cascade="all, delete-orphan",
@@ -917,7 +926,7 @@ class AppArmorRule(db.Model):
         nullable=False,
     )
     application_name = db.Column(db.String(120), nullable=False)
-    executable_path = db.Column(db.String(255), nullable=False)
+    executable_path = db.Column(db.String(512), nullable=False)
     match_type = db.Column(
         db.String(32),
         nullable=False,
@@ -1001,8 +1010,13 @@ class AppUsageHistory(db.Model):
 class AppPolicy(db.Model):
     __tablename__ = 'app_policy'
 
+    PLATFORM_LINUX = 'linux'
+    PLATFORM_ANDROID = 'android'
+    VALID_PLATFORMS = {PLATFORM_LINUX, PLATFORM_ANDROID}
+
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(120), unique=True, nullable=False)
+    platform = db.Column(db.String(20), nullable=False, default=PLATFORM_LINUX)
     created_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
     updated_at = db.Column(
         db.DateTime(timezone=True),
@@ -1038,11 +1052,12 @@ class AppPolicyRule(db.Model):
     PRESET_COMPLAIN = 'complain'
     MATCH_TYPE_EXECUTABLE = 'executable'
     MATCH_TYPE_PATH_PATTERN = 'path_pattern'
+    MATCH_TYPE_PACKAGE = 'package'
 
     id = db.Column(db.Integer, primary_key=True)
     policy_id = db.Column(db.Integer, db.ForeignKey('app_policy.id'), nullable=False)
     application_name = db.Column(db.String(120), nullable=False)
-    executable_path = db.Column(db.String(255), nullable=False)
+    executable_path = db.Column(db.String(512), nullable=False)
     match_type = db.Column(
         db.String(32),
         nullable=False,
@@ -1068,6 +1083,91 @@ class AppPolicyRule(db.Model):
 
     def __repr__(self):
         return f'<AppPolicyRule {self.application_name} [{self.preset}]>'
+
+
+class ApplicationIcon(db.Model):
+    __tablename__ = 'application_icon'
+
+    content_hash = db.Column(db.String(64), primary_key=True)
+    mime_type = db.Column(db.String(64), nullable=False, default='image/png')
+    data = db.Column(db.LargeBinary, nullable=False)
+    created_at = db.Column(
+        db.DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+    def __repr__(self):
+        return f'<ApplicationIcon {self.content_hash[:12]}...>'
+
+
+class DeviceInstalledApplication(db.Model):
+    __tablename__ = 'device_installed_application'
+
+    MATCH_TYPE_EXECUTABLE = 'executable'
+    MATCH_TYPE_PACKAGE = 'package'
+    VALID_MATCH_TYPES = {MATCH_TYPE_EXECUTABLE, MATCH_TYPE_PACKAGE}
+
+    PLATFORM_LINUX = 'linux'
+    PLATFORM_ANDROID = 'android'
+    VALID_PLATFORMS = {PLATFORM_LINUX, PLATFORM_ANDROID}
+
+    id = db.Column(db.Integer, primary_key=True)
+    system_id = db.Column(db.String(50), db.ForeignKey('agent_device.system_id'), nullable=False)
+    linux_username = db.Column(db.String(50), nullable=False)
+    application_name = db.Column(db.String(120), nullable=False)
+    identifier = db.Column(db.String(512), nullable=False)
+    match_type = db.Column(db.String(32), nullable=False, default=MATCH_TYPE_EXECUTABLE)
+    platform = db.Column(db.String(20), nullable=False)
+    version_name = db.Column(db.String(120), nullable=True)
+    icon_hash = db.Column(db.String(64), nullable=True)
+    first_seen_at = db.Column(
+        db.DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+    last_seen_at = db.Column(
+        db.DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+    is_present = db.Column(db.Boolean, default=True, nullable=False)
+
+    __table_args__ = (
+        db.UniqueConstraint(
+            'system_id',
+            'linux_username',
+            'identifier',
+            'match_type',
+            name='device_installed_app_uc',
+        ),
+    )
+
+    def __repr__(self):
+        return f'<DeviceInstalledApplication {self.application_name} [{self.match_type}]>'
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'system_id': self.system_id,
+            'linux_username': self.linux_username,
+            'application_name': self.application_name,
+            'identifier': self.identifier,
+            'match_type': self.match_type,
+            'platform': self.platform,
+            'version_name': self.version_name,
+            'icon_hash': self.icon_hash,
+            'first_seen_at': self.first_seen_at.isoformat() if self.first_seen_at else None,
+            'last_seen_at': self.last_seen_at.isoformat() if self.last_seen_at else None,
+            'is_present': self.is_present,
+        }
+
+    def to_policy_fields(self):
+        return {
+            'application_name': self.application_name,
+            'executable_path': self.identifier,
+            'match_type': self.match_type,
+        }
 
 
 class ManagedUserAppPolicyAssignment(db.Model):

@@ -87,7 +87,7 @@ def test_route_response():
     # If correlation_id does not exist
     assert not AgentConnectionManager.route_response("nonexistent-cid", {})
 
-def test_send_command_sync_failures():
+def test_send_command_sync_failures(db_session):
     # Case: system_id is None or empty
     success, msg, _data = AgentConnectionManager.send_command_sync(None, "action", "john")
     assert not success

@@ -7,7 +7,13 @@ import hashlib
 from datetime import datetime, timezone
 from unittest.mock import patch
 from sqlalchemy import text
-from app import ws_agent_handler, _ensure_database_schema, _get_blocklist_sources, task_manager
+from app import (
+    initialize_runtime,
+    ws_agent_handler,
+    _ensure_database_schema,
+    _get_blocklist_sources,
+    task_manager,
+)
 from src.database import (
     AgentAlert,
     AgentDevice,
@@ -131,6 +137,8 @@ def test_dashboard_routes(client, db_session):
     res = client.get('/dashboard')
     assert res.status_code == 200
     assert b"jack" in res.data
+    assert b"dashboard-live-indicator" in res.data
+    assert b"Never" in res.data
 
 def test_admin_panel(client, db_session):
     Settings.set_admin_password("admin")
@@ -319,10 +327,10 @@ def test_blocklist_catalog_and_assignment_routes(client, db_session):
     assert status_payload['effective_domain_count'] == 3
     assert status_payload['mapping_count'] == 1
 
-    weekly_page = client.get(f'/weekly-schedule/{user.id}')
-    assert weekly_page.status_code == 200
-    assert b'Internet Blocklists' in weekly_page.data
-    assert b'School Hours' in weekly_page.data
+    user_edit_page = client.get(f'/admin/users/{user.id}')
+    assert user_edit_page.status_code == 200
+    assert b'Internet Blocklists' in user_edit_page.data
+    assert b'School Hours' in user_edit_page.data
 
     device_page = client.get(f'/devices/{device.system_id}')
     assert device_page.status_code == 200
@@ -346,6 +354,46 @@ def test_ensure_database_schema_repairs_stamped_empty_database(app, db_session):
     assert 'blocklist_source' in table_names
     assert 'settings' in table_names
     assert table_names >= set(db.metadata.tables.keys())
+
+
+def test_ensure_database_schema_applies_pending_column_migrations(app, db_session):
+    db.session.execute(text('DROP TABLE IF EXISTS app_policy'))
+    db.session.execute(text('''
+        CREATE TABLE app_policy (
+            id INTEGER PRIMARY KEY,
+            name VARCHAR(120) NOT NULL,
+            created_at DATETIME NOT NULL,
+            updated_at DATETIME NOT NULL
+        )
+    '''))
+    db.session.execute(text('DROP TABLE IF EXISTS alembic_version'))
+    db.session.execute(text(
+        'CREATE TABLE alembic_version (version_num VARCHAR(32) NOT NULL)'
+    ))
+    db.session.execute(text("INSERT INTO alembic_version VALUES ('c4d9e2a1b7f3')"))
+    db.session.commit()
+
+    migrations_dir = os.path.join(app.root_path, 'migrations')
+    _ensure_database_schema(migrations_dir)
+
+    columns = {col['name'] for col in db.inspect(db.engine).get_columns('app_policy')}
+    assert 'platform' in columns
+
+
+def test_initialize_runtime_is_idempotent_and_preserves_data(app, db_session):
+    device = AgentDevice(
+        system_id="persist-device",
+        system_hostname="persist-pc",
+        status="approved",
+        secure_token="tok",
+    )
+    db_session.add(device)
+    db_session.commit()
+
+    initialize_runtime(start_background_tasks=False)
+    initialize_runtime(start_background_tasks=False)
+
+    assert AgentDevice.query.filter_by(system_id="persist-device").count() == 1
 
 
 def test_delete_blocklist_source_uses_bulk_delete_path(client, db_session):
@@ -1103,70 +1151,77 @@ def test_alert_pages_for_user_and_device(client, db_session):
     res = client.get(f'/stats/{user.id}')
     assert res.status_code == 200
     assert b'Alert Audit' in res.data
-    assert b'User Signed In' in res.data
-    assert b'System Sleep' in res.data
-    assert b'other-user' not in res.data
-    assert f'/devices/{device.system_id}'.encode() in res.data
 
-    filtered = client.get(f'/stats/{user.id}?alert_search=prepare')
-    assert filtered.status_code == 200
-    assert b'System Sleep' in filtered.data
-    assert b'User Signed In' not in filtered.data
+    # Query alerts API instead of checking HTML directly (since page uses AJAX)
+    api_res = client.get(f'/api/alerts?managed_user_id={user.id}')
+    assert api_res.status_code == 200
+    api_data = json.loads(api_res.data)
+    assert api_data['success'] is True
+    alerts = api_data['data']['alerts']
 
+    event_types = [a['event_type'] for a in alerts]
+    assert 'user_signed_in' in event_types
+    assert 'system_sleep' in event_types
+    assert 'user_signed_out' not in event_types
+
+    # For search filtering
+    filtered_api_res = client.get(f'/api/alerts?managed_user_id={user.id}&search=prepare')
+    assert filtered_api_res.status_code == 200
+    filtered_data = json.loads(filtered_api_res.data)
+    filtered_alerts = filtered_data['data']['alerts']
+    filtered_event_types = [a['event_type'] for a in filtered_alerts]
+    assert 'system_sleep' in filtered_event_types
+    assert 'user_signed_in' not in filtered_event_types
+
+    # For device page
     device_page = client.get(f'/devices/{device.system_id}')
     assert device_page.status_code == 200
     assert b'Device details, linked accounts, and alert history' in device_page.data
     assert b'jack &rarr; jack' in device_page.data
-    assert b'other-user' in device_page.data
 
-    device_filtered = client.get(f'/devices/{device.system_id}?alert_search=other-user')
-    assert device_filtered.status_code == 200
-    assert b'other-user' in device_filtered.data
-    assert b'User Signed In' not in device_filtered.data
+    # Query device alerts API
+    device_api_res = client.get(f'/api/alerts?system_id={device.system_id}')
+    assert device_api_res.status_code == 200
+    device_api_data = json.loads(device_api_res.data)
+    device_alerts = device_api_data['data']['alerts']
+    device_event_types = [a['event_type'] for a in device_alerts]
+    assert 'user_signed_in' in device_event_types
+    assert 'system_sleep' in device_event_types
+    assert 'user_signed_out' in device_event_types
 
-    admin_res = client.get('/admin/devices')
-    assert admin_res.status_code == 200
-    assert f'/devices/{device.system_id}'.encode() in admin_res.data
+    # Filter device alerts
+    device_filtered_api_res = client.get(f'/api/alerts?system_id={device.system_id}&search=other-user')
+    assert device_filtered_api_res.status_code == 200
+    device_filtered_data = json.loads(device_filtered_api_res.data)
+    device_filtered_alerts = device_filtered_data['data']['alerts']
+    device_filtered_event_types = [a['event_type'] for a in device_filtered_alerts]
+    assert 'user_signed_out' in device_filtered_event_types
+    assert 'user_signed_in' not in device_filtered_event_types
 
 
 def test_apparmor_policy_rejects_globbed_custom_paths(client, db_session):
     Settings.set_admin_password("admin")
     client.post('/', data={'username': 'admin', 'password': 'admin'})
 
-    device = AgentDevice(
-        system_id="device-apparmor-guard",
-        system_hostname="family-pc",
-        system_ip="10.0.0.30",
-        status="approved",
-        secure_token="tok",
-    )
-    user = ManagedUser(username="maya", system_ip="Unassigned", is_valid=True)
-    db_session.add_all([device, user])
-    db_session.flush()
-
-    mapping = ManagedUserDeviceMap(
-        managed_user_id=user.id,
-        system_id=device.system_id,
-        linux_username="maya",
-        is_valid=True,
-    )
-    db_session.add(mapping)
+    policy = AppPolicy(name="Maya Policy")
+    db_session.add(policy)
     db_session.commit()
 
     res = client.post(
-        f'/apparmor/policy/{mapping.id}',
+        f'/admin/app-policies/{policy.id}/rule/add',
         data={
-            'custom_app_name': 'Everything',
-            'custom_app_path': '/usr/bin/**',
-            'custom_app_preset': 'complain',
+            'application_name': 'Everything',
+            'match_type': 'executable',
+            'executable_path': '/usr/bin/**',
+            'preset': 'complain',
         },
         follow_redirects=True,
     )
 
     assert res.status_code == 200
     assert b'glob patterns like /usr/bin/** are not allowed' in res.data
-    assert AppArmorRule.query.filter_by(
-        device_map_id=mapping.id,
+    assert AppPolicyRule.query.filter_by(
+        policy_id=policy.id,
         executable_path='/usr/bin/**',
     ).count() == 0
 
@@ -1175,40 +1230,24 @@ def test_apparmor_policy_accepts_home_subtree_path_rules(client, db_session):
     Settings.set_admin_password("admin")
     client.post('/', data={'username': 'admin', 'password': 'admin'})
 
-    device = AgentDevice(
-        system_id="device-apparmor-path",
-        system_hostname="family-pc",
-        system_ip="10.0.0.31",
-        status="approved",
-        secure_token="tok",
-    )
-    user = ManagedUser(username="maya", system_ip="Unassigned", is_valid=True)
-    db_session.add_all([device, user])
-    db_session.flush()
-
-    mapping = ManagedUserDeviceMap(
-        managed_user_id=user.id,
-        system_id=device.system_id,
-        linux_username="maya",
-        is_valid=True,
-    )
-    db_session.add(mapping)
+    policy = AppPolicy(name="Maya Policy")
+    db_session.add(policy)
     db_session.commit()
 
     res = client.post(
-        f'/apparmor/policy/{mapping.id}',
+        f'/admin/app-policies/{policy.id}/rule/add',
         data={
-            'custom_app_name': 'Downloads',
-            'custom_app_match_type': 'path_pattern',
-            'custom_app_path': '$HOME/Downloads/**',
-            'custom_app_preset': 'blocked',
+            'application_name': 'Downloads',
+            'match_type': 'path_pattern',
+            'executable_path': '$HOME/Downloads/**',
+            'preset': 'blocked',
         },
         follow_redirects=True,
     )
 
     assert res.status_code == 200
-    rule = AppArmorRule.query.filter_by(
-        device_map_id=mapping.id,
+    rule = AppPolicyRule.query.filter_by(
+        policy_id=policy.id,
         executable_path='$HOME/Downloads/**',
     ).first()
     assert rule is not None
@@ -1216,7 +1255,7 @@ def test_apparmor_policy_accepts_home_subtree_path_rules(client, db_session):
     assert rule.preset == AppArmorRule.PRESET_BLOCKED
 
 
-def test_delete_apparmor_rule_uses_delete_route_and_resyncs_policy(client, db_session):
+def test_delete_app_policy_rule_recompiles_and_resyncs(client, db_session):
     Settings.set_admin_password("admin")
     client.post('/', data={'username': 'admin', 'password': 'admin'})
 
@@ -1240,32 +1279,44 @@ def test_delete_apparmor_rule_uses_delete_route_and_resyncs_policy(client, db_se
     db_session.add(mapping)
     db_session.flush()
 
-    rule = AppArmorRule(
-        device_map_id=mapping.id,
+    policy = AppPolicy(name="Nina Policy")
+    db_session.add(policy)
+    db_session.flush()
+
+    rule = AppPolicyRule(
+        policy_id=policy.id,
         application_name='OBS Studio',
         executable_path='/usr/bin/obs',
-        preset=AppArmorRule.PRESET_BLOCKED,
+        preset=AppPolicyRule.PRESET_BLOCKED,
         is_custom=True,
     )
     db_session.add(rule)
+    db_session.flush()
+
+    assignment = ManagedUserAppPolicyAssignment(managed_user_id=user.id, policy_id=policy.id)
+    db_session.add(assignment)
     db_session.commit()
 
-    page = client.get(f'/apparmor/policy/{mapping.id}')
-    assert page.status_code == 200
-    assert f'formaction="/apparmor/rule/{rule.id}/delete"'.encode() in page.data
-    assert f'<form action="/apparmor/rule/{rule.id}/delete"'.encode() not in page.data
+    # Compile initial rules
+    from src.apparmor_manager import compile_user_apparmor_rules
+    compile_user_apparmor_rules(user)
+
+    # Verify compiled rule exists
+    assert AppArmorRule.query.filter_by(device_map_id=mapping.id, executable_path='/usr/bin/obs').first() is not None
 
     with patch.object(AgentConnectionManager, 'is_online', return_value=True), \
          patch('src.agent_helper.AgentClient.sync_apparmor_policy') as mock_sync:
         mock_sync.return_value = (True, 'ok')
         res = client.post(
-            f'/apparmor/rule/{rule.id}/delete',
+            f'/admin/app-policies/rule/{rule.id}/delete',
             follow_redirects=True,
         )
 
-    assert res.status_code == 200
-    assert b'Removed AppArmor rule for OBS Studio and synced family-pc' in res.data
-    assert db.session.get(AppArmorRule, rule.id) is None
+    assert b'Removed rule for' in res.data
+    assert b'OBS Studio' in res.data
+    assert db_session.get(AppPolicyRule, rule.id) is None
+    # Verify compiled AppArmorRule was cleaned up after re-compilation
+    assert AppArmorRule.query.filter_by(device_map_id=mapping.id, executable_path='/usr/bin/obs').first() is None
     mock_sync.assert_called_once_with('nina', [])
 
 

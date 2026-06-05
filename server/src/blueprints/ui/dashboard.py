@@ -1,8 +1,10 @@
 import logging
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session
 from src.database import db, ManagedUser, AgentDevice, Settings, AppPolicy
-from src.agent_helper import AgentConnectionManager
-from src.helpers import _format_seconds, _get_device_label_map, _device_display_label
+from src.agent_helper import AgentConnectionManager, refresh_installed_apps
+from src.installed_apps_manager import list_installed_apps_for_device, list_installed_apps_for_managed_user
+from src.helpers import _get_device_label_map
+from src.dashboard_helper import build_dashboard_snapshot
 from src.alerts_manager import _build_user_alert_groups, _build_device_alert_entries
 from src.apparmor_manager import _get_apparmor_usage_summary
 from src.blocklists_manager import (
@@ -43,39 +45,12 @@ def dashboard():
         return redirect(url_for('ui_auth.login'))
     
     db.session.expire_all()
-    users = ManagedUser.query.all()
-    pending_adjustments = {}
-    
-    user_data = []
-    for user in users:
-        usage_data = user.get_recent_usage(days=7)
-        mapping_count = len(user.device_mappings)
-        online_mapping_count = sum(
-            1 for mapping in user.device_mappings if AgentConnectionManager.is_online(mapping.system_id)
-        )
-        valid_mapping_count = sum(1 for mapping in user.device_mappings if mapping.is_valid)
-        time_left_formatted = _format_seconds(user.get_effective_time_left_seconds())
-        
-        if user.pending_time_adjustment is not None and user.pending_time_operation is not None:
-            minutes = user.pending_time_adjustment // 60
-            operation = user.pending_time_operation
-            pending_adjustments[str(user.id)] = f"{operation}{minutes} minutes"
-        
-        user_data.append({
-            'id': user.id,
-            'username': user.username,
-            'is_online': online_mapping_count > 0,
-            'mapping_count': mapping_count,
-            'online_mapping_count': online_mapping_count,
-            'valid_mapping_count': valid_mapping_count,
-            'last_checked': user.last_checked,
-            'usage_data': usage_data,
-            'time_left': time_left_formatted,
-            'weekly_schedule': user.weekly_schedule
-        })
-
-    users_sorted = sorted(user_data, key=lambda item: item['username'].lower())
-    return render_template('dashboard.html', users=users_sorted, pending_adjustments=pending_adjustments)
+    snapshot = build_dashboard_snapshot()
+    return render_template(
+        'dashboard.html',
+        users=snapshot['users'],
+        pending_adjustments=snapshot['pending_adjustments'],
+    )
 
 
 @ui_dashboard_bp.route('/admin')
@@ -116,7 +91,17 @@ def edit_user_profile(user_id):
     blocklist_sync_status = _build_user_blocklist_sync_status(user)
     blocklist_sources = _get_blocklist_sources(include_domains=False, enabled_only=True)
     app_policies = AppPolicy.query.order_by(AppPolicy.name.asc()).all()
+    linux_app_policies = [policy for policy in app_policies if policy.platform == AppPolicy.PLATFORM_LINUX]
+    android_app_policies = [policy for policy in app_policies if policy.platform == AppPolicy.PLATFORM_ANDROID]
     assigned_policy_ids = {assignment.policy_id for assignment in user.app_policy_assignments}
+    installed_apps = list_installed_apps_for_managed_user(user.id)
+    user_platforms = set()
+    for mapping in user.device_mappings:
+        platform = (mapping.device.platform if mapping.device else None) or AppPolicy.PLATFORM_LINUX
+        if platform == AppPolicy.PLATFORM_ANDROID:
+            user_platforms.add(AppPolicy.PLATFORM_ANDROID)
+        else:
+            user_platforms.add(AppPolicy.PLATFORM_LINUX)
     
     return render_template(
         'admin_user_edit.html',
@@ -124,7 +109,11 @@ def edit_user_profile(user_id):
         blocklist_sources=blocklist_sources,
         blocklist_sync_status=blocklist_sync_status,
         app_policies=app_policies,
+        linux_app_policies=linux_app_policies,
+        android_app_policies=android_app_policies,
         assigned_policy_ids=assigned_policy_ids,
+        installed_apps=installed_apps,
+        user_platforms=user_platforms,
     )
 
 
@@ -143,6 +132,7 @@ def admin_devices():
         approved_devices=approved_devices,
         pending_devices=pending_devices,
         device_labels=device_labels,
+        AgentConnectionManager=AgentConnectionManager,
     )
 
 
@@ -271,9 +261,11 @@ def settings():
                 flash('Password updated successfully', 'success')
                 return redirect(url_for('ui_dashboard.settings'))
 
+    # Pairing/provisioning always uses the persisted URL; the form field may show
+    # a rejected submission while validation errors are displayed.
     server_url = build_agent_websocket_url(
         request,
-        configured_url=agent_websocket_url,
+        configured_url=_get_agent_websocket_url(),
     )
     registration_token = AgentConnectionManager.registration_token
     pairing_payload = pairing_payload_json(server_url, registration_token)
@@ -382,8 +374,13 @@ def device_detail(system_id):
         })
 
     usage_summaries = {}
+    installed_apps_by_mapping = {}
     for mapping in mapped_accounts:
         usage_summaries[mapping.id] = _get_apparmor_usage_summary(mapping.id)
+        installed_apps_by_mapping[mapping.id] = list_installed_apps_for_device(
+            mapping.system_id,
+            linux_username=mapping.linux_username,
+        )
 
     return render_template(
         'device_detail.html',
@@ -395,4 +392,34 @@ def device_detail(system_id):
         alert_entries=alert_entries,
         alert_summary=alert_summary,
         usage_summaries=usage_summaries,
+        installed_apps_by_mapping=installed_apps_by_mapping,
+        agent_online=AgentConnectionManager.is_online(system_id),
     )
+
+
+@ui_dashboard_bp.route('/devices/<system_id>/installed-apps/refresh', methods=['POST'])
+def refresh_device_installed_apps_ui(system_id):
+    if not session.get('logged_in'):
+        flash('Please login first', 'warning')
+        return redirect(url_for('ui_auth.login'))
+
+    device = AgentDevice.query.get_or_404(system_id)
+    linux_username = (request.form.get('linux_username') or '').strip()
+    if not linux_username:
+        mapping = device.user_mappings[0] if device.user_mappings else None
+        if mapping is None:
+            flash('No linked account available to refresh application inventory', 'warning')
+            return redirect(url_for('ui_dashboard.device_detail', system_id=system_id))
+        linux_username = mapping.linux_username
+
+    if not AgentConnectionManager.is_online(system_id):
+        flash('Device is offline. Inventory will refresh when the agent reconnects.', 'warning')
+        return redirect(url_for('ui_dashboard.device_detail', system_id=system_id))
+
+    try:
+        refresh_installed_apps(system_id, linux_username)
+        flash('Requested installed application inventory refresh from agent', 'success')
+    except RuntimeError as exc:
+        flash(str(exc), 'danger')
+
+    return redirect(url_for('ui_dashboard.device_detail', system_id=system_id))

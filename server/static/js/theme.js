@@ -1,6 +1,6 @@
 /**
- * Theme Toggle System
- * Handles light/dark mode switching with persistence
+ * Theme Sync System
+ * Automatically synchronizes the application theme with the browser/system preference.
  */
 
 class ThemeManager {
@@ -9,64 +9,24 @@ class ThemeManager {
     }
 
     init() {
-        // Get saved theme or default to light
-        this.currentTheme = localStorage.getItem('theme') || 'light';
-        this.applyTheme(this.currentTheme);
-        this.createThemeToggle();
-        this.updateChartTheme();
+        // Query system preference
+        this.systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)');
+        
+        // Initial apply
+        this.updateTheme();
+        
+        // Listen for system theme changes dynamically
+        this.systemPrefersDark.addEventListener('change', () => {
+            this.updateTheme();
+        });
     }
 
-    applyTheme(theme) {
+    updateTheme() {
+        const theme = this.systemPrefersDark.matches ? 'dark' : 'light';
         document.documentElement.setAttribute('data-theme', theme);
+        document.documentElement.setAttribute('data-bs-theme', theme);
         this.currentTheme = theme;
-        localStorage.setItem('theme', theme);
-    }
-
-    toggleTheme() {
-        const newTheme = this.currentTheme === 'light' ? 'dark' : 'light';
-        this.applyTheme(newTheme);
         this.updateChartTheme();
-        this.updateThemeToggle();
-    }
-
-    createThemeToggle() {
-        // Check if toggle already exists
-        if (document.querySelector('.theme-toggle')) return;
-
-        const toggle = document.createElement('button');
-        toggle.className = 'theme-toggle';
-        toggle.setAttribute('aria-label', 'Toggle theme');
-        toggle.innerHTML = this.getToggleIcon();
-        
-        toggle.addEventListener('click', () => this.toggleTheme());
-        document.body.appendChild(toggle);
-    }
-
-    updateThemeToggle() {
-        const toggle = document.querySelector('.theme-toggle');
-        if (toggle) {
-            toggle.innerHTML = this.getToggleIcon();
-        }
-    }
-
-    getToggleIcon() {
-        const lightIcon = `
-            <svg class="theme-toggle-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-                      d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/>
-            </svg>
-            <span>Light</span>
-        `;
-        
-        const darkIcon = `
-            <svg class="theme-toggle-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-                      d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>
-            </svg>
-            <span>Dark</span>
-        `;
-
-        return this.currentTheme === 'light' ? darkIcon : lightIcon;
     }
 
     updateChartTheme() {

@@ -603,6 +603,9 @@ class BackgroundTaskManager:
                 traceback.format_exc(),
             )
             db.session.rollback()
+        else:
+            from src.dashboard_events import notify_dashboard_changed
+            notify_dashboard_changed('user_data_cycle')
 
     def refresh_external_blocklist_source(self, source_id, force=False):
         """Refresh a single external blocklist source and persist its new revision."""

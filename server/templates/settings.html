@@ -1,331 +1,149 @@
 {% extends "base.html" %}
 
-{% block title %}Settings - TimeKpr WebUI{% endblock %}
+{% block title %}Settings - Guardian Parental Controls{% endblock %}
 
 {% block content %}
-<div class="settings-header-title" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; flex-wrap: wrap; gap: 1rem;">
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
     <div>
-        <h1 style="margin: 0; font-size: 2rem;">Settings</h1>
-        <p style="margin: 0; color: var(--pico-muted-color); font-weight: 500;">Application configuration, webhook alerts, and blocklist catalogs</p>
+        <h1 class="fw-bold mb-1" style="font-size: 2.25rem; font-weight: 800; letter-spacing: -0.025em;">Settings</h1>
+        <p class="text-secondary mb-0 fw-medium">Configure global system defaults, credentials, and webhook alert webhooks.</p>
     </div>
 </div>
 
-<div class="users-grid" style="grid-template-columns: 1fr; max-width: 1200px; margin: 0 auto;">
-    <article class="card" style="margin-bottom: 1.5rem;">
-        <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem; border-bottom: 1px solid var(--pico-card-border-color); padding-bottom: 0.5rem;">
-            <h2 style="font-size: 1.25rem; font-weight: 700; margin: 0;">Agent pairing (Android &amp; Linux)</h2>
-        </div>
-        <p style="color: var(--pico-muted-color); margin-top: 0;">
-            Scan this QR code from the TimeKpr Android app during setup or from the main screen. It encodes the WebSocket URL required for device enrollment.
-        </p>
-        <form action="{{ url_for('ui_dashboard.settings') }}" method="POST" style="margin-top: 1.25rem;">
-            <input type="hidden" name="form_name" value="agent_pairing">
-            <div class="form-group" style="margin-bottom: 0;">
-                <label for="agent_websocket_url" class="form-label">Agent WebSocket URL</label>
-                <input
-                    type="text"
-                    id="agent_websocket_url"
-                    name="agent_websocket_url"
-                    class="form-control"
-                    placeholder="wss://your-server.example/ws"
-                    value="{{ agent_websocket_url }}"
-                >
-                <small style="display: block; margin-top: 0.25rem; color: var(--pico-muted-color); font-weight: 500;">
-                    Leave blank to auto-detect from your current browser session. Set a custom URL when agents connect through a reverse proxy or public hostname.
-                </small>
+<div class="row g-4 justify-content-center" style="max-width: 1200px; margin: 0 auto;">
+    
+    <!-- Security / Password Credentials -->
+    <div class="col-12 col-md-6">
+        <div class="card border shadow-sm h-100">
+            <div class="card-header bg-dark text-white py-3 d-flex align-items-center gap-2">
+                <i class="fas fa-lock text-warning fs-5"></i>
+                <h5 class="mb-0 fw-bold">{% if oidc_enabled %}Authentication Settings{% else %}Update Admin Credentials{% endif %}</h5>
             </div>
-            <button type="submit" class="btn btn-secondary btn-sm" style="margin-top: 1rem;">Save pairing URL</button>
-        </form>
-        <div style="display: flex; flex-wrap: wrap; gap: 2rem; align-items: flex-start; margin-top: 1.25rem;">
-            <img src="{{ pairing_qr_data_uri }}" alt="TimeKpr pairing QR code" width="220" height="220" style="border: 1px solid var(--pico-card-border-color); border-radius: 0.75rem; background: #fff; padding: 0.5rem;" />
-            <div style="flex: 1; min-width: 260px;">
-                <p style="margin: 0 0 0.5rem 0; font-size: 0.85rem; color: var(--pico-muted-color); text-transform: uppercase; font-weight: 700;">WebSocket URL</p>
-                <code style="display: block; word-break: break-all; padding: 0.75rem; border-radius: 0.5rem; background: var(--pico-background-color);">{{ pairing_server_url }}</code>
-                <p style="margin: 1rem 0 0.5rem 0; font-size: 0.85rem; color: var(--pico-muted-color); text-transform: uppercase; font-weight: 700;">Payload</p>
-                <code style="display: block; word-break: break-all; padding: 0.75rem; border-radius: 0.5rem; background: var(--pico-background-color); font-size: 0.8rem;">{{ pairing_payload }}</code>
-                <p style="margin-top: 1rem;">
-                    <a href="{{ url_for('api_pairing.pairing_qr_png') }}" class="btn btn-secondary btn-sm">Download QR PNG</a>
-                </p>
-            </div>
-        </div>
-
-        <div style="margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--pico-card-border-color);">
-            <h3 style="font-size: 1.1rem; font-weight: 700; margin: 0 0 0.5rem 0;">Android MDM provisioning QR</h3>
-            <p style="color: var(--pico-muted-color); margin-top: 0;">
-                Use this QR during factory-reset setup (tap the welcome screen six times, then scan). Android downloads the agent APK, sets device owner, and applies the server URL automatically.
-            </p>
-            {% if android_agent_apk_uploaded %}
-            <div style="background: var(--pico-background-color); padding: 1rem; border-radius: 0.75rem; border: 1px solid var(--pico-card-border-color); margin-top: 1.25rem;">
-                <p style="margin: 0 0 0.5rem 0; font-size: 0.85rem; color: var(--pico-muted-color); text-transform: uppercase; font-weight: 700;">Uploaded APK</p>
-                <strong>{{ android_agent_apk_filename or 'android-agent.apk' }}</strong>
-                {% if android_agent_signature_checksum %}
-                <p style="margin: 0.75rem 0 0 0; font-size: 0.85rem; color: var(--pico-muted-color);">Signature checksum computed automatically on upload.</p>
+            <div class="card-body p-4">
+                {% if oidc_enabled %}
+                    <div class="alert alert-info py-2 small mb-3">
+                        <i class="fas fa-info-circle me-1"></i><strong>Single Sign-On Active:</strong> Auth is managed via your OIDC identity provider. Password changes must be configured there.
+                    </div>
+                    {% if session_user %}
+                        <div class="border rounded p-3 bg-body-secondary">
+                            <h6 class="text-secondary small fw-bold text-uppercase mb-2" style="font-size: 0.7rem;">Session Account Info</h6>
+                            <div class="d-flex flex-column gap-1 small fw-semibold">
+                                <div><span class="text-muted">Username:</span> {{ session_user.username }}</div>
+                                {% if session_user.name %}
+                                    <div><span class="text-muted">Full Name:</span> {{ session_user.name }}</div>
+                                {% endif %}
+                                {% if session_user.email %}
+                                    <div><span class="text-muted">Email:</span> {{ session_user.email }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    {% endif %}
+                {% else %}
+                    <p class="text-secondary small fw-medium mb-3">Update the local parent administrator password for the Guardian web panel.</p>
+                    <form action="{{ url_for('settings') }}" method="POST">
+                        <input type="hidden" name="form_name" value="password">
+                        <div class="mb-3">
+                            <label for="current_password" class="form-label fw-bold small text-muted">CURRENT PASSWORD</label>
+                            <input type="password" id="current_password" name="current_password" class="form-control" placeholder="Enter current password" required autocomplete="current-password">
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="new_password" class="form-label fw-bold small text-muted">NEW PASSWORD</label>
+                            <input type="password" id="new_password" name="new_password" class="form-control" placeholder="Minimum 4 characters" required autocomplete="new-password">
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="confirm_password" class="form-label fw-bold small text-muted">CONFIRM NEW PASSWORD</label>
+                            <input type="password" id="confirm_password" name="confirm_password" class="form-control" placeholder="Verify new password" required autocomplete="new-password">
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary fw-bold w-100 mt-2">Update Password</button>
+                    </form>
                 {% endif %}
-                <form action="{{ url_for('ui_dashboard.settings') }}" method="POST" style="margin-top: 0.75rem;">
-                    <input type="hidden" name="form_name" value="android_provisioning">
-                    <input type="hidden" name="remove_android_apk" value="1">
-                    <button type="submit" class="btn btn-secondary btn-sm">Remove uploaded APK</button>
-                </form>
             </div>
-            {% endif %}
-            <form action="{{ url_for('ui_dashboard.settings') }}" method="POST" enctype="multipart/form-data" style="margin-top: 1.25rem;">
-                <input type="hidden" name="form_name" value="android_provisioning">
-                <div class="form-group" style="margin-bottom: 0;">
-                    <label for="android_agent_apk" class="form-label">{% if android_agent_apk_uploaded %}Replace Android APK{% else %}Upload Android APK{% endif %}</label>
-                    <input
-                        type="file"
-                        id="android_agent_apk"
-                        name="android_agent_apk"
-                        class="form-control"
-                        accept=".apk,application/vnd.android.package-archive"
-                    >
-                    <small style="display: block; margin-top: 0.25rem; color: var(--pico-muted-color); font-weight: 500;">
-                        Upload a signed release APK for dev/testing, or leave empty to use the GitHub release for server version <code>{{ server_version }}</code> when available. The server hosts uploaded APKs at <code>/api/pairing/provisioning/apk</code> and computes the signature checksum automatically.
-                    </small>
-                </div>
-                <button type="submit" class="btn btn-secondary btn-sm" style="margin-top: 1rem;">Upload APK</button>
-            </form>
-
-            {% if not provisioning.provisioning_ready %}
-            <div class="flash-alert flash-alert-warning" style="margin-top: 1.25rem;">
-                <span>
-                    <strong>MDM provisioning QR unavailable.</strong>
-                    {% if provisioning.is_dev_version %}
-                    Server version <code>{{ server_version }}</code> has no published release assets. Build a release APK (<code>./gradlew assembleRelease</code>) and upload it above.
-                    {% else %}
-                    Upload an Android APK above, or publish release assets for <code>{{ server_version }}</code>.
-                    {% endif %}
-                </span>
-            </div>
-            {% else %}
-            <div style="display: flex; flex-wrap: wrap; gap: 2rem; align-items: flex-start; margin-top: 1.25rem;">
-                <img src="{{ provisioning_qr_data_uri }}" alt="Android MDM provisioning QR code" width="220" height="220" style="border: 1px solid var(--pico-card-border-color); border-radius: 0.75rem; background: #fff; padding: 0.5rem;" />
-                <div style="flex: 1; min-width: 260px;">
-                    <p style="margin: 0 0 0.5rem 0; font-size: 0.85rem; color: var(--pico-muted-color); text-transform: uppercase; font-weight: 700;">APK URL ({{ provisioning.apk_source }})</p>
-                    <code style="display: block; word-break: break-all; padding: 0.75rem; border-radius: 0.5rem; background: var(--pico-background-color); font-size: 0.8rem;">{{ provisioning.apk_url }}</code>
-                    <p style="margin: 1rem 0 0.5rem 0; font-size: 0.85rem; color: var(--pico-muted-color); text-transform: uppercase; font-weight: 700;">Signature checksum ({{ provisioning.checksum_source }})</p>
-                    <code style="display: block; word-break: break-all; padding: 0.75rem; border-radius: 0.5rem; background: var(--pico-background-color); font-size: 0.8rem;">{{ provisioning.signature_checksum }}</code>
-                    <p style="margin: 1rem 0 0.5rem 0; font-size: 0.85rem; color: var(--pico-muted-color); text-transform: uppercase; font-weight: 700;">Provisioning payload</p>
-                    <code style="display: block; word-break: break-all; padding: 0.75rem; border-radius: 0.5rem; background: var(--pico-background-color); font-size: 0.8rem;">{{ provisioning.payload_json }}</code>
-                    <p style="margin-top: 1rem;">
-                        <a href="{{ url_for('api_pairing.provisioning_qr_png') }}" class="btn btn-secondary btn-sm">Download provisioning QR PNG</a>
-                    </p>
-                </div>
-            </div>
-            {% endif %}
         </div>
-    </article>
+    </div>
 
-    <!-- Authentication & Security Cards -->
-    <article class="card">
-        <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem; border-bottom: 1px solid var(--pico-card-border-color); padding-bottom: 0.5rem;">
-            <svg width="22" height="22" fill="var(--pico-primary)" viewBox="0 0 16 16">
-                <path d="M8 1a2 2 0 0 1 2 2v4H6V3a2 2 0 0 1 2-2zm3 6V3a3 3 0 0 0-6 0v4a2 2 0 0 0-2 2v5a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2zM5 8h6a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/>
-            </svg>
-            <h2 style="font-size: 1.25rem; font-weight: 700; margin: 0;">{% if oidc_enabled %}Authentication Status{% else %}Change Admin Password{% endif %}</h2>
-        </div>
-
-        <div class="card-body" style="padding: 0;">
-            {% if oidc_enabled %}
-            <div class="flash-alert flash-alert-info">
-                <svg width="18" height="18" fill="currentColor" viewBox="0 0 16 16" style="flex-shrink: 0;">
-                    <path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16zm.93-9.412-1 4.705c-.07.34.029.533.304.533.194 0 .487-.07.686-.246l-.088.416c-.287.346-.92.598-1.465.598-.703 0-1.002-.422-.808-1.319l.738-3.468c.064-.293.006-.399-.287-.47l-.451-.081.082-.381 2.29-.287zM8 5.5a1 1 0 1 1 0-2 1 1 0 0 1 0 2z"/>
-                </svg>
-                <span><strong>OIDC Single Sign-On Active:</strong> Authentication is handled by your external identity provider. Password configuration must be managed there.</span>
+    <!-- Webhook Alerts Configuration -->
+    <div class="col-12 col-md-6">
+        <div class="card border shadow-sm h-100">
+            <div class="card-header bg-dark text-white py-3 d-flex align-items-center gap-2">
+                <i class="fas fa-bell text-danger fs-5"></i>
+                <h5 class="mb-0 fw-bold">Outbound Alert Webhooks</h5>
             </div>
-            {% if session_user %}
-            <div style="background: var(--pico-background-color); padding: 1rem; border-radius: 0.75rem; border: 1px solid var(--pico-card-border-color); margin-bottom: 1.25rem;">
-                <h3 style="margin-top: 0; font-size: 0.95rem; color: var(--pico-muted-color); text-transform: uppercase;">Identity Details</h3>
-                <div style="display: grid; grid-template-columns: auto 1fr; gap: 0.25rem 1rem; font-size: 0.85rem;">
-                    <span style="color: var(--pico-muted-color);">Username:</span>
-                    <strong>{{ session_user.username }}</strong>
-                    {% if session_user.name %}
-                    <span style="color: var(--pico-muted-color);">Full Name:</span>
-                    <strong>{{ session_user.name }}</strong>
-                    {% endif %}
-                    {% if session_user.email %}
-                    <span style="color: var(--pico-muted-color);">Email:</span>
-                    <strong>{{ session_user.email }}</strong>
-                    {% endif %}
-                </div>
-            </div>
-            {% endif %}
-            {% else %}
-            <div class="flash-alert flash-alert-info" style="margin-bottom: 1rem;">
-                <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-                    <path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16zm.93-9.412-1 4.705c-.07.34.029.533.304.533.194 0 .487-.07.686-.246l-.088.416c-.287.346-.92.598-1.465.598-.703 0-1.002-.422-.808-1.319l.738-3.468c.064-.293.006-.399-.287-.47l-.451-.081.082-.381 2.29-.287zM8 5.5a1 1 0 1 1 0-2 1 1 0 0 1 0 2z"/>
-                </svg>
-                <span>This password controls local parent access to the TimeKpr WebUI console.</span>
-            </div>
-            
-            <form action="{{ url_for('settings') }}" method="POST" style="margin-bottom: 1.5rem;">
-                <input type="hidden" name="form_name" value="password">
-                <div class="form-group">
-                    <label for="current_password" class="form-label">Current Admin Password</label>
-                    <input type="password" id="current_password" name="current_password" class="form-control" placeholder="Enter your current password" required>
-                </div>
-                
-                <div class="form-group">
-                    <label for="new_password" class="form-label">New Password</label>
-                    <input type="password" id="new_password" name="new_password" class="form-control" placeholder="Enter new password" required>
-                </div>
-                
-                <div class="form-group">
-                    <label for="confirm_password" class="form-label">Confirm New Password</label>
-                    <input type="password" id="confirm_password" name="confirm_password" class="form-control" placeholder="Confirm new password" required>
-                </div>
-                
-                <div class="form-group" style="margin: 0;">
-                    <button type="submit" class="btn btn-primary btn-cta btn-lg" style="width: 100%;">Update admin password</button>
-                </div>
-            </form>
-            {% endif %}
-            
-            <!-- Alert Webhook Section Redesigned -->
-            <div style="margin-top: 2rem; padding-top: 2rem; border-top: 1px solid var(--pico-card-border-color);">
-                <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem;">
-                    <svg width="18" height="18" fill="var(--pico-primary)" viewBox="0 0 16 16">
-                        <path d="M8 16a2 2 0 0 0 2-2H6a2 2 0 0 0 2 2zM8 1.918l-.797.161A4.002 4.002 0 0 0 4 6c0 .628-.134 2.197-.459 3.742-.16.767-.376 1.566-.663 2.258h10.244c-.287-.692-.502-1.49-.663-2.258C12.134 8.197 12 6.628 12 6a4.002 4.002 0 0 0-3.203-3.92L8 1.917zM14.22 12c.223.447.481.801.78 1H1c.299-.199.557-.553.78-1C2.68 10.2 3 6.88 3 6c0-2.42 1.72-4.44 4.005-4.901a1 1 0 1 1 1.99 0A5.002 5.002 0 0 1 13 6c0 .88.32 4.2 1.22 6z"/>
-                    </svg>
-                    <h3 style="margin: 0; font-size: 1.15rem; font-weight: 700;">Alert Webhooks</h3>
-                </div>
-                <form action="{{ url_for('ui_dashboard.settings') }}" method="POST" style="margin: 0;">
+            <div class="card-body p-4">
+                <p class="text-secondary small fw-medium mb-3">Guardian can dispatch alerts and limits infractions to an external Slack, Discord, or custom server endpoint.</p>
+                <form action="{{ url_for('ui_dashboard.settings') }}" method="POST">
                     <input type="hidden" name="form_name" value="alert_webhook">
                     
-                    <fieldset>
-                        <label for="alert_webhook_enabled" style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem; cursor: pointer; font-weight: bold;">
-                            <input
-                                type="checkbox"
-                                id="alert_webhook_enabled"
-                                name="alert_webhook_enabled"
-                                role="switch"
-                                {% if alert_webhook_settings.enabled %}checked{% endif %}
-                            >
-                            <span>Enable webhook deliveries for device status changes</span>
-                        </label>
-                    </fieldset>
-
-                    <div class="form-group">
-                        <label for="alert_webhook_url" class="form-label">Outbound Webhook URL</label>
-                        <input
-                            type="url"
-                            id="alert_webhook_url"
-                            name="alert_webhook_url"
-                            class="form-control"
-                            placeholder="https://example.com/timekpr-alerts-endpoint"
-                            value="{{ alert_webhook_settings.url }}"
-                        >
+                    <div class="form-check form-switch mb-3">
+                        <input class="form-check-input" type="checkbox" id="alert_webhook_enabled" name="alert_webhook_enabled" {% if alert_webhook_settings.enabled %}checked{% endif %}>
+                        <label class="form-check-label fw-bold small text-body" for="alert_webhook_enabled">Enable outbound webhook dispatches</label>
                     </div>
 
-                    <div class="form-group">
-                        <label for="alert_webhook_secret" class="form-label">Webhook Secret (outbound cryptographic signature)</label>
-                        <input
-                            type="password"
-                            id="alert_webhook_secret"
-                            name="alert_webhook_secret"
-                            class="form-control"
-                            placeholder="Optional secret key to verify request signatures"
-                            value="{{ alert_webhook_settings.secret }}"
-                        >
+                    <div class="mb-3">
+                        <label for="alert_webhook_url" class="form-label fw-bold small text-muted">DESTINATION WEBHOOK URL</label>
+                        <input type="url" id="alert_webhook_url" name="alert_webhook_url" class="form-control" placeholder="https://yourserver/webhook-receiver" value="{{ alert_webhook_settings.url }}">
                     </div>
 
-                    <div class="flash-alert flash-alert-info" style="margin-bottom: 1rem;">
-                        <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-                            <path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16zm.93-9.412-1 4.705c-.07.34.029.533.304.533.194 0 .487-.07.686-.246l-.088.416c-.287.346-.92.598-1.465.598-.703 0-1.002-.422-.808-1.319l.738-3.468c.064-.293.006-.399-.287-.47l-.451-.081.082-.381 2.29-.287zM8 5.5a1 1 0 1 1 0-2 1 1 0 0 1 0 2z"/>
-                        </svg>
-                        <span>Alerts are stored inside the TimeKpr database. Dispatching to an external webhook is an optional feature.</span>
+                    <div class="mb-3">
+                        <label for="alert_webhook_secret" class="form-label fw-bold small text-muted">SIGNING KEY / SECRET (OPTIONAL)</label>
+                        <input type="password" id="alert_webhook_secret" name="alert_webhook_secret" class="form-control" placeholder="Outbound cryptographic signature validation" value="{{ alert_webhook_settings.secret }}" autocomplete="new-password">
                     </div>
 
-                    <div style="font-size: 0.8rem; color: var(--pico-muted-color); font-weight: bold; margin-bottom: 1rem;">
-                        Outbound Delivery Status:
-                        <span class="badge {% if alert_webhook_settings.is_active %}badge-success{% elif alert_webhook_settings.enabled %}badge-warning{% else %}badge-secondary{% endif %}" style="margin-left: 0.25rem;">
-                            {% if alert_webhook_settings.is_active %}
-                            Active
-                            {% elif alert_webhook_settings.enabled %}
-                            Enabled but missing URL
-                            {% else %}
-                            Disabled
-                            {% endif %}
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <span class="small fw-bold text-muted">DELIVERY STATUS</span>
+                        <span class="badge {% if alert_webhook_settings.is_active %}bg-success{% elif alert_webhook_settings.enabled %}bg-warning text-dark{% else %}bg-secondary{% endif %} p-2">
+                            {% if alert_webhook_settings.is_active %}Active{% elif alert_webhook_settings.enabled %}Missing URL{% else %}Disabled{% endif %}
                         </span>
                     </div>
 
-                    <button type="submit" class="btn btn-secondary btn-sm" style="width: 100%; margin: 0;">Save webhook configuration</button>
+                    <button type="submit" class="btn btn-secondary w-100 fw-bold mt-2">Save Webhook Settings</button>
                 </form>
-            </div>
-
-            <!-- Application Settings Section -->
-            <div style="margin-top: 2rem; padding-top: 2rem; border-top: 1px solid var(--pico-card-border-color);">
-                <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem;">
-                    <svg width="18" height="18" fill="var(--pico-primary)" viewBox="0 0 16 16">
-                        <path d="M9.405 1.05c-.413-1.4-2.397-1.4-2.81 0l-.1.34a1.464 1.464 0 0 1-2.105.872l-.31-.17c-1.283-.698-2.686.705-1.987 1.987l.17.31a1.464 1.464 0 0 1-.872 2.105l-.34.1c-1.4.413-1.4 2.397 0 2.81l.34.1a1.464 1.464 0 0 1 .872 2.105l-.17.31c-.698 1.283.705 2.686 1.987 1.987l.31-.17a1.464 1.464 0 0 1 2.105.872l.1.34c.413 1.4 2.397 1.4 2.81 0l.1-.34a1.464 1.464 0 0 1 2.105-.872l.31.17c1.283.698 2.686-.705 1.987-1.987l-.17-.31a1.464 1.464 0 0 1 .872-2.105l.34-.1c1.4-.413 1.4-2.397 0-2.81l-.34-.1a1.464 1.464 0 0 1-.872-2.105l.17-.31c.698-1.283-.705-2.686-1.987-1.987l-.31.17a1.464 1.464 0 0 1-2.105-.872l-.1-.34zM8 10.93a2.929 2.929 0 1 1 0-5.86 2.929 2.929 0 0 1 0 5.858z"/>
-                    </svg>
-                    <h3 style="margin: 0; font-size: 1.15rem; font-weight: 700;">Application Settings</h3>
-                </div>
-                <form action="{{ url_for('ui_dashboard.settings') }}" method="POST" style="margin: 0;">
-                    <input type="hidden" name="form_name" value="application_settings">
-                    
-                    <div class="form-group">
-                        <label for="time_sync_tolerance" class="form-label">Time Sync Tolerance (seconds)</label>
-                        <input
-                            type="number"
-                            id="time_sync_tolerance"
-                            name="time_sync_tolerance"
-                            class="form-control"
-                            min="0"
-                            step="1"
-                            placeholder="15"
-                            value="{{ time_sync_tolerance }}"
-                        >
-                        <small style="display: block; margin-top: 0.25rem; color: var(--pico-muted-color); font-weight: 500;">
-                            Prevents redundant client notifications by ignoring time drifts smaller than this threshold (default: 15 seconds).
-                        </small>
-                    </div>
-
-                    <div class="form-group" style="margin-top: 1.5rem;">
-                        <label for="alert_retention_days" class="form-label">Alert Retention (days)</label>
-                        <input
-                            type="number"
-                            id="alert_retention_days"
-                            name="alert_retention_days"
-                            class="form-control"
-                            min="1"
-                            step="1"
-                            placeholder="30"
-                            value="{{ alert_retention_days }}"
-                        >
-                        <small style="display: block; margin-top: 0.25rem; color: var(--pico-muted-color); font-weight: 500;">
-                            Number of days to keep alert logs before automatic pruning (default: 30 days).
-                        </small>
-                    </div>
-
-                    <button type="submit" class="btn btn-secondary btn-sm" style="width: 100%; margin-top: 1rem;">Save application settings</button>
-                </form>
-            </div>
-
-            <!-- Systems Info -->
-            <div style="margin-top: 2rem; padding-top: 2rem; border-top: 1px solid var(--pico-card-border-color); display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem;">
-                <div>
-                    <h4 style="font-size: 0.85rem; font-weight: bold; color: var(--pico-muted-color); text-transform: uppercase; margin-bottom: 0.5rem;">System Configuration</h4>
-                    <div style="font-size: 0.85rem; display: flex; justify-content: space-between; align-items: center; background: var(--pico-background-color); border: 1px solid var(--pico-card-border-color); padding: 0.5rem 0.75rem; border-radius: 0.5rem;">
-                        <span style="color: var(--pico-muted-color); font-weight: bold;">System Timezone:</span>
-                        <strong style="color: var(--pico-color);">{{ timezone }}</strong>
-                    </div>
-                    <p style="font-size: 0.75rem; color: var(--pico-muted-color); margin-top: 0.25rem; font-weight: 500;">
-                        To modify the timezone, configure the `TZ` environment variable in your docker-compose parameters.
-                    </p>
-                </div>
-                <div>
-                    <h4 style="font-size: 0.85rem; font-weight: bold; color: var(--pico-muted-color); text-transform: uppercase; margin-bottom: 0.5rem;">Security Guidelines</h4>
-                    <ul style="margin: 0; padding-left: 1rem; font-size: 0.8rem; color: var(--pico-muted-color); font-weight: 500;">
-                        <li style="margin-bottom: 0.2rem;">Choose a password with 8+ random characters.</li>
-                        <li style="margin-bottom: 0.2rem;">Combine uppercase, symbols, and numeric characters.</li>
-                        <li>Rotate keys immediately if suspicious device activity is detected.</li>
-                    </ul>
-                </div>
             </div>
         </div>
-    </article>
+    </div>
 
+    <!-- Application / Pruning Configuration -->
+    <div class="col-12 mt-4">
+        <div class="card border shadow-sm">
+            <div class="card-header bg-dark text-white py-3 d-flex align-items-center gap-2">
+                <i class="fas fa-cogs text-info fs-5"></i>
+                <h5 class="mb-0 fw-bold">General Engine Configuration</h5>
+            </div>
+            <div class="card-body p-4">
+                <form action="{{ url_for('ui_dashboard.settings') }}" method="POST">
+                    <input type="hidden" name="form_name" value="application_settings">
+                    
+                    <div class="row g-3">
+                        <div class="col-12 col-md-6">
+                            <label for="time_sync_tolerance" class="form-label fw-bold small text-muted">TIME SYNC TOLERANCE (SECONDS)</label>
+                            <input type="number" id="time_sync_tolerance" name="time_sync_tolerance" class="form-control" min="0" step="1" value="{{ time_sync_tolerance }}">
+                            <div class="form-text text-secondary small">Ignores trivial client timezone drift smaller than this offset (default: 15s).</div>
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <label for="alert_retention_days" class="form-label fw-bold small text-muted">ALERT RETENTION DAYS</label>
+                            <input type="number" id="alert_retention_days" name="alert_retention_days" class="form-control" min="1" step="1" value="{{ alert_retention_days }}">
+                            <div class="form-text text-secondary small">Retention period for security logs and device warnings before purging (default: 30 days).</div>
+                        </div>
+                    </div>
+
+                    <div class="row g-3 mt-3 pt-3 border-top">
+                        <div class="col-12 col-md-6">
+                            <h6 class="text-secondary small fw-bold text-uppercase mb-2" style="font-size: 0.7rem;">Timezone Context</h6>
+                            <div class="border rounded p-2 bg-body-secondary small fw-semibold">
+                                <span class="text-muted">Environment TZ:</span> <span class="text-body">{{ timezone }}</span>
+                            </div>
+                        </div>
+                        <div class="col-12 col-md-6 d-flex align-items-end">
+                            <button type="submit" class="btn btn-primary fw-bold w-100 py-2">Save Engine Configurations</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
 </div>
 {% endblock %}
 
@@ -341,20 +159,20 @@
             
             if (confirmPassword && newPassword !== confirmPassword) {
                 this.setCustomValidity('Passwords do not match');
-                this.style.borderColor = 'var(--danger-color)';
+                this.classList.add('is-invalid');
             } else {
                 this.setCustomValidity('');
-                this.style.borderColor = '';
+                this.classList.remove('is-invalid');
             }
         });
         
         newPasswordField.addEventListener('input', function() {
             if (confirmPasswordField.value && this.value !== confirmPasswordField.value) {
                 confirmPasswordField.setCustomValidity('Passwords do not match');
-                confirmPasswordField.style.borderColor = 'var(--danger-color)';
+                confirmPasswordField.classList.add('is-invalid');
             } else {
                 confirmPasswordField.setCustomValidity('');
-                confirmPasswordField.style.borderColor = '';
+                confirmPasswordField.classList.remove('is-invalid');
             }
         });
     }

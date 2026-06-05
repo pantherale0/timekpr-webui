@@ -8,9 +8,11 @@ import sys
 
 import pytest
 
-# Set TESTING environment variable before importing app
+# Configure an isolated in-memory database before importing app so db.init_app()
+# never binds to the developer's on-disk SQLite file.
 os.environ['TESTING'] = 'True'
 os.environ['TIMEKPR_SERVER_VERSION'] = 'v0.10'
+os.environ['DATABASE_URL'] = 'sqlite:///:memory:'
 
 # Add workspace path to sys.path so we can import app and src.
 server_root = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))

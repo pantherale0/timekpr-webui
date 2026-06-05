@@ -1,3 +1,4 @@
+import fcntl
 import logging
 import os
 import secrets
@@ -37,7 +38,12 @@ __version__ = os.environ.get("TIMEKPR_SERVER_VERSION", "v0.0.0-dev")
 # Initialize Flask app
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL') or os.environ.get('SQLALCHEMY_DATABASE_URI') or 'sqlite:///timekpr.db'
+_default_db_uri = 'sqlite:///:memory:' if os.environ.get('TESTING') else 'sqlite:///timekpr.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = (
+    os.environ.get('DATABASE_URL')
+    or os.environ.get('SQLALCHEMY_DATABASE_URI')
+    or _default_db_uri
+)
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # Initialize extensions
@@ -46,25 +52,38 @@ migrate = Migrate(app, db)
 sock = Sock(app)
 
 # Configure logging
+_LOGGING_CONFIGURED = False
 
-formatter = logging.Formatter(
-    '%(asctime)s %(levelname)s: %(message)s '
-    '[in %(pathname)s:%(lineno)d]'
+
+def _configure_logging():
+    """Configure process logging once, even if app.py is imported multiple times."""
+    global _LOGGING_CONFIGURED
+    if _LOGGING_CONFIGURED:
+        return
+
+    formatter = logging.Formatter(
+        '%(asctime)s %(levelname)s: %(message)s '
+        '[in %(pathname)s:%(lineno)d]'
     )
 
-root_logger = logging.getLogger()
-root_logger.setLevel(logging.DEBUG)
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.DEBUG)
 
-if os.environ.get("DEBUG", "0") == "1":
-    file_handler = logging.FileHandler(os.path.join(app.instance_path, "debug.log"))
-    file_handler.setLevel(logging.DEBUG)
-    file_handler.setFormatter(formatter)
-    root_logger.addHandler(file_handler)
+    if os.environ.get("DEBUG", "0") == "1":
+        os.makedirs(app.instance_path, exist_ok=True)
+        file_handler = logging.FileHandler(os.path.join(app.instance_path, "debug.log"))
+        file_handler.setLevel(logging.DEBUG)
+        file_handler.setFormatter(formatter)
+        root_logger.addHandler(file_handler)
 
-stream_handler = logging.StreamHandler()
-stream_handler.setLevel(logging.INFO)
-stream_handler.setFormatter(formatter)
-root_logger.addHandler(stream_handler)
+    stream_handler = logging.StreamHandler()
+    stream_handler.setLevel(logging.INFO)
+    stream_handler.setFormatter(formatter)
+    root_logger.addHandler(stream_handler)
+    _LOGGING_CONFIGURED = True
+
+
+_configure_logging()
 
 # Initialize background task manager
 task_manager = BackgroundTaskManager(
@@ -96,11 +115,12 @@ from src.blueprints import (
     api_users_bp,
     api_schedule_bp,
     api_blocklists_bp,
-    api_apparmor_bp,
     api_time_bp,
     api_tasks_bp,
     api_alerts_bp,
     api_pairing_bp,
+    api_dashboard_bp,
+    api_installed_apps_bp,
     websocket_bp,
 )
 
@@ -112,11 +132,12 @@ app.register_blueprint(api_devices_bp)
 app.register_blueprint(api_users_bp)
 app.register_blueprint(api_schedule_bp)
 app.register_blueprint(api_blocklists_bp)
-app.register_blueprint(api_apparmor_bp)
 app.register_blueprint(api_time_bp)
 app.register_blueprint(api_tasks_bp)
 app.register_blueprint(api_alerts_bp)
 app.register_blueprint(api_pairing_bp)
+app.register_blueprint(api_dashboard_bp)
+app.register_blueprint(api_installed_apps_bp, url_prefix='/api')
 app.register_blueprint(websocket_bp)
 
 # Register WebSocket endpoint via Flask-Sock
@@ -138,37 +159,139 @@ def fallback_handler(error, endpoint, values):
 app.url_build_error_handlers.append(fallback_handler)
 
 
-def _ensure_database_schema(migrations_dir):
-    """Ensure model tables exist, repairing stamped-but-empty databases."""
-    from sqlalchemy import inspect as sqla_inspect, text
-    from flask_migrate import upgrade
+def _expected_schema_tables():
+    return set(db.metadata.tables.keys())
 
-    inspector = sqla_inspect(db.engine)
-    existing_tables = set(inspector.get_table_names())
-    expected_tables = set(db.metadata.tables.keys())
-    missing_tables = expected_tables - existing_tables
 
+def _create_missing_tables(missing_tables):
     if not missing_tables:
         return
+    _LOGGER.warning(
+        "Creating missing database tables: %s",
+        ", ".join(sorted(missing_tables)),
+    )
+    db.create_all()
 
-    schema_tables = expected_tables & existing_tables
-    if 'alembic_version' in existing_tables and not schema_tables:
-        _LOGGER.warning(
-            "Database has Alembic revision metadata but no schema tables; "
-            "re-running migrations from scratch."
-        )
-        db.session.execute(text('DELETE FROM alembic_version'))
-        db.session.commit()
+
+def _repair_stamped_empty_database(migrations_dir, migrations_exist):
+    """Rebuild a database that only has Alembic metadata and no model tables."""
+    from sqlalchemy import text
+    from flask_migrate import upgrade
+
+    _LOGGER.warning(
+        "Database has Alembic revision metadata but no schema tables; "
+        "re-running migrations from scratch."
+    )
+    db.session.execute(text('DELETE FROM alembic_version'))
+    db.session.commit()
+    if migrations_exist:
         upgrade(directory=migrations_dir)
-        existing_tables = set(sqla_inspect(db.engine).get_table_names())
-        missing_tables = expected_tables - existing_tables
-
-    if missing_tables:
-        _LOGGER.warning(
-            "Creating missing database tables: %s",
-            ", ".join(sorted(missing_tables)),
-        )
+    else:
         db.create_all()
+
+
+def _apply_database_schema(migrations_dir):
+    """Bring the connected database schema up to date without wiping existing data."""
+    from sqlalchemy import inspect as sqla_inspect
+    from flask_migrate import stamp, upgrade
+
+    migrations_exist = os.path.isdir(migrations_dir)
+    inspector = sqla_inspect(db.engine)
+    existing_tables = set(inspector.get_table_names())
+    expected_tables = _expected_schema_tables()
+    schema_tables = expected_tables & existing_tables
+
+    if 'alembic_version' in existing_tables and not schema_tables:
+        _repair_stamped_empty_database(migrations_dir, migrations_exist)
+    elif not schema_tables:
+        if migrations_exist:
+            try:
+                upgrade(directory=migrations_dir)
+            except Exception as exc:
+                _LOGGER.info("Database upgrade() failed or database is new: %s", exc)
+                db.create_all()
+                try:
+                    stamp(directory=migrations_dir)
+                    _LOGGER.info("Database stamped as head revision after create_all()")
+                except Exception as stamp_err:
+                    _LOGGER.warning("Could not stamp database: %s", stamp_err)
+        else:
+            _LOGGER.info("Migrations directory missing. Creating database tables directly...")
+            db.create_all()
+    elif migrations_exist:
+        try:
+            upgrade(directory=migrations_dir)
+        except Exception as exc:
+            _LOGGER.warning("Database upgrade() failed: %s", exc)
+
+    existing_tables = set(sqla_inspect(db.engine).get_table_names())
+    _create_missing_tables(expected_tables - existing_tables)
+
+
+def _ensure_database_schema(migrations_dir):
+    """Ensure model tables exist, repairing stamped-but-empty databases."""
+    _apply_database_schema(migrations_dir)
+
+
+def _init_admin_password():
+    try:
+        if not Settings.get_value('admin_password_hash', None) and not Settings.get_value('admin_password', None):
+            Settings.set_admin_password('admin')
+            _LOGGER.info("Admin password initialized")
+    except Exception as exc:
+        _LOGGER.warning("Warning: Could not initialize admin password: %s", exc)
+
+
+def _runtime_init_lock_path():
+    os.makedirs(app.instance_path, exist_ok=True)
+    return os.path.join(app.instance_path, '.runtime_init.lock')
+
+
+def _initialize_database():
+    """Initialize or upgrade the database schema using a cross-process file lock."""
+    from flask_migrate import stamp
+
+    migrations_dir = os.path.join(app.root_path, 'migrations')
+    migrations_exist = os.path.isdir(migrations_dir)
+    db_uri = app.config.get('SQLALCHEMY_DATABASE_URI', '')
+    is_pg = db_uri.startswith('postgresql://') or db_uri.startswith('postgresql+psycopg2://')
+
+    with open(_runtime_init_lock_path(), 'w', encoding='utf-8') as lock_file:
+        fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+        try:
+            sqlite_migrated = False
+            if is_pg:
+                possible_sqlite_paths = [
+                    os.path.join(app.instance_path, 'timekpr.db'),
+                    os.path.join(app.root_path, 'timekpr.db'),
+                    'instance/timekpr.db',
+                    'timekpr.db',
+                ]
+                for path in possible_sqlite_paths:
+                    if os.path.exists(path):
+                        _LOGGER.info("Found SQLite DB at %s. Initiating migration...", path)
+                        db.create_all()
+                        try:
+                            migrate_data_sqlite_to_pg(path)
+                            sqlite_migrated = True
+                            if migrations_exist:
+                                try:
+                                    stamp(directory=migrations_dir)
+                                    _LOGGER.info("Stamped PostgreSQL database migration state as head.")
+                                except Exception as stamp_err:
+                                    _LOGGER.warning("Warning: Failed to stamp PostgreSQL: %s", stamp_err)
+                        except Exception as mig_err:
+                            _LOGGER.error("Error during SQLite to PostgreSQL migration: %s", mig_err)
+                        break
+
+            if not sqlite_migrated:
+                if migrations_exist:
+                    _LOGGER.info("Ensuring database is up to date (dir: %s)...", migrations_dir)
+                _apply_database_schema(migrations_dir)
+
+            _init_admin_password()
+        finally:
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
 
 
 def migrate_data_sqlite_to_pg(sqlite_db_path):
@@ -270,93 +393,36 @@ def migrate_data_sqlite_to_pg(sqlite_db_path):
 
 def initialize_runtime(start_background_tasks=False):
     """Initialize the database and start background tasks."""
-    from flask_migrate import stamp, upgrade
     _LOGGER.info("Runtime initialization started")
     if os.environ.get('TESTING'):
         return
 
     with _runtime_init_lock:
-        if not RUNTIME_STATE['initialized']:
-            with app.app_context():
-                db_uri = app.config.get('SQLALCHEMY_DATABASE_URI', '')
-                is_pg = db_uri.startswith('postgresql://') or db_uri.startswith('postgresql+psycopg2://')
-                
-                # Use absolute path for migrations directory to avoid CWD issues
-                migrations_dir = os.path.join(app.root_path, 'migrations')
-                migrations_exist = os.path.isdir(migrations_dir)
-                
-                sqlite_migrated = False
-                if is_pg:
-                    possible_sqlite_paths = [
-                        os.path.join(app.instance_path, 'timekpr.db'),
-                        os.path.join(app.root_path, 'timekpr.db'),
-                        'instance/timekpr.db',
-                        'timekpr.db'
-                    ]
-                    for path in possible_sqlite_paths:
-                        if os.path.exists(path):
-                            _LOGGER.info(f"Found SQLite DB at {path}. Initiating migration...")
-                            db.create_all()
-                            try:
-                                migrate_data_sqlite_to_pg(path)
-                                sqlite_migrated = True
-                                if migrations_exist:
-                                    try:
-                                        stamp(directory=migrations_dir)
-                                        _LOGGER.info("Stamped PostgreSQL database migration state as head.")
-                                    except Exception as stamp_err:
-                                        _LOGGER.warning(f"Warning: Failed to stamp PostgreSQL: {stamp_err}")
-                            except Exception as mig_err:
-                                _LOGGER.error(f"Error during SQLite to PostgreSQL migration: {mig_err}")
-                            break
-
-                if not sqlite_migrated:
-                    if migrations_exist:
-                        _LOGGER.info(f"Ensuring database is up to date (dir: {migrations_dir})...")
-                        try:
-                            # Try to upgrade first (handles existing databases with migrations)
-                            upgrade(directory=migrations_dir)
-                            _LOGGER.info("Database migrations applied successfully")
-                        except Exception as e:
-                            _LOGGER.info(f"Database upgrade() failed or database is new: {e}")
-                            # Fallback: ensure tables exist and stamp as head
-                            try:
-                                db.create_all()
-                                try:
-                                    stamp(directory=migrations_dir)
-                                    _LOGGER.info("Database stamped as head revision after create_all()")
-                                except Exception as stamp_err:
-                                    _LOGGER.warning(f"Could not stamp database: {stamp_err}")
-                            except Exception as create_err:
-                                _LOGGER.error(f"Failure during db.create_all() fallback: {create_err}")
-                    else:
-                        _LOGGER.info("Migrations directory missing. Creating database tables directly...")
-                        db.create_all()
-
-                # Final safety measure: ensure tables exist even when Alembic is stamped.
-                _ensure_database_schema(migrations_dir)
-
-                try:
-                    if not Settings.get_value('admin_password_hash', None) and not Settings.get_value('admin_password', None):
-                        Settings.set_admin_password('admin')
-                        _LOGGER.info("Admin password initialized")
-                except Exception as e:
-                    _LOGGER.warning(f"Warning: Could not initialize admin password: {e}")
-
-            RUNTIME_STATE['initialized'] = True
-            _LOGGER.info("Runtime initialization completed")
+        with app.app_context():
+            _initialize_database()
+        RUNTIME_STATE['initialized'] = True
+        _LOGGER.info("Runtime initialization completed")
 
     if start_background_tasks:
         task_manager.start()
         _LOGGER.info("Background tasks started automatically")
 
 
-if not os.environ.get('TESTING'):
+def _should_initialize_on_import():
+    if os.environ.get('TESTING'):
+        return False
+    # app.py executed directly handles initialization in __main__.
+    if __name__ == '__main__':
+        return False
+    return True
+
+
+if _should_initialize_on_import():
     initialize_runtime(start_background_tasks=_env_flag_enabled('TIMEKPR_ENABLE_BACKGROUND_TASKS'))
 
 if __name__ == '__main__':
     debug = bool(int(os.environ.get("DEBUG", "0")))
-    # With the Werkzeug reloader, the parent watchdog also runs this block.
-    if not debug or os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
+    use_reloader = debug
+    if not use_reloader or os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
         initialize_runtime(start_background_tasks=True)
-    app.run(host='0.0.0.0', port=5000, debug=debug, use_reloader=False)
+    app.run(host='0.0.0.0', port=5000, debug=debug, use_reloader=use_reloader)

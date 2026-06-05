@@ -151,6 +151,8 @@ class AgentConnectionManager(metaclass=AgentConnectionManagerMeta):
         cls.active_ips[remote_ip] = system_id
         cls.active_connections[system_id + "_ip"] = remote_ip
         logger.info("Agent registered: %s from IP %s", system_id, remote_ip)
+        from src.dashboard_events import notify_dashboard_changed
+        notify_dashboard_changed('agent_online')
 
     @classmethod
     def unregister(cls, system_id):
@@ -163,6 +165,8 @@ class AgentConnectionManager(metaclass=AgentConnectionManagerMeta):
                 del cls.active_connections[system_id + "_ip"]
             del cls.active_connections[system_id]
             logger.info("Agent unregistered: %s", system_id)
+            from src.dashboard_events import notify_dashboard_changed
+            notify_dashboard_changed('agent_offline')
 
     @classmethod
     def register_pending(cls, system_id, ws):
@@ -623,3 +627,20 @@ class AgentClient:
             },
         )
         return success, message
+
+    def refresh_installed_apps(self, username):
+        """Ask the connected agent to scan and push installed application inventory."""
+        success, message, data = AgentConnectionManager.send_command_sync(
+            self.system_id,
+            "refresh_installed_apps",
+            username,
+            {},
+        )
+        if not success:
+            raise RuntimeError(message or 'Agent rejected refresh_installed_apps')
+        return data or {"queued": True}
+
+
+def refresh_installed_apps(system_id, username):
+    """Module-level helper for API routes."""
+    return AgentClient(system_id).refresh_installed_apps(username)

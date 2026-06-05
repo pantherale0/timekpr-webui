@@ -76,3 +76,23 @@ def reject_device(system_id):
         
     _LOGGER.info("Rejected device %s and closed connections.", system_id)
     return jsonify({'success': True, 'message': f'Device {device_label} rejected successfully.'})
+
+
+@api_devices_bp.route('/api/devices/pending', methods=['GET'])
+def get_pending_devices():
+    """Return a JSON list of all pending devices for the onboarding wizard."""
+    if not session.get('logged_in'):
+        return jsonify({'success': False, 'message': 'Not authenticated'}), 401
+    
+    pending = AgentDevice.query.filter_by(status='pending').all()
+    results = []
+    for device in pending:
+        results.append({
+            'system_id': device.system_id,
+            'display_name': device.display_name,
+            'system_ip': device.system_ip,
+            'linux_users': device.linux_users,
+            'platform': device.platform or 'linux'
+        })
+    return jsonify({'success': True, 'devices': results})
+

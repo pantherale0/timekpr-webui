@@ -22,3 +22,4 @@ libc = "0.2"
 reqwest = { version = "0.11", default-features = false, features = ["rustls-tls-native-roots"] }
 flate2 = "1.0"
 tar = "0.4"
+base64 = "0.22"

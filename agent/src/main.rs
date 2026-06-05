@@ -2,6 +2,7 @@ mod apparmor;
 mod audit_monitor;
 mod domain_policy;
 mod firewall;
+mod installed_apps;
 mod local_dns;
 mod netlink;
 mod timekpr_dbus;
@@ -52,6 +53,7 @@ const AGENT_VERSION: &str = match option_env!("TIMEKPR_AGENT_VERSION") {
     None => env!("CARGO_PKG_VERSION"),
 };
 const POLICY_SYNC_INTERVAL_SECS: u64 = 4 * 60 * 60;
+const INSTALLED_APPS_SYNC_INTERVAL_SECS: u64 = 24 * 60 * 60;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 struct Config {
@@ -535,6 +537,11 @@ async fn handle_command(action: &str, username: &str, args: &serde_json::Value) 
                 Err(e) => (false, e, serde_json::json!({})),
             }
         }
+        "refresh_installed_apps" => (
+            true,
+            "Installed apps refresh queued".to_string(),
+            serde_json::json!({ "queued": true, "linux_username": username }),
+        ),
         _ => (false, format!("Unknown action '{}'", action), serde_json::json!({})),
     }
 }
@@ -708,6 +715,41 @@ fn spawn_policy_sync_scheduler(
                             eprintln!("Failed to build periodic policy sync check message: {}", error);
                         }
                     }
+                }
+            }
+        }
+    })
+}
+
+fn push_inventory_for_user(inventory_tx: &mpsc::UnboundedSender<String>, linux_username: &str) {
+    let apps = installed_apps::discover_for_user(linux_username);
+    let report_id = Uuid::new_v4().to_string();
+    for message in installed_apps::build_inventory_messages(linux_username, &apps, &report_id) {
+        let _ = inventory_tx.send(message);
+    }
+}
+
+fn push_inventory_for_users(inventory_tx: &mpsc::UnboundedSender<String>, users: &HashMap<u32, String>) {
+    for username in users.values() {
+        push_inventory_for_user(inventory_tx, username);
+    }
+}
+
+fn spawn_installed_apps_scheduler(
+    inventory_tx: mpsc::UnboundedSender<String>,
+    users: HashMap<u32, String>,
+    mut shutdown: watch::Receiver<bool>,
+) -> JoinHandle<()> {
+    tokio::spawn(async move {
+        loop {
+            tokio::select! {
+                changed = shutdown.changed() => {
+                    if changed.is_err() || *shutdown.borrow() {
+                        break;
+                    }
+                }
+                _ = sleep(Duration::from_secs(INSTALLED_APPS_SYNC_INTERVAL_SECS)) => {
+                    push_inventory_for_users(&inventory_tx, &users);
                 }
             }
         }
@@ -1183,23 +1225,40 @@ async fn main() {
 
                 let (mut ws_write, mut ws_read) = ws_stream.split();
                 let (client_tx, mut client_rx) = mpsc::unbounded_channel::<ClientMessage>();
+                let (inventory_tx, mut inventory_rx) = mpsc::unbounded_channel::<String>();
                 {
                     let mut guard = active_client_tx.lock().unwrap();
                     *guard = Some(client_tx.clone());
                 }
                 let writer_handle = tokio::spawn(async move {
-                    while let Some(message) = client_rx.recv().await {
-                        let serialized = match serde_json::to_string(&message) {
-                            Ok(serialized) => serialized,
-                            Err(e) => {
-                                eprintln!("Failed to serialize client message: {}", e);
-                                continue;
-                            }
-                        };
+                    loop {
+                        tokio::select! {
+                            maybe_message = client_rx.recv() => {
+                                let Some(message) = maybe_message else {
+                                    break;
+                                };
+                                let serialized = match serde_json::to_string(&message) {
+                                    Ok(serialized) => serialized,
+                                    Err(e) => {
+                                        eprintln!("Failed to serialize client message: {}", e);
+                                        continue;
+                                    }
+                                };
 
-                        if let Err(e) = ws_write.send(Message::Text(serialized.into())).await {
-                            eprintln!("Failed to send client message: {}", e);
-                            break;
+                                if ws_write.send(Message::Text(serialized.into())).await.is_err() {
+                                    eprintln!("Failed to send client message");
+                                    break;
+                                }
+                            }
+                            maybe_inventory = inventory_rx.recv() => {
+                                let Some(message) = maybe_inventory else {
+                                    break;
+                                };
+                                if ws_write.send(Message::Text(message.into())).await.is_err() {
+                                    eprintln!("Failed to send inventory message");
+                                    break;
+                                }
+                            }
                         }
                     }
                 });
@@ -1211,6 +1270,13 @@ async fn main() {
                     client_tx.clone(),
                     shutdown_tx.subscribe(),
                     policy_sync_rx,
+                );
+                let inventory_users = get_system_users_map();
+                push_inventory_for_users(&inventory_tx, &inventory_users);
+                let installed_apps_handle = spawn_installed_apps_scheduler(
+                    inventory_tx.clone(),
+                    inventory_users,
+                    shutdown_tx.subscribe(),
                 );
 
                 let startup_details = serde_json::json!({
@@ -1241,6 +1307,10 @@ async fn main() {
                                 if client_tx.send(response).is_err() {
                                     eprintln!("Writer channel closed while sending command response");
                                     break;
+                                }
+
+                                if action == "refresh_installed_apps" && success {
+                                    push_inventory_for_user(&inventory_tx, &username);
                                 }
                             }
                             Ok(ServerMessage::PolicySyncHint { reason }) => {
@@ -1285,6 +1355,7 @@ async fn main() {
                     let _ = handle.await;
                 }
                 let _ = policy_sync_handle.await;
+                let _ = installed_apps_handle.await;
                 let _ = writer_handle.await;
             }
             Err(e) => {

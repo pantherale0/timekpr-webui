@@ -12,7 +12,7 @@ def test_validate_android_package_match_type():
         'com.android.chrome',
         'android',
     )
-    assert package == 'com.android.chrome'
+    assert package == '/android/package/com.android.chrome'
 
 
 def test_validate_android_prefixed_executable_path():
@@ -21,4 +21,4 @@ def test_validate_android_prefixed_executable_path():
         '/android/package/com.discord',
         'android',
     )
-    assert package == 'com.discord'
+    assert package == '/android/package/com.discord'

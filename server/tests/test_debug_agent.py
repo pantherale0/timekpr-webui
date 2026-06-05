@@ -140,6 +140,7 @@ def test_debug_agent_emits_seed_alerts_only_once():
                     "details": {"source": "test"},
                 }
             ],
+            "send_installed_apps_on_auth": False,
         }
     )
 

@@ -56,7 +56,7 @@ class DomainBlockVpnService : VpnService() {
         if (running.getAndSet(true)) return
 
         val domainStore = TimeKprApplication.from(this).domainPolicyStore
-        if (domainStore.allBlockedDomains().isEmpty()) {
+        if (domainStore.blockedMatcher().isEmpty()) {
             Log.i(TAG, "No blocked domains configured; skipping VPN tunnel")
             running.set(false)
             stopSelf()
@@ -104,7 +104,7 @@ class DomainBlockVpnService : VpnService() {
 
         Log.i(
             TAG,
-            "VPN started with ${domainStore.allBlockedDomains().size} blocked domain(s); " +
+            "VPN started with ${domainStore.blockedDomainCount()} blocked domain(s); " +
                 "upstreamNetwork=$network routedDns=${dnsServers.joinToString { it.hostAddress ?: "?" }}",
         )
 
@@ -125,8 +125,8 @@ class DomainBlockVpnService : VpnService() {
         val packet = ByteArray(32767)
 
         while (running.get()) {
-            val blocked = domainStore.allBlockedDomains()
-            if (blocked.isEmpty()) {
+            val matcher = domainStore.blockedMatcher()
+            if (matcher.isEmpty()) {
                 stopTunnel()
                 stopSelf()
                 break
@@ -143,7 +143,7 @@ class DomainBlockVpnService : VpnService() {
             executor.execute {
                 if (!running.get()) return@execute
                 try {
-                    val dnsPayload = if (domainStore.isDomainBlocked(parsed.queryName, blocked)) {
+                    val dnsPayload = if (matcher.isBlocked(parsed.queryName)) {
                         Log.d(TAG, "Blocked TUN DNS query for ${parsed.queryName}")
                         BlockNotificationCoordinator.onDomainBlocked(this@DomainBlockVpnService, parsed.queryName)
                         DnsAnswerBuilder.buildNxDomain(parsed)
@@ -216,8 +216,7 @@ class DomainBlockVpnService : VpnService() {
         private const val VPN_PREFIX = 32
         fun reconcile(context: Context) {
             val app = TimeKprApplication.from(context)
-            val blocked = app.domainPolicyStore.allBlockedDomains()
-            if (blocked.isEmpty()) {
+            if (app.domainPolicyStore.blockedMatcher().isEmpty()) {
                 clearAlwaysOnVpnIfDeviceOwner(context)
                 context.stopService(Intent(context, DomainBlockVpnService::class.java).setAction(ACTION_STOP))
                 return

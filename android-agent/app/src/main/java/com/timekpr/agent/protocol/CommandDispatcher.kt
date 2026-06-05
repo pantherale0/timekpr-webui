@@ -6,6 +6,8 @@ import com.timekpr.agent.policy.AppPolicyStore
 import com.timekpr.agent.policy.DomainPolicyStore
 import com.timekpr.agent.policy.TimeLimitStore
 import com.timekpr.agent.policy.UidPolicy
+import com.timekpr.agent.discovery.DiscoveredApp
+import com.timekpr.agent.discovery.InstalledAppsDiscovery
 import com.timekpr.agent.util.AndroidUsers
 import org.json.JSONArray
 import org.json.JSONObject
@@ -36,6 +38,7 @@ class CommandDispatcher(
             "finalize_domain_policy_sync" -> handleFinalizeDomainSync(args)
             "abort_domain_policy_sync" -> handleAbortDomainSync(args)
             "sync_apparmor_policy" -> handleAppPolicy(username, args)
+            "refresh_installed_apps" -> handleRefreshInstalledApps(username)
             else -> DispatchResult(false, "Unsupported action '$action'", JSONObject())
         }
     }
@@ -183,9 +186,23 @@ class CommandDispatcher(
         return DispatchResult(true, "App policies synchronized", JSONObject())
     }
 
+    private fun handleRefreshInstalledApps(username: String): DispatchResult {
+        timeLimitStore.ensureUser(username, AndroidUsers.currentLinuxUid(context))
+        val apps = InstalledAppsDiscovery.discover(context)
+        return DispatchResult(
+            success = true,
+            message = "Installed apps refresh queued",
+            data = JSONObject().put("queued", true),
+            followUpApps = apps,
+            followUpUsername = username,
+        )
+    }
+
     data class DispatchResult(
         val success: Boolean,
         val message: String,
         val data: JSONObject,
+        val followUpApps: List<DiscoveredApp>? = null,
+        val followUpUsername: String? = null,
     )
 }

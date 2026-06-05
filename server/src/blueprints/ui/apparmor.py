@@ -11,13 +11,14 @@ from src.database import (
 )
 from src.agent_helper import AgentConnectionManager, AgentClient
 from src.helpers import _get_device_label_map
+from src.installed_apps_manager import list_discovered_apps_for_platform
 from src.apparmor_manager import (
     CURATED_APPARMOR_APPS,
     CURATED_APPARMOR_PATHS,
     _get_apparmor_usage_summary,
     compile_user_apparmor_rules,
-    _validate_apparmor_rule_target,
-    _is_valid_preset_for_match_type,
+    validate_policy_rule_for_platform,
+    _normalize_policy_platform,
     _build_apparmor_policy_sync_payload,
 )
 
@@ -61,12 +62,17 @@ def admin_app_policies():
     policies = AppPolicy.query.order_by(AppPolicy.name.asc()).all()
     managed_users = ManagedUser.query.order_by(ManagedUser.username.asc()).all()
     curated_options = CURATED_APPARMOR_APPS
+    discovered_apps_by_policy = {
+        policy.id: list_discovered_apps_for_platform(policy.platform)
+        for policy in policies
+    }
 
     return render_template(
         'restrictions_app.html',
         policies=policies,
         managed_users=managed_users,
         curated_options=curated_options,
+        discovered_apps_by_policy=discovered_apps_by_policy,
     )
 
 
@@ -77,8 +83,15 @@ def create_app_policy():
         return redirect(url_for('ui_auth.login'))
 
     name = (request.form.get('name') or '').strip()
+    platform_raw = (request.form.get('platform') or AppPolicy.PLATFORM_LINUX).strip()
     if not name:
         flash('Policy name is required', 'danger')
+        return redirect(url_for('ui_apparmor.admin_app_policies'))
+
+    try:
+        platform = _normalize_policy_platform(platform_raw)
+    except ValueError as exc:
+        flash(str(exc), 'danger')
         return redirect(url_for('ui_apparmor.admin_app_policies'))
 
     existing = AppPolicy.query.filter_by(name=name).first()
@@ -86,7 +99,7 @@ def create_app_policy():
         flash(f'Policy "{name}" already exists', 'warning')
         return redirect(url_for('ui_apparmor.admin_app_policies'))
 
-    policy = AppPolicy(name=name)
+    policy = AppPolicy(name=name, platform=platform)
     db.session.add(policy)
     db.session.commit()
 
@@ -135,9 +148,18 @@ def add_app_policy_rule(policy_id):
     path = (request.form.get('executable_path') or '').strip()
     preset = (request.form.get('preset') or AppPolicyRule.PRESET_ALLOWED).strip()
 
-    # Prepopulate if curated app option chosen
+    # Prepopulate if curated or discovered app option chosen
     curated_path = request.form.get('curated_app_choice')
-    if curated_path:
+    discovered_key = (request.form.get('discovered_app_choice') or '').strip()
+    if discovered_key:
+        for app in list_discovered_apps_for_platform(policy.platform):
+            app_key = f"{app['match_type']}|{app['identifier']}"
+            if app_key == discovered_key:
+                app_name = app['application_name']
+                path = app['identifier']
+                match_type = app['match_type']
+                break
+    elif curated_path and policy.platform == AppPolicy.PLATFORM_LINUX:
         for app in CURATED_APPARMOR_APPS:
             if app['path'] == curated_path:
                 app_name = app['name']
@@ -146,21 +168,19 @@ def add_app_policy_rule(policy_id):
                 break
 
     if not app_name or not path:
-        flash('Application name and executable path are required', 'danger')
+        flash('Application name and target are required', 'danger')
         return redirect(url_for('ui_apparmor.admin_app_policies'))
 
-    if match_type not in AppArmorRule.VALID_MATCH_TYPES:
-        match_type = AppArmorRule.MATCH_TYPE_EXECUTABLE
-
     try:
-        # Validate path pattern using generic placeholder username 'user'
-        path = _validate_apparmor_rule_target(match_type, path, 'user')
+        _, match_type, preset, path = validate_policy_rule_for_platform(
+            policy.platform,
+            match_type,
+            preset,
+            path,
+        )
     except ValueError as exc:
         flash(str(exc), 'danger')
         return redirect(url_for('ui_apparmor.admin_app_policies'))
-
-    if not _is_valid_preset_for_match_type(match_type, preset):
-        preset = AppPolicyRule.PRESET_ALLOWED
 
     # Duplicate or update rule check
     existing = AppPolicyRule.query.filter_by(policy_id=policy.id, executable_path=path).first()

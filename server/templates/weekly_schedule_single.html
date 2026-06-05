@@ -1,133 +1,111 @@
 {% extends "base.html" %}
 
-{% block title %}Weekly Schedule - {{ user.username }} - TimeKpr WebUI{% endblock %}
+{% block title %}Weekly Schedule - {{ user.username }} - Guardian{% endblock %}
 
 {% block top_nav_extra %}
-<span class="badge sync-status-badge"
-    style="display: none; font-size: 0.75rem; padding: 0.25rem 0.5rem; height: fit-content; line-height: 1; align-items: center;">
-    <svg width="10" height="10" fill="currentColor" viewBox="0 0 16 16" style="margin-right: 4px; flex-shrink: 0;">
+<span class="badge bg-warning text-dark sync-status-badge d-none align-items-center gap-1"
+    style="font-size: 0.75rem; padding: 0.25rem 0.5rem; height: fit-content; line-height: 1;">
+    <svg width="10" height="10" fill="currentColor" viewBox="0 0 16 16" style="flex-shrink: 0;">
         <path class="sync-status-icon"
             d="M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767L8.982 1.566zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5zm.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2z" />
     </svg>
-    <span class="sync-status-text" style="font-size: 0.7rem; font-weight: bold; line-height: 1;">Pending Sync</span>
+    <span class="sync-status-text fw-bold" style="font-size: 0.7rem; line-height: 1;">Pending Sync</span>
 </span>
 {% endblock %}
 
 {% block content %}
-<div class="schedule-header-title"
-    style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; flex-wrap: wrap; gap: 1rem;">
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
     <div>
-        <h1 style="margin: 0; font-size: 2rem;">{{ user.username }} &mdash; Limits</h1>
-        <p style="margin: 0; color: var(--pico-muted-color); font-weight: 500;">Manage daily limits, allowed timelines,
-            and blocklists</p>
+        <h1 class="fw-bold mb-1" style="font-size: 2.25rem; font-weight: 800; letter-spacing: -0.025em;">{{ user.username }} &mdash; Time Limits</h1>
+        <p class="text-secondary mb-0 fw-medium">Configure allowed login schedules and daily time limits.</p>
     </div>
     <div>
-        <a href="{{ url_for('weekly_schedule') }}" class="btn btn-secondary btn-sm">
-            <svg width="14" height="14" fill="currentColor" viewBox="0 0 16 16" style="margin-right: 4px;">
-                <path fill-rule="evenodd"
-                    d="M15 8a.5.5 0 0 0-.5-.5H2.707l3.147-3.146a.5.5 0 1 0-.708-.708l-4 4a.5.5 0 0 0 0 .708l4 4a.5.5 0 0 0 .708-.708L2.707 8.5H14.5A.5.5 0 0 0 15 8z" />
-            </svg>
-            Back to Users
+        <a href="{{ url_for('weekly_schedule') }}" class="btn btn-secondary btn-sm fw-bold">
+            <i class="fas fa-arrow-left me-1"></i> Back to Users
         </a>
     </div>
 </div>
 
 <div class="schedule-main">
     <!-- Status Overview & Metrics -->
-    <article class="card schedule-overview" style="margin-bottom: 1.5rem;">
-        <div
-            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 0.5rem;">
-            <div>
-                <h2 style="margin: 0; font-size: 1.5rem;">Schedule Summary</h2>
-                <p style="margin: 0; color: var(--pico-muted-color); font-size: 0.9rem;">
-                    {{ user.device_mappings|length }} active device mapping(s) configured
-                </p>
-            </div>
+    <div class="card shadow-sm border mb-4">
+        <div class="card-header py-3 bg-body-secondary">
+            <h5 class="mb-0 fw-bold">Schedule Summary</h5>
+            <span class="text-secondary small fw-semibold">{{ user.device_mappings|length }} active device mapping(s) configured</span>
         </div>
-
-        {% if user.weekly_schedule %}
-        {% set schedule = user.weekly_schedule.get_schedule_dict() %}
-        {% set total_week = schedule['monday'] + schedule['tuesday'] + schedule['wednesday'] + schedule['thursday'] +
-        schedule['friday'] %}
-        {% set total_weekend = schedule['saturday'] + schedule['sunday'] %}
-        {% set total_all = total_week + total_weekend %}
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
-            <div
-                style="text-align: center; padding: 1rem; background: var(--pico-background-color); border: 1px solid var(--pico-card-border-color); border-radius: 0.75rem;">
-                <div style="font-size: 2rem; font-weight: 700; color: var(--pico-primary); line-height: 1.1;">{{
-                    total_all }}h</div>
-                <div
-                    style="font-size: 0.8rem; color: var(--pico-muted-color); font-weight: bold; text-transform: uppercase; margin-top: 0.25rem;">
-                    Total per week</div>
+        <div class="card-body">
+            {% if user.weekly_schedule %}
+            {% set schedule = user.weekly_schedule.get_schedule_dict() %}
+            {% set total_week = schedule['monday'] + schedule['tuesday'] + schedule['wednesday'] + schedule['thursday'] + schedule['friday'] %}
+            {% set total_weekend = schedule['saturday'] + schedule['sunday'] %}
+            {% set total_all = total_week + total_weekend %}
+            <div class="row g-3">
+                <div class="col-12 col-md-4">
+                    <div class="bg-body-secondary p-3 rounded text-center border">
+                        <span class="text-secondary small fw-bold text-uppercase d-block mb-1" style="font-size: 0.65rem; letter-spacing: 0.05em;">Total per week</span>
+                        <strong class="fs-2 text-primary d-block lh-1 fw-bold">{{ total_all }}h</strong>
+                    </div>
+                </div>
+                <div class="col-12 col-md-4">
+                    <div class="bg-body-secondary p-3 rounded text-center border">
+                        <span class="text-secondary small fw-bold text-uppercase d-block mb-1" style="font-size: 0.65rem; letter-spacing: 0.05em;">Weekdays (Mon-Fri)</span>
+                        <strong class="fs-2 text-body d-block lh-1 fw-bold">{{ total_week }}h</strong>
+                    </div>
+                </div>
+                <div class="col-12 col-md-4">
+                    <div class="bg-body-secondary p-3 rounded text-center border">
+                        <span class="text-secondary small fw-bold text-uppercase d-block mb-1" style="font-size: 0.65rem; letter-spacing: 0.05em;">Weekends (Sat-Sun)</span>
+                        <strong class="fs-2 text-warning d-block lh-1 fw-bold">{{ total_weekend }}h</strong>
+                    </div>
+                </div>
             </div>
-            <div
-                style="text-align: center; padding: 1rem; background: var(--pico-background-color); border: 1px solid var(--pico-card-border-color); border-radius: 0.75rem;">
-                <div style="font-size: 1.75rem; font-weight: 700; color: var(--pico-color); line-height: 1.1;">{{
-                    total_week }}h</div>
-                <div
-                    style="font-size: 0.8rem; color: var(--pico-muted-color); font-weight: bold; text-transform: uppercase; margin-top: 0.25rem;">
-                    Weekdays (Mon-Fri)</div>
-            </div>
-            <div
-                style="text-align: center; padding: 1rem; background: var(--pico-background-color); border: 1px solid var(--pico-card-border-color); border-radius: 0.75rem;">
-                <div style="font-size: 1.75rem; font-weight: 700; color: var(--warning-color); line-height: 1.1;">{{
-                    total_weekend }}h</div>
-                <div
-                    style="font-size: 0.8rem; color: var(--pico-muted-color); font-weight: bold; text-transform: uppercase; margin-top: 0.25rem;">
-                    Weekends (Sat-Sun)</div>
-            </div>
+            {% endif %}
         </div>
-        {% endif %}
-    </article>
+    </div>
 
     <!-- Bulk/Quick Time Controls Panel -->
-    <article class="card schedule-bulk-controls" style="margin-bottom: 1.5rem;">
-        <h3 style="margin-bottom: 1rem; font-size: 1.25rem;">Quick Time & Interval Actions</h3>
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1rem;">
-            <!-- Bulk Hours -->
-            <div
-                style="background: var(--pico-background-color); border: 1px solid var(--pico-card-border-color); padding: 1rem; border-radius: 0.75rem;">
-                <label style="font-weight: bold; font-size: 0.85rem; color: var(--pico-muted-color);">BULK SET
-                    HOURS</label>
-                <div style="display: flex; align-items: center; gap: 0.25rem; margin: 0.5rem 0;">
-                    <button type="button" class="btn btn-secondary btn-sm" onclick="adjustBulkTime(-0.25)">-15m</button>
-                    <input type="number" id="bulk-hours" min="0" max="24" step="0.25" placeholder="2.0"
-                        style="width: 70px; text-align: center; font-weight: bold; margin: 0; padding: 0.25rem;">
-                    <button type="button" class="btn btn-secondary btn-sm" onclick="adjustBulkTime(0.25)">+15m</button>
+    <div class="card shadow-sm border mb-4">
+        <div class="card-header py-3 bg-body-secondary">
+            <h5 class="mb-0 fw-bold">Quick Time &amp; Interval Actions</h5>
+        </div>
+        <div class="card-body">
+            <div class="row g-3">
+                <!-- Bulk Hours -->
+                <div class="col-12 col-md-6">
+                    <div class="bg-body-secondary p-3 rounded border h-100">
+                        <label class="form-label fw-bold small text-muted text-uppercase mb-2" style="font-size: 0.7rem; letter-spacing: 0.05em;">Bulk Set Daily Hours</label>
+                        <div class="d-flex align-items-center gap-2 mb-3">
+                            <button type="button" class="btn btn-outline-secondary btn-sm fw-bold" onclick="adjustBulkTime(-0.25)">-15m</button>
+                            <input type="number" id="bulk-hours" min="0" max="24" step="0.25" placeholder="2.0" class="form-control form-control-sm text-center fw-bold" style="width: 80px;">
+                            <button type="button" class="btn btn-outline-secondary btn-sm fw-bold" onclick="adjustBulkTime(0.25)">+15m</button>
+                        </div>
+                        <div class="d-flex gap-1 flex-wrap">
+                            <button type="button" class="btn btn-sm btn-secondary fw-bold" onclick="setWeekdays()">Weekdays</button>
+                            <button type="button" class="btn btn-sm btn-secondary fw-bold" onclick="setWeekends()">Weekends</button>
+                            <button type="button" class="btn btn-sm btn-secondary fw-bold" onclick="setAllDays()">All Days</button>
+                        </div>
+                    </div>
                 </div>
-                <div style="display: flex; gap: 0.25rem; flex-wrap: wrap;">
-                    <button type="button" class="btn btn-secondary btn-sm" style="padding: 0.25rem 0.5rem;"
-                        onclick="setWeekdays()">Weekdays</button>
-                    <button type="button" class="btn btn-secondary btn-sm" style="padding: 0.25rem 0.5rem;"
-                        onclick="setWeekends()">Weekends</button>
-                    <button type="button" class="btn btn-secondary btn-sm" style="padding: 0.25rem 0.5rem;"
-                        onclick="setAllDays()">All Days</button>
-                </div>
-            </div>
 
-            <!-- Bulk Intervals -->
-            <div
-                style="background: var(--pico-background-color); border: 1px solid var(--pico-card-border-color); padding: 1rem; border-radius: 0.75rem;">
-                <label style="font-weight: bold; font-size: 0.85rem; color: var(--pico-muted-color);">BULK SET TIMELINE
-                    INTERVAL</label>
-                <div style="display: flex; align-items: center; gap: 0.5rem; margin: 0.5rem 0;">
-                    <input type="time" id="bulk-start" class="form-control"
-                        style="margin: 0; padding: 0.25rem; font-size: 0.85rem;" step="900" value="09:00">
-                    <span style="font-size: 0.85rem; font-weight: bold;">to</span>
-                    <input type="time" id="bulk-end" class="form-control"
-                        style="margin: 0; padding: 0.25rem; font-size: 0.85rem;" step="900" value="17:00">
-                </div>
-                <div style="display: flex; gap: 0.25rem; flex-wrap: wrap;">
-                    <button type="button" class="btn btn-secondary btn-sm" style="padding: 0.25rem 0.5rem;"
-                        onclick="setWeekdayIntervals()">Weekdays</button>
-                    <button type="button" class="btn btn-secondary btn-sm" style="padding: 0.25rem 0.5rem;"
-                        onclick="setWeekendIntervals()">Weekends</button>
-                    <button type="button" class="btn btn-secondary btn-sm" style="padding: 0.25rem 0.5rem;"
-                        onclick="setAllIntervals()">All Days</button>
+                <!-- Bulk Intervals -->
+                <div class="col-12 col-md-6">
+                    <div class="bg-body-secondary p-3 rounded border h-100">
+                        <label class="form-label fw-bold small text-muted text-uppercase mb-2" style="font-size: 0.7rem; letter-spacing: 0.05em;">Bulk Set Allowed Timeline Interval</label>
+                        <div class="d-flex align-items-center gap-2 mb-3">
+                            <input type="time" id="bulk-start" class="form-control form-control-sm" style="width: 120px;" step="900" value="09:00">
+                            <span class="small fw-bold">to</span>
+                            <input type="time" id="bulk-end" class="form-control form-control-sm" style="width: 120px;" step="900" value="17:00">
+                        </div>
+                        <div class="d-flex gap-1 flex-wrap">
+                            <button type="button" class="btn btn-sm btn-secondary fw-bold" onclick="setWeekdayIntervals()">Weekdays</button>
+                            <button type="button" class="btn btn-sm btn-secondary fw-bold" onclick="setWeekendIntervals()">Weekends</button>
+                            <button type="button" class="btn btn-sm btn-secondary fw-bold" onclick="setAllIntervals()">All Days</button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
-    </article>
+    </div>
 
     <!-- Main Scheduler Form -->
     <form id="schedule-form" method="POST" action="{{ url_for('update_weekly_schedule') }}">
@@ -145,96 +123,73 @@
             ] %}
 
             {% for day_key, day_name, day_num in days %}
-            <article class="card day-schedule-card {% if day_num >= 6 %}weekend{% endif %}" id="day-card-{{ day_num }}"
-                style="padding: 1.25rem; margin-bottom: 1.25rem;">
-                <div class="day-card-header"
-                    style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--pico-card-border-color); padding-bottom: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">
-                    <h3 class="day-name"
-                        style="margin: 0; font-size: 1.25rem; font-weight: 700; color: {{ 'var(--warning-color)' if day_num >= 6 else 'var(--pico-color)' }};">
-                        {{ day_name }}</h3>
+            <div class="card shadow-sm border mb-4 {% if day_num >= 6 %}border-warning{% endif %}" id="day-card-{{ day_num }}">
+                <div class="card-header d-flex justify-content-between align-items-center py-3 {% if day_num >= 6 %}bg-warning-subtle{% else %}bg-body-secondary{% endif %}">
+                    <h5 class="mb-0 fw-bold {% if day_num >= 6 %}text-warning-emphasis{% endif %}">{{ day_name }}</h5>
 
                     <!-- Daily Time Limit input in header -->
-                    <div class="time-section" style="display: flex; align-items: center; gap: 0.5rem;">
-                        <label
-                            style="margin: 0; font-size: 0.85rem; font-weight: bold; color: var(--pico-muted-color);">Time
-                            Limit:</label>
-                        <div class="time-controls" style="display: flex; align-items: center; gap: 0.25rem;">
-                            <button type="button" class="btn btn-secondary btn-sm"
-                                style="padding: 0.2rem 0.5rem; margin: 0;"
-                                onclick="adjustTime('{{ day_key }}', -0.25)">−</button>
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="small fw-bold text-muted">Daily Time Limit:</span>
+                        <div class="input-group input-group-sm" style="width: 140px;">
+                            <button type="button" class="btn btn-outline-secondary" onclick="adjustTime('{{ day_key }}', -0.25)">−</button>
                             <input type="number" id="{{ day_key }}" name="{{ day_key }}" min="0" max="24" step="0.25"
-                                value="{% if user.weekly_schedule %}{{ user.weekly_schedule.get_schedule_dict()[day_key] }}{% else %}0{% endif %}"
-                                class="time-input"
-                                style="width: 68px; text-align: center; padding: 0.25rem; font-size: 0.95rem; font-weight: 700; margin: 0; border-radius: 0.5rem;">
-                            <button type="button" class="btn btn-secondary btn-sm"
-                                style="padding: 0.2rem 0.5rem; margin: 0;"
-                                onclick="adjustTime('{{ day_key }}', 0.25)">+</button>
+                                   value="{% if user.weekly_schedule %}{{ user.weekly_schedule.get_schedule_dict()[day_key] }}{% else %}0{% endif %}"
+                                   class="form-control text-center fw-bold">
+                            <button type="button" class="btn btn-outline-secondary" onclick="adjustTime('{{ day_key }}', 0.25)">+</button>
                         </div>
-                        <span style="font-size: 0.8rem; color: var(--pico-muted-color); font-weight: bold;">hours</span>
+                        <span class="small fw-bold text-muted">hours</span>
                     </div>
                 </div>
-
-                <!-- Interactive 24-Hour Visual Touch Grid -->
-                <div class="timeline-outer">
-                    <div class="timeline-header-info">
-                        <span style="color: var(--pico-color); font-weight: bold;">Visual Allowance Timeline</span>
-                        <span style="font-size: 0.75rem; color: var(--pico-muted-color);">Tap active blocks to
-                            block/allow login</span>
-                    </div>
-                    <div id="timeline-container-{{ day_num }}" class="timeline-container">
-                        <!-- Javascript will dynamically inject 24 blocks here -->
-                    </div>
-                    <div class="timeline-ticks">
-                        <span>12am</span>
-                        <span>3am</span>
-                        <span>6am</span>
-                        <span>9am</span>
-                        <span>12pm</span>
-                        <span>3pm</span>
-                        <span>6pm</span>
-                        <span>9pm</span>
-                        <span>12am</span>
-                    </div>
-                </div>
-
-                <!-- Precise Manual Editors below -->
-                <details class="interval-details"
-                    style="margin-top: 1rem; border: none; background: transparent; padding: 0;">
-                    <summary
-                        style="font-size: 0.85rem; font-weight: bold; color: var(--pico-primary); cursor: pointer; margin: 0;">
-                        Show Precise Allowed Clock Ranges (<span
-                            id="interval-summary-{{ day_num }}">Unrestricted</span>)
-                    </summary>
-                    <div class="interval-editor"
-                        style="margin-top: 1rem; background: var(--pico-background-color); border: 1px solid var(--pico-card-border-color); border-radius: 0.75rem; padding: 1rem;">
-                        <div id="interval-list-{{ day_num }}" class="interval-list"
-                            style="display: grid; gap: 0.5rem; margin-bottom: 1rem;"></div>
-                        <div class="interval-actions">
-                            <button type="button" class="btn btn-secondary btn-sm"
-                                onclick="addInterval({{ day_num }})">Add precise range</button>
+                <div class="card-body">
+                    <!-- Interactive 24-Hour Visual Touch Grid -->
+                    <div class="timeline-outer">
+                        <div class="timeline-header-info">
+                            <span class="fw-bold">Visual Allowance Timeline</span>
+                            <span class="small text-muted fw-normal">Tap active blocks to block/allow login</span>
+                        </div>
+                        <div id="timeline-container-{{ day_num }}" class="timeline-container">
+                            <!-- Javascript will dynamically inject 24 blocks here -->
+                        </div>
+                        <div class="timeline-ticks">
+                            <span>12am</span>
+                            <span>3am</span>
+                            <span>6am</span>
+                            <span>9am</span>
+                            <span>12pm</span>
+                            <span>3pm</span>
+                            <span>6pm</span>
+                            <span>9pm</span>
+                            <span>12am</span>
                         </div>
                     </div>
-                </details>
-            </article>
+
+                    <!-- Precise Manual Editors below -->
+                    <details class="interval-details mt-3">
+                        <summary class="text-primary fw-bold small cursor-pointer" style="list-style: none;">
+                            <i class="fas fa-chevron-down me-1"></i> Show Precise Allowed Clock Ranges (<span id="interval-summary-{{ day_num }}">Unrestricted</span>)
+                        </summary>
+                        <div class="interval-editor mt-2 p-3 bg-body-secondary border rounded">
+                            <div id="interval-list-{{ day_num }}" class="interval-list d-flex flex-column gap-2 mb-3"></div>
+                            <div class="interval-actions">
+                                <button type="button" class="btn btn-outline-secondary btn-sm fw-bold" onclick="addInterval({{ day_num }})">
+                                    <i class="fas fa-plus me-1"></i> Add precise range
+                                </button>
+                            </div>
+                        </div>
+                    </details>
+                </div>
+            </div>
             {% endfor %}
         </div>
 
         <!-- Action buttons container sticky at page bottom -->
-        <div class="actions-section"
-            style="position: sticky; bottom: 0.5rem; background: var(--pico-card-background-color); border: 1px solid var(--pico-card-border-color); border-radius: 2rem; padding: 0.5rem 1.25rem; box-shadow: var(--shadow-hover); display: flex; justify-content: center; gap: 0.75rem; z-index: 50; margin-top: 2rem; width: fit-content; margin-left: auto; margin-right: auto; max-width: 90%;">
-            <button type="button" class="btn btn-primary btn-cta" style="margin: 0; padding: 0 1.5rem; font-size: 0.85rem; font-weight: bold; border-radius: 2rem; display: inline-flex; align-items: center; justify-content: center; gap: 0.35rem; height: 42px; width: auto;" onclick="saveAll()">
-                <svg width="14" height="14" fill="currentColor" viewBox="0 0 16 16" style="flex-shrink: 0;">
-                    <path
-                        d="M15.854 5.146a.5.5 0 0 1 0 .708l-3 3a.5.5 0 0 1-.708 0l-1.5-1.5a.5.5 0 0 1 .708-.708L12.5 7.793l2.646-2.647a.5.5 0 0 1 .708 0z" />
-                </svg>
+        <div class="actions-section position-sticky bottom-0 bg-body border rounded-pill p-2 shadow d-flex justify-content-center gap-2 z-3 mt-4 mx-auto" style="width: fit-content; max-width: 90%;">
+            <button type="button" class="btn btn-success rounded-pill px-4 py-2 fw-bold d-inline-flex align-items-center justify-content-center gap-2" onclick="saveAll()">
+                <i class="fas fa-check-circle"></i>
                 <span>Save all changes</span>
             </button>
-            <button type="button" class="btn btn-secondary" style="margin: 0; padding: 0 1.5rem; font-size: 0.85rem; font-weight: bold; border-radius: 2rem; display: inline-flex; align-items: center; justify-content: center; gap: 0.35rem; height: 42px; width: auto;" onclick="resetForm()">
-                <svg width="14" height="14" fill="currentColor" viewBox="0 0 16 16" style="flex-shrink: 0;">
-                    <path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2v1z" />
-                    <path
-                        d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z" />
-                </svg>
+            <button type="button" class="btn btn-secondary rounded-pill px-4 py-2 fw-bold d-inline-flex align-items-center justify-content-center gap-2" onclick="resetForm()">
+                <i class="fas fa-undo"></i>
                 <span>Reset to saved</span>
             </button>
         </div>
@@ -252,6 +207,7 @@
     </div>
 </div>
 {% endblock %}
+
 
 {% block extra_js %}
 <script>
@@ -508,28 +464,15 @@
         } else {
             dayIntervals.forEach((interval, index) => {
                 const row = document.createElement('div');
-                row.className = 'interval-row';
-                row.style.display = 'flex';
-                row.style.alignItems = 'center';
-                row.style.gap = '0.5rem';
-                row.style.padding = '0.4rem 0.75rem';
-                row.style.border = '1px solid var(--pico-card-border-color)';
-                row.style.borderRadius = '0.5rem';
-                row.style.background = 'var(--pico-card-background-color)';
-                row.style.marginBottom = '0.25rem';
-                row.style.flexWrap = 'wrap';
+                row.className = 'interval-row d-flex align-items-center gap-2 p-2 border rounded bg-body-tertiary mb-2 flex-wrap';
 
                 const controls = document.createElement('div');
-                controls.className = 'interval-row-controls';
-                controls.style.display = 'flex';
-                controls.style.alignItems = 'center';
-                controls.style.gap = '0.5rem';
-                controls.style.flex = '1';
+                controls.className = 'interval-row-controls d-flex align-items-center gap-2 flex-grow-1';
                 controls.innerHTML = `
-                    <span class="interval-row-index" style="font-size:0.75rem; font-weight:bold; color:var(--pico-muted-color);">#${index + 1}</span>
-                    <input type="time" class="interval-time-input form-control" style="margin:0; padding:0.25rem; font-size:0.85rem;" step="${INTERVAL_STEP_SECONDS}" value="${interval.start_time}">
-                    <span style="font-size:0.8rem; font-weight:bold;">to</span>
-                    <input type="time" class="interval-time-input form-control" style="margin:0; padding:0.25rem; font-size:0.85rem;" step="${INTERVAL_STEP_SECONDS}" value="${interval.end_time}">
+                    <span class="interval-row-index text-secondary fw-bold small">#${index + 1}</span>
+                    <input type="time" class="interval-time-input form-control form-control-sm" style="width: 110px;" step="${INTERVAL_STEP_SECONDS}" value="${interval.start_time}">
+                    <span class="fw-bold small text-muted">to</span>
+                    <input type="time" class="interval-time-input form-control form-control-sm" style="width: 110px;" step="${INTERVAL_STEP_SECONDS}" value="${interval.end_time}">
                 `;
 
                 const [startInput, endInput] = controls.querySelectorAll('input');
@@ -544,10 +487,8 @@
 
                 const removeButton = document.createElement('button');
                 removeButton.type = 'button';
-                removeButton.className = 'btn btn-sm btn-danger';
-                removeButton.style.padding = '0.2rem 0.5rem';
-                removeButton.style.margin = '0';
-                removeButton.textContent = 'Remove';
+                removeButton.className = 'btn btn-sm btn-outline-danger';
+                removeButton.innerHTML = '<i class="fas fa-trash me-1"></i> Remove';
                 removeButton.addEventListener('click', () => removeInterval(day, index));
 
                 row.appendChild(controls);

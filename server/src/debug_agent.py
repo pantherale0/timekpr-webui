@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import base64
 import copy
 import hashlib
 import hmac
@@ -26,7 +27,14 @@ DEFAULT_SYNTHETIC_ACTIVITY_INTERVAL_SECONDS = 15
 DEFAULT_TIME_LEFT_DAY = 2 * 60 * 60
 DEFAULT_EMIT_STARTUP_ALERT_ON_AUTH = False
 DEFAULT_SEND_POLICY_SYNC_CHECK_ON_AUTH = False
+DEFAULT_SEND_INSTALLED_APPS_ON_AUTH = True
 SECONDS_PER_HOUR = 60 * 60
+
+# 1x1 PNG used for synthetic app icons in debug reports.
+_DEBUG_ICON_PNG = base64.b64decode(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
+)
+_DEBUG_ICON_HASH = hashlib.sha256(_DEBUG_ICON_PNG).hexdigest()
 
 
 def _json_clone(value):
@@ -184,6 +192,49 @@ def _default_seed_alerts():
     ]
 
 
+def _default_installed_apps_for_user(username):
+    linux_apps = [
+        {
+            "application_name": "Firefox",
+            "identifier": "/usr/bin/firefox",
+            "match_type": "executable",
+            "version_name": "128.0",
+            "icon_hash": _DEBUG_ICON_HASH,
+        },
+        {
+            "application_name": "Discord",
+            "identifier": "/usr/bin/discord",
+            "match_type": "executable",
+            "version_name": "0.0.37",
+            "icon_hash": _DEBUG_ICON_HASH,
+        },
+        {
+            "application_name": "Steam",
+            "identifier": "/usr/bin/steam",
+            "match_type": "executable",
+            "version_name": "2024.1",
+            "icon_hash": _DEBUG_ICON_HASH,
+        },
+    ]
+    if username == "alice":
+        linux_apps.append({
+            "application_name": "Flatpak App",
+            "identifier": "/var/lib/flatpak/exports/bin/org.example.Demo",
+            "match_type": "executable",
+            "version_name": "1.0",
+            "icon_hash": _DEBUG_ICON_HASH,
+        })
+    if username == "bob":
+        linux_apps.append({
+            "application_name": "Example Android App",
+            "identifier": "/android/package/com.example.demo",
+            "match_type": "package",
+            "version_name": "2.1.0",
+            "icon_hash": _DEBUG_ICON_HASH,
+        })
+    return linux_apps
+
+
 def _default_config():
     return {
         "server_url": DEFAULT_SERVER_URL,
@@ -200,6 +251,8 @@ def _default_config():
         "synthetic_activity_interval_seconds": DEFAULT_SYNTHETIC_ACTIVITY_INTERVAL_SECONDS,
         "emit_startup_alert_on_auth": DEFAULT_EMIT_STARTUP_ALERT_ON_AUTH,
         "send_policy_sync_check_on_auth": DEFAULT_SEND_POLICY_SYNC_CHECK_ON_AUTH,
+        "send_installed_apps_on_auth": DEFAULT_SEND_INSTALLED_APPS_ON_AUTH,
+        "installed_apps_report_sent": False,
         "seed_fake_users": True,
         "users": {},
         "seed_alerts_on_first_auth": True,
@@ -263,6 +316,14 @@ def normalize_config(config):
     normalized["send_policy_sync_check_on_auth"] = _coerce_bool(
         normalized.get("send_policy_sync_check_on_auth"),
         DEFAULT_SEND_POLICY_SYNC_CHECK_ON_AUTH,
+    )
+    normalized["send_installed_apps_on_auth"] = _coerce_bool(
+        normalized.get("send_installed_apps_on_auth"),
+        DEFAULT_SEND_INSTALLED_APPS_ON_AUTH,
+    )
+    normalized["installed_apps_report_sent"] = _coerce_bool(
+        normalized.get("installed_apps_report_sent"),
+        False,
     )
     normalized["seed_fake_users"] = _coerce_bool(
         normalized.get("seed_fake_users"),
@@ -401,6 +462,36 @@ class DebugAgentProtocol:
             "source_revisions": _json_clone(state.get("source_revisions", {})),
         }
 
+    def build_installed_apps_report(self, linux_username, report_id=None, is_final=True):
+        apps = _default_installed_apps_for_user(linux_username)
+        return {
+            "type": "installed_apps_report",
+            "report_id": report_id or str(uuid.uuid4()),
+            "linux_username": linux_username,
+            "chunk_index": 0,
+            "chunk_total": 1,
+            "is_final": is_final,
+            "reported_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "apps": apps,
+        }
+
+    def build_app_icon_report(self):
+        return {
+            "type": "app_icon_report",
+            "content_hash": _DEBUG_ICON_HASH,
+            "mime_type": "image/png",
+            "data_base64": base64.b64encode(_DEBUG_ICON_PNG).decode("ascii"),
+        }
+
+    def build_installed_apps_payloads(self, linux_username=None):
+        usernames = [linux_username] if linux_username else sorted(self.config["users"])
+        payloads = [self.build_app_icon_report()]
+        for username in usernames:
+            if not username:
+                continue
+            payloads.append(self.build_installed_apps_report(username))
+        return payloads
+
     def handle_server_message(self, message):
         msg_type = message.get("type")
         result = {
@@ -446,6 +537,10 @@ class DebugAgentProtocol:
                     )
                 if self.config["send_policy_sync_check_on_auth"]:
                     result["outbound_messages"].append(self.build_policy_sync_check())
+                installed_payloads, installed_changed = self._consume_installed_apps_reports()
+                if installed_payloads:
+                    result["outbound_messages"].extend(installed_payloads)
+                    result["config_changed"] = result["config_changed"] or installed_changed
             else:
                 self.authenticated = False
                 LOGGER.warning("Authentication failed: %s", message.get("message", ""))
@@ -457,8 +552,9 @@ class DebugAgentProtocol:
             return result
 
         if msg_type == "command_request":
-            response, changed = self._handle_command_request(message)
+            response, changed, extra_messages = self._handle_command_request(message)
             result["outbound_messages"].append(response)
+            result["outbound_messages"].extend(extra_messages)
             result["config_changed"] = changed
             return result
 
@@ -506,6 +602,16 @@ class DebugAgentProtocol:
             )
         self.config["seed_alerts_sent"] = True
         return payloads
+
+    def _consume_installed_apps_reports(self):
+        if not self.config.get("send_installed_apps_on_auth"):
+            return [], False
+        if self.config.get("installed_apps_report_sent"):
+            return [], False
+
+        payloads = self.build_installed_apps_payloads()
+        self.config["installed_apps_report_sent"] = True
+        return payloads, True
 
     def _build_random_agent_message(self):
         if self.random.random() < 0.25:
@@ -675,6 +781,10 @@ class DebugAgentProtocol:
         args = message.get("args") or {}
 
         success, response_message, data, changed = self._handle_command(action, username, args)
+        extra_messages = []
+        if action == "refresh_installed_apps" and success:
+            reports = data.pop("reports", [])
+            extra_messages.extend(reports)
         return (
             {
                 "type": "command_response",
@@ -684,6 +794,7 @@ class DebugAgentProtocol:
                 "data": data,
             },
             changed,
+            extra_messages,
         )
 
     def _handle_command(self, action, username, args):
@@ -875,6 +986,17 @@ class DebugAgentProtocol:
             user_state["apparmor_policies"] = _json_clone(policies)
             self.config["apparmor_state"][username] = _json_clone(policies)
             return True, f"Stored {len(policies)} AppArmor policies", {}, True
+
+        if action == "refresh_installed_apps":
+            user_state = self._ensure_user(username)
+            if user_state is None:
+                return False, f"Unknown user '{username}'", {}, False
+            return (
+                True,
+                "Installed apps refresh queued",
+                {"queued": True, "reports": self.build_installed_apps_payloads(username)},
+                False,
+            )
 
         return False, f"Unknown action '{action}'", {}, False
 

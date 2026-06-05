@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Usage History - {{ user.username }} - TimeKpr WebUI{% endblock %}
+{% block title %}Usage History - {{ user.username }} - Guardian{% endblock %}
 
 {% block extra_head %}
 <!-- Include Chart.js for analytics tab visualization -->
@@ -8,10 +8,10 @@
 {% endblock %}
 
 {% block content %}
-<div class="stats-header-title" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; flex-wrap: wrap; gap: 1rem;">
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
     <div>
-        <h1 style="margin: 0; font-size: 2rem;">{{ user.username }} &mdash; History</h1>
-        <p style="margin: 0; color: var(--pico-muted-color); font-weight: 500;">
+        <h1 class="fw-bold mb-1" style="font-size: 2.25rem; font-weight: 800; letter-spacing: -0.025em;">{{ user.username }} &mdash; History &amp; Analytics</h1>
+        <p class="text-secondary mb-0 fw-medium">
             {{ user.device_mappings|length }} linked mapping(s) &bull; Usage statistics and alerts
         </p>
     </div>
@@ -19,155 +19,174 @@
 
 <div class="stats-main">
     <!-- Summary strip — values injected by JS after period switch -->
-    <div class="summary-strip" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
-        <article class="card summary-card" style="margin: 0; padding: 1rem; text-align: center;">
-            <div class="summary-label" style="font-size: 0.75rem; font-weight: bold; color: var(--pico-muted-color); text-transform: uppercase;">Total Time</div>
-            <div class="summary-value" id="stat-total" style="font-size: 1.75rem; font-weight: 700; color: var(--pico-primary);">—</div>
-            <div class="summary-sub" id="stat-total-sub" style="font-size: 0.75rem; color: var(--pico-muted-color); font-weight: bold;"></div>
-        </article>
-        <article class="card summary-card" style="margin: 0; padding: 1rem; text-align: center;">
-            <div class="summary-label" style="font-size: 0.75rem; font-weight: bold; color: var(--pico-muted-color); text-transform: uppercase;">Daily Average</div>
-            <div class="summary-value" id="stat-avg" style="font-size: 1.75rem; font-weight: 700; color: var(--pico-color);">—</div>
-            <div class="summary-sub" id="stat-avg-sub" style="font-size: 0.75rem; color: var(--pico-muted-color); font-weight: bold;">per day</div>
-        </article>
-        <article class="card summary-card" style="margin: 0; padding: 1rem; text-align: center;">
-            <div class="summary-label" style="font-size: 0.75rem; font-weight: bold; color: var(--pico-muted-color); text-transform: uppercase;">Peak Usage</div>
-            <div class="summary-value" id="stat-peak" style="font-size: 1.75rem; font-weight: 700; color: var(--warning-color);">—</div>
-            <div class="summary-sub" id="stat-peak-label" style="font-size: 0.75rem; color: var(--pico-muted-color); font-weight: bold;"></div>
-        </article>
+    <div class="row g-3 mb-4">
+        <div class="col-12 col-md-4">
+            <div class="card shadow-sm border text-center p-3 mb-0 h-100">
+                <span class="text-secondary small fw-bold text-uppercase d-block mb-1" style="font-size: 0.7rem; letter-spacing: 0.05em;">Total Time</span>
+                <strong class="fs-2 text-primary d-block lh-1 fw-bold" id="stat-total">—</strong>
+                <span class="small text-muted fw-bold mt-2 d-block" id="stat-total-sub"></span>
+            </div>
+        </div>
+        <div class="col-12 col-md-4">
+            <div class="card shadow-sm border text-center p-3 mb-0 h-100">
+                <span class="text-secondary small fw-bold text-uppercase d-block mb-1" style="font-size: 0.7rem; letter-spacing: 0.05em;">Daily Average</span>
+                <strong class="fs-2 text-body d-block lh-1 fw-bold" id="stat-avg">—</strong>
+                <span class="small text-muted fw-bold mt-2 d-block" id="stat-avg-sub">per day</span>
+            </div>
+        </div>
+        <div class="col-12 col-md-4">
+            <div class="card shadow-sm border text-center p-3 mb-0 h-100">
+                <span class="text-secondary small fw-bold text-uppercase d-block mb-1" style="font-size: 0.7rem; letter-spacing: 0.05em;">Peak Usage</span>
+                <strong class="fs-2 text-warning d-block lh-1 fw-bold" id="stat-peak">—</strong>
+                <span class="small text-muted fw-bold mt-2 d-block" id="stat-peak-label"></span>
+            </div>
+        </div>
     </div>
 
-    <!-- Period Tabs using PicoCSS Nav -->
-    <nav class="period-tabs-nav" style="margin-bottom: 1.5rem; background: var(--pico-card-background-color); border: 1px solid var(--pico-card-border-color); border-radius: 0.75rem; padding: 0.25rem;">
-        <ul style="display: flex; gap: 0.25rem; list-style: none; margin: 0; padding: 0; flex-wrap: wrap;">
-            <li style="flex: 1; text-align: center; margin: 0; padding: 0;">
-                <button class="period-tab active btn btn-ghost btn-sm" data-period="daily" style="width: 100%; margin: 0; font-weight: bold; font-size: 0.85rem;">Last 30 Days</button>
-            </li>
-            <li style="flex: 1; text-align: center; margin: 0; padding: 0;">
-                <button class="period-tab btn btn-ghost btn-sm" data-period="weekly" style="width: 100%; margin: 0; font-weight: bold; font-size: 0.85rem;">Last 3 Months</button>
-            </li>
-            <li style="flex: 1; text-align: center; margin: 0; padding: 0;">
-                <button class="period-tab btn btn-ghost btn-sm" data-period="monthly" style="width: 100%; margin: 0; font-weight: bold; font-size: 0.85rem;">Last 12 Months</button>
-            </li>
-            <li style="flex: 1; text-align: center; margin: 0; padding: 0;">
-                <button class="period-tab btn btn-ghost btn-sm" data-period="alltime" style="width: 100%; margin: 0; font-weight: bold; font-size: 0.85rem;">All Time</button>
-            </li>
-        </ul>
-    </nav>
+    <!-- Period Tabs using Bootstrap Nav Pills -->
+    <div class="card shadow-sm border mb-4">
+        <div class="card-body p-2">
+            <ul class="nav nav-pills nav-fill gap-1" id="periodTabs" role="tablist">
+                <li class="nav-item">
+                    <button class="nav-link active fw-bold small py-2 period-tab" data-period="daily" type="button">Last 30 Days</button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link fw-bold small py-2 period-tab" data-period="weekly" type="button">Last 3 Months</button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link fw-bold small py-2 period-tab" data-period="monthly" type="button">Last 12 Months</button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link fw-bold small py-2 period-tab" data-period="alltime" type="button">All Time</button>
+                </li>
+            </ul>
+        </div>
+    </div>
 
     <!-- Chart Panels Redesigned -->
-    <article class="card chart-panel active" id="panel-daily" style="margin-bottom: 1.5rem; padding: 1.25rem;">
-        <h3 class="chart-panel-title" style="font-size: 0.95rem; font-weight: bold; color: var(--pico-muted-color); text-transform: uppercase; margin-bottom: 1rem;">Daily usage &mdash; last 30 days</h3>
-        {% if daily_30 %}
-            <div class="chart-wrapper" style="height: 280px; position: relative;"><canvas id="chart-daily"></canvas></div>
-        {% else %}
-            <div class="no-data-msg" style="text-align: center; color: var(--pico-muted-color); padding: 3rem 0;">No usage records found.</div>
-        {% endif %}
-    </article>
+    <div class="card shadow-sm border mb-4 chart-panel active" id="panel-daily">
+        <div class="card-header py-3 bg-body-secondary">
+            <h6 class="mb-0 fw-bold text-secondary text-uppercase tracking-wider" style="font-size: 0.75rem; letter-spacing: 0.05em;">Daily usage &mdash; last 30 days</h6>
+        </div>
+        <div class="card-body">
+            {% if daily_30 %}
+                <div class="chart-wrapper" style="height: 280px; position: relative;"><canvas id="chart-daily"></canvas></div>
+            {% else %}
+                <div class="text-center text-secondary py-5">No usage records found.</div>
+            {% endif %}
+        </div>
+    </div>
 
-    <article class="card chart-panel" id="panel-weekly" style="margin-bottom: 1.5rem; padding: 1.25rem; display: none;">
-        <h3 class="chart-panel-title" style="font-size: 0.95rem; font-weight: bold; color: var(--pico-muted-color); text-transform: uppercase; margin-bottom: 1rem;">Weekly totals &mdash; last 13 weeks</h3>
-        {% if weekly_13 %}
-            <div class="chart-wrapper" style="height: 280px; position: relative;"><canvas id="chart-weekly"></canvas></div>
-        {% else %}
-            <div class="no-data-msg" style="text-align: center; color: var(--pico-muted-color); padding: 3rem 0;">No usage records found.</div>
-        {% endif %}
-    </article>
+    <div class="card shadow-sm border mb-4 chart-panel" id="panel-weekly" style="display: none;">
+        <div class="card-header py-3 bg-body-secondary">
+            <h6 class="mb-0 fw-bold text-secondary text-uppercase tracking-wider" style="font-size: 0.75rem; letter-spacing: 0.05em;">Weekly totals &mdash; last 13 weeks</h6>
+        </div>
+        <div class="card-body">
+            {% if weekly_13 %}
+                <div class="chart-wrapper" style="height: 280px; position: relative;"><canvas id="chart-weekly"></canvas></div>
+            {% else %}
+                <div class="text-center text-secondary py-5">No usage records found.</div>
+            {% endif %}
+        </div>
+    </div>
 
-    <article class="card chart-panel" id="panel-monthly" style="margin-bottom: 1.5rem; padding: 1.25rem; display: none;">
-        <h3 class="chart-panel-title" style="font-size: 0.95rem; font-weight: bold; color: var(--pico-muted-color); text-transform: uppercase; margin-bottom: 1rem;">Monthly totals &mdash; last 12 months</h3>
-        {% if monthly_12 %}
-            <div class="chart-wrapper" style="height: 280px; position: relative;"><canvas id="chart-monthly"></canvas></div>
-        {% else %}
-            <div class="no-data-msg" style="text-align: center; color: var(--pico-muted-color); padding: 3rem 0;">No usage records found.</div>
-        {% endif %}
-    </article>
+    <div class="card shadow-sm border mb-4 chart-panel" id="panel-monthly" style="display: none;">
+        <div class="card-header py-3 bg-body-secondary">
+            <h6 class="mb-0 fw-bold text-secondary text-uppercase tracking-wider" style="font-size: 0.75rem; letter-spacing: 0.05em;">Monthly totals &mdash; last 12 months</h6>
+        </div>
+        <div class="card-body">
+            {% if monthly_12 %}
+                <div class="chart-wrapper" style="height: 280px; position: relative;"><canvas id="chart-monthly"></canvas></div>
+            {% else %}
+                <div class="text-center text-secondary py-5">No usage records found.</div>
+            {% endif %}
+        </div>
+    </div>
 
-    <article class="card chart-panel" id="panel-alltime" style="margin-bottom: 1.5rem; padding: 1.25rem; display: none;">
-        <h3 class="chart-panel-title" style="font-size: 0.95rem; font-weight: bold; color: var(--pico-muted-color); text-transform: uppercase; margin-bottom: 1rem;">All recorded history by month</h3>
-        {% if all_monthly %}
-            <div class="chart-wrapper" style="height: 280px; position: relative;"><canvas id="chart-alltime"></canvas></div>
-        {% else %}
-            <div class="no-data-msg" style="text-align: center; color: var(--pico-muted-color); padding: 3rem 0;">No usage records found.</div>
-        {% endif %}
-    </article>
+    <div class="card shadow-sm border mb-4 chart-panel" id="panel-alltime" style="display: none;">
+        <div class="card-header py-3 bg-body-secondary">
+            <h6 class="mb-0 fw-bold text-secondary text-uppercase tracking-wider" style="font-size: 0.75rem; letter-spacing: 0.05em;">All recorded history by month</h6>
+        </div>
+        <div class="card-body">
+            {% if all_monthly %}
+                <div class="chart-wrapper" style="height: 280px; position: relative;"><canvas id="chart-alltime"></canvas></div>
+            {% else %}
+                <div class="text-center text-secondary py-5">No usage records found.</div>
+            {% endif %}
+        </div>
+    </div>
 
     <!-- Alerts Audits System -->
-    <article class="card alerts-section" style="margin-bottom: 1.5rem; padding: 1.25rem;">
-        <div class="alerts-section-header" style="display: flex; justify-content: space-between; gap: 1rem; align-items: flex-start; flex-wrap: wrap; border-bottom: 1px solid var(--pico-card-border-color); padding-bottom: 1rem; margin-bottom: 1.25rem;">
+    <div class="card shadow-sm border mb-4">
+        <div class="card-header py-3 bg-body-secondary d-flex justify-content-between align-items-center flex-wrap gap-2">
             <div>
-                <h2 style="margin: 0; font-size: 1.5rem;">Alert Audit Trail</h2>
-                <p style="margin: 0.25rem 0 0 0; color: var(--pico-muted-color); font-size: 0.9rem; font-weight: 500;">
-                    Log of parent alerts, blocklist violations, and local device events
-                </p>
+                <h5 class="mb-0 fw-bold">Alert Audit Trail</h5>
+                <span class="text-secondary small fw-medium">Log of parent alerts, blocklist violations, and local device events</span>
             </div>
-            <div style="display:flex; gap: 0.5rem; flex-wrap: wrap;" id="alert-summary-stats">
+            <div id="alert-summary-stats">
                 <!-- Injected by JS -->
             </div>
         </div>
-
-        <div class="alerts-toolbar" style="margin-bottom: 1.25rem; display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; justify-content: space-between;">
-            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; flex: 1;">
-                <input
-                    type="text"
-                    id="alert-search-input"
-                    class="form-control"
-                    placeholder="Search events, details..."
-                    style="margin: 0; max-width: 300px;"
-                >
-                <select id="alert-type-filter" style="margin: 0; max-width: 200px; padding: 0.3rem 0.5rem; height: auto;">
-                    <option value="">All Event Types</option>
-                </select>
-                <select id="alert-sort-by" style="margin: 0; max-width: 150px; padding: 0.3rem 0.5rem; height: auto;">
-                    <option value="date">Sort by Date</option>
-                    <option value="type">Sort by Type</option>
-                </select>
-                <select id="alert-sort-dir" style="margin: 0; max-width: 100px; padding: 0.3rem 0.5rem; height: auto;">
-                    <option value="desc">Desc</option>
-                    <option value="asc">Asc</option>
-                </select>
+        <div class="card-body">
+            <!-- toolbar -->
+            <div class="d-flex gap-2 mb-3 flex-wrap align-items-center justify-content-between">
+                <div class="d-flex gap-2 flex-wrap flex-grow-1">
+                    <input type="text" id="alert-search-input" class="form-control form-control-sm" placeholder="Search events..." style="max-width: 250px;">
+                    <select id="alert-type-filter" class="form-select form-select-sm" style="max-width: 180px;">
+                        <option value="">All Event Types</option>
+                    </select>
+                    <select id="alert-sort-by" class="form-select form-select-sm" style="max-width: 140px;">
+                        <option value="date">Sort by Date</option>
+                        <option value="type">Sort by Type</option>
+                    </select>
+                    <select id="alert-sort-dir" class="form-select form-select-sm" style="max-width: 100px;">
+                        <option value="desc">Desc</option>
+                        <option value="asc">Asc</option>
+                    </select>
+                </div>
+                <div>
+                    <button id="alert-prune-btn" class="btn btn-sm btn-outline-danger fw-bold"><i class="fas fa-trash-alt me-1"></i> Prune Old Alerts</button>
+                </div>
             </div>
-            <div style="display: flex; gap: 0.5rem;">
-                <button id="alert-prune-btn" class="btn btn-ghost btn-sm" style="margin: 0; color: var(--danger-color); border-color: var(--danger-color);">Prune Old Alerts</button>
+
+            <div id="alerts-loading" class="text-center py-5" style="display: none;">
+                <div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div>
+                <span class="small text-secondary fw-semibold">Loading alert history...</span>
             </div>
-        </div>
 
-        <div id="alerts-loading" style="text-align: center; padding: 2rem 0; display: none;">
-            <div aria-busy="true">Loading alert history...</div>
-        </div>
-
-        <div id="alerts-table-container" class="alerts-table-wrapper" style="overflow-x: auto;">
-            <table class="striped alerts-table" style="width: 100%; border-collapse: collapse; margin: 0;">
-                <thead>
-                    <tr>
-                        <th>Date & Time</th>
-                        <th>Event Type</th>
-                        <th>Scope</th>
-                        <th>Target Device</th>
-                        <th>Webhook Delivery</th>
-                        <th>Diagnostic Details</th>
-                    </tr>
-                </thead>
-                <tbody id="alerts-tbody">
-                    <!-- Injected by JS -->
-                </tbody>
-            </table>
-        </div>
-
-        <div id="alerts-empty" style="text-align: center; color: var(--pico-muted-color); padding: 3rem 0; font-weight: 500; display: none;">
-            No audit records found matching the current filters.
-        </div>
-
-        <div id="alerts-pagination" style="display: flex; justify-content: space-between; align-items: center; margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--pico-card-border-color);">
-            <div style="font-size: 0.85rem; color: var(--pico-muted-color); font-weight: 500;" id="pagination-info">
-                Showing 0-0 of 0 alerts
+            <div id="alerts-table-container" class="table-responsive" style="display: none;">
+                <table class="table table-hover table-striped align-middle small mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Date &amp; Time</th>
+                            <th>Event Type</th>
+                            <th>Scope</th>
+                            <th>Target Device</th>
+                            <th>Webhook Delivery</th>
+                            <th>Diagnostic Details</th>
+                        </tr>
+                    </thead>
+                    <tbody id="alerts-tbody">
+                        <!-- Injected by JS -->
+                    </tbody>
+                </table>
             </div>
-            <div style="display: flex; gap: 0.5rem;">
-                <button id="prev-page" class="btn btn-secondary btn-sm" style="margin: 0;" disabled>Previous</button>
-                <button id="next-page" class="btn btn-secondary btn-sm" style="margin: 0;" disabled>Next</button>
+
+            <div id="alerts-empty" class="text-center text-secondary py-5 fw-medium" style="display: none;">
+                No audit records found matching the current filters.
+            </div>
+
+            <div id="alerts-pagination" class="d-flex justify-content-between align-items-center mt-3 pt-3 border-top" style="display: none;">
+                <div class="small text-secondary fw-semibold" id="pagination-info">
+                    Showing 0-0 of 0 alerts
+                </div>
+                <div class="d-flex gap-1">
+                    <button id="prev-page" class="btn btn-outline-secondary btn-sm fw-bold" disabled>Previous</button>
+                    <button id="next-page" class="btn btn-outline-secondary btn-sm fw-bold" disabled>Next</button>
+                </div>
             </div>
         </div>
-    </article>
+    </div>
 </div>
 {% endblock %}
 
@@ -341,14 +360,6 @@
     function switchPeriod(period) {
         document.querySelectorAll('.period-tab').forEach(t => {
             t.classList.toggle('active', t.dataset.period === period);
-            // style helper
-            if (t.dataset.period === period) {
-                t.style.backgroundColor = 'var(--pico-primary-background)';
-                t.style.color = '#ffffff';
-            } else {
-                t.style.backgroundColor = 'transparent';
-                t.style.color = '';
-            }
         });
         
         document.querySelectorAll('.chart-panel').forEach(p => {
@@ -436,6 +447,14 @@
         }
     }
 
+    function formatStatusBadge(status) {
+        if (!status) return '<span class="badge bg-secondary">Unknown</span>';
+        const label = status.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+        if (status === 'delivered') return `<span class="badge bg-success">${label}</span>`;
+        if (status === 'failed') return `<span class="badge bg-danger">${label}</span>`;
+        return `<span class="badge bg-warning text-dark">${label}</span>`;
+    }
+
     function renderAlerts(alerts) {
         if (!alerts || alerts.length === 0) {
             elements.empty.style.display = 'block';
@@ -445,25 +464,25 @@
         elements.table.style.display = 'block';
         elements.tbody.innerHTML = alerts.map(alert => `
             <tr>
-                <td style="font-size: 0.8rem; font-weight: bold; color: var(--pico-muted-color); white-space: nowrap;">
+                <td class="fw-bold text-secondary text-nowrap" style="font-size: 0.8rem;">
                     ${alert.occurred_at ? formatDate(alert.occurred_at) : 'Unknown'}
                 </td>
                 <td>
                     <strong style="font-size: 0.9rem;">${alert.event_label}</strong>
-                    <div style="font-size: 0.7rem; color: var(--pico-muted-color); font-weight: bold;">ID: #${alert.id}</div>
+                    <div class="text-secondary small fw-bold" style="font-size: 0.7rem;">ID: #${alert.id}</div>
                 </td>
-                <td><span class="badge badge-secondary" style="font-weight: bold;">${alert.scope_label}</span></td>
+                <td><span class="badge bg-secondary">${alert.scope_label}</span></td>
                 <td>
-                    <a href="/devices/${alert.system_id}" style="font-weight: bold;">${alert.device_label}</a>
+                    <a href="/devices/${alert.system_id}" class="fw-bold">${alert.device_label}</a>
                 </td>
                 <td>
-                    <div style="font-weight: bold; font-size: 0.85rem;">${formatStatus(alert.delivery_status)}</div>
-                    <div style="font-size: 0.7rem; color: var(--pico-muted-color); font-weight: bold;">
+                    <div class="mb-1">${formatStatusBadge(alert.delivery_status)}</div>
+                    <div class="text-secondary small fw-bold" style="font-size: 0.7rem;">
                         ${alert.delivery_attempts} attempt(s)
-                        ${alert.last_delivery_error ? `<br><span style="color: var(--danger-color);">Error: ${alert.last_delivery_error}</span>` : ''}
+                        ${alert.last_delivery_error ? `<br><span class="text-danger">Error: ${alert.last_delivery_error}</span>` : ''}
                     </div>
                 </td>
-                <td class="alerts-details" style="font-size: 0.75rem; color: var(--pico-muted-color); font-family: monospace; max-width: 280px; overflow-wrap: break-word;">${alert.details_text}</td>
+                <td class="alerts-details" style="font-size: 0.75rem; max-width: 280px; overflow-wrap: break-word;"><code class="small text-secondary">${alert.details_text}</code></td>
             </tr>
         `).join('');
     }
@@ -477,11 +496,6 @@
                String(date.getMinutes()).padStart(2, '0');
     }
 
-    function formatStatus(status) {
-        if (!status) return 'Unknown';
-        return status.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
-    }
-
     function updatePagination(pagination) {
         const start = (pagination.page - 1) * pagination.per_page + 1;
         const end = Math.min(pagination.page * pagination.per_page, pagination.total_items);
@@ -492,6 +506,12 @@
             
         elements.prevBtn.disabled = !pagination.has_prev;
         elements.nextBtn.disabled = !pagination.has_next;
+        
+        // Show/hide pagination section based on total items
+        const pagSection = document.getElementById('alerts-pagination');
+        if (pagSection) {
+            pagSection.style.display = pagination.total_items > 0 ? 'flex' : 'none';
+        }
     }
 
     function updateFilters(filters) {
@@ -505,10 +525,9 @@
 
     function updateSummaryStats(total) {
         elements.summary.innerHTML = `
-            <div style="text-align: center; padding: 0.4rem 0.75rem; background: var(--pico-background-color); border: 1px solid var(--pico-card-border-color); border-radius: 0.5rem; min-width: 100px;">
-                <div style="font-size: 0.7rem; font-weight: bold; color: var(--pico-muted-color); text-transform: uppercase;">Filtered Results</div>
-                <div style="font-size: 1.1rem; font-weight: 700;">${total}</div>
-            </div>
+            <span class="badge bg-primary px-3 py-2 fw-bold" style="font-size: 0.85rem;">
+                ${total} Event(s) Found
+            </span>
         `;
     }
 

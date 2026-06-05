@@ -107,7 +107,8 @@ Local release signing uses the same variables via `ANDROID_KEYSTORE_PATH` or `an
 |------------|------------------|
 | Background connection | Foreground service (`AgentWebSocketService`) |
 | Screen time enforcement | Device Admin (`TimeKprDeviceAdminReceiver`) |
-| App discovery & usage | `PACKAGE_USAGE_STATS` (Usage Access) |
+| App usage monitoring | `PACKAGE_USAGE_STATS` (Usage Access) |
+| Installed app inventory | `PackageManager` (launcher-visible apps; no extra permission beyond normal install visibility) |
 | Web/domain policies | `VpnService` consent |
 | Boot persistence | `RECEIVE_BOOT_COMPLETED` |
 
@@ -150,6 +151,14 @@ Presets:
 - `blocked` → package suspended + launch blocked
 - `no_internet` → tracked for future per-app network rules (domain VPN still applies globally)
 - `complain` → usage alerts without blocking
+
+## Installed application inventory
+
+After each authenticated sync session the agent scans launcher-visible packages and sends chunked `installed_apps_report` messages to the server, plus optional `app_icon_report` PNG uploads (64×64, content-addressed). The server uses this inventory in the application policies UI.
+
+The agent also handles `refresh_installed_apps` RPC for on-demand rescans while connected.
+
+See [app-discovery.md](app-discovery.md) for the full protocol reference.
 
 ## Building
 

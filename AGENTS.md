@@ -1,6 +1,6 @@
 # AGENTS.md
 
-This repository implements a server–agent system for managing TimeKpr‑nExT across multiple Linux machines. The Flask server provides the web UI, REST APIs, and a WebSocket hub; each managed machine runs a Rust agent that connects outbound to the server. A lightweight Python debug agent is included for local testing.
+This repository implements a server–agent parental controls system that manages policies across multiple Linux machines, Androide devices and in the future other platforms. The Flask server provides the web UI, REST APIs, and a WebSocket hub; each managed machine runs a Rust agent that connects outbound to the server. A lightweight Python debug agent is included for local testing.
 
 ## Essential commands
 
@@ -19,6 +19,8 @@ This repository implements a server–agent system for managing TimeKpr‑nExT a
   - See `docs/android-agent.md` for pairing QR, permissions, and policy mapping.
 - Tests (from `server/`):
   - `pytest` (project includes tests under `server/tests/`)
+- Agents (from `.agents/`):
+  - Within here you might find important sub-agents to invoke. Always check the details in `.agents/ARCHITECTURE.md` with every request, this is important as this will define how to build features, UI design, backend and frontend specialisms.
 
 Environment (observed):
 - `AGENT_TOKEN` bootstrap token (server)

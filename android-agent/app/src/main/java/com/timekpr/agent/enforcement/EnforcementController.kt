@@ -4,6 +4,8 @@ import android.app.admin.DevicePolicyManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ApplicationInfo
+import android.content.pm.PackageManager
 import com.timekpr.agent.TimeKprApplication
 import com.timekpr.agent.admin.TimeKprDeviceAdminReceiver
 import com.timekpr.agent.monitor.UsageMonitorService
@@ -39,10 +41,32 @@ class EnforcementController(
         val dpm = context.getSystemService(DevicePolicyManager::class.java) ?: return
         if (!dpm.isAdminActive(adminComponent)) return
 
-        val blocked = appPolicyStore.blockedPackages(username).toTypedArray()
-        if (blocked.isNotEmpty()) {
-            dpm.setPackagesSuspended(adminComponent, blocked, true)
+        val blocked = appPolicyStore.blockedPackages(username)
+        val previouslyEnforced = appPolicyStore.lastEnforcedBlockedPackages(username)
+        val releasedBySync = appPolicyStore.consumePackagesReleasedBySync(username)
+        var toUnsuspend = (previouslyEnforced + releasedBySync - blocked).toMutableSet()
+        if (blocked.isEmpty() && toUnsuspend.isEmpty()) {
+            toUnsuspend.addAll(findSuspendedThirdPartyPackages())
         }
+        val toSuspend = blocked.toTypedArray()
+        val toUnsuspendArray = toUnsuspend.toTypedArray()
+        if (toUnsuspendArray.isNotEmpty()) {
+            dpm.setPackagesSuspended(adminComponent, toUnsuspendArray, false)
+        }
+        if (toSuspend.isNotEmpty()) {
+            dpm.setPackagesSuspended(adminComponent, toSuspend, true)
+        }
+        appPolicyStore.setLastEnforcedBlockedPackages(username, blocked)
+    }
+
+    private fun findSuspendedThirdPartyPackages(): Set<String> {
+        val pm = context.packageManager
+        return pm.getInstalledApplications(PackageManager.MATCH_UNINSTALLED_PACKAGES)
+            .asSequence()
+            .filter { (it.flags and ApplicationInfo.FLAG_SUSPENDED) != 0 }
+            .map { it.packageName }
+            .filter { it != context.packageName }
+            .toSet()
     }
 
     fun suspendBlockedLaunch(packageName: String, username: String): Boolean {

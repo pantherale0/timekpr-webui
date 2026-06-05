@@ -9,11 +9,12 @@ from src.blueprints.api import (
     api_users_bp,
     api_schedule_bp,
     api_blocklists_bp,
-    api_apparmor_bp,
     api_time_bp,
     api_tasks_bp,
     api_alerts_bp,
     api_pairing_bp,
+    api_dashboard_bp,
+    api_installed_apps_bp,
 )
 from src.blueprints.websocket import websocket_bp
 
@@ -26,10 +27,11 @@ __all__ = [
     'api_users_bp',
     'api_schedule_bp',
     'api_blocklists_bp',
-    'api_apparmor_bp',
     'api_time_bp',
     'api_tasks_bp',
     'api_alerts_bp',
     'api_pairing_bp',
+    'api_dashboard_bp',
+    'api_installed_apps_bp',
     'websocket_bp',
 ]
