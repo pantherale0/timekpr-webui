@@ -316,7 +316,8 @@ def build_source_domain_map(sources):
     return domain_map
 
 
-def compute_mapping_policy_hash(linux_uid, source_state_map, assigned_source_ids):
+def compute_mapping_policy_hash(linux_uid, source_state_map, assigned_source_ids,
+                              approval_revision=None):
     """Hash a mapping's effective blocklist policy for sync comparisons."""
     payload = {
         'linux_uid': linux_uid,
@@ -328,6 +329,8 @@ def compute_mapping_policy_hash(linux_uid, source_state_map, assigned_source_ids
             for source_id in sorted({int(source_id) for source_id in assigned_source_ids})
         },
     }
+    if approval_revision:
+        payload['approval_revision'] = approval_revision
     digest_source = json.dumps(payload, sort_keys=True, separators=(',', ':'))
     return hashlib.sha256(digest_source.encode('utf-8')).hexdigest()
 
@@ -399,7 +402,19 @@ def summarize_mapping_blocklist_sync(mapping, source_state_map, assigned_source_
             'retry_hash': retry_hash,
         }
 
-    policy_hash = compute_mapping_policy_hash(mapping.linux_uid, source_state_map, source_ids)
+    approval_revision = None
+    try:
+        from src.approvals_manager import compute_approval_revision_hash
+        approval_revision = compute_approval_revision_hash(mapping)
+    except (ImportError, RuntimeError, TypeError, ValueError):
+        approval_revision = None
+
+    policy_hash = compute_mapping_policy_hash(
+        mapping.linux_uid,
+        source_state_map,
+        source_ids,
+        approval_revision=approval_revision,
+    )
     is_current = (
         bool(mapping.blocklist_is_synced)
         and mapping.blocklist_policy_hash == policy_hash

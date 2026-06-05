@@ -1,5 +1,8 @@
 mod apparmor;
+mod approval_deduper;
+mod approval_policy;
 mod audit_monitor;
+mod domain_notify;
 mod domain_policy;
 mod firewall;
 mod installed_apps;
@@ -203,6 +206,18 @@ fn load_or_create_config() -> Config {
     }
 
     config
+}
+
+fn clear_agent_enrollment() -> Result<(), String> {
+    let config_path = get_config_path();
+    let mut config = load_or_create_config();
+    config.agent_token = None;
+
+    let serialized = serde_json::to_string_pretty(&config)
+        .map_err(|e| format!("Failed to serialize config: {}", e))?;
+    fs::write(&config_path, serialized)
+        .map_err(|e| format!("Failed to write config to {}: {}", config_path, e))?;
+    Ok(())
 }
 
 fn get_system_hostname() -> Option<String> {
@@ -532,7 +547,10 @@ async fn handle_command(action: &str, username: &str, args: &serde_json::Value) 
                 Err(e) => return (false, format!("Failed to parse policies: {}", e), serde_json::json!({})),
             };
 
-            match apparmor::sync_user_policy(username, policies).await {
+            let approval_policy =
+                approval_policy::ApprovalPolicy::parse(args.get("approval_policy"));
+
+            match apparmor::sync_user_policy(username, policies, approval_policy).await {
                 Ok(msg) => (true, msg, serde_json::json!({})),
                 Err(e) => (false, e, serde_json::json!({})),
             }
@@ -542,6 +560,14 @@ async fn handle_command(action: &str, username: &str, args: &serde_json::Value) 
             "Installed apps refresh queued".to_string(),
             serde_json::json!({ "queued": true, "linux_username": username }),
         ),
+        "unenroll" => match clear_agent_enrollment() {
+            Ok(()) => (
+                true,
+                "Device unenrolled locally; agent token cleared".to_string(),
+                serde_json::json!({}),
+            ),
+            Err(message) => (false, message, serde_json::json!({})),
+        },
         _ => (false, format!("Unknown action '{}'", action), serde_json::json!({})),
     }
 }
@@ -1052,6 +1078,7 @@ async fn main() {
     let netlink_config = netlink::MonitorConfig {
         monitored_uids: users_map.clone(),
     };
+    netlink::register_alert_sender(alert_tx.clone());
     tokio::spawn(netlink::run_process_monitor(netlink_config, alert_tx.clone()));
     tokio::spawn(audit_monitor::run_audit_monitor(users_map, alert_tx));
 
@@ -1076,6 +1103,7 @@ async fn main() {
     });
 
     loop {
+        let mut device_unenrolled = false;
         let config = load_or_create_config();
         let server_url = config.server_url.clone();
         let system_id = config.system_id.clone().unwrap_or_else(|| Uuid::new_v4().to_string());
@@ -1312,6 +1340,12 @@ async fn main() {
                                 if action == "refresh_installed_apps" && success {
                                     push_inventory_for_user(&inventory_tx, &username);
                                 }
+
+                                if action == "unenroll" && success {
+                                    device_unenrolled = true;
+                                    let _ = shutdown_tx.send(true);
+                                    break;
+                                }
                             }
                             Ok(ServerMessage::PolicySyncHint { reason }) => {
                                 println!(
@@ -1361,6 +1395,11 @@ async fn main() {
             Err(e) => {
                 eprintln!("Connection failed: {}. Retrying...", e);
             }
+        }
+
+        if device_unenrolled {
+            println!("Device unenrolled; stopping agent reconnect loop.");
+            return;
         }
 
         println!("Reconnecting in 5 seconds...");

@@ -1,6 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
+use users::os::unix::UserExt;
 
 use base64::Engine;
 use serde::Serialize;
@@ -64,7 +65,7 @@ pub fn discover_for_user(linux_username: &str) -> Vec<DiscoveredApp> {
         PathBuf::from("/var/lib/snapd/desktop/applications"),
     ];
 
-    if let Some(home) = users::get_user_by_name(linux_username).and_then(|user| user.home_dir().map(Path::to_path_buf)) {
+    if let Some(home) = users::get_user_by_name(linux_username).map(|user| user.home_dir().to_path_buf()) {
         desktop_dirs.push(home.join(".local/share/applications"));
         desktop_dirs.push(home.join(".local/share/flatpak/exports/share/applications"));
     }

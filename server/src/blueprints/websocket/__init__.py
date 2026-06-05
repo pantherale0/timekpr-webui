@@ -145,7 +145,16 @@ def ws_agent_handler(ws):
                         _LOGGER.debug("Pending websocket closed for %s", system_id)
                     return
     
-                if device.status == 'rejected':
+                pending_factory_reset = bool(getattr(device, 'pending_factory_reset', False))
+                is_android = (device.platform or '').strip().lower() == 'android'
+                allow_pending_reset_auth = (
+                    device.status == 'rejected'
+                    and pending_factory_reset
+                    and is_android
+                    and bool(device.secure_token)
+                )
+
+                if device.status == 'rejected' and not allow_pending_reset_auth:
                     _LOGGER.warning(
                         "Connection rejected: Device %s is banned/rejected",
                         system_id,
@@ -153,7 +162,7 @@ def ws_agent_handler(ws):
                     ws.send(json.dumps({"type": "auth_result", "success": False, "message": "Device rejected/banned"}))
                     return
     
-                if device.status == 'approved':
+                if device.status == 'approved' or allow_pending_reset_auth:
                     challenge = secrets.token_hex(32)
                     ws.send(json.dumps({
                         "type": "challenge",
@@ -197,6 +206,12 @@ def ws_agent_handler(ws):
                         system_id,
                         remote_ip,
                     )
+
+                    if pending_factory_reset:
+                        from src.device_lifecycle_manager import deliver_pending_factory_reset_on_connect
+
+                        if deliver_pending_factory_reset_on_connect(system_id):
+                            return
     
         except (
             OSError,
@@ -241,6 +256,26 @@ def ws_agent_handler(ws):
                         )
                         if alert.event_type == 'app_usage':
                             _store_app_usage_from_alert(system_id, normalized_alert)
+                        elif alert.event_type in {'access_requested', 'app_blocked'}:
+                            try:
+                                from src.approvals_manager import ingest_access_request
+                                ingest_access_request(
+                                    system_id,
+                                    normalized_alert,
+                                    source_alert_id=alert.id,
+                                )
+                            except ValueError as exc:
+                                _LOGGER.warning(
+                                    "Rejected approval ingest from %s: %s",
+                                    system_id,
+                                    exc,
+                                )
+                            except Exception as exc:
+                                _LOGGER.error(
+                                    "Failed to ingest approval request from %s: %s",
+                                    system_id,
+                                    exc,
+                                )
                     except ValueError as exc:
                         _LOGGER.warning(
                             "Rejected invalid alert payload from %s: %s",
@@ -257,6 +292,12 @@ def ws_agent_handler(ws):
                 elif msg_type == "installed_apps_report":
                     try:
                         result = handle_installed_apps_report(system_id, msg)
+                        if result.get("success") and not result.get("pending"):
+                            from src.approvals_manager import push_approval_policies_after_inventory
+                            push_approval_policies_after_inventory(
+                                system_id,
+                                msg.get("linux_username"),
+                            )
                         ws.send(json.dumps({
                             "type": "installed_apps_report_ack",
                             "report_id": msg.get("report_id"),

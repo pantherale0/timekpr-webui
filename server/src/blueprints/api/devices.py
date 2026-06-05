@@ -1,10 +1,11 @@
 import json
 import logging
 import secrets
-from flask import Blueprint, session, jsonify
+from flask import Blueprint, request, session, jsonify
 from src.database import db, AgentDevice
 from src.agent_helper import AgentConnectionManager
 from src.agent_push import notify_pairing_approved
+from src.device_lifecycle_manager import unenroll_device as lifecycle_unenroll_device
 from src.helpers import _device_display_label
 
 _LOGGER = logging.getLogger(__name__)
@@ -76,6 +77,19 @@ def reject_device(system_id):
         
     _LOGGER.info("Rejected device %s and closed connections.", system_id)
     return jsonify({'success': True, 'message': f'Device {device_label} rejected successfully.'})
+
+
+@api_devices_bp.route('/api/device/<system_id>/unenroll', methods=['POST'])
+def unenroll_device(system_id):
+    """Unenroll a device or request an Android factory reset."""
+    if not session.get('logged_in'):
+        return jsonify({'success': False, 'message': 'Not authenticated'}), 401
+
+    payload = request.get_json(silent=True) or {}
+    mode = payload.get('mode', 'unenroll')
+    result = lifecycle_unenroll_device(system_id, mode)
+    status_code = result.pop('status_code', 200)
+    return jsonify(result), status_code
 
 
 @api_devices_bp.route('/api/devices/pending', methods=['GET'])

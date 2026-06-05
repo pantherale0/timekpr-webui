@@ -14,6 +14,7 @@ This repository implements a server–agent parental controls system that manage
   - `python debug_agent.py --server-url "ws://127.0.0.1:5000/ws" --agent-version "vX.Y"`
 - Rust agent (from `agent/`):
   - Build: `cargo build --release`
+  - See `docs/linux-agent.md` for AppArmor enforcement, domain blocklists, and access approvals.
 - Android agent (from `android-agent/`):
   - Build: `./gradlew assembleDebug`
   - See `docs/android-agent.md` for pairing QR, permissions, and policy mapping.

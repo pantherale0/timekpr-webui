@@ -2,10 +2,12 @@ use serde_json::json;
 use std::collections::{HashMap, HashSet};
 use std::mem;
 use std::os::unix::io::{AsRawFd, RawFd};
+use std::sync::{Mutex, OnceLock};
 use tokio::sync::mpsc;
 use tokio::time::Instant;
 
 use crate::apparmor;
+use crate::approval_deduper;
 
 /// Alert payload ready to be forwarded to the server.
 #[derive(Debug, Clone)]
@@ -13,6 +15,28 @@ pub struct AppAlert {
     pub event_type: String,
     pub linux_username: String,
     pub payload: serde_json::Value,
+}
+
+static ALERT_SENDER: OnceLock<Mutex<Option<mpsc::UnboundedSender<AppAlert>>>> = OnceLock::new();
+
+pub fn register_alert_sender(tx: mpsc::UnboundedSender<AppAlert>) {
+    let slot = ALERT_SENDER.get_or_init(|| Mutex::new(None));
+    let mut guard = slot.lock().expect("alert sender mutex poisoned");
+    *guard = Some(tx);
+}
+
+pub fn send_app_alert(event_type: &str, linux_username: &str, payload: serde_json::Value) {
+    let Some(slot) = ALERT_SENDER.get() else {
+        return;
+    };
+    let guard = slot.lock().expect("alert sender mutex poisoned");
+    if let Some(tx) = guard.as_ref() {
+        let _ = tx.send(AppAlert {
+            event_type: event_type.to_string(),
+            linux_username: linux_username.to_string(),
+            payload,
+        });
+    }
 }
 
 /// Configuration for which usernames (and their UIDs) to monitor.
@@ -366,7 +390,49 @@ async fn run_monitor_inner(
                 let cwd = pid_to_cwd(pid);
                 let transient = username.is_none() || exe_path.is_empty();
 
-                // 1. AppArmor / Enforcement Check
+                // 1. Approval overlay enforcement (allowlist/blocklist)
+                if let Some(ref username) = username {
+                    if !exe_path.is_empty() {
+                        if let Some(_blocked_path) =
+                            apparmor::check_approval_launch_block(username, &exe_path).await
+                        {
+                            let has_overlay = apparmor::approval_policy_for_user(username)
+                                .await
+                                .is_some();
+                            if has_overlay
+                                && approval_deduper::should_emit("app_launch", &exe_path)
+                            {
+                                let _ = alert_tx.send(AppAlert {
+                                    event_type: "access_requested".to_string(),
+                                    linux_username: username.clone(),
+                                    payload: json!({
+                                        "request_type": "app_launch",
+                                        "target_kind": "executable",
+                                        "target_value": &exe_path,
+                                        "display_label": &comm,
+                                    }),
+                                });
+                            }
+                            let _ = alert_tx.send(AppAlert {
+                                event_type: "app_blocked".to_string(),
+                                linux_username: username.clone(),
+                                payload: json!({
+                                    "reason": "not_approved",
+                                    "application_name": &comm,
+                                    "executable_path": &exe_path,
+                                    "target_kind": "executable",
+                                    "pid": pid,
+                                    "enforcement_source": "approval_overlay",
+                                    "disposition": "DENIED",
+                                }),
+                            });
+                            kill_pid(pid);
+                            continue;
+                        }
+                    }
+                }
+
+                // 2. AppArmor / static rule enforcement
                 if let Some(decision) = if let Some(ref username) = username {
                     if exe_path.is_empty() {
                         None
@@ -384,17 +450,15 @@ async fn run_monitor_inner(
                             .clone()
                             .unwrap_or_else(|| "unknown".to_string()),
                         payload: json!({
-                            "details": {
-                                "application_name": &comm,
-                                "executable_path": &exe_path,
-                                "pid": pid,
-                                "path_rule": decision.rule_name,
-                                "rule_target": decision.rule_target,
-                                "matched_path": decision.matched_path,
-                                "matched_via": decision.matched_via,
-                                "enforcement_source": "exec_monitor",
-                                "disposition": if blocked { "DENIED" } else { "ALLOWED" },
-                            }
+                            "application_name": &comm,
+                            "executable_path": &exe_path,
+                            "pid": pid,
+                            "path_rule": decision.rule_name,
+                            "rule_target": decision.rule_target,
+                            "matched_path": decision.matched_path,
+                            "matched_via": decision.matched_via,
+                            "enforcement_source": "exec_monitor",
+                            "disposition": if blocked { "DENIED" } else { "ALLOWED" },
                         }),
                     });
                     if blocked {
@@ -412,12 +476,10 @@ async fn run_monitor_inner(
                             event_type: "app_launched".to_string(),
                             linux_username: username.clone(),
                             payload: json!({
-                                "details": {
-                                    "application_name": &comm,
-                                    "executable_path": &exe_path,
-                                    "pid": pid,
-                                    "transient": transient,
-                                }
+                                "application_name": &comm,
+                                "executable_path": &exe_path,
+                                "pid": pid,
+                                "transient": transient,
                             }),
                         });
 
@@ -457,14 +519,12 @@ async fn run_monitor_inner(
                             event_type: "app_usage".to_string(),
                             linux_username: process.username.clone(),
                             payload: json!({
-                                "details": {
-                                    "application_name": &process.comm,
-                                    "executable_path": &process.exe_path,
-                                    "pid": process.pid,
-                                    "duration_seconds": duration_secs,
-                                    "start_time": start_time.to_rfc3339(),
-                                    "end_time": now.to_rfc3339(),
-                                }
+                                "application_name": &process.comm,
+                                "executable_path": &process.exe_path,
+                                "pid": process.pid,
+                                "duration_seconds": duration_secs,
+                                "start_time": start_time.to_rfc3339(),
+                                "end_time": now.to_rfc3339(),
                             }),
                         });
                     }

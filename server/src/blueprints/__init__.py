@@ -15,6 +15,8 @@ from src.blueprints.api import (
     api_pairing_bp,
     api_dashboard_bp,
     api_installed_apps_bp,
+    api_approvals_bp,
+    api_android_device_policy_bp,
 )
 from src.blueprints.websocket import websocket_bp
 
@@ -33,5 +35,7 @@ __all__ = [
     'api_pairing_bp',
     'api_dashboard_bp',
     'api_installed_apps_bp',
+    'api_approvals_bp',
+    'api_android_device_policy_bp',
     'websocket_bp',
 ]

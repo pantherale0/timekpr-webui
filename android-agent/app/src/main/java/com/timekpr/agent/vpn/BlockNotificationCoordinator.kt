@@ -5,8 +5,14 @@ import android.os.Handler
 import android.os.Looper
 import android.os.PowerManager
 import android.util.Log
+import com.timekpr.agent.TimeKprApplication
+import com.timekpr.agent.monitor.AlertEventBus
+import com.timekpr.agent.monitor.ApprovalRequestDeduper
 import com.timekpr.agent.monitor.ForegroundAppTracker
+import com.timekpr.agent.policy.UidPolicy
 import com.timekpr.agent.ui.BlockedDomainOverlay
+import com.timekpr.agent.util.AndroidUsers
+import org.json.JSONObject
 
 /**
  * Deduplicates domain-block UI: overlay for isolated blocks, notification for bursts.
@@ -58,6 +64,8 @@ object BlockNotificationCoordinator {
 
         val normalized = queryDomain.trim().lowercase().trimEnd('.')
         if (normalized.isEmpty()) return
+
+        emitDomainAccessRequestIfNeeded(context, normalized)
 
         val now = System.currentTimeMillis()
         pruneOldEvents(now)
@@ -119,8 +127,15 @@ object BlockNotificationCoordinator {
         }
 
         val displayDomain = distinctRegistrable.firstOrNull() ?: events.first().queryDomain
+        val uidPolicy = currentUidPolicy(context)
+        val showRequestAccess = uidPolicy?.domainAccessMode == UidPolicy.DOMAIN_ACCESS_APPROVAL_ON_BLOCK
         Log.i(TAG, "Showing overlay for blocked domain $displayDomain")
-        if (BlockedDomainOverlay.show(context, displayDomain)) {
+        if (BlockedDomainOverlay.show(
+                context,
+                displayDomain,
+                showRequestAccess,
+                uidPolicy?.linuxUsername ?: AndroidUsers.currentLinuxUsername(context),
+            )) {
             markShown()
         } else {
             BlockBurstNotifier.showSingleFallback(context, displayDomain)
@@ -145,5 +160,27 @@ object BlockNotificationCoordinator {
     private fun isScreenOn(context: Context): Boolean {
         val powerManager = context.getSystemService(PowerManager::class.java) ?: return true
         return powerManager.isInteractive
+    }
+
+    private fun currentUidPolicy(context: Context): UidPolicy? {
+        val domainStore = TimeKprApplication.from(context).domainPolicyStore
+        val uid = AndroidUsers.currentLinuxUid(context).toString()
+        return domainStore.policyForUid(uid)
+    }
+
+    private fun emitDomainAccessRequestIfNeeded(context: Context, normalizedDomain: String) {
+        val policy = currentUidPolicy(context) ?: return
+        if (policy.domainAccessMode != UidPolicy.DOMAIN_ACCESS_APPROVAL_ON_BLOCK) return
+        val target = DomainGrouping.registrableDomain(normalizedDomain)
+        if (!ApprovalRequestDeduper.shouldEmit("domain_access", target)) return
+        AlertEventBus.emit(
+            "access_requested",
+            policy.linuxUsername,
+            JSONObject()
+                .put("request_type", "domain_access")
+                .put("target_kind", "domain")
+                .put("target_value", target)
+                .put("display_label", target),
+        )
     }
 }

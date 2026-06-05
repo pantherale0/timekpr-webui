@@ -41,6 +41,7 @@ ALLOWED_AGENT_ALERT_TYPES = {
     'app_launched',
     'app_blocked',
     'app_usage',
+    'access_requested',
 }
 
 
@@ -300,7 +301,17 @@ class AgentConnectionManager(metaclass=AgentConnectionManagerMeta):
         """Verify the HMAC-SHA256 signature of challenge + system_id using the device-specific token"""
         try:
             device = AgentDevice.query.get(system_id)
-            if not device or not device.secure_token or device.status != 'approved':
+            if not device or not device.secure_token:
+                logger.warning(
+                    "Signature verification rejected: Device %s missing token",
+                    system_id,
+                )
+                return False
+
+            is_approved = device.status == 'approved'
+            pending_reset = bool(getattr(device, 'pending_factory_reset', False))
+            is_android = (device.platform or '').strip().lower() == 'android'
+            if not is_approved and not (pending_reset and is_android):
                 logger.warning(
                     "Signature verification rejected: Device %s not approved or missing token",
                     system_id,
@@ -616,15 +627,31 @@ class AgentClient:
         )
         return success, message
 
-    def sync_apparmor_policy(self, username, policies_list):
+    def sync_apparmor_policy(self, username, policies_list, approval_policy=None):
         """Synchronize the effective per-user AppArmor policy through the agent."""
+        payload = {
+            "policies": policies_list or [],
+        }
+        if approval_policy:
+            payload["approval_policy"] = approval_policy
         success, message, _ = AgentConnectionManager.send_command_sync(
             self.system_id,
             "sync_apparmor_policy",
             username,
-            {
-                "policies": policies_list or [],
-            },
+            payload,
+        )
+        return success, message
+
+    def sync_android_device_policy(self, username, device_policy):
+        """Synchronize AMAPI-aligned Android device restrictions through the agent."""
+        payload = {
+            "device_policy": device_policy or {},
+        }
+        success, message, _ = AgentConnectionManager.send_command_sync(
+            self.system_id,
+            "sync_android_device_policy",
+            username,
+            payload,
         )
         return success, message
 
@@ -639,6 +666,31 @@ class AgentClient:
         if not success:
             raise RuntimeError(message or 'Agent rejected refresh_installed_apps')
         return data or {"queued": True}
+
+    def unenroll_device(self, username):
+        """Ask the connected agent to stop enforcement and clear local enrollment state."""
+        success, message, _ = AgentConnectionManager.send_command_sync(
+            self.system_id,
+            "unenroll",
+            username,
+            {},
+            timeout=30,
+        )
+        return success, message
+
+    def factory_reset_device(self, username):
+        """Ask an Android device-owner agent to wipe the device."""
+        from src.agent_push import wake_android_for_factory_reset
+
+        wake_android_for_factory_reset(self.system_id)
+        success, message, _ = AgentConnectionManager.send_command_sync(
+            self.system_id,
+            "factory_reset",
+            username,
+            {},
+            timeout=60,
+        )
+        return success, message
 
 
 def refresh_installed_apps(system_id, username):

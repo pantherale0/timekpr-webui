@@ -69,6 +69,14 @@ class AgentConfigStore(context: Context) {
             .apply()
     }
 
+    fun clearEnrollmentState() {
+        prefs.edit()
+            .remove(KEY_AGENT_TOKEN)
+            .putBoolean(KEY_PAIRING_COMPLETE, false)
+            .remove(KEY_FCM_TOKEN)
+            .apply()
+    }
+
     private fun saveSystemId(systemId: String) {
         prefs.edit().putString(KEY_SYSTEM_ID, systemId).apply()
     }

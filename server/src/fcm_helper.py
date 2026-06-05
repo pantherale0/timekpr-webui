@@ -18,6 +18,7 @@ FCM_ACTION_SYNC_POLICIES = 'sync_policies'
 FCM_ACTION_PAIRING_APPROVED = 'pairing_approved'
 FCM_ACTION_CONNECT = 'connect'
 FCM_ACTION_COMMAND_WAKE = 'command_wake'
+FCM_ACTION_FACTORY_RESET = 'factory_reset'
 
 _cached_access_token: str | None = None
 _cached_access_token_expires_at = 0.0

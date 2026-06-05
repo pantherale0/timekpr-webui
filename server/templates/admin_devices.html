@@ -172,7 +172,10 @@
                                                     </button>
                                                 </form>
                                                 {% endif %}
-                                                <button onclick="rejectDevice('{{ device.system_id }}')" class="btn btn-sm btn-outline-danger fw-bold">Revoke Trust</button>
+                                                <button onclick="unenrollDevice('{{ device.system_id }}')" class="btn btn-sm btn-outline-danger fw-bold">Unenroll</button>
+                                                {% if device.platform == 'android' %}
+                                                <button onclick="factoryResetDevice('{{ device.system_id }}', '{{ device_labels.get(device.system_id, device.display_name) }}')" class="btn btn-sm btn-danger fw-bold">Factory Reset</button>
+                                                {% endif %}
                                             </div>
                                         </td>
                                     </tr>
@@ -218,6 +221,41 @@
                 window.location.reload();
             })
             .catch(() => alert('Failed to reject device'));
+    }
+
+    function unenrollDevice(systemId) {
+        if (!confirm('Remove this device from family management? The child device will stop receiving policies; you can re-pair later.')) return;
+        fetch(`/api/device/${encodeURIComponent(systemId)}/unenroll`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ mode: 'unenroll' }),
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (!data.success) {
+                    alert(data.message || 'Failed to unenroll device');
+                }
+                window.location.reload();
+            })
+            .catch(() => alert('Failed to unenroll device'));
+    }
+
+    function factoryResetDevice(systemId, deviceLabel) {
+        const typed = prompt(`Erase this Android device and remove TimeKpr management. All personal data will be deleted.\n\nType "${deviceLabel}" or RESET to confirm:`);
+        if (!typed || (typed !== deviceLabel && typed !== 'RESET')) return;
+        fetch(`/api/device/${encodeURIComponent(systemId)}/unenroll`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ mode: 'factory_reset' }),
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (!data.success) {
+                    alert(data.message || 'Failed to request factory reset');
+                }
+                window.location.reload();
+            })
+            .catch(() => alert('Failed to request factory reset'));
     }
 </script>
 {% endblock %}

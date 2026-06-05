@@ -161,6 +161,8 @@ class AgentDevice(db.Model):
     installed_apps_report_hash = db.Column(db.String(64), nullable=True)
     installed_apps_last_reported = db.Column(db.DateTime(timezone=True), nullable=True)
     installed_apps_count = db.Column(db.Integer, nullable=True)
+    pending_factory_reset = db.Column(db.Boolean, default=False, nullable=False)
+    unenrolled_at = db.Column(db.DateTime(timezone=True), nullable=True)
 
     # Relationship to per-user Linux account mappings on this device
     user_mappings = db.relationship(
@@ -1184,3 +1186,277 @@ class ManagedUserAppPolicyAssignment(db.Model):
 
     def __repr__(self):
         return f'<ManagedUserAppPolicyAssignment user={self.managed_user_id} policy={self.policy_id}>'
+
+
+class MappingApprovalSettings(db.Model):
+    __tablename__ = 'mapping_approval_settings'
+
+    APP_LAUNCH_OPEN = 'open'
+    APP_LAUNCH_ALLOWLIST = 'allowlist'
+    APP_LAUNCH_BLOCKLIST = 'blocklist'
+    VALID_APP_LAUNCH_MODES = {
+        APP_LAUNCH_OPEN,
+        APP_LAUNCH_ALLOWLIST,
+        APP_LAUNCH_BLOCKLIST,
+    }
+
+    DOMAIN_BLOCKLIST_ONLY = 'blocklist_only'
+    DOMAIN_APPROVAL_ON_BLOCK = 'approval_on_block'
+    VALID_DOMAIN_ACCESS_MODES = {
+        DOMAIN_BLOCKLIST_ONLY,
+        DOMAIN_APPROVAL_ON_BLOCK,
+    }
+
+    id = db.Column(db.Integer, primary_key=True)
+    device_map_id = db.Column(
+        db.Integer,
+        db.ForeignKey('managed_user_device_map.id'),
+        nullable=False,
+        unique=True,
+    )
+    app_launch_mode = db.Column(
+        db.String(32),
+        nullable=False,
+        default=APP_LAUNCH_OPEN,
+    )
+    domain_access_mode = db.Column(
+        db.String(32),
+        nullable=False,
+        default=DOMAIN_BLOCKLIST_ONLY,
+    )
+    created_at = db.Column(
+        db.DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+    updated_at = db.Column(
+        db.DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+    device_map = db.relationship(
+        'ManagedUserDeviceMap',
+        backref=db.backref('approval_settings', uselist=False, cascade='all, delete-orphan'),
+    )
+
+    def __repr__(self):
+        return (
+            f'<MappingApprovalSettings map={self.device_map_id} '
+            f'app={self.app_launch_mode} domain={self.domain_access_mode}>'
+        )
+
+
+class MappingAndroidDevicePolicy(db.Model):
+    __tablename__ = 'mapping_android_device_policy'
+
+    CAMERA_ACCESS_UNSPECIFIED = 'CAMERA_ACCESS_UNSPECIFIED'
+    CAMERA_ACCESS_DISABLED = 'CAMERA_ACCESS_DISABLED'
+    CAMERA_ACCESS_USER_CHOICE = 'CAMERA_ACCESS_USER_CHOICE'
+    CAMERA_ACCESS_ENFORCED = 'CAMERA_ACCESS_ENFORCED'
+    VALID_CAMERA_ACCESS = {
+        CAMERA_ACCESS_UNSPECIFIED,
+        CAMERA_ACCESS_DISABLED,
+        CAMERA_ACCESS_USER_CHOICE,
+        CAMERA_ACCESS_ENFORCED,
+    }
+
+    DEVELOPER_SETTINGS_UNSPECIFIED = 'DEVELOPER_SETTINGS_UNSPECIFIED'
+    DEVELOPER_SETTINGS_DISABLED = 'DEVELOPER_SETTINGS_DISABLED'
+    DEVELOPER_SETTINGS_ALLOWED = 'DEVELOPER_SETTINGS_ALLOWED'
+    VALID_DEVELOPER_SETTINGS = {
+        DEVELOPER_SETTINGS_UNSPECIFIED,
+        DEVELOPER_SETTINGS_DISABLED,
+        DEVELOPER_SETTINGS_ALLOWED,
+    }
+
+    DEFAULT_SHORT_SUPPORT_MESSAGE = (
+        'This setting is managed by your parent through TimeKpr.'
+    )
+    DEFAULT_LONG_SUPPORT_MESSAGE = (
+        'This device is protected by TimeKpr parental controls. Your parent manages '
+        'screen time, apps, and websites. Ask them if you need something changed.'
+    )
+    MAX_SHORT_SUPPORT_MESSAGE_LENGTH = 200
+    MAX_LONG_SUPPORT_MESSAGE_LENGTH = 4096
+
+    id = db.Column(db.Integer, primary_key=True)
+    device_map_id = db.Column(
+        db.Integer,
+        db.ForeignKey('managed_user_device_map.id'),
+        nullable=False,
+        unique=True,
+    )
+    screen_capture_disabled = db.Column(db.Boolean, nullable=False, default=False)
+    camera_access = db.Column(
+        db.String(40),
+        nullable=False,
+        default=CAMERA_ACCESS_UNSPECIFIED,
+    )
+    install_apps_disabled = db.Column(db.Boolean, nullable=False, default=False)
+    uninstall_apps_disabled = db.Column(db.Boolean, nullable=False, default=False)
+    developer_settings = db.Column(
+        db.String(40),
+        nullable=False,
+        default=DEVELOPER_SETTINGS_UNSPECIFIED,
+    )
+    short_support_message = db.Column(
+        db.Text,
+        nullable=False,
+        default=DEFAULT_SHORT_SUPPORT_MESSAGE,
+    )
+    long_support_message = db.Column(
+        db.Text,
+        nullable=False,
+        default=DEFAULT_LONG_SUPPORT_MESSAGE,
+    )
+    revision = db.Column(db.String(64), nullable=False, default='')
+    is_synced = db.Column(db.Boolean, nullable=False, default=False)
+    last_synced_at = db.Column(db.DateTime(timezone=True), nullable=True)
+    last_sync_error = db.Column(db.Text, nullable=True)
+    created_at = db.Column(
+        db.DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+    updated_at = db.Column(
+        db.DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+    device_map = db.relationship(
+        'ManagedUserDeviceMap',
+        backref=db.backref('android_device_policy', uselist=False, cascade='all, delete-orphan'),
+    )
+
+    def __repr__(self):
+        return f'<MappingAndroidDevicePolicy map={self.device_map_id} revision={self.revision}>'
+
+
+class ApprovalRequest(db.Model):
+    __tablename__ = 'approval_request'
+
+    REQUEST_APP_LAUNCH = 'app_launch'
+    REQUEST_DOMAIN_ACCESS = 'domain_access'
+    VALID_REQUEST_TYPES = {REQUEST_APP_LAUNCH, REQUEST_DOMAIN_ACCESS}
+
+    TARGET_PACKAGE = 'package'
+    TARGET_EXECUTABLE = 'executable'
+    TARGET_PATH_PATTERN = 'path_pattern'
+    TARGET_DOMAIN = 'domain'
+    VALID_TARGET_KINDS = {
+        TARGET_PACKAGE,
+        TARGET_EXECUTABLE,
+        TARGET_PATH_PATTERN,
+        TARGET_DOMAIN,
+    }
+
+    STATUS_PENDING = 'pending'
+    STATUS_APPROVED = 'approved'
+    STATUS_DENIED = 'denied'
+    STATUS_SUPERSEDED = 'superseded'
+    VALID_STATUSES = {STATUS_PENDING, STATUS_APPROVED, STATUS_DENIED, STATUS_SUPERSEDED}
+
+    id = db.Column(db.Integer, primary_key=True)
+    device_map_id = db.Column(
+        db.Integer,
+        db.ForeignKey('managed_user_device_map.id'),
+        nullable=False,
+    )
+    request_type = db.Column(db.String(32), nullable=False)
+    target_kind = db.Column(db.String(32), nullable=False)
+    target_value = db.Column(db.String(512), nullable=False)
+    display_label = db.Column(db.String(120), nullable=False)
+    status = db.Column(db.String(32), nullable=False, default=STATUS_PENDING)
+    requested_at = db.Column(
+        db.DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+    decided_at = db.Column(db.DateTime(timezone=True), nullable=True)
+    decided_by = db.Column(db.String(80), nullable=True)
+    denial_reason = db.Column(db.Text, nullable=True)
+    source_alert_id = db.Column(
+        db.Integer,
+        db.ForeignKey('agent_alert.id'),
+        nullable=True,
+    )
+    details_json = db.Column(db.Text, nullable=True)
+
+    device_map = db.relationship(
+        'ManagedUserDeviceMap',
+        backref=db.backref('approval_requests', cascade='all, delete-orphan'),
+    )
+    source_alert = db.relationship('AgentAlert', foreign_keys=[source_alert_id])
+
+    __table_args__ = (
+        db.Index('approval_request_status_requested_idx', 'status', 'requested_at'),
+        db.Index('approval_request_map_status_idx', 'device_map_id', 'status'),
+    )
+
+    def __repr__(self):
+        return f'<ApprovalRequest {self.request_type}:{self.target_value} [{self.status}]>'
+
+
+class PolicyApprovalGrant(db.Model):
+    __tablename__ = 'policy_approval_grant'
+
+    GRANT_APP_LAUNCH = 'app_launch'
+    GRANT_DOMAIN_ACCESS = 'domain_access'
+    VALID_GRANT_TYPES = {GRANT_APP_LAUNCH, GRANT_DOMAIN_ACCESS}
+
+    TARGET_PACKAGE = 'package'
+    TARGET_EXECUTABLE = 'executable'
+    TARGET_PATH_PATTERN = 'path_pattern'
+    TARGET_DOMAIN = 'domain'
+    VALID_TARGET_KINDS = {
+        TARGET_PACKAGE,
+        TARGET_EXECUTABLE,
+        TARGET_PATH_PATTERN,
+        TARGET_DOMAIN,
+    }
+
+    STATUS_ACTIVE = 'active'
+    STATUS_REVOKED = 'revoked'
+    VALID_STATUSES = {STATUS_ACTIVE, STATUS_REVOKED}
+
+    id = db.Column(db.Integer, primary_key=True)
+    device_map_id = db.Column(
+        db.Integer,
+        db.ForeignKey('managed_user_device_map.id'),
+        nullable=False,
+    )
+    grant_type = db.Column(db.String(32), nullable=False)
+    target_kind = db.Column(db.String(32), nullable=False)
+    target_value = db.Column(db.String(512), nullable=False)
+    display_label = db.Column(db.String(120), nullable=False)
+    status = db.Column(db.String(32), nullable=False, default=STATUS_ACTIVE)
+    created_at = db.Column(
+        db.DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+    created_by = db.Column(db.String(80), nullable=True)
+    revoked_at = db.Column(db.DateTime(timezone=True), nullable=True)
+    revoked_by = db.Column(db.String(80), nullable=True)
+    source_request_id = db.Column(
+        db.Integer,
+        db.ForeignKey('approval_request.id'),
+        nullable=True,
+    )
+
+    device_map = db.relationship(
+        'ManagedUserDeviceMap',
+        backref=db.backref('approval_grants', cascade='all, delete-orphan'),
+    )
+    source_request = db.relationship('ApprovalRequest', foreign_keys=[source_request_id])
+
+    __table_args__ = (
+        db.Index('policy_approval_grant_map_status_idx', 'device_map_id', 'status'),
+    )
+
+    def __repr__(self):
+        return f'<PolicyApprovalGrant {self.grant_type}:{self.target_value} [{self.status}]>'

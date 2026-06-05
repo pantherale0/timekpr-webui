@@ -8,10 +8,12 @@ import android.app.usage.UsageEvents
 import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import com.timekpr.agent.R
 import com.timekpr.agent.TimeKprApplication
+import com.timekpr.agent.discovery.PackageChangeMonitor
 import com.timekpr.agent.enforcement.EnforcementController
 import com.timekpr.agent.policy.AppPolicyStore
 import com.timekpr.agent.util.AndroidUsers
@@ -34,23 +36,28 @@ class UsageMonitorService : Service() {
 
     private lateinit var appPolicyStore: AppPolicyStore
     private lateinit var enforcement: EnforcementController
+    private lateinit var packageChangeMonitor: PackageChangeMonitor
     private val activeSessions = mutableMapOf<String, Long>()
+    private val processedResumeKeys = LinkedHashSet<String>()
 
     override fun onCreate() {
         super.onCreate()
-        appPolicyStore = AppPolicyStore(this).also { it.restore() }
+        appPolicyStore = TimeKprApplication.from(this).appPolicyStore
         enforcement = EnforcementController(this, appPolicyStore)
+        packageChangeMonitor = PackageChangeMonitor(this, enforcement)
         createNotificationChannel()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         startForeground(NOTIFICATION_ID, buildNotification())
+        packageChangeMonitor.register()
         monitorJob?.cancel()
         monitorJob = scope.launch { monitorLoop() }
         return START_STICKY
     }
 
     override fun onDestroy() {
+        packageChangeMonitor.unregister()
         monitorJob?.cancel()
         scope.cancel()
         super.onDestroy()
@@ -64,7 +71,8 @@ class UsageMonitorService : Service() {
         val timeStore = TimeKprApplication.from(this).timeLimitStore
 
         while (scope.isActive) {
-            if (!timeStore.isAccessAllowed(username)) {
+            val accessAllowed = timeStore.isAccessAllowed(username)
+            if (!accessAllowed) {
                 enforcement.applyTimePolicies(username)
             }
 
@@ -77,20 +85,28 @@ class UsageMonitorService : Service() {
                 when (event.eventType) {
                     UsageEvents.Event.ACTIVITY_RESUMED -> {
                         val packageName = event.packageName ?: continue
-                        if (enforcement.suspendBlockedLaunch(packageName, username)) {
-                            emitLocalAlert(
-                                "app_blocked",
-                                JSONObject()
-                                    .put("application_name", packageName)
-                                    .put("executable_path", "/android/package/$packageName")
-                                    .put("reason", "policy_block"),
-                            )
+                        val resumeKey = "$packageName:${event.timeStamp}"
+                        if (resumeKey in processedResumeKeys) {
                             continue
                         }
-                        activeSessions[packageName] = event.timeStamp
+                        processedResumeKeys.add(resumeKey)
+                        while (processedResumeKeys.size > 200) {
+                            val oldest = processedResumeKeys.first()
+                            processedResumeKeys.remove(oldest)
+                        }
+                        if (enforcement.suspendBlockedLaunch(packageName, username)) {
+                            emitBlockedLaunchAlerts(packageName, username, accessAllowed)
+                            continue
+                        }
+                        if (accessAllowed) {
+                            activeSessions[packageName] = event.timeStamp
+                        }
                     }
                     UsageEvents.Event.ACTIVITY_PAUSED,
                     UsageEvents.Event.ACTIVITY_STOPPED -> {
+                        if (!accessAllowed) {
+                            continue
+                        }
                         val packageName = event.packageName ?: continue
                         val startedAt = activeSessions.remove(packageName) ?: continue
                         val durationSeconds = ((event.timeStamp - startedAt) / 1000).coerceAtLeast(1)
@@ -118,6 +134,60 @@ class UsageMonitorService : Service() {
                 }
             }
             delay(2_000)
+        }
+    }
+
+    private fun emitBlockedLaunchAlerts(
+        packageName: String,
+        username: String,
+        accessAllowed: Boolean,
+    ) {
+        val displayLabel = applicationLabel(packageName) ?: packageName
+        if (!accessAllowed) {
+            emitLocalAlert(
+                "app_blocked",
+                JSONObject()
+                    .put("application_name", displayLabel)
+                    .put("executable_path", "/android/package/$packageName")
+                    .put("reason", "screen_time_exhausted"),
+            )
+            return
+        }
+        val approval = appPolicyStore.approvalPolicyForUser(username)
+        if (approval != null && ApprovalRequestDeduper.shouldEmit("app_launch", packageName)) {
+            emitLocalAlert(
+                "access_requested",
+                JSONObject()
+                    .put("request_type", "app_launch")
+                    .put("target_kind", "package")
+                    .put("target_value", packageName)
+                    .put("display_label", displayLabel),
+            )
+            emitLocalAlert(
+                "app_blocked",
+                JSONObject()
+                    .put("application_name", displayLabel)
+                    .put("executable_path", "/android/package/$packageName")
+                    .put("reason", "not_approved"),
+            )
+            return
+        }
+        emitLocalAlert(
+            "app_blocked",
+            JSONObject()
+                .put("application_name", displayLabel)
+                .put("executable_path", "/android/package/$packageName")
+                .put("reason", "policy_block"),
+        )
+    }
+
+    private fun applicationLabel(packageName: String): String? {
+        return try {
+            val pm = packageManager
+            val appInfo = pm.getApplicationInfo(packageName, 0)
+            pm.getApplicationLabel(appInfo)?.toString()
+        } catch (_: PackageManager.NameNotFoundException) {
+            null
         }
     }
 

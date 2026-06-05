@@ -8,7 +8,7 @@ Android does **not** keep a WebSocket open 24/7. That would drain the battery qu
 
 | Trigger | Behavior |
 |---------|----------|
-| **FCM data message** | Server pushes `sync_policies`, `command_wake`, or `pairing_approved` → app runs a **short WebSocket session** (connect, sync, disconnect) |
+| **FCM data message** | Server pushes `sync_policies`, `command_wake`, `factory_reset`, or `pairing_approved` → app runs a **short WebSocket session** (connect, sync, disconnect) or wipes immediately for `factory_reset` |
 | **WorkManager** | Periodic sync every 4 hours (matches Linux agent policy timer) |
 | **Pairing poll** | Every 15 minutes while unpaired (replaces holding WS open during approval) |
 | **User / boot** | Manual reconnect or startup schedules an expedited sync |
@@ -37,6 +37,29 @@ Copy `android-agent/app/google-services.json.example` → `google-services.json`
 | `/etc/timekpr-agent/config.json` | `AgentConfigStore` (EncryptedSharedPreferences-ready SharedPreferences) |
 | logind session alerts | `user_signed_in` / `app_usage` alerts via usage events |
 | Persistent WebSocket loop | FCM wake + ephemeral `AgentWebSocketClient` sessions |
+
+## Screen time lockout
+
+When daily time is exhausted or the current hour falls outside allowed windows (`TimeLimitStore.isAccessAllowed()`), the agent **does not** lock the device screen. Instead:
+
+1. A **persistent top banner** (`TimeExhaustedOverlay`) informs the user that screen time is used up.
+2. All launcher apps are **suspended** via Device Admin `setPackagesSuspended`, except packages in the exempt set.
+3. When access is restored (parent adds time, schedule changes, etc.), the banner is dismissed and suspensions from the lockout are cleared; normal app-policy suspensions remain.
+
+### Phone exemption
+
+On devices with telephony and an **active SIM** (`READ_PHONE_STATE` + `TelephonyManager.SIM_STATE_READY`):
+
+- The default dialer and in-call UI packages stay unsuspended so calls can be placed and received.
+- The overlay shows a **Make a call** button that opens the system dialer.
+
+Tablets and phones without a ready SIM get banner-only lockout with all apps suspended.
+
+### Future screentime whitelist
+
+`TimeLimitStore.screentimeExemptPackages()` holds packages that may run regardless of screen-time limits (for example, educational apps on a tablet). The set is persisted locally and empty by default; a future server command will populate it. Whitelisted packages use the same exempt-package path as the dialer on phones.
+
+Server screen-time inputs are unchanged: `set_weekly_time_limits`, `set_allowed_hours`, and `modify_time_left`.
 
 ## Pairing flows
 
@@ -138,6 +161,101 @@ Rules:
 - Overlay requires `SYSTEM_ALERT_WINDOW` (auto-granted on device owner); sideloaded installs without overlay permission get a heads-up notification instead
 
 Implementation: `BlockNotificationCoordinator` in the VPN service, `BlockedDomainOverlay` for single blocks, `BlockBurstNotifier` for bursts.
+
+## Access approvals (app launch + domains)
+
+When a child profile uses approval modes on the server, the Android agent consumes additive sync fields and emits parent-review alerts.
+
+### App launch (`sync_apparmor_policy`)
+
+When `app_launch_mode` is `allowlist` or `blocklist`, the server includes:
+
+```json
+{
+  "policies": [ ... ],
+  "approval_policy": {
+    "app_launch_mode": "allowlist",
+    "approved_packages": ["com.approved.app"],
+    "blocked_packages": ["com.unapproved.app"]
+  }
+}
+```
+
+The agent suspends packages from `blocked_packages` (server-precomputed). When `approval_policy` is omitted (`open` mode), only static `blocked` rules from `policies` apply.
+
+On blocked launch under an approval overlay, the agent emits `access_requested` (and `app_blocked` with `reason: not_approved` as fallback).
+
+### Domain access (`update_domain_policy_manifest`)
+
+Per-UID manifest entries may include:
+
+```json
+{
+  "linux_username": "child",
+  "source_ids": ["1"],
+  "domain_access_mode": "approval_on_block",
+  "allowed_domains": ["wikipedia.org"]
+}
+```
+
+Granted domains bypass the DNS VPN block. When `domain_access_mode` is `approval_on_block`, blocked domains show a **Request access** overlay button and emit `access_requested` alerts (rate-limited on device).
+
+FCM `sync_policies` wakes a short WebSocket session; policy JSON is delivered via existing sync commands, not in the FCM payload.
+
+## Device restrictions (`sync_android_device_policy`)
+
+Per Android device mapping, the admin UI can configure AMAPI-aligned device restriction fields. The server pushes them via `sync_android_device_policy` (on save, and again when the agent reconnects after an FCM `sync_policies` wake).
+
+Payload shape (field names match [Android Management API Policy](https://developers.google.com/android/management/reference/rest/v1/enterprises.policies)):
+
+```json
+{
+  "device_policy": {
+    "screenCaptureDisabled": false,
+    "cameraAccess": "CAMERA_ACCESS_DISABLED",
+    "installAppsDisabled": true,
+    "uninstallAppsDisabled": false,
+    "advancedSecurityOverrides": {
+      "developerSettings": "DEVELOPER_SETTINGS_DISABLED"
+    },
+    "shortSupportMessage": {
+      "defaultMessage": "This setting is managed by your parent through TimeKpr."
+    },
+    "longSupportMessage": {
+      "defaultMessage": "This device is protected by TimeKpr parental controls. Your parent manages screen time, apps, and websites. Ask them if you need something changed."
+    }
+  }
+}
+```
+
+Supported `cameraAccess` values: `CAMERA_ACCESS_UNSPECIFIED`, `CAMERA_ACCESS_DISABLED`, `CAMERA_ACCESS_USER_CHOICE`, `CAMERA_ACCESS_ENFORCED`.
+
+Supported `developerSettings` values: `DEVELOPER_SETTINGS_UNSPECIFIED`, `DEVELOPER_SETTINGS_DISABLED`, `DEVELOPER_SETTINGS_ALLOWED`.
+
+`shortSupportMessage` and `longSupportMessage` use AMAPI `UserFacingMessage` objects (`defaultMessage` string). Defaults are parental-controls wording, not enterprise/work policy text:
+
+- Short: *"This setting is managed by your parent through TimeKpr."*
+- Long: *"This device is protected by TimeKpr parental controls…"*
+
+Parents can customize both messages per Android device mapping in the admin UI. The agent applies them via `DevicePolicyManager.setShortSupportMessage()` / `setLongSupportMessage()`.
+
+Enforcement uses `DevicePolicyManager` and requires **device owner** provisioning. Device-admin-only installs show a warning in the admin UI and skip most restrictions.
+
+## Device unenrollment and factory reset
+
+Admins can remove devices from family management from the device detail page or devices list.
+
+| Command / FCM action | Behavior |
+|----------------------|----------|
+| `unenroll` | Stops enforcement, clears VPN/usage monitoring, clears stored agent token and pairing state via `AgentConfigStore.clearEnrollmentState()`. Server revokes trust (`status=rejected`). |
+| `factory_reset` (WebSocket) | Requires **device owner**. Calls `DevicePolicyManager.wipeData(admin, 0)`. |
+| `factory_reset` (FCM) | Immediate wipe on a background thread without waiting for a full policy sync cycle. |
+
+`device_admin.xml` declares `<wipe-data />` so device-owner agents can perform remote wipes.
+
+If a factory reset is requested while the device is offline, the server sets `pending_factory_reset` on the `AgentDevice` row, revokes management trust, and retries delivery on the next WebSocket connection (FCM `factory_reset` is also sent when an FCM token is available).
+
+Linux agents handle `unenroll` by clearing `/etc/timekpr-agent/config.json` agent token and stopping the reconnect loop. Linux has no remote factory reset.
 
 ## App policies on Android
 

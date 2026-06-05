@@ -22,6 +22,10 @@ def get_dashboard_snapshot():
         'success': True,
         'users': snapshot['users'],
         'pending_adjustments': snapshot['pending_adjustments'],
+        'pending_approvals': snapshot.get(
+            'pending_approvals',
+            {'total': 0, 'by_user': {}, 'items': []},
+        ),
     })
 
 

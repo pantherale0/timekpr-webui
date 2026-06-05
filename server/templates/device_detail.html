@@ -230,8 +230,58 @@
             </div>
         </div>
 
-        <!-- Right Column: Filtering profiles, diagnostic logs -->
+        <!-- Right Column: Device management, filtering profiles -->
         <div class="col-12 col-lg-4">
+            {% if device.status == 'approved' %}
+            <div class="card shadow-sm border border-danger mb-4">
+                <div class="card-header bg-danger-subtle py-3 d-flex align-items-center gap-2">
+                    <div class="bg-danger text-white p-2 rounded d-flex align-items-center justify-content-center" style="width: 38px; height: 38px;">
+                        <i class="fas fa-exclamation-triangle fs-5"></i>
+                    </div>
+                    <div>
+                        <h5 class="mb-0 fw-bold text-danger">Device Management</h5>
+                        <span class="text-secondary small fw-medium">Remove this device from family management</span>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex flex-wrap gap-2 mb-3">
+                        {% if agent_online %}
+                            <span class="badge bg-success-subtle text-success border border-success-subtle">Agent online</span>
+                        {% else %}
+                            <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle">Agent offline</span>
+                        {% endif %}
+                        {% if fcm_available %}
+                            <span class="badge bg-primary-subtle text-primary border border-primary-subtle">FCM available</span>
+                        {% else %}
+                            <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle">No FCM token</span>
+                        {% endif %}
+                    </div>
+
+                    <p class="small text-secondary mb-3">
+                        <strong>Unenroll</strong> revokes server trust and asks the agent to stop enforcement and clear local credentials.
+                        You can re-pair the device later.
+                    </p>
+                    <button type="button" id="unenroll-device-btn" class="btn btn-outline-danger fw-bold w-100 mb-3">
+                        <i class="fas fa-unlink me-1"></i> Unenroll Device
+                    </button>
+
+                    {% if device.platform == 'android' %}
+                    <hr>
+                    <p class="small text-secondary mb-3">
+                        <strong>Factory reset</strong> erases this Android device and removes TimeKpr management.
+                        All personal data on the device will be deleted. This cannot be undone.
+                        Requires device-owner provisioning.
+                    </p>
+                    <button type="button" id="factory-reset-device-btn" class="btn btn-danger fw-bold w-100" data-device-label="{{ device_label }}">
+                        <i class="fas fa-eraser me-1"></i> Factory Reset Device
+                    </button>
+                    {% endif %}
+
+                    <div id="lifecycle-result" class="alert mt-3 mb-0 d-none" role="alert"></div>
+                </div>
+            </div>
+            {% endif %}
+
             <!-- Domain Policy Contributors -->
             <div class="card shadow-sm border mb-4">
                 <div class="card-header bg-body-secondary py-3 d-flex align-items-center gap-2">
@@ -354,6 +404,89 @@
 {% endblock %}
 
 {% block extra_js %}
+<script>
+(function() {
+    const systemId = "{{ device.system_id }}";
+    const deviceLabel = {{ device_label|tojson }};
+    const unenrollBtn = document.getElementById('unenroll-device-btn');
+    const factoryResetBtn = document.getElementById('factory-reset-device-btn');
+    const lifecycleResult = document.getElementById('lifecycle-result');
+
+    function showLifecycleResult(message, isSuccess) {
+        if (!lifecycleResult) return;
+        lifecycleResult.textContent = message;
+        lifecycleResult.className = `alert mt-3 mb-0 alert-${isSuccess ? 'success' : 'danger'}`;
+        lifecycleResult.classList.remove('d-none');
+    }
+
+    async function postUnenroll(mode) {
+        const response = await fetch(`/api/device/${encodeURIComponent(systemId)}/unenroll`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ mode }),
+        });
+        const data = await response.json();
+        if (!response.ok || !data.success) {
+            throw new Error(data.message || 'Request failed');
+        }
+        return data;
+    }
+
+    if (unenrollBtn) {
+        unenrollBtn.addEventListener('click', async () => {
+            const confirmed = confirm(
+                'Remove this device from family management? The child device will stop receiving policies; you can re-pair later.'
+            );
+            if (!confirmed) return;
+
+            unenrollBtn.disabled = true;
+            try {
+                const data = await postUnenroll('unenroll');
+                const details = [];
+                if (data.delivered_to_agent) details.push('agent cleanup delivered');
+                if (data.server_revoked) details.push('server trust revoked');
+                showLifecycleResult(
+                    `${data.message || 'Device unenrolled successfully'}${details.length ? ' (' + details.join(', ') + ')' : ''}`,
+                    true
+                );
+                setTimeout(() => { window.location.href = "{{ url_for('ui_dashboard.admin_devices') }}"; }, 1200);
+            } catch (error) {
+                showLifecycleResult(error.message || 'Failed to unenroll device', false);
+                unenrollBtn.disabled = false;
+            }
+        });
+    }
+
+    if (factoryResetBtn) {
+        factoryResetBtn.addEventListener('click', async () => {
+            const expected = factoryResetBtn.dataset.deviceLabel || 'RESET';
+            const typed = prompt(
+                `Erase this Android device and remove TimeKpr management. All personal data will be deleted.\n\nType "${expected}" or RESET to confirm:`
+            );
+            if (!typed || (typed !== expected && typed !== 'RESET')) return;
+
+            factoryResetBtn.disabled = true;
+            if (unenrollBtn) unenrollBtn.disabled = true;
+            try {
+                const data = await postUnenroll('factory_reset');
+                const details = [];
+                if (data.factory_reset_requested) details.push('factory reset requested');
+                if (data.pending_factory_reset) details.push('queued for next connection');
+                if (data.server_revoked) details.push('server trust revoked');
+                showLifecycleResult(
+                    `${data.message || 'Factory reset requested'}${details.length ? ' (' + details.join(', ') + ')' : ''}`,
+                    true
+                );
+                setTimeout(() => { window.location.href = "{{ url_for('ui_dashboard.admin_devices') }}"; }, 1500);
+            } catch (error) {
+                showLifecycleResult(error.message || 'Failed to request factory reset', false);
+                factoryResetBtn.disabled = false;
+                if (unenrollBtn) unenrollBtn.disabled = false;
+            }
+        });
+    }
+})();
+</script>
 <script>
 (function() {
     const alertConfig = {

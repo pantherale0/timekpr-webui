@@ -135,6 +135,116 @@
 
     <!-- Right Sidebar Content: App Locks & Installed Apps -->
     <div class="col-12 col-lg-4">
+        <!-- Access Approval Policies -->
+        <div class="card border shadow-sm mb-4">
+            <div class="card-header bg-dark text-white py-3">
+                <h5 class="mb-0 fw-bold"><i class="fas fa-clipboard-check text-warning me-2"></i>Access Approval Policies</h5>
+            </div>
+            <div class="card-body p-4">
+                <p class="text-secondary small fw-medium mb-3">Configure per-device approval modes for app launches and blocked websites.</p>
+                {% if user.device_mappings %}
+                    <div class="d-flex flex-column gap-3">
+                        {% for mapping in user.device_mappings %}
+                            {% set settings = approval_settings_by_mapping.get(mapping.id, {}) %}
+                            <div class="border rounded p-3 bg-body-tertiary" data-mapping-id="{{ mapping.id }}">
+                                <strong class="d-block text-body mb-2">{{ mapping.linux_username }}@{{ settings.device_label or mapping.system_id }}</strong>
+                                <div class="mb-2">
+                                    <label class="form-label fw-bold small text-muted text-uppercase mb-1" style="font-size: 0.7rem;">App Launches</label>
+                                    <select class="form-select form-select-sm approval-app-mode" data-mapping-id="{{ mapping.id }}">
+                                        <option value="open" {% if settings.app_launch_mode == 'open' %}selected{% endif %}>Open (no approval overlay)</option>
+                                        <option value="allowlist" {% if settings.app_launch_mode == 'allowlist' %}selected{% endif %}>Require approval (allowlist)</option>
+                                        <option value="blocklist" {% if settings.app_launch_mode == 'blocklist' %}selected{% endif %}>Blocklist with exceptions</option>
+                                    </select>
+                                </div>
+                                <div class="mb-0">
+                                    <label class="form-label fw-bold small text-muted text-uppercase mb-1" style="font-size: 0.7rem;">Websites</label>
+                                    <select class="form-select form-select-sm approval-domain-mode" data-mapping-id="{{ mapping.id }}">
+                                        <option value="blocklist_only" {% if settings.domain_access_mode == 'blocklist_only' %}selected{% endif %}>Blocklist only</option>
+                                        <option value="approval_on_block" {% if settings.domain_access_mode == 'approval_on_block' %}selected{% endif %}>Allow requests when blocked</option>
+                                    </select>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                    <button type="button" class="btn btn-primary btn-sm fw-bold mt-3" onclick="saveApprovalSettings()">Save Approval Settings</button>
+                {% else %}
+                    <p class="text-secondary small mb-0">Link a device mapping before configuring approval policies.</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Android Device Restrictions -->
+        <div class="card border shadow-sm mb-4">
+            <div class="card-header bg-dark text-white py-3">
+                <h5 class="mb-0 fw-bold"><i class="fas fa-mobile-alt text-info me-2"></i>Android Device Restrictions</h5>
+            </div>
+            <div class="card-body p-4">
+                <p class="text-secondary small fw-medium mb-3">Device-owner restrictions aligned with Android Management API policy fields.</p>
+                {% if android_device_policy_by_mapping %}
+                    <div class="d-flex flex-column gap-3">
+                        {% for mapping in user.device_mappings %}
+                            {% set device_policy = android_device_policy_by_mapping.get(mapping.id) %}
+                            {% if device_policy %}
+                            <div class="border rounded p-3 bg-body-tertiary android-device-policy-card" data-mapping-id="{{ mapping.id }}">
+                                <div class="d-flex justify-content-between align-items-start gap-2 mb-2 flex-wrap">
+                                    <strong class="text-body">{{ mapping.linux_username }}@{{ device_policy.device_label or mapping.system_id }}</strong>
+                                    <span class="badge android-device-policy-sync-badge {% if device_policy.is_synced %}bg-success{% else %}bg-warning text-dark{% endif %}" style="font-size: 0.65rem;">
+                                        {% if device_policy.is_synced %}Synced{% else %}Sync pending{% endif %}
+                                    </span>
+                                </div>
+                                <div class="alert alert-warning py-2 small mb-3">
+                                    <i class="fas fa-info-circle me-1"></i>Requires device-owner provisioning (MDM QR or <code>adb dpm set-device-owner</code>).
+                                </div>
+                                <div class="form-check form-switch mb-2">
+                                    <input class="form-check-input android-screen-capture" type="checkbox" data-mapping-id="{{ mapping.id }}" id="screen-capture-{{ mapping.id }}" {% if device_policy.screen_capture_disabled %}checked{% endif %}>
+                                    <label class="form-check-label small" for="screen-capture-{{ mapping.id }}">Disable screen capture</label>
+                                </div>
+                                <div class="mb-2">
+                                    <label class="form-label fw-bold small text-muted text-uppercase mb-1" style="font-size: 0.7rem;">Camera access</label>
+                                    <select class="form-select form-select-sm android-camera-access" data-mapping-id="{{ mapping.id }}">
+                                        <option value="CAMERA_ACCESS_UNSPECIFIED" {% if device_policy.camera_access == 'CAMERA_ACCESS_UNSPECIFIED' %}selected{% endif %}>Unspecified (no policy)</option>
+                                        <option value="CAMERA_ACCESS_DISABLED" {% if device_policy.camera_access == 'CAMERA_ACCESS_DISABLED' %}selected{% endif %}>Disabled</option>
+                                        <option value="CAMERA_ACCESS_USER_CHOICE" {% if device_policy.camera_access == 'CAMERA_ACCESS_USER_CHOICE' %}selected{% endif %}>User choice</option>
+                                        <option value="CAMERA_ACCESS_ENFORCED" {% if device_policy.camera_access == 'CAMERA_ACCESS_ENFORCED' %}selected{% endif %}>Enforced on</option>
+                                    </select>
+                                </div>
+                                <div class="form-check form-switch mb-2">
+                                    <input class="form-check-input android-install-apps" type="checkbox" data-mapping-id="{{ mapping.id }}" id="install-apps-{{ mapping.id }}" {% if device_policy.install_apps_disabled %}checked{% endif %}>
+                                    <label class="form-check-label small" for="install-apps-{{ mapping.id }}">Disable app installation</label>
+                                </div>
+                                <div class="form-check form-switch mb-2">
+                                    <input class="form-check-input android-uninstall-apps" type="checkbox" data-mapping-id="{{ mapping.id }}" id="uninstall-apps-{{ mapping.id }}" {% if device_policy.uninstall_apps_disabled %}checked{% endif %}>
+                                    <label class="form-check-label small" for="uninstall-apps-{{ mapping.id }}">Disable app uninstallation</label>
+                                </div>
+                                <div class="mb-2">
+                                    <label class="form-label fw-bold small text-muted text-uppercase mb-1" style="font-size: 0.7rem;">Developer settings</label>
+                                    <select class="form-select form-select-sm android-developer-settings" data-mapping-id="{{ mapping.id }}">
+                                        <option value="DEVELOPER_SETTINGS_UNSPECIFIED" {% if device_policy.developer_settings == 'DEVELOPER_SETTINGS_UNSPECIFIED' %}selected{% endif %}>Unspecified (default disabled)</option>
+                                        <option value="DEVELOPER_SETTINGS_DISABLED" {% if device_policy.developer_settings == 'DEVELOPER_SETTINGS_DISABLED' %}selected{% endif %}>Disabled</option>
+                                        <option value="DEVELOPER_SETTINGS_ALLOWED" {% if device_policy.developer_settings == 'DEVELOPER_SETTINGS_ALLOWED' %}selected{% endif %}>Allowed</option>
+                                    </select>
+                                </div>
+                                <div class="mb-2">
+                                    <label class="form-label fw-bold small text-muted text-uppercase mb-1" style="font-size: 0.7rem;">Short support message</label>
+                                    <input type="text" class="form-control form-control-sm android-short-support" data-mapping-id="{{ mapping.id }}" maxlength="200" value="{{ device_policy.short_support_message }}">
+                                    <span class="text-secondary d-block mt-1" style="font-size: 0.65rem;">Shown when a restricted setting is tapped (max 200 characters).</span>
+                                </div>
+                                <div class="mb-0">
+                                    <label class="form-label fw-bold small text-muted text-uppercase mb-1" style="font-size: 0.7rem;">Long support message</label>
+                                    <textarea class="form-control form-control-sm android-long-support" data-mapping-id="{{ mapping.id }}" rows="3" maxlength="4096">{{ device_policy.long_support_message }}</textarea>
+                                    <span class="text-secondary d-block mt-1" style="font-size: 0.65rem;">Shown on the device administrator screen.</span>
+                                </div>
+                            </div>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                    <button type="button" class="btn btn-primary btn-sm fw-bold mt-3" onclick="saveAndroidDevicePolicies()">Save Device Restrictions</button>
+                {% else %}
+                    <p class="text-secondary small mb-0">Link an Android device mapping to configure device restrictions.</p>
+                {% endif %}
+            </div>
+        </div>
+
         <!-- Application Control & Locks -->
         <div class="card border shadow-sm mb-4">
             <div class="card-header bg-dark text-white py-3">
@@ -215,9 +325,23 @@
                                     {% endif %}
                                 </div>
                                 <div class="min-width-0 flex-grow-1" style="min-width: 0;">
-                                    <strong class="d-block text-body text-truncate small">{{ app.application_name }}</strong>
+                                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                                        <strong class="text-body text-truncate small mb-0">{{ app.application_name }}</strong>
+                                        {% if app.approval_status == 'approved' %}
+                                            <span class="badge bg-success-subtle text-success border border-success-subtle" style="font-size: 0.65rem;">Approved</span>
+                                        {% elif app.approval_status == 'pending' %}
+                                            <span class="badge bg-warning text-dark" style="font-size: 0.65rem;">Pending</span>
+                                        {% endif %}
+                                    </div>
                                     <code class="d-block text-secondary text-truncate" style="font-size: 0.65rem;" title="{{ app.identifier }}">{{ app.identifier }}</code>
                                     <span class="text-secondary d-block" style="font-size: 0.65rem;">{{ app.device_hostname or app.system_id }}</span>
+                                </div>
+                                <div class="flex-shrink-0 d-flex flex-column gap-1">
+                                    {% if app.approval_status == 'approved' and app.grant_id %}
+                                        <button type="button" class="btn btn-sm btn-outline-danger" style="min-height: 36px;" onclick="revokeAppGrant({{ app.grant_id }})">Revoke</button>
+                                    {% elif app.device_map_id %}
+                                        <button type="button" class="btn btn-sm btn-outline-success" style="min-height: 36px;" onclick="preapproveApp({{ app.device_map_id }}, '{{ app.identifier|e }}', '{{ app.application_name|e }}', '{{ app.platform|e }}')">Approve</button>
+                                    {% endif %}
                                 </div>
                             </div>
                         {% endfor %}
@@ -271,6 +395,128 @@
             .catch(error => {
                 console.error('Error fetching sync status:', error);
             });
+    }
+
+    function updateAndroidDevicePolicyBadge(mappingId, isSynced) {
+        const card = document.querySelector(`.android-device-policy-card[data-mapping-id="${mappingId}"]`);
+        if (!card) return;
+        const badge = card.querySelector('.android-device-policy-sync-badge');
+        if (!badge) return;
+        badge.className = `badge android-device-policy-sync-badge ${isSynced ? 'bg-success' : 'bg-warning text-dark'}`;
+        badge.textContent = isSynced ? 'Synced' : 'Sync pending';
+    }
+
+    function saveAndroidDevicePolicies() {
+        const mappingIds = new Set();
+        document.querySelectorAll('.android-device-policy-card').forEach(card => mappingIds.add(card.dataset.mappingId));
+        const requests = Array.from(mappingIds).map(mappingId => {
+            const screenCapture = document.querySelector(`.android-screen-capture[data-mapping-id="${mappingId}"]`);
+            const cameraAccess = document.querySelector(`.android-camera-access[data-mapping-id="${mappingId}"]`);
+            const installApps = document.querySelector(`.android-install-apps[data-mapping-id="${mappingId}"]`);
+            const uninstallApps = document.querySelector(`.android-uninstall-apps[data-mapping-id="${mappingId}"]`);
+            const developerSettings = document.querySelector(`.android-developer-settings[data-mapping-id="${mappingId}"]`);
+            const shortSupport = document.querySelector(`.android-short-support[data-mapping-id="${mappingId}"]`);
+            const longSupport = document.querySelector(`.android-long-support[data-mapping-id="${mappingId}"]`);
+            return fetch(`/api/mappings/${mappingId}/android-device-policy`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    screen_capture_disabled: screenCapture ? screenCapture.checked : false,
+                    camera_access: cameraAccess ? cameraAccess.value : 'CAMERA_ACCESS_UNSPECIFIED',
+                    install_apps_disabled: installApps ? installApps.checked : false,
+                    uninstall_apps_disabled: uninstallApps ? uninstallApps.checked : false,
+                    developer_settings: developerSettings ? developerSettings.value : 'DEVELOPER_SETTINGS_UNSPECIFIED',
+                    short_support_message: shortSupport ? shortSupport.value.trim() : '',
+                    long_support_message: longSupport ? longSupport.value.trim() : '',
+                }),
+            }).then(response => response.json().then(payload => ({ mappingId, payload })));
+        });
+
+        Promise.all(requests)
+            .then(results => {
+                const failed = results.find(item => !item.payload.success);
+                if (failed) {
+                    showNotification(failed.payload.message || 'Failed to save device restrictions', 'error');
+                    return;
+                }
+                results.forEach(({ mappingId, payload }) => {
+                    updateAndroidDevicePolicyBadge(mappingId, !!payload.policy?.is_synced);
+                });
+                const pending = results.some(({ payload }) => !payload.policy?.is_synced);
+                showNotification(
+                    pending
+                        ? 'Device restrictions saved; sync pending until the Android agent reconnects'
+                        : 'Device restrictions saved and synced',
+                );
+            })
+            .catch(() => showNotification('Failed to save device restrictions', 'error'));
+    }
+
+    function saveApprovalSettings() {
+        const mappingIds = new Set();
+        document.querySelectorAll('.approval-app-mode').forEach(select => mappingIds.add(select.dataset.mappingId));
+        const requests = Array.from(mappingIds).map(mappingId => {
+            const appMode = document.querySelector(`.approval-app-mode[data-mapping-id="${mappingId}"]`);
+            const domainMode = document.querySelector(`.approval-domain-mode[data-mapping-id="${mappingId}"]`);
+            return fetch(`/api/mappings/${mappingId}/approval-settings`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    app_launch_mode: appMode ? appMode.value : 'open',
+                    domain_access_mode: domainMode ? domainMode.value : 'blocklist_only',
+                }),
+            }).then(response => response.json());
+        });
+
+        Promise.all(requests)
+            .then(results => {
+                const failed = results.find(item => !item.success);
+                if (failed) {
+                    showNotification(failed.message || 'Failed to save approval settings', 'error');
+                    return;
+                }
+                showNotification('Approval settings saved');
+            })
+            .catch(() => showNotification('Failed to save approval settings', 'error'));
+    }
+
+    function preapproveApp(mappingId, identifier, displayLabel, platform) {
+        const targetKind = (platform === 'linux' || identifier.startsWith('/')) ? 'executable' : 'package';
+        fetch(`/api/mappings/${mappingId}/approval-grants`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                grant_type: 'app_launch',
+                target_kind: targetKind,
+                target_value: identifier,
+                display_label: displayLabel,
+            }),
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (!data.success) {
+                    showNotification(data.message || 'Failed to approve app', 'error');
+                    return;
+                }
+                showNotification('App approved');
+                window.location.reload();
+            })
+            .catch(() => showNotification('Failed to approve app', 'error'));
+    }
+
+    function revokeAppGrant(grantId) {
+        if (!confirm('Revoke approval for this app?')) return;
+        fetch(`/api/approval-grants/${grantId}/revoke`, { method: 'POST' })
+            .then(response => response.json())
+            .then(data => {
+                if (!data.success) {
+                    showNotification(data.message || 'Failed to revoke grant', 'error');
+                    return;
+                }
+                showNotification('Grant revoked');
+                window.location.reload();
+            })
+            .catch(() => showNotification('Failed to revoke grant', 'error'));
     }
 
     document.addEventListener('DOMContentLoaded', function () {

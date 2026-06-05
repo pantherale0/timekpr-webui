@@ -61,9 +61,18 @@ def build_dashboard_snapshot():
         user_data.append(entry)
 
     users_sorted = sorted(user_data, key=lambda item: item['username'].lower())
+
+    pending_approvals = {'total': 0, 'by_user': {}, 'items': []}
+    try:
+        from src.approvals_manager import build_pending_approvals_snapshot
+        pending_approvals = build_pending_approvals_snapshot(limit=5)
+    except (ImportError, RuntimeError, TypeError, ValueError):
+        pass
+
     return {
         'users': users_sorted,
         'pending_adjustments': pending_adjustments,
+        'pending_approvals': pending_approvals,
     }
 
 
@@ -89,4 +98,5 @@ def build_dashboard_json_snapshot():
     return {
         'users': users,
         'pending_adjustments': snapshot['pending_adjustments'],
+        'pending_approvals': snapshot.get('pending_approvals', {'total': 0, 'by_user': {}, 'items': []}),
     }

@@ -811,6 +811,23 @@ class BackgroundTaskManager:
                             reason,
                             message,
                         )
+                    android_success, android_message = self._sync_android_device_policy_system(
+                        system_id,
+                    )
+                    if android_success:
+                        logger.info(
+                            "Completed Android device policy sync for %s (%s): %s",
+                            system_id,
+                            reason,
+                            android_message,
+                        )
+                    else:
+                        logger.warning(
+                            "Android device policy sync failed for %s (%s): %s",
+                            system_id,
+                            reason,
+                            android_message,
+                        )
                 finally:
                     db.session.remove()
         except (RuntimeError, TypeError, ValueError, SQLAlchemyError):
@@ -848,10 +865,26 @@ class BackgroundTaskManager:
                 continue
             source_ids = [str(source_id) for source_id in assigned_source_ids]
             desired_source_ids.update(source_ids)
-            device_policies[str(mapping.linux_uid)] = {
+            policy_entry = {
                 'linux_username': mapping.linux_username,
                 'source_ids': source_ids,
             }
+            try:
+                from src.approvals_manager import (
+                    build_domain_allowed_domains,
+                    get_or_create_settings,
+                )
+                from src.database import MappingApprovalSettings
+
+                settings = get_or_create_settings(mapping)
+                if settings.domain_access_mode != MappingApprovalSettings.DOMAIN_BLOCKLIST_ONLY:
+                    policy_entry['domain_access_mode'] = settings.domain_access_mode
+                allowed_domains = build_domain_allowed_domains(mapping)
+                if allowed_domains:
+                    policy_entry['allowed_domains'] = allowed_domains
+            except (ImportError, RuntimeError, TypeError, ValueError):
+                pass
+            device_policies[str(mapping.linux_uid)] = policy_entry
 
         agent_client = AgentClient(system_id=system_id)
         if source_revisions is None:
@@ -944,6 +977,11 @@ class BackgroundTaskManager:
             summary = summarize_mapping_blocklist_sync(mapping, source_state_map, assigned_source_ids)
             mapping_state.append((mapping, assigned_source_ids, summary))
         return mapping_state, source_state_map
+
+    def _sync_android_device_policy_system(self, system_id):
+        from src.android_device_policy_manager import sync_android_device_policies_for_system
+
+        return sync_android_device_policies_for_system(system_id)
 
     def _sync_domain_policy_system(self, system_id, agent_source_revisions=None):
         mapping_state, source_state_map = self._build_domain_policy_mapping_state(system_id)

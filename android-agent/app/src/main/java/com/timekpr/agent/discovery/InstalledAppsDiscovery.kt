@@ -32,28 +32,31 @@ object InstalledAppsDiscovery {
 
     fun discover(context: Context): List<DiscoveredApp> {
         val packageManager = context.packageManager
-        val launcherPackages = if (launcherAppsOnly) {
+        val packageNames = if (launcherAppsOnly) {
             packageManager.queryIntentActivities(
                 Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER),
-                PackageManager.MATCH_DEFAULT_ONLY,
-            ).map { it.activityInfo.packageName }.toSet()
+                PackageManager.MATCH_ALL,
+            ).map { it.activityInfo.packageName }
         } else {
-            emptySet()
+            packageManager.getInstalledApplications(PackageManager.GET_META_DATA).map { it.packageName }
         }
 
-        val applications = packageManager.getInstalledApplications(PackageManager.GET_META_DATA)
         val results = mutableListOf<DiscoveredApp>()
-        for (appInfo in applications) {
-            if ((appInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0 &&
-                (appInfo.flags and ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) == 0 &&
-                launcherAppsOnly
-            ) {
-                // Keep updated system apps; skip untouched system internals when filtering launchers.
-            }
-            if ((appInfo.flags and ApplicationInfo.FLAG_INSTALLED) == 0) {
+        val seenPackages = mutableSetOf<String>()
+        for (packageName in packageNames) {
+            if (!seenPackages.add(packageName)) {
                 continue
             }
-            if (launcherAppsOnly && appInfo.packageName !in launcherPackages) {
+            if (packageName == context.packageName) {
+                continue
+            }
+
+            val appInfo = try {
+                packageManager.getApplicationInfo(packageName, PackageManager.GET_META_DATA)
+            } catch (_: PackageManager.NameNotFoundException) {
+                continue
+            }
+            if ((appInfo.flags and ApplicationInfo.FLAG_INSTALLED) == 0) {
                 continue
             }
 
@@ -63,7 +66,8 @@ object InstalledAppsDiscovery {
             }
 
             val versionName = try {
-                packageManager.getPackageInfo(appInfo.packageName, 0).versionName
+                @Suppress("DEPRECATION")
+                packageManager.getPackageInfo(packageName, 0).versionName
             } catch (_: PackageManager.NameNotFoundException) {
                 null
             }
@@ -72,7 +76,7 @@ object InstalledAppsDiscovery {
             results.add(
                 DiscoveredApp(
                     applicationName = label,
-                    identifier = "$ANDROID_PACKAGE_PREFIX${appInfo.packageName}",
+                    identifier = "$ANDROID_PACKAGE_PREFIX$packageName",
                     matchType = MATCH_TYPE_PACKAGE,
                     versionName = versionName,
                     iconHash = iconResult?.first,

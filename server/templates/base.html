@@ -152,6 +152,12 @@
                         </button>
                     </li>
                     <li class="nav-item">
+                        <span class="badge rounded-pill bg-warning text-dark me-2" id="navbar-approvals-badge" style="display: none; cursor: pointer;" aria-live="polite" onclick="location.href='{{ url_for('ui_dashboard.admin_approvals') }}'">
+                            <i class="fas fa-clipboard-check me-1"></i>
+                            <span id="navbar-approvals-count">0</span> Requests
+                        </span>
+                    </li>
+                    <li class="nav-item">
                         <!-- Background Task Dot/Indicator -->
                         <span class="badge rounded-pill bg-danger text-white me-2" id="navbar-task-badge" style="display: none; cursor: pointer;" onclick="location.href='{{ url_for('settings') }}'">
                             <span class="task-status-indicator-dot danger me-1"></span> Tasks Offline
@@ -203,6 +209,15 @@
                             <a href="{{ url_for('ui_apparmor.admin_app_policies') }}" class="nav-link {% if request.path.startswith('/admin/app-policies') %}active{% endif %}">
                                 <i class="nav-icon fas fa-lock"></i>
                                 <p>App Locks</p>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="{{ url_for('ui_dashboard.admin_approvals') }}" class="nav-link {% if request.path.startswith('/admin/approvals') %}active{% endif %}">
+                                <i class="nav-icon fas fa-clipboard-check"></i>
+                                <p class="d-flex align-items-center justify-content-between w-100 mb-0">
+                                    <span>Access Requests</span>
+                                    <span class="badge bg-warning text-dark ms-2" id="sidebar-approvals-badge" style="display: none;">0</span>
+                                </p>
                             </a>
                         </li>
 
@@ -483,13 +498,86 @@
         </div>
     </div>
 
+    <!-- Notification Toast -->
+    <div id="notification-toast" class="notification-toast">
+        <div class="toast-content">
+            <svg class="toast-icon" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zm-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.061L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z"/>
+            </svg>
+            <span class="toast-message">Changes saved successfully!</span>
+        </div>
+    </div>
+
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/admin-lte@4.0.0/dist/js/adminlte.min.js"></script>
     
     <!-- Background Task Poller & Onboarding Wizard Controller -->
     <script>
+        function showNotification(message, type = 'success') {
+            const toast = document.getElementById('notification-toast');
+            if (!toast) return;
+            const messageEl = toast.querySelector('.toast-message');
+            const iconEl = toast.querySelector('.toast-icon path');
+            if (!messageEl || !iconEl) return;
+
+            messageEl.textContent = message;
+            toast.className = `notification-toast ${type}`;
+
+            if (type === 'success') {
+                iconEl.setAttribute('d', 'M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zm-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.061L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z');
+            } else if (type === 'error') {
+                iconEl.setAttribute('d', 'M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zM5.354 4.646a.5.5 0 1 0-.708.708L7.293 8l-2.647 2.646a.5.5 0 0 0 .708.708L8 8.707l2.646 2.647a.5.5 0 0 0 .708-.708L8.707 8l2.647-2.646a.5.5 0 0 0-.708-.708L8 7.293 5.354 4.646z');
+            }
+
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 2500);
+        }
+
+        function updateApprovalsBadges(pendingApprovals) {
+            const total = pendingApprovals && typeof pendingApprovals.total === 'number'
+                ? pendingApprovals.total
+                : 0;
+            const navbarBadge = document.getElementById('navbar-approvals-badge');
+            const navbarCount = document.getElementById('navbar-approvals-count');
+            const sidebarBadge = document.getElementById('sidebar-approvals-badge');
+
+            if (navbarBadge && navbarCount) {
+                if (total > 0) {
+                    navbarBadge.style.display = 'inline-flex';
+                    navbarCount.textContent = String(total);
+                } else {
+                    navbarBadge.style.display = 'none';
+                    navbarCount.textContent = '0';
+                }
+            }
+
+            if (sidebarBadge) {
+                if (total > 0) {
+                    sidebarBadge.style.display = 'inline-flex';
+                    sidebarBadge.textContent = String(total);
+                } else {
+                    sidebarBadge.style.display = 'none';
+                    sidebarBadge.textContent = '0';
+                }
+            }
+        }
+
+        function updateApprovalsBadgesFromApi() {
+            fetch('/api/dashboard')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success && data.pending_approvals) {
+                        updateApprovalsBadges(data.pending_approvals);
+                    }
+                })
+                .catch(() => {});
+        }
+
         document.addEventListener('DOMContentLoaded', () => {
+            updateApprovalsBadgesFromApi();
+            setInterval(updateApprovalsBadgesFromApi, 30000);
+
             function checkGlobalTaskStatus() {
                 fetch('/api/task-status')
                     .then(response => response.json())

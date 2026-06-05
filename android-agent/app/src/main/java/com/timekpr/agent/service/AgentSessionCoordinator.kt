@@ -10,7 +10,6 @@ import com.timekpr.agent.TimeKprApplication
 import com.timekpr.agent.admin.DeviceOwnerProvisioner
 import com.timekpr.agent.enforcement.EnforcementController
 import com.timekpr.agent.monitor.UsageMonitorService
-import com.timekpr.agent.policy.AppPolicyStore
 import com.timekpr.agent.protocol.AgentWebSocketClient
 import com.timekpr.agent.push.PushTokenProvider
 import com.timekpr.agent.work.AgentSyncWorker
@@ -29,8 +28,9 @@ object AgentSessionCoordinator {
     fun startMobileAgent(context: Context) {
         val appContext = context.applicationContext
         DeviceOwnerProvisioner.applyIfDeviceOwner(appContext)
-        AppPolicyStore(appContext).restore()
-        TimeKprApplication.from(appContext).domainPolicyStore.restore()
+        val app = TimeKprApplication.from(appContext)
+        app.appPolicyStore.restore()
+        app.domainPolicyStore.restore()
         UsageMonitorService.start(appContext)
         schedulePeriodicSync(appContext)
         schedulePairingPollIfNeeded(appContext)

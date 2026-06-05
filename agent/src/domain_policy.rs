@@ -1,3 +1,4 @@
+use crate::approval_deduper;
 use crate::firewall::{self, FirewallPolicy};
 use crate::local_dns::{DnsPolicy, LocalDnsController};
 use serde::{Deserialize, Serialize};
@@ -23,6 +24,10 @@ pub struct DeviceDomainPolicyPayload {
 pub struct IncomingUidPolicy {
     pub linux_username: String,
     pub source_ids: Vec<String>,
+    #[serde(default)]
+    pub domain_access_mode: Option<String>,
+    #[serde(default)]
+    pub allowed_domains: Vec<String>,
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug, Default, PartialEq, Eq)]
@@ -39,11 +44,15 @@ struct PersistedDomainPolicyState {
     policies: HashMap<String, PersistedUidPolicy>,
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Deserialize, Serialize, Clone, Debug, Default, PartialEq, Eq)]
 struct PersistedUidPolicy {
     linux_username: String,
     source_ids: Vec<String>,
     listen_port: u16,
+    #[serde(default)]
+    domain_access_mode: String,
+    #[serde(default)]
+    allowed_domains: Vec<String>,
 }
 
 #[derive(Serialize, Clone, Debug, Default, PartialEq, Eq)]
@@ -86,6 +95,8 @@ struct ResolvedUidPolicy {
     source_ids: Vec<String>,
     listen_port: u16,
     blocked_domains: Vec<String>,
+    domain_access_mode: String,
+    allowed_domains: Vec<String>,
 }
 
 #[derive(Default)]
@@ -357,6 +368,7 @@ impl DomainPolicyRuntime {
         let pending = self.pending_sync.take().unwrap_or_default();
         let next_state = build_next_state_from_pending(&self.current_state, pending)?;
         self.apply_state(&next_state).await?;
+        clear_domain_grant_dedupe(&next_state);
         self.current_state = next_state.clone();
         save_state(&self.state_path, &next_state)?;
         Ok(format!(
@@ -368,6 +380,7 @@ impl DomainPolicyRuntime {
     async fn sync(&mut self, payload: DeviceDomainPolicyPayload) -> Result<String, String> {
         let next_state = resolve_full_sync_state(&self.current_state, payload)?;
         self.apply_state(&next_state).await?;
+        clear_domain_grant_dedupe(&next_state);
         self.current_state = next_state.clone();
         self.pending_sync = None;
         save_state(&self.state_path, &next_state)?;
@@ -385,6 +398,9 @@ impl DomainPolicyRuntime {
                 uid: policy.uid,
                 listen_port: policy.listen_port,
                 blocked_domains: policy.blocked_domains.clone(),
+                allowed_domains: policy.allowed_domains.clone(),
+                domain_access_mode: policy.domain_access_mode.clone(),
+                linux_username: policy.linux_username.clone(),
             })
             .collect();
         let firewall_policies: Vec<FirewallPolicy> = resolved_policies
@@ -594,11 +610,24 @@ fn resolve_next_policies(
                 linux_username: policy.linux_username.trim().to_string(),
                 source_ids,
                 listen_port,
+                domain_access_mode: policy
+                    .domain_access_mode
+                    .as_deref()
+                    .unwrap_or("blocklist_only")
+                    .trim()
+                    .to_string(),
+                allowed_domains: normalize_domains(policy.allowed_domains.clone()),
             },
         );
     }
 
     Ok(next_policies)
+}
+
+fn clear_domain_grant_dedupe(state: &PersistedDomainPolicyState) {
+    for policy in state.policies.values() {
+        approval_deduper::on_domain_grants_synced(&policy.allowed_domains);
+    }
 }
 
 fn allocate_policy_port(used_ports: &HashSet<u16>) -> Result<u16, String> {
@@ -635,6 +664,8 @@ fn resolve_uid_policies(state: &PersistedDomainPolicyState) -> Vec<ResolvedUidPo
             source_ids: policy.source_ids.clone(),
             listen_port: policy.listen_port,
             blocked_domains,
+            domain_access_mode: policy.domain_access_mode.clone(),
+            allowed_domains: policy.allowed_domains.clone(),
         });
     }
 
@@ -710,6 +741,7 @@ mod tests {
                     linux_username: "alice".to_string(),
                     source_ids: vec!["1".to_string()],
                     listen_port: 23010,
+                    ..Default::default()
                 },
             )]),
         };
@@ -721,6 +753,7 @@ mod tests {
                 IncomingUidPolicy {
                     linux_username: "alice".to_string(),
                     source_ids: vec!["1".to_string()],
+                    ..Default::default()
                 },
             )]),
         };
@@ -755,6 +788,7 @@ mod tests {
                     linux_username: "alice".to_string(),
                     source_ids: vec!["1".to_string()],
                     listen_port: 23010,
+                    ..Default::default()
                 },
             )]),
         };
@@ -777,6 +811,7 @@ mod tests {
                 IncomingUidPolicy {
                     linux_username: "alice".to_string(),
                     source_ids: vec!["1".to_string()],
+                    ..Default::default()
                 },
             )])),
         };
@@ -815,6 +850,7 @@ mod tests {
                     linux_username: "charlie".to_string(),
                     source_ids: vec!["1".to_string(), "2".to_string()],
                     listen_port: 23012,
+                    ..Default::default()
                 },
             )]),
         };

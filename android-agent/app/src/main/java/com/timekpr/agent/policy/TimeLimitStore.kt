@@ -1,6 +1,7 @@
 package com.timekpr.agent.policy
 
 import android.content.Context
+import org.json.JSONArray
 import org.json.JSONObject
 import java.time.DayOfWeek
 import java.time.LocalDate
@@ -15,6 +16,11 @@ import java.util.concurrent.ConcurrentHashMap
 class TimeLimitStore(context: Context) {
     private val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     private val users = ConcurrentHashMap<String, UserTimeState>()
+    private val screentimeExemptByUser = ConcurrentHashMap<String, Set<String>>()
+
+    init {
+        restoreScreentimeExemptPackages()
+    }
 
     data class UserTimeState(
         var linuxUid: Int,
@@ -97,6 +103,19 @@ class TimeLimitStore(context: Context) {
         state.timeSpentDay += seconds
         state.timeLeftDay = maxOf(0, state.timeLeftDay - seconds)
         persist(username, state)
+    }
+
+    fun screentimeExemptPackages(username: String): Set<String> {
+        return screentimeExemptByUser[username] ?: emptySet()
+    }
+
+    fun setScreentimeExemptPackages(username: String, packages: Set<String>): Boolean {
+        if (!users.containsKey(username) && loadPersisted(username) == null) {
+            return false
+        }
+        screentimeExemptByUser[username] = packages.toSet()
+        persistScreentimeExemptPackages()
+        return true
     }
 
     fun isAccessAllowed(username: String, zoneId: ZoneId = ZoneId.systemDefault()): Boolean {
@@ -198,7 +217,35 @@ class TimeLimitStore(context: Context) {
         }
     }
 
+    private fun persistScreentimeExemptPackages() {
+        val root = JSONObject()
+        screentimeExemptByUser.forEach { (username, packages) ->
+            root.put(username, JSONArray(packages.toList()))
+        }
+        prefs.edit().putString(KEY_SCREENTIME_EXEMPT, root.toString()).apply()
+    }
+
+    private fun restoreScreentimeExemptPackages() {
+        val raw = prefs.getString(KEY_SCREENTIME_EXEMPT, null) ?: return
+        try {
+            val root = JSONObject(raw)
+            val keys = root.keys()
+            while (keys.hasNext()) {
+                val username = keys.next()
+                val array = root.optJSONArray(username) ?: continue
+                val packages = mutableSetOf<String>()
+                for (index in 0 until array.length()) {
+                    array.optString(index).takeIf { it.isNotBlank() }?.let { packages += it }
+                }
+                screentimeExemptByUser[username] = packages
+            }
+        } catch (_: Exception) {
+            screentimeExemptByUser.clear()
+        }
+    }
+
     companion object {
         private const val PREFS_NAME = "timekpr_time_limits"
+        private const val KEY_SCREENTIME_EXEMPT = "screentime_exempt_packages"
     }
 }

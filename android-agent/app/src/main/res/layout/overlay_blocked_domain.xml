@@ -25,13 +25,30 @@
         android:textColor="#333333"
         android:textSize="14sp" />
 
-    <Button
-        android:id="@+id/blocked_domain_dismiss"
-        android:layout_width="wrap_content"
+    <LinearLayout
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_gravity="end"
         android:layout_marginTop="8dp"
-        android:background="@android:color/transparent"
-        android:text="@string/domain_block_dismiss"
-        android:textColor="@color/timekpr_primary" />
+        android:gravity="end"
+        android:orientation="horizontal">
+
+        <Button
+            android:id="@+id/blocked_domain_request_access"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="8dp"
+            android:minHeight="44dp"
+            android:text="@string/domain_block_request_access"
+            android:textColor="@color/timekpr_primary"
+            android:visibility="gone" />
+
+        <Button
+            android:id="@+id/blocked_domain_dismiss"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="@android:color/transparent"
+            android:minHeight="44dp"
+            android:text="@string/domain_block_dismiss"
+            android:textColor="@color/timekpr_primary" />
+    </LinearLayout>
 </LinearLayout>

@@ -87,6 +87,10 @@ def build_sse_snapshot(reason='updated'):
         'ts': datetime.now(timezone.utc).isoformat(),
         'users': snapshot['users'],
         'pending_adjustments': snapshot['pending_adjustments'],
+        'pending_approvals': snapshot.get(
+            'pending_approvals',
+            {'total': 0, 'by_user': {}, 'items': []},
+        ),
     }
 
 

@@ -1,5 +1,8 @@
+use crate::approval_deduper;
+use crate::approval_policy::ApprovalPolicy;
+
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -67,6 +70,8 @@ struct ResolvedPathRule {
 struct PersistedAppArmorState {
     /// Per-linux-username list of active policies
     users: HashMap<String, Vec<AppArmorPolicy>>,
+    #[serde(default)]
+    approval_overlays: HashMap<String, ApprovalPolicy>,
 }
 
 struct AppArmorRuntime {
@@ -86,11 +91,49 @@ pub async fn initialize_runtime() -> Result<(), String> {
 pub async fn sync_user_policy(
     username: &str,
     policies: Vec<AppArmorPolicy>,
+    approval_policy: Option<ApprovalPolicy>,
 ) -> Result<String, String> {
     let runtime = get_runtime();
     let mut guard = runtime.lock().await;
     guard.ensure_restored()?;
-    guard.update_user_policy(username, policies)
+    guard.update_user_policy(username, policies, approval_policy)
+}
+
+pub async fn approval_policy_for_user(username: &str) -> Option<ApprovalPolicy> {
+    let runtime = get_runtime();
+    let guard = runtime.lock().await;
+    guard
+        .current_state
+        .approval_overlays
+        .get(username)
+        .cloned()
+}
+
+pub async fn rules_blocked_identifiers(username: &str) -> HashSet<String> {
+    let runtime = get_runtime();
+    let guard = runtime.lock().await;
+    guard.rules_blocked_identifiers(username)
+}
+
+pub async fn effective_blocked_identifiers(username: &str) -> HashSet<String> {
+    let runtime = get_runtime();
+    let guard = runtime.lock().await;
+    let rules_blocked = guard.rules_blocked_identifiers(username);
+    let approval = guard.current_state.approval_overlays.get(username);
+    ApprovalPolicy::effective_blocked(&rules_blocked, approval)
+}
+
+pub async fn check_approval_launch_block(username: &str, exe_path: &str) -> Option<String> {
+    let runtime = get_runtime();
+    let guard = runtime.lock().await;
+    let approval = guard.current_state.approval_overlays.get(username)?;
+    let rules_blocked = guard.rules_blocked_identifiers(username);
+    let effective_blocked = ApprovalPolicy::effective_blocked(&rules_blocked, Some(approval));
+    if approval.executable_matches_blocked(exe_path, username, &effective_blocked) {
+        Some(exe_path.to_string())
+    } else {
+        None
+    }
 }
 
 pub async fn load_profiles_for_user(username: &str) -> Result<(), String> {
@@ -175,10 +218,23 @@ impl AppArmorRuntime {
         Ok(())
     }
 
+    fn rules_blocked_identifiers(&self, username: &str) -> HashSet<String> {
+        self.current_state
+            .users
+            .get(username)
+            .into_iter()
+            .flatten()
+            .filter(|policy| policy.preset == "blocked")
+            .map(|policy| policy.executable_path.trim().to_string())
+            .filter(|value| !value.is_empty())
+            .collect()
+    }
+
     fn update_user_policy(
         &mut self,
         username: &str,
         policies: Vec<AppArmorPolicy>,
+        approval_policy: Option<ApprovalPolicy>,
     ) -> Result<String, String> {
         let mut restrictive = Vec::new();
         for policy in policies.into_iter().filter(|p| {
@@ -196,6 +252,19 @@ impl AppArmorRuntime {
             self.current_state
                 .users
                 .insert(username.to_string(), restrictive);
+        }
+
+        match approval_policy {
+            Some(overlay) => {
+                self.current_state
+                    .approval_overlays
+                    .insert(username.to_string(), overlay.clone());
+                approval_deduper::on_app_approval_policy_synced(Some(&overlay));
+            }
+            None => {
+                self.current_state.approval_overlays.remove(username);
+                approval_deduper::on_app_approval_policy_synced(None);
+            }
         }
 
         self.persist()?;

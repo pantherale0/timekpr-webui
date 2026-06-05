@@ -1,13 +1,22 @@
 package com.timekpr.agent.policy
 
 import android.content.Context
+import com.timekpr.agent.monitor.ApprovalRequestDeduper
+import org.json.JSONArray
 import org.json.JSONObject
 import java.util.concurrent.ConcurrentHashMap
 
 data class UidPolicy(
     val linuxUsername: String,
     val sourceIds: List<String>,
-)
+    val allowedDomains: Set<String> = emptySet(),
+    val domainAccessMode: String = DOMAIN_ACCESS_BLOCKLIST_ONLY,
+) {
+    companion object {
+        const val DOMAIN_ACCESS_BLOCKLIST_ONLY = "blocklist_only"
+        const val DOMAIN_ACCESS_APPROVAL_ON_BLOCK = "approval_on_block"
+    }
+}
 
 class DomainPolicyStore(context: Context) {
     private val persistence = DomainPolicyPersistence(context.applicationContext)
@@ -34,6 +43,8 @@ class DomainPolicyStore(context: Context) {
 
     fun blockedDomainCount(): Int = blockedMatcher.domainCount
 
+    fun policyForUid(linuxUid: String): UidPolicy? = policies[linuxUid]
+
     fun getStatePayload(): JSONObject {
         val revisions = JSONObject()
         sourceRevisions.forEach { (id, revision) -> revisions.put(id, revision) }
@@ -55,6 +66,11 @@ class DomainPolicyStore(context: Context) {
 
     fun allBlockedDomains(): Set<String> = collectEffectiveDomains()
 
+    fun isDomainAllowed(queryDomain: String, allowedDomains: Set<String>): Boolean {
+        if (allowedDomains.isEmpty()) return false
+        return AllowedDomainMatcher.from(allowedDomains).isBlocked(queryDomain)
+    }
+
     fun applyFullSync(payload: JSONObject) {
         sources.clear()
         sourceRevisions.clear()
@@ -75,15 +91,9 @@ class DomainPolicyStore(context: Context) {
         val policiesObj = payload.optJSONObject("policies") ?: JSONObject()
         policiesObj.keys().forEach { uid ->
             val entry = policiesObj.optJSONObject(uid) ?: return@forEach
-            policies[uid] = UidPolicy(
-                linuxUsername = entry.optString("linux_username"),
-                sourceIds = entry.optJSONArray("source_ids")?.let { array ->
-                    (0 until array.length()).map { array.optString(it) }
-                } ?: emptyList(),
-            )
+            policies[uid] = parseUidPolicyEntry(entry)
         }
-        rebuildBlockedMatcher()
-        persist()
+        onPoliciesUpdated()
     }
 
     fun beginSync(syncId: String) {
@@ -109,8 +119,7 @@ class DomainPolicyStore(context: Context) {
         }
         policies.clear()
         policies.putAll(session.policies)
-        rebuildBlockedMatcher()
-        persist()
+        onPoliciesUpdated()
         return true
     }
 
@@ -155,6 +164,14 @@ class DomainPolicyStore(context: Context) {
         return false
     }
 
+    private fun onPoliciesUpdated() {
+        rebuildBlockedMatcher()
+        policies.values.forEach { policy ->
+            ApprovalRequestDeduper.onDomainGrantsSynced(policy.allowedDomains)
+        }
+        persist()
+    }
+
     private fun rebuildBlockedMatcher() {
         blockedMatcher = BlockedDomainMatcher.from(collectEffectiveDomains())
     }
@@ -191,4 +208,38 @@ class DomainPolicyStore(context: Context) {
         }
         return digest.digest().joinToString("") { "%02x".format(it) }
     }
+
+    companion object {
+        fun parseUidPolicyEntry(entry: JSONObject): UidPolicy {
+            val sourceIds = entry.optJSONArray("source_ids")?.let { array ->
+                (0 until array.length()).map { array.optString(it) }
+            } ?: emptyList()
+            val allowedDomains = entry.optJSONArray("allowed_domains")?.let { array ->
+                parseDomainArray(array)
+            } ?: emptySet()
+            val domainAccessMode = entry.optString("domain_access_mode", UidPolicy.DOMAIN_ACCESS_BLOCKLIST_ONLY)
+                .trim()
+                .lowercase()
+                .ifBlank { UidPolicy.DOMAIN_ACCESS_BLOCKLIST_ONLY }
+            return UidPolicy(
+                linuxUsername = entry.optString("linux_username"),
+                sourceIds = sourceIds,
+                allowedDomains = allowedDomains,
+                domainAccessMode = domainAccessMode,
+            )
+        }
+
+        private fun parseDomainArray(array: JSONArray): Set<String> {
+            val domains = LinkedHashSet<String>()
+            for (index in 0 until array.length()) {
+                val domain = array.optString(index).trim().lowercase().trimEnd('.')
+                if (domain.isNotEmpty()) {
+                    domains.add(domain)
+                }
+            }
+            return domains
+        }
+    }
 }
+
+typealias AllowedDomainMatcher = BlockedDomainMatcher

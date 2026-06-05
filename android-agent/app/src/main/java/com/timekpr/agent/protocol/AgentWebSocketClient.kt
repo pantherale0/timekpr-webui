@@ -36,6 +36,8 @@ class AgentWebSocketClient(
     private val commandDispatcher: CommandDispatcher,
     private val enforcement: EnforcementController,
 ) {
+    private var activeWebSocket: WebSocket? = null
+
     private val client = OkHttpClient.Builder()
         .pingInterval(15, TimeUnit.SECONDS)
         .readTimeout(90, TimeUnit.SECONDS)
@@ -77,11 +79,13 @@ class AgentWebSocketClient(
                     }
 
                     override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
+                        clearAlertListener()
                         AgentConnectionState.update(AgentConnectionStatus.DISCONNECTED, reason)
                         if (!completed) finish(SessionResult(success = code == 1000, reason = reason))
                     }
 
                     override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
+                        clearAlertListener()
                         AgentConnectionState.update(
                             AgentConnectionStatus.ERROR,
                             t.message ?: "connection failed",
@@ -160,6 +164,12 @@ class AgentWebSocketClient(
                     return
                 }
                 AgentConnectionState.update(AgentConnectionStatus.AUTHENTICATED, "Synced")
+                activeWebSocket = webSocket
+                AlertEventBus.setListener { pending ->
+                    activeWebSocket?.let { socket ->
+                        sendAlert(socket, pending.eventType, pending.details)
+                    }
+                }
                 sendAlert(webSocket, "system_startup", JSONObject().put("platform", "android"))
                 sendPolicySyncCheck(webSocket)
                 enforcement.startAll()
@@ -172,7 +182,9 @@ class AgentWebSocketClient(
                 val linuxUsername = AndroidUsers.currentLinuxUsername(context)
                 val discoveredApps = InstalledAppsDiscovery.discover(context)
                 InstalledAppsReporter.sendInventory(webSocket, linuxUsername, discoveredApps)
+                enforcement.applyAppPolicies(linuxUsername)
 
+                clearAlertListener()
                 onComplete(SessionResult(success = true, reason = "sync_complete"))
             }
             "command_request" -> {
@@ -204,6 +216,11 @@ class AgentWebSocketClient(
         webSocket.send(AgentMessages.policySyncCheck(revisions))
     }
 
+    private fun clearAlertListener() {
+        activeWebSocket = null
+        AlertEventBus.setListener(null)
+    }
+
     private fun sendAlert(webSocket: WebSocket, eventType: String, details: JSONObject) {
         webSocket.send(
             AgentMessages.alertEvent(
@@ -231,8 +248,9 @@ class AgentWebSocketClient(
 
     companion object {
         fun create(context: Context): AgentWebSocketClient {
-            val appPolicyStore = AppPolicyStore(context).also { it.restore() }
-            TimeKprApplication.from(context).domainPolicyStore.restore()
+            val app = TimeKprApplication.from(context)
+            val appPolicyStore = app.appPolicyStore
+            app.domainPolicyStore.restore()
             val enforcement = EnforcementController(context, appPolicyStore)
             val dispatcher = CommandDispatcher(
                 context = context,
@@ -240,6 +258,7 @@ class AgentWebSocketClient(
                 onDomainPolicyChanged = { DomainBlockVpnService.reconcile(context) },
                 onAppPolicyChanged = { username -> enforcement.applyAppPolicies(username) },
                 onTimePolicyChanged = { username -> enforcement.applyTimePolicies(username) },
+                onDeviceRestrictionChanged = { username -> enforcement.applyDeviceRestrictions(username) },
             )
             return AgentWebSocketClient(context, dispatcher, enforcement)
         }

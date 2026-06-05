@@ -667,6 +667,7 @@ def test_task_manager_syncs_domain_policy_payloads(app, db_session):
     )["args"]
     assert manifest_payload["policies"]["1005"]["linux_username"] == "policy-user"
     assert manifest_payload["policies"]["1005"]["source_ids"] == ["1"]
+    assert "domain_access_mode" not in manifest_payload["policies"]["1005"]
 
     mapping = ManagedUserDeviceMap.query.filter_by(system_id=device.system_id).first()
     assert mapping.blocklist_is_synced
@@ -677,6 +678,97 @@ def test_task_manager_syncs_domain_policy_payloads(app, db_session):
     with app.app_context():
         manager._sync_domain_policies()
     assert len(ws.sent_messages) == sent_count
+
+    AgentConnectionManager.unregister(device.system_id)
+
+
+def test_task_manager_syncs_android_device_policy(app, db_session):
+    from src.android_device_policy_manager import upsert_policy
+
+    manager = BackgroundTaskManager(app)
+    user = ManagedUser(username="android-policy-user", system_ip="Unassigned", is_valid=True)
+    device = AgentDevice(
+        system_id="sys-android-device-policy",
+        status="approved",
+        secure_token="tok",
+        platform="android",
+    )
+    db_session.add_all([user, device])
+    db_session.flush()
+    mapping = ManagedUserDeviceMap(
+        managed_user_id=user.id,
+        system_id=device.system_id,
+        linux_username="android",
+        is_valid=True,
+    )
+    db_session.add(mapping)
+    db_session.commit()
+
+    upsert_policy(mapping, {
+        'screen_capture_disabled': True,
+        'camera_access': 'CAMERA_ACCESS_DISABLED',
+    })
+
+    ws = DummyWS()
+    AgentConnectionManager.register(device.system_id, ws, "10.0.0.22")
+
+    with app.app_context():
+        success, message = manager._sync_android_device_policy_system(device.system_id)
+
+    assert success is True
+    sent_payloads = [json.loads(message) for message in ws.sent_messages]
+    device_policy_payload = next(
+        payload for payload in sent_payloads
+        if payload.get("action") == "sync_android_device_policy"
+    )
+    assert device_policy_payload["username"] == "android"
+    assert device_policy_payload["args"]["device_policy"]["screenCaptureDisabled"] is True
+    assert device_policy_payload["args"]["device_policy"]["cameraAccess"] == "CAMERA_ACCESS_DISABLED"
+    assert "Pushed device policy" in message
+
+    AgentConnectionManager.unregister(device.system_id)
+
+
+def test_task_manager_manifest_includes_domain_access_mode(app, db_session):
+    from src.approvals_manager import upsert_settings
+
+    manager = BackgroundTaskManager(app)
+    user = ManagedUser(username="approval-domain-user", system_ip="Unassigned", is_valid=True)
+    device = AgentDevice(system_id="sys-approval-domain", status="approved", secure_token="tok")
+    source = BlocklistSource(name="Approval DoH", source_type=BlocklistSource.TYPE_MANUAL, is_enabled=True)
+    db_session.add_all([user, device, source])
+    db_session.flush()
+    mapping = ManagedUserDeviceMap(
+        managed_user_id=user.id,
+        system_id=device.system_id,
+        linux_username="approval-domain-user",
+        linux_uid=1006,
+        is_valid=True,
+    )
+    db_session.add_all([
+        mapping,
+        ManagedUserBlocklistAssignment(managed_user_id=user.id, source_id=source.id),
+        BlocklistDomain(source_id=source.id, domain="blocked.example.com"),
+    ])
+    db_session.commit()
+
+    upsert_settings(mapping, domain_access_mode="approval_on_block")
+
+    ws = DummyWS()
+    AgentConnectionManager.register(device.system_id, ws, "10.0.0.21")
+
+    with app.app_context():
+        manager._sync_domain_policies()
+
+    sent_payloads = [json.loads(message) for message in ws.sent_messages]
+    manifest_payload = next(
+        payload for payload in sent_payloads
+        if payload["action"] == "update_domain_policy_manifest"
+    )["args"]
+    entry = manifest_payload["policies"]["1006"]
+    assert entry["linux_username"] == "approval-domain-user"
+    assert entry["domain_access_mode"] == "approval_on_block"
+    assert "allowed_domains" not in entry
 
     AgentConnectionManager.unregister(device.system_id)
 

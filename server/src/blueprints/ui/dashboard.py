@@ -96,12 +96,75 @@ def edit_user_profile(user_id):
     assigned_policy_ids = {assignment.policy_id for assignment in user.app_policy_assignments}
     installed_apps = list_installed_apps_for_managed_user(user.id)
     user_platforms = set()
+    device_labels = _get_device_label_map()
     for mapping in user.device_mappings:
         platform = (mapping.device.platform if mapping.device else None) or AppPolicy.PLATFORM_LINUX
         if platform == AppPolicy.PLATFORM_ANDROID:
             user_platforms.add(AppPolicy.PLATFORM_ANDROID)
         else:
             user_platforms.add(AppPolicy.PLATFORM_LINUX)
+
+    from src.android_device_policy_manager import get_or_create_policy
+    from src.database import MappingAndroidDevicePolicy
+    from src.approvals_manager import get_or_create_settings, grant_status_for_apps
+    from src.installed_apps_manager import list_installed_apps_for_device
+
+    approval_settings_by_mapping = {}
+    android_device_policy_by_mapping = {}
+    installed_apps_enriched = []
+    seen_apps = set()
+    for mapping in user.device_mappings:
+        settings = get_or_create_settings(mapping)
+        approval_settings_by_mapping[mapping.id] = {
+            'app_launch_mode': settings.app_launch_mode,
+            'domain_access_mode': settings.domain_access_mode,
+            'device_label': device_labels.get(mapping.system_id, mapping.system_id),
+        }
+        mapping_platform = (mapping.device.platform if mapping.device else None) or AppPolicy.PLATFORM_LINUX
+        if mapping_platform == AppPolicy.PLATFORM_ANDROID:
+            try:
+                device_policy = get_or_create_policy(mapping)
+                android_device_policy_by_mapping[mapping.id] = {
+                    'device_label': device_labels.get(mapping.system_id, mapping.system_id),
+                    'screen_capture_disabled': device_policy.screen_capture_disabled,
+                    'camera_access': device_policy.camera_access,
+                    'install_apps_disabled': device_policy.install_apps_disabled,
+                    'uninstall_apps_disabled': device_policy.uninstall_apps_disabled,
+                    'developer_settings': device_policy.developer_settings,
+                    'short_support_message': (
+                        device_policy.short_support_message
+                        or MappingAndroidDevicePolicy.DEFAULT_SHORT_SUPPORT_MESSAGE
+                    ),
+                    'long_support_message': (
+                        device_policy.long_support_message
+                        or MappingAndroidDevicePolicy.DEFAULT_LONG_SUPPORT_MESSAGE
+                    ),
+                    'is_synced': device_policy.is_synced,
+                    'last_sync_error': device_policy.last_sync_error,
+                }
+            except ValueError:
+                pass
+        mapping_apps = list_installed_apps_for_device(
+            mapping.system_id,
+            linux_username=mapping.linux_username,
+        )
+        status_map = grant_status_for_apps(mapping, mapping_apps)
+        for app in mapping_apps:
+            dedupe_key = (app.system_id, app.linux_username, app.identifier, app.match_type)
+            if dedupe_key in seen_apps:
+                continue
+            seen_apps.add(dedupe_key)
+            status_entry = status_map.get(app.identifier, {'status': 'none', 'grant_id': None})
+            payload = app.to_dict()
+            payload['device_map_id'] = mapping.id
+            payload['device_hostname'] = mapping.device.system_hostname if mapping.device else None
+            payload['approval_status'] = status_entry.get('status', 'none')
+            payload['grant_id'] = status_entry.get('grant_id')
+            installed_apps_enriched.append(payload)
+
+    installed_apps_enriched.sort(
+        key=lambda item: (item['application_name'].lower(), item['identifier']),
+    )
     
     return render_template(
         'admin_user_edit.html',
@@ -112,8 +175,36 @@ def edit_user_profile(user_id):
         linux_app_policies=linux_app_policies,
         android_app_policies=android_app_policies,
         assigned_policy_ids=assigned_policy_ids,
-        installed_apps=installed_apps,
+        installed_apps=installed_apps_enriched or installed_apps,
         user_platforms=user_platforms,
+        approval_settings_by_mapping=approval_settings_by_mapping,
+        android_device_policy_by_mapping=android_device_policy_by_mapping,
+        device_labels=device_labels,
+    )
+
+
+@ui_dashboard_bp.route('/admin/approvals')
+def admin_approvals():
+    """Render the access approval request queue."""
+    if not session.get('logged_in'):
+        flash('Please login first', 'warning')
+        return redirect(url_for('ui_auth.login'))
+
+    from src.approvals_manager import build_request_summary, list_pending_requests
+
+    pending_rows = list_pending_requests(limit=100)
+    device_labels = _get_device_label_map()
+    pending_approvals = []
+    for row in pending_rows:
+        summary = build_request_summary(row)
+        # Keep datetime for Jinja localtime filter; API consumers use isoformat.
+        summary['requested_at'] = row.requested_at
+        pending_approvals.append(summary)
+    return render_template(
+        'approvals.html',
+        pending_approvals=pending_approvals,
+        pending_count=len(pending_rows),
+        device_labels=device_labels,
     )
 
 
@@ -394,6 +485,7 @@ def device_detail(system_id):
         usage_summaries=usage_summaries,
         installed_apps_by_mapping=installed_apps_by_mapping,
         agent_online=AgentConnectionManager.is_online(system_id),
+        fcm_available=bool((device.fcm_token or '').strip()),
     )
 
 

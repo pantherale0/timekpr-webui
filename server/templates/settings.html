@@ -11,7 +11,130 @@
 </div>
 
 <div class="row g-4 justify-content-center" style="max-width: 1200px; margin: 0 auto;">
-    
+
+    <!-- Agent Pairing & Android Provisioning -->
+    <div class="col-12">
+        <div class="card border shadow-sm">
+            <div class="card-header bg-dark text-white py-3 d-flex align-items-center gap-2">
+                <i class="fas fa-qrcode text-info fs-5"></i>
+                <h5 class="mb-0 fw-bold">Agent Pairing (Android &amp; Linux)</h5>
+            </div>
+            <div class="card-body p-4">
+                <p class="text-secondary small fw-medium mb-3">
+                    Scan the pairing QR from the Guardian Android app during setup, or use the WebSocket URL when installing Linux agents.
+                </p>
+                <form action="{{ url_for('ui_dashboard.settings') }}" method="POST" class="mb-4">
+                    <input type="hidden" name="form_name" value="agent_pairing">
+                    <label for="agent_websocket_url" class="form-label fw-bold small text-muted">AGENT WEBSOCKET URL</label>
+                    <input
+                        type="text"
+                        id="agent_websocket_url"
+                        name="agent_websocket_url"
+                        class="form-control"
+                        placeholder="wss://your-server.example/ws"
+                        value="{{ agent_websocket_url }}"
+                    >
+                    <div class="form-text text-secondary small">
+                        Leave blank to auto-detect from your current browser session. Set a custom URL when agents connect through a reverse proxy or public hostname.
+                    </div>
+                    <button type="submit" class="btn btn-secondary fw-bold mt-3">Save Pairing URL</button>
+                </form>
+
+                <div class="row g-4 align-items-start">
+                    <div class="col-12 col-md-auto text-center">
+                        <img
+                            src="{{ pairing_qr_data_uri }}"
+                            alt="Guardian pairing QR code"
+                            class="img-fluid border rounded p-2 bg-white"
+                            width="220"
+                            height="220"
+                        >
+                    </div>
+                    <div class="col">
+                        <h6 class="text-secondary small fw-bold text-uppercase mb-2" style="font-size: 0.7rem;">WebSocket URL</h6>
+                        <code class="d-block word-break-all p-2 rounded bg-body-secondary small">{{ pairing_server_url }}</code>
+                        <h6 class="text-secondary small fw-bold text-uppercase mb-2 mt-3" style="font-size: 0.7rem;">Payload</h6>
+                        <code class="d-block word-break-all p-2 rounded bg-body-secondary small">{{ pairing_payload }}</code>
+                        <a href="{{ url_for('api_pairing.pairing_qr_png') }}" class="btn btn-outline-secondary btn-sm fw-bold mt-3">Download QR PNG</a>
+                    </div>
+                </div>
+
+                <hr class="my-4">
+
+                <h6 class="fw-bold mb-2">Android MDM Provisioning QR</h6>
+                <p class="text-secondary small fw-medium mb-3">
+                    Use this QR during factory-reset setup (tap the welcome screen six times, then scan). Android downloads the agent APK, sets device owner, and applies the server URL automatically.
+                </p>
+
+                {% if android_agent_apk_uploaded %}
+                <div class="border rounded p-3 bg-body-secondary mb-3">
+                    <h6 class="text-secondary small fw-bold text-uppercase mb-2" style="font-size: 0.7rem;">Uploaded APK</h6>
+                    <div class="fw-semibold">{{ android_agent_apk_filename or 'android-agent.apk' }}</div>
+                    {% if android_agent_signature_checksum %}
+                    <div class="form-text text-secondary small mt-1">Signature checksum computed automatically on upload.</div>
+                    {% endif %}
+                    <form action="{{ url_for('ui_dashboard.settings') }}" method="POST" class="mt-2">
+                        <input type="hidden" name="form_name" value="android_provisioning">
+                        <input type="hidden" name="remove_android_apk" value="1">
+                        <button type="submit" class="btn btn-outline-danger btn-sm fw-bold">Remove Uploaded APK</button>
+                    </form>
+                </div>
+                {% endif %}
+
+                <form action="{{ url_for('ui_dashboard.settings') }}" method="POST" enctype="multipart/form-data">
+                    <input type="hidden" name="form_name" value="android_provisioning">
+                    <label for="android_agent_apk" class="form-label fw-bold small text-muted">
+                        {% if android_agent_apk_uploaded %}REPLACE ANDROID APK{% else %}UPLOAD ANDROID APK{% endif %}
+                    </label>
+                    <input
+                        type="file"
+                        id="android_agent_apk"
+                        name="android_agent_apk"
+                        class="form-control"
+                        accept=".apk,application/vnd.android.package-archive"
+                    >
+                    <div class="form-text text-secondary small">
+                        Upload a signed release APK for dev/testing, or leave empty to use the GitHub release for server version <code>{{ server_version }}</code> when available. Uploaded APKs are hosted at <code>/api/pairing/provisioning/apk</code> with an automatic signature checksum.
+                    </div>
+                    <button type="submit" class="btn btn-secondary fw-bold mt-3">Upload APK</button>
+                </form>
+
+                {% if not provisioning.provisioning_ready %}
+                <div class="alert alert-warning small py-2 mt-4 mb-0">
+                    <i class="fas fa-exclamation-triangle me-1"></i>
+                    <strong>MDM provisioning QR unavailable.</strong>
+                    {% if provisioning.is_dev_version %}
+                    Server version <code>{{ server_version }}</code> has no published release assets. Build a release APK (<code>./gradlew assembleRelease</code>) and upload it above.
+                    {% else %}
+                    Upload an Android APK above, or publish release assets for <code>{{ server_version }}</code>.
+                    {% endif %}
+                </div>
+                {% else %}
+                <div class="row g-4 align-items-start mt-4">
+                    <div class="col-12 col-md-auto text-center">
+                        <img
+                            src="{{ provisioning_qr_data_uri }}"
+                            alt="Android MDM provisioning QR code"
+                            class="img-fluid border rounded p-2 bg-white"
+                            width="220"
+                            height="220"
+                        >
+                    </div>
+                    <div class="col">
+                        <h6 class="text-secondary small fw-bold text-uppercase mb-2" style="font-size: 0.7rem;">APK URL ({{ provisioning.apk_source }})</h6>
+                        <code class="d-block word-break-all p-2 rounded bg-body-secondary small">{{ provisioning.apk_url }}</code>
+                        <h6 class="text-secondary small fw-bold text-uppercase mb-2 mt-3" style="font-size: 0.7rem;">Signature Checksum ({{ provisioning.checksum_source }})</h6>
+                        <code class="d-block word-break-all p-2 rounded bg-body-secondary small">{{ provisioning.signature_checksum }}</code>
+                        <h6 class="text-secondary small fw-bold text-uppercase mb-2 mt-3" style="font-size: 0.7rem;">Provisioning Payload</h6>
+                        <code class="d-block word-break-all p-2 rounded bg-body-secondary small">{{ provisioning.payload_json }}</code>
+                        <a href="{{ url_for('api_pairing.provisioning_qr_png') }}" class="btn btn-outline-secondary btn-sm fw-bold mt-3">Download Provisioning QR PNG</a>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
     <!-- Security / Password Credentials -->
     <div class="col-12 col-md-6">
         <div class="card border shadow-sm h-100">

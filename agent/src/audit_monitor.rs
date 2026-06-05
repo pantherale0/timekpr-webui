@@ -143,14 +143,12 @@ async fn run_monitor_inner(
             event_type: "app_blocked".to_string(),
             linux_username: username,
             payload: json!({
-                "details": {
-                    "disposition": disposition,
-                    "profile": profile.unwrap_or_default(),
-                    "operation": operation.unwrap_or_default(),
-                    "blocked_path": name.unwrap_or_default(),
-                    "comm": comm.unwrap_or_default(),
-                    "raw_line": &line,
-                }
+                "disposition": disposition,
+                "profile": profile.unwrap_or_default(),
+                "operation": operation.unwrap_or_default(),
+                "blocked_path": name.unwrap_or_default(),
+                "comm": comm.unwrap_or_default(),
+                "raw_line": &line,
             }),
         });
     }

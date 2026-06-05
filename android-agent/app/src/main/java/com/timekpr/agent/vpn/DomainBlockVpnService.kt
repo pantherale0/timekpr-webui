@@ -18,6 +18,7 @@ import com.timekpr.agent.TimeKprApplication
 import com.timekpr.agent.admin.DeviceOwnerProvisioner
 import com.timekpr.agent.admin.TimeKprDeviceAdminReceiver
 import com.timekpr.agent.policy.DomainPolicyStore
+import com.timekpr.agent.util.AndroidUsers
 import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.util.concurrent.ExecutorService
@@ -143,13 +144,23 @@ class DomainBlockVpnService : VpnService() {
             executor.execute {
                 if (!running.get()) return@execute
                 try {
-                    val dnsPayload = if (matcher.isBlocked(parsed.queryName)) {
+                    val uid = AndroidUsers.currentLinuxUid(this@DomainBlockVpnService).toString()
+                    val uidPolicy = domainStore.policyForUid(uid)
+                    val isBlocked = matcher.isBlocked(parsed.queryName)
+                    val isGranted = uidPolicy != null &&
+                        domainStore.isDomainAllowed(parsed.queryName, uidPolicy.allowedDomains)
+                    val dnsPayload = if (isBlocked && !isGranted) {
                         Log.d(TAG, "Blocked TUN DNS query for ${parsed.queryName}")
                         BlockNotificationCoordinator.onDomainBlocked(this@DomainBlockVpnService, parsed.queryName)
                         DnsAnswerBuilder.buildNxDomain(parsed)
-                    } else {
+                    } else if (!isBlocked) {
                         resolver.resolve(parsed) ?: run {
                             Log.w(TAG, "Failed to resolve TUN DNS query for ${parsed.queryName}")
+                            DnsAnswerBuilder.buildServFail(parsed)
+                        }
+                    } else {
+                        resolver.resolve(parsed) ?: run {
+                            Log.w(TAG, "Failed to resolve granted TUN DNS query for ${parsed.queryName}")
                             DnsAnswerBuilder.buildServFail(parsed)
                         }
                     }

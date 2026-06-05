@@ -1,6 +1,8 @@
 package com.timekpr.agent.policy
 
 import android.content.Context
+import com.timekpr.agent.discovery.InstalledAppsDiscovery
+import com.timekpr.agent.monitor.ApprovalRequestDeduper
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -27,6 +29,7 @@ class AppPolicyStore(context: Context) {
     private val appContext = context.applicationContext
     private val prefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     private val policiesByUser = mutableMapOf<String, MutableList<AppPolicyRule>>()
+    private val approvalPolicyByUser = mutableMapOf<String, ApprovalPolicy>()
     private val lastEnforcedBlockedByUser = mutableMapOf<String, Set<String>>()
     private val packagesReleasedBySync = mutableMapOf<String, Set<String>>()
 
@@ -34,8 +37,12 @@ class AppPolicyStore(context: Context) {
         return policiesByUser[username]?.toList() ?: emptyList()
     }
 
-    fun syncPolicies(username: String, policiesArray: JSONArray) {
-        val previousBlocked = blockedPackages(username)
+    fun approvalPolicyForUser(username: String): ApprovalPolicy? {
+        return approvalPolicyByUser[username]
+    }
+
+    fun syncPolicies(username: String, policiesArray: JSONArray, approvalPolicyJson: JSONObject? = null) {
+        val previousBlocked = effectiveBlockedPackages(username)
         val rules = mutableListOf<AppPolicyRule>()
         for (index in 0 until policiesArray.length()) {
             val entry = policiesArray.optJSONObject(index) ?: continue
@@ -51,10 +58,16 @@ class AppPolicyStore(context: Context) {
             )
         }
         policiesByUser[username] = rules
-        val newBlocked = rules
-            .filter { it.preset == "blocked" }
-            .mapNotNull { it.packageName }
-            .toSet()
+
+        val approval = ApprovalPolicy.parse(approvalPolicyJson)
+        if (approval == null) {
+            approvalPolicyByUser.remove(username)
+        } else {
+            approvalPolicyByUser[username] = approval
+            ApprovalRequestDeduper.onAppApprovalPolicySynced(approval)
+        }
+
+        val newBlocked = effectiveBlockedPackages(username)
         packagesReleasedBySync[username] = previousBlocked - newBlocked
         persist()
     }
@@ -80,6 +93,22 @@ class AppPolicyStore(context: Context) {
             .toSet()
     }
 
+    fun effectiveBlockedPackages(username: String): Set<String> {
+        val rulesBlocked = blockedPackages(username)
+        val approval = approvalPolicyForUser(username) ?: return rulesBlocked
+        if (approval.appLaunchMode == "allowlist") {
+            val installed = InstalledAppsDiscovery.discover(appContext)
+                .mapNotNull { app ->
+                    app.identifier.removePrefix(InstalledAppsDiscovery.ANDROID_PACKAGE_PREFIX)
+                        .takeIf { it.isNotBlank() }
+                }
+                .toSet()
+            val blocked = installed - approval.approvedPackages
+            return blocked
+        }
+        return ApprovalPolicy.effectiveBlockedPackages(rulesBlocked, approval)
+    }
+
     fun noInternetPackages(username: String): Set<String> {
         return rulesForUser(username)
             .filter { it.preset == "no_internet" }
@@ -103,6 +132,21 @@ class AppPolicyStore(context: Context) {
             root.put(user, array)
         }
         prefs.edit().putString(KEY_RULES, root.toString()).apply()
+        persistApprovalPolicies()
+    }
+
+    private fun persistApprovalPolicies() {
+        val root = JSONObject()
+        approvalPolicyByUser.forEach { (user, approval) ->
+            root.put(
+                user,
+                JSONObject()
+                    .put("app_launch_mode", approval.appLaunchMode)
+                    .put("approved_packages", JSONArray(approval.approvedPackages.toList()))
+                    .put("blocked_packages", JSONArray(approval.blockedPackages.toList())),
+            )
+        }
+        prefs.edit().putString(KEY_APPROVAL_POLICIES, root.toString()).apply()
     }
 
     private fun persistLastEnforcedBlocked() {
@@ -135,6 +179,20 @@ class AppPolicyStore(context: Context) {
         }
     }
 
+    private fun restoreApprovalPolicies(raw: String?) {
+        approvalPolicyByUser.clear()
+        if (raw.isNullOrBlank()) return
+        try {
+            val root = JSONObject(raw)
+            root.keys().forEach { user ->
+                val entry = root.optJSONObject(user) ?: return@forEach
+                ApprovalPolicy.parse(entry)?.let { approvalPolicyByUser[user] = it }
+            }
+        } catch (_: Exception) {
+            approvalPolicyByUser.clear()
+        }
+    }
+
     fun restore() {
         policiesByUser.clear()
         packagesReleasedBySync.clear()
@@ -150,6 +208,7 @@ class AppPolicyStore(context: Context) {
                 policiesByUser.clear()
             }
         }
+        restoreApprovalPolicies(prefs.getString(KEY_APPROVAL_POLICIES, null))
         restoreLastEnforcedBlocked(prefs.getString(KEY_LAST_ENFORCED_BLOCKED, null))
     }
 
@@ -174,6 +233,7 @@ class AppPolicyStore(context: Context) {
     companion object {
         private const val PREFS_NAME = "timekpr_app_policies"
         private const val KEY_RULES = "rules"
+        private const val KEY_APPROVAL_POLICIES = "approval_policies"
         private const val KEY_LAST_ENFORCED_BLOCKED = "last_enforced_blocked"
         private val RESTRICTIVE_PRESETS = setOf("blocked", "no_internet", "complain")
     }

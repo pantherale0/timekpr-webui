@@ -121,6 +121,8 @@ from src.blueprints import (
     api_pairing_bp,
     api_dashboard_bp,
     api_installed_apps_bp,
+    api_approvals_bp,
+    api_android_device_policy_bp,
     websocket_bp,
 )
 
@@ -138,6 +140,8 @@ app.register_blueprint(api_alerts_bp)
 app.register_blueprint(api_pairing_bp)
 app.register_blueprint(api_dashboard_bp)
 app.register_blueprint(api_installed_apps_bp, url_prefix='/api')
+app.register_blueprint(api_approvals_bp)
+app.register_blueprint(api_android_device_policy_bp)
 app.register_blueprint(websocket_bp)
 
 # Register WebSocket endpoint via Flask-Sock

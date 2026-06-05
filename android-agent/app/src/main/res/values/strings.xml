@@ -13,8 +13,13 @@
     <string name="domain_block_burst_title">Web access restricted</string>
     <string name="domain_block_burst_body">Some traffic on this website has been blocked.</string>
     <string name="domain_block_dismiss">Dismiss</string>
+    <string name="domain_block_request_access">Request access</string>
+    <string name="domain_block_request_sent">Access request sent to your parent.</string>
     <string name="time_exhausted_title">Screen time limit reached</string>
     <string name="time_exhausted_body">Your daily allowance is used up.</string>
+    <string name="time_exhausted_call">Make a call</string>
+    <string name="time_exhausted_notification_channel">Screen time lockout</string>
+    <string name="time_exhausted_notification_channel_desc">Persistent alert when screen time is exhausted</string>
     <string name="pairing_scan_qr">Scan server QR code</string>
     <string name="pairing_manual_server">Server WebSocket URL</string>
     <string name="pairing_save">Save and connect</string>

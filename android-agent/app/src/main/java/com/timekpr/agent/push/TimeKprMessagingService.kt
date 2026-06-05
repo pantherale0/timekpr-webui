@@ -2,6 +2,7 @@ package com.timekpr.agent.push
 
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
+import com.timekpr.agent.admin.DeviceLifecycleManager
 import com.timekpr.agent.service.AgentSessionCoordinator
 
 /**
@@ -38,4 +39,5 @@ object FcmActions {
     const val PAIRING_APPROVED = "pairing_approved"
     const val CONNECT = "connect"
     const val COMMAND_WAKE = "command_wake"
+    const val FACTORY_RESET = "factory_reset"
 }

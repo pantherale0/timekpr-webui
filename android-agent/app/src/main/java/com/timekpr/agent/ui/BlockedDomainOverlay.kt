@@ -13,8 +13,13 @@ import android.view.View
 import android.view.WindowManager
 import android.widget.Button
 import android.widget.TextView
+import android.widget.Toast
 import com.timekpr.agent.R
+import com.timekpr.agent.monitor.AlertEventBus
+import com.timekpr.agent.monitor.ApprovalRequestDeduper
 import com.timekpr.agent.vpn.BlockBurstNotifier
+import com.timekpr.agent.vpn.DomainGrouping
+import org.json.JSONObject
 
 /**
  * Small overlay card shown when a single domain is blocked (requires SYSTEM_ALERT_WINDOW).
@@ -28,7 +33,12 @@ object BlockedDomainOverlay {
     private var windowManager: WindowManager? = null
     private var dismissRunnable: Runnable? = null
 
-    fun show(context: Context, domain: String): Boolean {
+    fun show(
+        context: Context,
+        domain: String,
+        showRequestAccess: Boolean = false,
+        linuxUsername: String = "android",
+    ): Boolean {
         if (!Settings.canDrawOverlays(context)) {
             Log.d(TAG, "Overlay permission not granted; caller should use notification fallback")
             return false
@@ -36,7 +46,7 @@ object BlockedDomainOverlay {
 
         handler.post {
             dismissImmediate()
-            if (!showInternal(context.applicationContext, domain)) {
+            if (!showInternal(context.applicationContext, domain, showRequestAccess, linuxUsername)) {
                 BlockBurstNotifier.showSingleFallback(context.applicationContext, domain)
             }
         }
@@ -47,13 +57,35 @@ object BlockedDomainOverlay {
         handler.post { dismissImmediate() }
     }
 
-    private fun showInternal(context: Context, domain: String): Boolean {
+    private fun showInternal(
+        context: Context,
+        domain: String,
+        showRequestAccess: Boolean,
+        linuxUsername: String,
+    ): Boolean {
         return try {
             val themedContext = ContextThemeWrapper(context, R.style.Theme_TimeKprAgent)
             val inflater = LayoutInflater.from(themedContext)
             val overlayView = inflater.inflate(R.layout.overlay_blocked_domain, null)
             overlayView.findViewById<TextView>(R.id.blocked_domain_message).text =
                 context.getString(R.string.domain_block_overlay_body, domain)
+
+            val requestButton = overlayView.findViewById<Button>(R.id.blocked_domain_request_access)
+            if (showRequestAccess) {
+                requestButton.visibility = View.VISIBLE
+                requestButton.setOnClickListener {
+                    emitDomainAccessRequest(context, domain, linuxUsername)
+                    Toast.makeText(
+                        context,
+                        context.getString(R.string.domain_block_request_sent),
+                        Toast.LENGTH_SHORT,
+                    ).show()
+                    dismissImmediate()
+                }
+            } else {
+                requestButton.visibility = View.GONE
+            }
+
             overlayView.findViewById<Button>(R.id.blocked_domain_dismiss).setOnClickListener {
                 dismissImmediate()
             }
@@ -80,6 +112,21 @@ object BlockedDomainOverlay {
             Log.w(TAG, "Failed to show overlay for $domain", e)
             false
         }
+    }
+
+    private fun emitDomainAccessRequest(context: Context, domain: String, linuxUsername: String) {
+        val normalized = domain.trim().lowercase().trimEnd('.')
+        val target = DomainGrouping.registrableDomain(normalized)
+        if (!ApprovalRequestDeduper.shouldEmit("domain_access", target)) return
+        AlertEventBus.emit(
+            "access_requested",
+            linuxUsername,
+            JSONObject()
+                .put("request_type", "domain_access")
+                .put("target_kind", "domain")
+                .put("target_value", target)
+                .put("display_label", target),
+        )
     }
 
     private fun scheduleAutoDismiss() {

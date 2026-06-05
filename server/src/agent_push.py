@@ -10,6 +10,7 @@ from src.database import AgentDevice
 from src.fcm_helper import (
     FCM_ACTION_COMMAND_WAKE,
     FCM_ACTION_CONNECT,
+    FCM_ACTION_FACTORY_RESET,
     FCM_ACTION_PAIRING_APPROVED,
     FCM_ACTION_SYNC_POLICIES,
     is_fcm_configured,
@@ -88,6 +89,13 @@ def wake_android_for_command(system_id: str, action: str | None = None) -> tuple
     if not device_prefers_push(device):
         return False, 'Device is not push-capable'
     return notify_android_agent(device, FCM_ACTION_COMMAND_WAKE, reason=action or 'command')
+
+
+def wake_android_for_factory_reset(system_id: str) -> tuple[bool, str]:
+    device = AgentDevice.query.get(system_id)
+    if not device_prefers_push(device):
+        return False, 'Device is not push-capable'
+    return notify_android_agent(device, FCM_ACTION_FACTORY_RESET, reason='factory_reset')
 
 
 def notify_policy_sync_hint(system_id: str, reason: str = 'server_update') -> tuple[bool, str]:

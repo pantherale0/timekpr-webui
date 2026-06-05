@@ -27,6 +27,21 @@ _LOGGER = logging.getLogger(__name__)
 ui_apparmor_bp = Blueprint('ui_apparmor', __name__)
 
 
+def _sync_mapping_app_policy_to_agent(mapping):
+    """Push restrictive rules plus approval overlay to an online agent."""
+    from src.approvals_manager import build_full_app_policy_sync_payload
+
+    policies_list, _, approval_policy = build_full_app_policy_sync_payload(mapping)
+    if not AgentConnectionManager.is_online(mapping.system_id):
+        return False, 'offline'
+    agent = AgentClient(system_id=mapping.system_id)
+    return agent.sync_apparmor_policy(
+        mapping.linux_username,
+        policies_list,
+        approval_policy=approval_policy,
+    )
+
+
 def sync_policy_to_all_assigned_users(policy):
     """Compile rules and sync to all managed users assigned to this policy."""
     device_labels = _get_device_label_map()
@@ -38,18 +53,12 @@ def sync_policy_to_all_assigned_users(policy):
         
         # Now sync down to all linked devices of this user
         for mapping in user.device_mappings:
-            policies_list, skipped_rule_names = _build_apparmor_policy_sync_payload(mapping)
-            if AgentConnectionManager.is_online(mapping.system_id):
-                agent = AgentClient(system_id=mapping.system_id)
-                device_label = device_labels.get(mapping.system_id, mapping.system_id)
-                success, sync_msg = agent.sync_apparmor_policy(
-                    mapping.linux_username,
-                    policies_list,
-                )
-                if success:
-                    _LOGGER.info("Synced AppArmor policy to %s on %s", mapping.linux_username, device_label)
-                else:
-                    _LOGGER.warning("Failed to sync AppArmor policy to %s on %s: %s", mapping.linux_username, device_label, sync_msg)
+            device_label = device_labels.get(mapping.system_id, mapping.system_id)
+            success, sync_msg = _sync_mapping_app_policy_to_agent(mapping)
+            if success:
+                _LOGGER.info("Synced AppArmor policy to %s on %s", mapping.linux_username, device_label)
+            elif sync_msg != 'offline':
+                _LOGGER.warning("Failed to sync AppArmor policy to %s on %s: %s", mapping.linux_username, device_label, sync_msg)
 
 
 @ui_apparmor_bp.route('/admin/app-policies', methods=['GET'])
@@ -126,10 +135,7 @@ def delete_app_policy(policy_id):
     for user in affected_users:
         compile_user_apparmor_rules(user)
         for mapping in user.device_mappings:
-            policies_list, _ = _build_apparmor_policy_sync_payload(mapping)
-            if AgentConnectionManager.is_online(mapping.system_id):
-                agent = AgentClient(system_id=mapping.system_id)
-                agent.sync_apparmor_policy(mapping.linux_username, policies_list)
+            _sync_mapping_app_policy_to_agent(mapping)
 
     flash(f'App Policy "{policy_name}" deleted successfully', 'success')
     return redirect(url_for('ui_apparmor.admin_app_policies'))
@@ -271,18 +277,12 @@ def update_user_app_policies(user_id):
     sync_count = 0
     fail_count = 0
     for mapping in user.device_mappings:
-        policies_list, _ = _build_apparmor_policy_sync_payload(mapping)
-        if AgentConnectionManager.is_online(mapping.system_id):
-            agent = AgentClient(system_id=mapping.system_id)
-            device_label = device_labels.get(mapping.system_id, mapping.system_id)
-            success, sync_msg = agent.sync_apparmor_policy(
-                mapping.linux_username,
-                policies_list,
-            )
-            if success:
-                sync_count += 1
-            else:
-                fail_count += 1
+        device_label = device_labels.get(mapping.system_id, mapping.system_id)
+        success, sync_msg = _sync_mapping_app_policy_to_agent(mapping)
+        if success:
+            sync_count += 1
+        elif sync_msg != 'offline':
+            fail_count += 1
 
     if sync_count > 0 and fail_count == 0:
         flash(f'Updated app policies for {user.username} and synced to online devices', 'success')

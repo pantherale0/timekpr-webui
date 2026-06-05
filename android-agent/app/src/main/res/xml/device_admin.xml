@@ -8,6 +8,8 @@
         <expire-password />
         <encrypted-storage />
         <disable-camera />
+        <disable-screen-capture />
         <disable-keyguard-features />
+        <wipe-data />
     </uses-policies>
 </device-admin>

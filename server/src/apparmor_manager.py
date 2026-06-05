@@ -183,6 +183,35 @@ def _rule_compatible_with_device_platform(rule, device_platform):
     }
 
 
+def _approved_identifier_from_rule(rule):
+    """Return the agent-facing identifier for an explicitly allowed rule."""
+    from src.installed_apps_manager import ANDROID_PACKAGE_PREFIX
+
+    value = (rule.executable_path or '').strip()
+    if rule.match_type == AppArmorRule.MATCH_TYPE_PACKAGE and value.startswith(ANDROID_PACKAGE_PREFIX):
+        return value[len(ANDROID_PACKAGE_PREFIX):]
+    return value
+
+
+def collect_policy_allowed_packages_from_mapping(mapping):
+    """Collect apps explicitly marked allowed via compiled AppArmor/AppPolicy rules."""
+    device_platform = _device_platform(mapping.device)
+    allowed = set()
+    for rule in AppArmorRule.query.filter_by(device_map_id=mapping.id).all():
+        if rule.preset != AppArmorRule.PRESET_ALLOWED:
+            continue
+        if not _rule_compatible_with_device_platform(rule, device_platform):
+            continue
+        try:
+            _validate_apparmor_rule_target(rule.match_type, rule.executable_path, mapping.linux_username)
+        except ValueError:
+            continue
+        identifier = _approved_identifier_from_rule(rule)
+        if identifier:
+            allowed.add(identifier)
+    return allowed
+
+
 def _build_apparmor_policy_sync_payload(mapping):
     """Collect restrictive AppArmor rules for a mapping and sanitize them for sync."""
     all_rules = AppArmorRule.query.filter_by(device_map_id=mapping.id).all()

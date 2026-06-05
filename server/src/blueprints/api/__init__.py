@@ -9,6 +9,8 @@ from src.blueprints.api.alerts import api_alerts_bp
 from src.blueprints.api.pairing import api_pairing_bp
 from src.blueprints.api.dashboard import api_dashboard_bp
 from src.blueprints.api.installed_apps import api_installed_apps_bp
+from src.blueprints.api.approvals import api_approvals_bp
+from src.blueprints.api.android_device_policy import api_android_device_policy_bp
 
 __all__ = [
     'api_devices_bp',
@@ -21,4 +23,6 @@ __all__ = [
     'api_pairing_bp',
     'api_dashboard_bp',
     'api_installed_apps_bp',
+    'api_approvals_bp',
+    'api_android_device_policy_bp',
 ]

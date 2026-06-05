@@ -984,7 +984,15 @@ class DebugAgentProtocol:
                 return False, f"Unknown user '{username}'", {}, False
 
             user_state["apparmor_policies"] = _json_clone(policies)
-            self.config["apparmor_state"][username] = _json_clone(policies)
+            approval_policy = args.get("approval_policy")
+            if approval_policy is not None:
+                user_state["approval_policy"] = _json_clone(approval_policy)
+            else:
+                user_state.pop("approval_policy", None)
+            self.config["apparmor_state"][username] = {
+                "policies": _json_clone(policies),
+                "approval_policy": _json_clone(approval_policy) if approval_policy is not None else None,
+            }
             return True, f"Stored {len(policies)} AppArmor policies", {}, True
 
         if action == "refresh_installed_apps":

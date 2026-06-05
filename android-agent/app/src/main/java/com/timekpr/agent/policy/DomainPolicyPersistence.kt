@@ -35,9 +35,16 @@ internal class DomainPolicyPersistence(context: Context) {
             .put(
                 "policies",
                 JSONObject(policies.mapValues { (_, policy) ->
-                    JSONObject()
+                    val entry = JSONObject()
                         .put("linux_username", policy.linuxUsername)
                         .put("source_ids", org.json.JSONArray(policy.sourceIds))
+                    if (policy.allowedDomains.isNotEmpty()) {
+                        entry.put("allowed_domains", org.json.JSONArray(policy.allowedDomains.toList()))
+                    }
+                    if (policy.domainAccessMode != UidPolicy.DOMAIN_ACCESS_BLOCKLIST_ONLY) {
+                        entry.put("domain_access_mode", policy.domainAccessMode)
+                    }
+                    entry
                 }),
             )
         prefs.edit().putString(KEY_META, meta.toString()).apply()
@@ -73,12 +80,7 @@ internal class DomainPolicyPersistence(context: Context) {
             meta.optJSONObject("policies")?.let { json ->
                 json.keys().forEach { uid ->
                     val entry = json.optJSONObject(uid) ?: return@forEach
-                    policies[uid] = UidPolicy(
-                        linuxUsername = entry.optString("linux_username"),
-                        sourceIds = entry.optJSONArray("source_ids")?.let { array ->
-                            (0 until array.length()).map { array.optString(it) }
-                        } ?: emptyList(),
-                    )
+                    policies[uid] = DomainPolicyStore.parseUidPolicyEntry(entry)
                 }
             }
             onPolicies(policies)

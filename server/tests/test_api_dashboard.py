@@ -6,7 +6,13 @@ from datetime import datetime, timezone
 
 import pytest
 
-from src.database import AgentDevice, ManagedUser, ManagedUserDeviceMap, Settings
+from src.database import (
+    AgentDevice,
+    ApprovalRequest,
+    ManagedUser,
+    ManagedUserDeviceMap,
+    Settings,
+)
 from src.dashboard_events import DashboardEventsHub, build_sse_snapshot
 
 
@@ -64,6 +70,28 @@ def test_dashboard_snapshot_authenticated(auth_client, dashboard_user):
     assert 'usage_data' in user
     assert 'schedule_is_synced' in user
     assert 'last_checked_display' in user
+    assert 'pending_approvals' in payload
+    assert payload['pending_approvals']['total'] == 0
+
+
+def test_dashboard_snapshot_includes_pending_approvals(auth_client, dashboard_user, db_session):
+    mapping = ManagedUserDeviceMap.query.filter_by(managed_user_id=dashboard_user.id).one()
+    request_row = ApprovalRequest(
+        device_map_id=mapping.id,
+        request_type=ApprovalRequest.REQUEST_APP_LAUNCH,
+        target_kind=ApprovalRequest.TARGET_PACKAGE,
+        target_value='/android/package/com.pending.app',
+        display_label='Pending App',
+        status=ApprovalRequest.STATUS_PENDING,
+        requested_at=datetime.now(timezone.utc),
+    )
+    db_session.add(request_row)
+    db_session.commit()
+
+    response = auth_client.get('/api/dashboard')
+    payload = response.get_json()
+    assert payload['pending_approvals']['total'] == 1
+    assert payload['pending_approvals']['by_user'][str(dashboard_user.id)] == 1
 
 
 def test_build_sse_snapshot_shape(dashboard_user):
@@ -73,6 +101,7 @@ def test_build_sse_snapshot_shape(dashboard_user):
     assert 'ts' in snapshot
     assert isinstance(snapshot['users'], list)
     assert isinstance(snapshot['pending_adjustments'], dict)
+    assert isinstance(snapshot['pending_approvals'], dict)
 
 
 def test_dashboard_events_hub_debounces_notifications(app, db_session):

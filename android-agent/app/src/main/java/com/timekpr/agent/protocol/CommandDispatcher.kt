@@ -6,6 +6,7 @@ import com.timekpr.agent.policy.AppPolicyStore
 import com.timekpr.agent.policy.DomainPolicyStore
 import com.timekpr.agent.policy.TimeLimitStore
 import com.timekpr.agent.policy.UidPolicy
+import com.timekpr.agent.admin.DeviceLifecycleManager
 import com.timekpr.agent.discovery.DiscoveredApp
 import com.timekpr.agent.discovery.InstalledAppsDiscovery
 import com.timekpr.agent.util.AndroidUsers
@@ -18,10 +19,12 @@ class CommandDispatcher(
     private val onDomainPolicyChanged: () -> Unit,
     private val onAppPolicyChanged: (String) -> Unit,
     private val onTimePolicyChanged: (String) -> Unit,
+    private val onDeviceRestrictionChanged: (String) -> Unit,
 ) {
     private val app: TimeKprApplication = TimeKprApplication.from(context)
     private val timeLimitStore: TimeLimitStore = app.timeLimitStore
     private val domainPolicyStore: DomainPolicyStore = app.domainPolicyStore
+    private val lifecycleManager = DeviceLifecycleManager(context)
 
     fun handle(action: String, username: String, args: JSONObject): DispatchResult {
         return when (action) {
@@ -38,7 +41,10 @@ class CommandDispatcher(
             "finalize_domain_policy_sync" -> handleFinalizeDomainSync(args)
             "abort_domain_policy_sync" -> handleAbortDomainSync(args)
             "sync_apparmor_policy" -> handleAppPolicy(username, args)
+            "sync_android_device_policy" -> handleAndroidDevicePolicy(username, args)
             "refresh_installed_apps" -> handleRefreshInstalledApps(username)
+            "unenroll" -> handleUnenroll()
+            "factory_reset" -> handleFactoryReset()
             else -> DispatchResult(false, "Unsupported action '$action'", JSONObject())
         }
     }
@@ -158,10 +164,7 @@ class CommandDispatcher(
             val sourceIds = entry.optJSONArray("source_ids")?.let { array ->
                 (0 until array.length()).map { array.optString(it) }
             } ?: emptyList()
-            session.policies[uid] = UidPolicy(
-                linuxUsername = entry.optString("linux_username"),
-                sourceIds = sourceIds,
-            )
+            session.policies[uid] = DomainPolicyStore.parseUidPolicyEntry(entry)
         }
         return DispatchResult(true, "Updated domain policy manifest", JSONObject())
     }
@@ -181,9 +184,27 @@ class CommandDispatcher(
 
     private fun handleAppPolicy(username: String, args: JSONObject): DispatchResult {
         val policies = args.optJSONArray("policies") ?: JSONArray()
-        appPolicyStore.syncPolicies(username, policies)
+        val approvalPolicy = args.optJSONObject("approval_policy")
+        appPolicyStore.syncPolicies(username, policies, approvalPolicy)
         onAppPolicyChanged(username)
         return DispatchResult(true, "App policies synchronized", JSONObject())
+    }
+
+    private fun handleAndroidDevicePolicy(username: String, args: JSONObject): DispatchResult {
+        val devicePolicy = args.optJSONObject("device_policy")
+        app.deviceRestrictionStore.syncPolicy(username, devicePolicy)
+        onDeviceRestrictionChanged(username)
+        return DispatchResult(true, "Android device policy synchronized", JSONObject())
+    }
+
+    private fun handleUnenroll(): DispatchResult {
+        val (success, message) = lifecycleManager.unenrollLocally()
+        return DispatchResult(success, message, JSONObject())
+    }
+
+    private fun handleFactoryReset(): DispatchResult {
+        val (success, message) = lifecycleManager.factoryReset()
+        return DispatchResult(success, message, JSONObject())
     }
 
     private fun handleRefreshInstalledApps(username: String): DispatchResult {
