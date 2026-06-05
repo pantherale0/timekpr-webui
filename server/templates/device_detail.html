@@ -58,7 +58,7 @@
                     </div>
                 </div>
                 <div>
-                    <a href="{{ url_for('apparmor_policy', mapping_id=mapping.id) }}" class="btn btn-sm btn-secondary" style="margin: 0; padding: 0.25rem 0.5rem; font-size: 0.8rem;">🛡️ Application policies</a>
+                    <a href="{{ url_for('ui_dashboard.edit_user_profile', user_id=mapping.managed_user.id) }}" class="btn btn-sm btn-secondary" style="margin: 0; padding: 0.25rem 0.5rem; font-size: 0.8rem;">🛡️ Application policies</a>
                 </div>
             </div>
             {% endfor %}

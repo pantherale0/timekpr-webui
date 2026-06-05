@@ -10,23 +10,17 @@ import com.timekpr.agent.protocol.PairingQrPayload
 
 class QrScanActivity : AppCompatActivity() {
     private val scanner = registerForActivityResult(ScanContract()) { result ->
-        if (result.contents == null) {
-            setResult(Activity.RESULT_CANCELED)
-            finish()
-            return
-        }
-        val payload = PairingQrPayload.parse(result.contents)
+        val payload = result.contents?.let { PairingQrPayload.parse(it) }
         if (payload == null) {
             setResult(Activity.RESULT_CANCELED)
-            finish()
-            return
+        } else {
+            val data = Intent()
+                .putExtra(EXTRA_SERVER_URL, payload.serverUrl)
+            if (!payload.registrationToken.isNullOrBlank()) {
+                data.putExtra(EXTRA_REGISTRATION_TOKEN, payload.registrationToken)
+            }
+            setResult(Activity.RESULT_OK, data)
         }
-        val data = Intent()
-            .putExtra(EXTRA_SERVER_URL, payload.serverUrl)
-        if (!payload.registrationToken.isNullOrBlank()) {
-            data.putExtra(EXTRA_REGISTRATION_TOKEN, payload.registrationToken)
-        }
-        setResult(Activity.RESULT_OK, data)
         finish()
     }
 

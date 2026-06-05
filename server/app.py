@@ -138,6 +138,39 @@ def fallback_handler(error, endpoint, values):
 app.url_build_error_handlers.append(fallback_handler)
 
 
+def _ensure_database_schema(migrations_dir):
+    """Ensure model tables exist, repairing stamped-but-empty databases."""
+    from sqlalchemy import inspect as sqla_inspect, text
+    from flask_migrate import upgrade
+
+    inspector = sqla_inspect(db.engine)
+    existing_tables = set(inspector.get_table_names())
+    expected_tables = set(db.metadata.tables.keys())
+    missing_tables = expected_tables - existing_tables
+
+    if not missing_tables:
+        return
+
+    schema_tables = expected_tables & existing_tables
+    if 'alembic_version' in existing_tables and not schema_tables:
+        _LOGGER.warning(
+            "Database has Alembic revision metadata but no schema tables; "
+            "re-running migrations from scratch."
+        )
+        db.session.execute(text('DELETE FROM alembic_version'))
+        db.session.commit()
+        upgrade(directory=migrations_dir)
+        existing_tables = set(sqla_inspect(db.engine).get_table_names())
+        missing_tables = expected_tables - existing_tables
+
+    if missing_tables:
+        _LOGGER.warning(
+            "Creating missing database tables: %s",
+            ", ".join(sorted(missing_tables)),
+        )
+        db.create_all()
+
+
 def migrate_data_sqlite_to_pg(sqlite_db_path):
     """Migrates all data from an existing SQLite database to the current PostgreSQL database."""
     from sqlalchemy import create_engine, select
@@ -300,9 +333,8 @@ def initialize_runtime(start_background_tasks=False):
                         _LOGGER.info("Migrations directory missing. Creating database tables directly...")
                         db.create_all()
 
-                # Final safety measure: Ensure all tables defined in models exist.
-                # This catches cases where migrations are 'current' but tables are missing.
-                db.create_all()
+                # Final safety measure: ensure tables exist even when Alembic is stamped.
+                _ensure_database_schema(migrations_dir)
 
                 try:
                     if not Settings.get_value('admin_password_hash', None) and not Settings.get_value('admin_password', None):
@@ -323,6 +355,8 @@ if not os.environ.get('TESTING'):
     initialize_runtime(start_background_tasks=_env_flag_enabled('TIMEKPR_ENABLE_BACKGROUND_TASKS'))
 
 if __name__ == '__main__':
-    initialize_runtime(start_background_tasks=True)
     debug = bool(int(os.environ.get("DEBUG", "0")))
-    app.run(host='0.0.0.0', port=5000, debug=debug, use_reloader=debug)
+    # With the Werkzeug reloader, the parent watchdog also runs this block.
+    if not debug or os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
+        initialize_runtime(start_background_tasks=True)
+    app.run(host='0.0.0.0', port=5000, debug=debug, use_reloader=False)

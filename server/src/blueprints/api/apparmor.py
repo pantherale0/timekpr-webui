@@ -69,7 +69,7 @@ def save_apparmor_policy(mapping_id):
             )
         except ValueError as exc:
             flash(str(exc), 'danger')
-            return redirect(url_for('ui_apparmor.apparmor_policy', mapping_id=mapping.id))
+            return redirect(url_for('ui_dashboard.edit_user_profile', user_id=mapping.managed_user_id))
         if not _is_valid_preset_for_match_type(custom_match_type, custom_preset):
             custom_preset = AppArmorRule.PRESET_ALLOWED
         existing = AppArmorRule.query.filter_by(
@@ -125,7 +125,7 @@ def save_apparmor_policy(mapping_id):
     else:
         flash('Policy saved. Will sync when the device reconnects.', 'success')
 
-    return redirect(url_for('ui_apparmor.apparmor_policy', mapping_id=mapping.id))
+    return redirect(url_for('ui_dashboard.edit_user_profile', user_id=mapping.managed_user_id))
 
 
 @api_apparmor_bp.route('/apparmor/rule/<int:rule_id>/delete', methods=['POST'])
@@ -162,4 +162,4 @@ def delete_apparmor_rule(rule_id):
             flash(f'Removed AppArmor rule for {rule_name}, but sync failed: {sync_msg}', 'warning')
     else:
         flash(f'Removed AppArmor rule for {rule_name}. Will sync when the device reconnects.', 'success')
-    return redirect(url_for('ui_apparmor.apparmor_policy', mapping_id=mapping_id))
+    return redirect(url_for('ui_dashboard.edit_user_profile', user_id=mapping.managed_user_id))

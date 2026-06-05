@@ -18,6 +18,24 @@
         <p style="color: var(--pico-muted-color); margin-top: 0;">
             Scan this QR code from the TimeKpr Android app during setup or from the main screen. It encodes the WebSocket URL required for device enrollment.
         </p>
+        <form action="{{ url_for('ui_dashboard.settings') }}" method="POST" style="margin-top: 1.25rem;">
+            <input type="hidden" name="form_name" value="agent_pairing">
+            <div class="form-group" style="margin-bottom: 0;">
+                <label for="agent_websocket_url" class="form-label">Agent WebSocket URL</label>
+                <input
+                    type="text"
+                    id="agent_websocket_url"
+                    name="agent_websocket_url"
+                    class="form-control"
+                    placeholder="wss://your-server.example/ws"
+                    value="{{ agent_websocket_url }}"
+                >
+                <small style="display: block; margin-top: 0.25rem; color: var(--pico-muted-color); font-weight: 500;">
+                    Leave blank to auto-detect from your current browser session. Set a custom URL when agents connect through a reverse proxy or public hostname.
+                </small>
+            </div>
+            <button type="submit" class="btn btn-secondary btn-sm" style="margin-top: 1rem;">Save pairing URL</button>
+        </form>
         <div style="display: flex; flex-wrap: wrap; gap: 2rem; align-items: flex-start; margin-top: 1.25rem;">
             <img src="{{ pairing_qr_data_uri }}" alt="TimeKpr pairing QR code" width="220" height="220" style="border: 1px solid var(--pico-card-border-color); border-radius: 0.75rem; background: #fff; padding: 0.5rem;" />
             <div style="flex: 1; min-width: 260px;">
@@ -29,6 +47,72 @@
                     <a href="{{ url_for('api_pairing.pairing_qr_png') }}" class="btn btn-secondary btn-sm">Download QR PNG</a>
                 </p>
             </div>
+        </div>
+
+        <div style="margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--pico-card-border-color);">
+            <h3 style="font-size: 1.1rem; font-weight: 700; margin: 0 0 0.5rem 0;">Android MDM provisioning QR</h3>
+            <p style="color: var(--pico-muted-color); margin-top: 0;">
+                Use this QR during factory-reset setup (tap the welcome screen six times, then scan). Android downloads the agent APK, sets device owner, and applies the server URL automatically.
+            </p>
+            {% if android_agent_apk_uploaded %}
+            <div style="background: var(--pico-background-color); padding: 1rem; border-radius: 0.75rem; border: 1px solid var(--pico-card-border-color); margin-top: 1.25rem;">
+                <p style="margin: 0 0 0.5rem 0; font-size: 0.85rem; color: var(--pico-muted-color); text-transform: uppercase; font-weight: 700;">Uploaded APK</p>
+                <strong>{{ android_agent_apk_filename or 'android-agent.apk' }}</strong>
+                {% if android_agent_signature_checksum %}
+                <p style="margin: 0.75rem 0 0 0; font-size: 0.85rem; color: var(--pico-muted-color);">Signature checksum computed automatically on upload.</p>
+                {% endif %}
+                <form action="{{ url_for('ui_dashboard.settings') }}" method="POST" style="margin-top: 0.75rem;">
+                    <input type="hidden" name="form_name" value="android_provisioning">
+                    <input type="hidden" name="remove_android_apk" value="1">
+                    <button type="submit" class="btn btn-secondary btn-sm">Remove uploaded APK</button>
+                </form>
+            </div>
+            {% endif %}
+            <form action="{{ url_for('ui_dashboard.settings') }}" method="POST" enctype="multipart/form-data" style="margin-top: 1.25rem;">
+                <input type="hidden" name="form_name" value="android_provisioning">
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label for="android_agent_apk" class="form-label">{% if android_agent_apk_uploaded %}Replace Android APK{% else %}Upload Android APK{% endif %}</label>
+                    <input
+                        type="file"
+                        id="android_agent_apk"
+                        name="android_agent_apk"
+                        class="form-control"
+                        accept=".apk,application/vnd.android.package-archive"
+                    >
+                    <small style="display: block; margin-top: 0.25rem; color: var(--pico-muted-color); font-weight: 500;">
+                        Upload a signed release APK for dev/testing, or leave empty to use the GitHub release for server version <code>{{ server_version }}</code> when available. The server hosts uploaded APKs at <code>/api/pairing/provisioning/apk</code> and computes the signature checksum automatically.
+                    </small>
+                </div>
+                <button type="submit" class="btn btn-secondary btn-sm" style="margin-top: 1rem;">Upload APK</button>
+            </form>
+
+            {% if not provisioning.provisioning_ready %}
+            <div class="flash-alert flash-alert-warning" style="margin-top: 1.25rem;">
+                <span>
+                    <strong>MDM provisioning QR unavailable.</strong>
+                    {% if provisioning.is_dev_version %}
+                    Server version <code>{{ server_version }}</code> has no published release assets. Build a release APK (<code>./gradlew assembleRelease</code>) and upload it above.
+                    {% else %}
+                    Upload an Android APK above, or publish release assets for <code>{{ server_version }}</code>.
+                    {% endif %}
+                </span>
+            </div>
+            {% else %}
+            <div style="display: flex; flex-wrap: wrap; gap: 2rem; align-items: flex-start; margin-top: 1.25rem;">
+                <img src="{{ provisioning_qr_data_uri }}" alt="Android MDM provisioning QR code" width="220" height="220" style="border: 1px solid var(--pico-card-border-color); border-radius: 0.75rem; background: #fff; padding: 0.5rem;" />
+                <div style="flex: 1; min-width: 260px;">
+                    <p style="margin: 0 0 0.5rem 0; font-size: 0.85rem; color: var(--pico-muted-color); text-transform: uppercase; font-weight: 700;">APK URL ({{ provisioning.apk_source }})</p>
+                    <code style="display: block; word-break: break-all; padding: 0.75rem; border-radius: 0.5rem; background: var(--pico-background-color); font-size: 0.8rem;">{{ provisioning.apk_url }}</code>
+                    <p style="margin: 1rem 0 0.5rem 0; font-size: 0.85rem; color: var(--pico-muted-color); text-transform: uppercase; font-weight: 700;">Signature checksum ({{ provisioning.checksum_source }})</p>
+                    <code style="display: block; word-break: break-all; padding: 0.75rem; border-radius: 0.5rem; background: var(--pico-background-color); font-size: 0.8rem;">{{ provisioning.signature_checksum }}</code>
+                    <p style="margin: 1rem 0 0.5rem 0; font-size: 0.85rem; color: var(--pico-muted-color); text-transform: uppercase; font-weight: 700;">Provisioning payload</p>
+                    <code style="display: block; word-break: break-all; padding: 0.75rem; border-radius: 0.5rem; background: var(--pico-background-color); font-size: 0.8rem;">{{ provisioning.payload_json }}</code>
+                    <p style="margin-top: 1rem;">
+                        <a href="{{ url_for('api_pairing.provisioning_qr_png') }}" class="btn btn-secondary btn-sm">Download provisioning QR PNG</a>
+                    </p>
+                </div>
+            </div>
+            {% endif %}
         </div>
     </article>
 

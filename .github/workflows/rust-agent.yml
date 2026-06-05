@@ -156,8 +156,17 @@ jobs:
         with:
           gradle-version: 8.9
 
+      - name: Decode release keystore
+        if: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+        run: echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android-agent/release.keystore
+
       - name: Build release APK
         working-directory: android-agent
+        env:
+          ANDROID_KEYSTORE_PATH: ${{ github.workspace }}/android-agent/release.keystore
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: ./gradlew assembleRelease --no-daemon
 
       - name: Package release asset
@@ -166,11 +175,20 @@ jobs:
           apk_path=$(find android-agent/app/build/outputs/apk/release -name '*.apk' | head -n 1)
           cp "$apk_path" "dist/timekpr-android-agent-${{ github.ref_name }}.apk"
 
+      - name: Compute APK signature checksum
+        run: |
+          chmod +x scripts/android-signature-checksum.sh
+          ./scripts/android-signature-checksum.sh \
+            "dist/timekpr-android-agent-${{ github.ref_name }}.apk" \
+            > "dist/timekpr-android-agent-${{ github.ref_name }}.signature-checksum"
+
       - name: Upload packaged asset
         uses: actions/upload-artifact@v4
         with:
           name: android-agent-apk
-          path: dist/timekpr-android-agent-${{ github.ref_name }}.apk
+          path: |
+            dist/timekpr-android-agent-${{ github.ref_name }}.apk
+            dist/timekpr-android-agent-${{ github.ref_name }}.signature-checksum
 
   publish-release:
     needs: [linux-release-build, android-release-build]

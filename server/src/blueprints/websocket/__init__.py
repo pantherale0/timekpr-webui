@@ -5,7 +5,11 @@ from datetime import datetime, timezone
 from flask import Blueprint, request
 from sqlalchemy.exc import SQLAlchemyError
 from src.database import db, AgentDevice
-from src.agent_helper import AgentConnectionManager, normalize_agent_alert_payload
+from src.agent_helper import (
+    AgentConnectionManager,
+    agent_versions_compatible,
+    normalize_agent_alert_payload,
+)
 from src.agent_push import update_device_push_metadata
 from src.alerts_manager import _store_agent_alert
 from src.apparmor_manager import _store_app_usage_from_alert
@@ -71,9 +75,7 @@ def ws_agent_handler(ws):
                 return
             
             agent_version = hello_msg.get("agent_version")
-            stripped_server = __version__.lstrip('v')
-            stripped_agent = agent_version.lstrip('v') if agent_version else ""
-            if stripped_agent != stripped_server:
+            if not agent_versions_compatible(__version__, agent_version):
                 _LOGGER.warning(
                     "Connection rejected: Agent version %s is incompatible with server version %s",
                     agent_version or "unknown",

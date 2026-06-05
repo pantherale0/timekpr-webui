@@ -1,14 +1,33 @@
 """Tests for agent pairing QR helpers."""
 
+import io
 import json
+import zipfile
+from unittest.mock import patch
 
 import pytest
+from werkzeug.datastructures import FileStorage
 
 from src.pairing_helper import (
+    ANDROID_DPC_COMPONENT,
+    ANDROID_EXTRA_REGISTRATION_TOKEN,
+    ANDROID_EXTRA_SERVER_URL,
     PAIRING_PAYLOAD_TYPE,
+    PROVISIONING_KEY_COMPONENT,
+    PROVISIONING_KEY_DOWNLOAD,
+    PROVISIONING_KEY_EXTRAS,
+    PROVISIONING_KEY_SIGNATURE,
+    build_android_provisioning_payload,
     build_pairing_payload,
+    default_android_apk_url,
+    is_dev_server_version,
+    normalize_agent_websocket_url,
     pairing_payload_json,
+    provisioning_payload_json,
     render_pairing_qr_png,
+    resolve_android_apk_url,
+    resolve_android_provisioning,
+    resolve_android_signature_checksum,
 )
 
 
@@ -47,3 +66,161 @@ def test_build_agent_websocket_url_explicit_override(app):
         from src.pairing_helper import build_agent_websocket_url
 
         assert build_agent_websocket_url(request, explicit_url='wss://custom/ws') == 'wss://custom/ws'
+
+
+def test_build_agent_websocket_url_configured_override(app):
+    with app.test_request_context('/', base_url='https://timekpr.example'):
+        from flask import request
+
+        from src.pairing_helper import build_agent_websocket_url
+
+        assert build_agent_websocket_url(
+            request,
+            configured_url='wss://public.example/ws',
+        ) == 'wss://public.example/ws'
+
+
+def test_normalize_agent_websocket_url_adds_default_path():
+    assert normalize_agent_websocket_url('wss://example.com') == 'wss://example.com/ws'
+
+
+def test_normalize_agent_websocket_url_rejects_invalid_scheme():
+    with pytest.raises(ValueError, match='ws:// or wss://'):
+        normalize_agent_websocket_url('https://example.com/ws')
+
+
+def test_is_dev_server_version():
+    assert is_dev_server_version('v0.0.0-dev') is True
+    assert is_dev_server_version('') is True
+    assert is_dev_server_version('v0.10') is False
+
+
+def test_default_android_apk_url():
+    url = default_android_apk_url('v1.2.3')
+    assert url.endswith('/timekpr-android-agent-v1.2.3.apk')
+    assert 'pantherale0/timekpr-webui' in url
+
+
+def test_resolve_android_apk_url_dev_without_upload(app):
+    with app.test_request_context('/'):
+        assert resolve_android_apk_url('v0.0.0-dev') == ''
+
+
+def test_resolve_android_apk_url_release_default(app):
+    with app.test_request_context('/'):
+        url = resolve_android_apk_url('v0.10')
+        assert 'timekpr-android-agent-v0.10.apk' in url
+
+
+@patch('src.pairing_helper.has_uploaded_android_apk', return_value=True)
+def test_resolve_android_apk_url_uses_agent_server_host(mock_uploaded):
+    url = resolve_android_apk_url('v0.0.0-dev', server_url='ws://10.10.5.25:5000/ws')
+    assert url == 'http://10.10.5.25:5000/api/pairing/provisioning/apk'
+
+
+def test_build_uploaded_android_apk_url_uses_wss_origin():
+    from src.pairing_helper import build_uploaded_android_apk_url
+
+    url = build_uploaded_android_apk_url('wss://timekpr.example/ws')
+    assert url == 'https://timekpr.example/api/pairing/provisioning/apk'
+
+
+def test_resolve_android_signature_checksum_prefers_override():
+    assert resolve_android_signature_checksum('v0.10', 'checksum-override') == 'checksum-override'
+
+
+@patch('src.pairing_helper._fetch_release_signature_checksum', return_value='release-checksum')
+def test_resolve_android_signature_checksum_fetches_release(mock_fetch):
+    assert resolve_android_signature_checksum('v0.10', '') == 'release-checksum'
+    mock_fetch.assert_called_once_with('v0.10')
+
+
+def test_build_android_provisioning_payload_shape():
+    payload = build_android_provisioning_payload(
+        'wss://example.com/ws',
+        'https://cdn.example/app.apk',
+        'abc123checksum',
+        'reg-token',
+    )
+    assert payload[PROVISIONING_KEY_COMPONENT] == ANDROID_DPC_COMPONENT
+    assert payload[PROVISIONING_KEY_DOWNLOAD] == 'https://cdn.example/app.apk'
+    assert payload[PROVISIONING_KEY_SIGNATURE] == 'abc123checksum'
+    extras = payload[PROVISIONING_KEY_EXTRAS]
+    assert extras[ANDROID_EXTRA_SERVER_URL] == 'wss://example.com/ws'
+    assert extras[ANDROID_EXTRA_REGISTRATION_TOKEN] == 'reg-token'
+
+
+def test_provisioning_payload_json_roundtrip():
+    raw = provisioning_payload_json(
+        'wss://example.com/ws',
+        'https://cdn.example/app.apk',
+        'abc123checksum',
+    )
+    parsed = json.loads(raw)
+    assert parsed[PROVISIONING_KEY_COMPONENT] == ANDROID_DPC_COMPONENT
+
+
+@patch('src.pairing_helper.has_uploaded_android_apk', return_value=False)
+@patch('src.pairing_helper._fetch_release_signature_checksum', return_value='release-checksum')
+def test_resolve_android_provisioning_ready_with_release_assets(mock_fetch, mock_uploaded):
+    context = resolve_android_provisioning(
+        'wss://example.com/ws',
+        'v0.10',
+        registration_token='secret',
+    )
+    assert context['provisioning_ready'] is True
+    assert context['apk_source'] == 'release'
+    assert context['checksum_source'] == 'release'
+    assert context['payload_json'] is not None
+
+
+def test_resolve_android_provisioning_not_ready_for_dev_without_overrides():
+    context = resolve_android_provisioning('wss://example.com/ws', 'v0.0.0-dev')
+    assert context['provisioning_ready'] is False
+    assert context['is_dev_version'] is True
+
+
+@patch('src.pairing_helper.has_uploaded_android_apk', return_value=True)
+def test_resolve_android_provisioning_ready_with_uploaded_apk(mock_uploaded):
+    context = resolve_android_provisioning(
+        'ws://10.10.5.25:5000/ws',
+        'v0.0.0-dev',
+        checksum_override='dev-checksum',
+    )
+    assert context['provisioning_ready'] is True
+    assert context['apk_source'] == 'upload'
+    assert context['checksum_source'] == 'upload'
+    assert context['apk_url'] == 'http://10.10.5.25:5000/api/pairing/provisioning/apk'
+
+
+def _make_apk_filestorage():
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, 'w') as archive:
+        archive.writestr('AndroidManifest.xml', '<manifest />')
+    buffer.seek(0)
+    return FileStorage(
+        stream=buffer,
+        filename='app-release.apk',
+        content_type='application/vnd.android.package-archive',
+    )
+
+
+def test_validate_android_apk_upload_rejects_non_apk():
+    from src.pairing_helper import _validate_android_apk_upload
+
+    storage = FileStorage(stream=io.BytesIO(b'plain-text'), filename='notes.txt')
+    with pytest.raises(ValueError, match='.apk'):
+        _validate_android_apk_upload(storage)
+
+
+@patch('src.pairing_helper.compute_apk_signature_checksum', return_value='checksum-value')
+def test_save_uploaded_android_apk_persists_file(mock_checksum, tmp_path, monkeypatch):
+    import os
+
+    from src.pairing_helper import get_android_apk_storage_path, save_uploaded_android_apk
+
+    monkeypatch.setenv('TIMEKPR_ANDROID_APK_PATH', str(tmp_path / 'android-agent.apk'))
+    filename, checksum = save_uploaded_android_apk(_make_apk_filestorage())
+    assert filename == 'app-release.apk'
+    assert checksum == 'checksum-value'
+    assert os.path.isfile(get_android_apk_storage_path())

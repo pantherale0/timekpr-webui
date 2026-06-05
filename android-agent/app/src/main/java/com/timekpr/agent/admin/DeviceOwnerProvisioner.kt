@@ -31,16 +31,13 @@ object DeviceOwnerProvisioner {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             grantPermission(dpm, admin, packageName, Manifest.permission.POST_NOTIFICATIONS)
         }
-
-        try {
-            if (dpm.alwaysOnVpnPackage != packageName) {
-                dpm.setAlwaysOnVpnPackage(admin, packageName, false)
-            }
-        } catch (e: Exception) {
-            Log.w(TAG, "Failed to set always-on VPN", e)
-        }
+        grantOverlayPermission(context)
 
         return true
+    }
+
+    fun hasOverlayPermission(context: Context): Boolean {
+        return android.provider.Settings.canDrawOverlays(context)
     }
 
     fun hasUsageAccess(context: Context): Boolean {
@@ -59,6 +56,28 @@ object DeviceOwnerProvisioner {
         return DeviceAdminActivationActivity.isActive(context)
             && hasUsageAccess(context)
             && hasVpnConsent(context)
+    }
+
+    private fun grantOverlayPermission(context: Context) {
+        val appOps = context.getSystemService(AppOpsManager::class.java) ?: return
+        try {
+            val method = AppOpsManager::class.java.getMethod(
+                "setMode",
+                String::class.java,
+                Int::class.javaPrimitiveType,
+                String::class.java,
+                Int::class.javaPrimitiveType,
+            )
+            method.invoke(
+                appOps,
+                AppOpsManager.OPSTR_SYSTEM_ALERT_WINDOW,
+                android.os.Process.myUid(),
+                context.packageName,
+                AppOpsManager.MODE_ALLOWED,
+            )
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to grant SYSTEM_ALERT_WINDOW", e)
+        }
     }
 
     private fun grantPermission(

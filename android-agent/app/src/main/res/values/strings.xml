@@ -6,6 +6,13 @@
     <string name="agent_notification_body">Policies active — server sync via push</string>
     <string name="vpn_notification_title">Web policy filter</string>
     <string name="vpn_notification_body">Blocking restricted domains</string>
+    <string name="domain_block_notification_channel">Domain blocks</string>
+    <string name="domain_block_notification_channel_desc">Alerts when web domains are blocked by policy</string>
+    <string name="domain_block_overlay_title">Web access restricted</string>
+    <string name="domain_block_overlay_body">%1$s is blocked by your TimeKpr policy.</string>
+    <string name="domain_block_burst_title">Web access restricted</string>
+    <string name="domain_block_burst_body">Some traffic on this website has been blocked.</string>
+    <string name="domain_block_dismiss">Dismiss</string>
     <string name="time_exhausted_title">Screen time limit reached</string>
     <string name="time_exhausted_body">Your daily allowance is used up.</string>
     <string name="pairing_scan_qr">Scan server QR code</string>

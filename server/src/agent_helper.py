@@ -12,8 +12,20 @@ from datetime import datetime, timezone
 from queue import Queue, Empty
 
 from src.database import AgentDevice
+from src.pairing_helper import is_dev_server_version
 
 logger = logging.getLogger(__name__)
+
+
+def agent_versions_compatible(server_version: str, agent_version: str | None) -> bool:
+    """Return True when an agent may connect to this server version."""
+    if is_dev_server_version(server_version):
+        return True
+    if not agent_version:
+        return False
+    stripped_server = server_version.lstrip('v')
+    stripped_agent = agent_version.lstrip('v')
+    return stripped_agent == stripped_server
 
 # Optional registration token firewall for new dynamic pairings
 REGISTRATION_TOKEN = os.environ.get('REGISTRATION_TOKEN')

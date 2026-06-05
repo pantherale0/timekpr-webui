@@ -10,11 +10,24 @@ from src.blocklists_manager import (
     _build_user_blocklist_sync_status,
     _get_blocklist_sources,
 )
-from src.settings_manager import _get_alert_webhook_settings, _get_time_sync_tolerance, _get_alert_retention_days
+from src.settings_manager import (
+    _get_agent_websocket_url,
+    _get_alert_webhook_settings,
+    _get_time_sync_tolerance,
+    _get_alert_retention_days,
+    _get_android_agent_apk_filename,
+    _get_android_agent_signature_checksum,
+)
 from src.pairing_helper import (
     build_agent_websocket_url,
+    get_server_version,
+    has_uploaded_android_apk,
+    normalize_agent_websocket_url,
     pairing_payload_json,
+    remove_uploaded_android_apk,
     render_pairing_qr_data_uri,
+    resolve_android_provisioning,
+    save_uploaded_android_apk,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -156,11 +169,53 @@ def settings():
     alert_webhook_settings = _get_alert_webhook_settings()
     time_sync_tolerance = _get_time_sync_tolerance()
     alert_retention_days = _get_alert_retention_days()
+    agent_websocket_url = _get_agent_websocket_url()
+    android_agent_apk_filename = _get_android_agent_apk_filename()
+    android_agent_signature_checksum = _get_android_agent_signature_checksum()
+    android_agent_apk_uploaded = has_uploaded_android_apk()
 
     if request.method == 'POST':
         form_name = (request.form.get('form_name') or 'password').strip()
 
-        if form_name == 'alert_webhook':
+        if form_name == 'agent_pairing':
+            submitted_url = (request.form.get('agent_websocket_url') or '').strip()
+            try:
+                normalized_url = normalize_agent_websocket_url(submitted_url)
+            except ValueError as exc:
+                flash(str(exc), 'danger')
+            else:
+                Settings.set_value('agent_websocket_url', normalized_url)
+                if normalized_url:
+                    flash('Agent pairing URL updated successfully', 'success')
+                else:
+                    flash('Agent pairing URL reset to auto-detect', 'success')
+                return redirect(url_for('ui_dashboard.settings'))
+
+            agent_websocket_url = submitted_url
+        elif form_name == 'android_provisioning':
+            if request.form.get('remove_android_apk') == '1':
+                remove_uploaded_android_apk()
+                Settings.set_value('android_agent_apk_filename', '')
+                Settings.set_value('android_agent_signature_checksum', '')
+                flash('Uploaded Android APK removed', 'success')
+                return redirect(url_for('ui_dashboard.settings'))
+
+            uploaded_apk = request.files.get('android_agent_apk')
+            if uploaded_apk and (uploaded_apk.filename or '').strip():
+                try:
+                    filename, checksum = save_uploaded_android_apk(uploaded_apk)
+                except ValueError as exc:
+                    flash(str(exc), 'danger')
+                except RuntimeError as exc:
+                    flash(f'Failed to process uploaded APK: {exc}', 'danger')
+                else:
+                    Settings.set_value('android_agent_apk_filename', filename)
+                    Settings.set_value('android_agent_signature_checksum', checksum)
+                    flash('Android APK uploaded successfully', 'success')
+                    return redirect(url_for('ui_dashboard.settings'))
+            else:
+                flash('Choose an APK file to upload', 'warning')
+        elif form_name == 'alert_webhook':
             webhook_enabled = request.form.get('alert_webhook_enabled') == 'on'
             webhook_url = (request.form.get('alert_webhook_url') or '').strip()
             webhook_secret = (request.form.get('alert_webhook_secret') or '').strip()
@@ -216,19 +271,39 @@ def settings():
                 flash('Password updated successfully', 'success')
                 return redirect(url_for('ui_dashboard.settings'))
 
-    server_url = build_agent_websocket_url(request)
+    server_url = build_agent_websocket_url(
+        request,
+        configured_url=agent_websocket_url,
+    )
     registration_token = AgentConnectionManager.registration_token
     pairing_payload = pairing_payload_json(server_url, registration_token)
     pairing_qr_data_uri = render_pairing_qr_data_uri(pairing_payload)
+
+    provisioning = resolve_android_provisioning(
+        server_url,
+        get_server_version(),
+        checksum_override=android_agent_signature_checksum,
+        registration_token=registration_token,
+    )
+    provisioning_qr_data_uri = None
+    if provisioning['provisioning_ready'] and provisioning['payload_json']:
+        provisioning_qr_data_uri = render_pairing_qr_data_uri(provisioning['payload_json'])
 
     return render_template(
         'settings.html',
         alert_webhook_settings=alert_webhook_settings,
         time_sync_tolerance=time_sync_tolerance,
         alert_retention_days=alert_retention_days,
+        agent_websocket_url=agent_websocket_url,
         pairing_server_url=server_url,
         pairing_qr_data_uri=pairing_qr_data_uri,
         pairing_payload=pairing_payload,
+        android_agent_apk_filename=android_agent_apk_filename,
+        android_agent_apk_uploaded=android_agent_apk_uploaded,
+        android_agent_signature_checksum=android_agent_signature_checksum,
+        provisioning=provisioning,
+        provisioning_qr_data_uri=provisioning_qr_data_uri,
+        server_version=get_server_version(),
     )
 
 

@@ -83,9 +83,9 @@ class DomainPolicyStore(context: Context) {
     }
 
     fun beginSync(syncId: String) {
-        val sessionSources = sources.mapValues { (_, domains) ->
+        val sessionSources = sources.mapValues { (sourceId, domains) ->
             SourceEntry(
-                revision = sourceRevisions[it.key] ?: "",
+                revision = sourceRevisions[sourceId] ?: "",
                 domains = domains.toMutableSet(),
             )
         }.toMutableMap()

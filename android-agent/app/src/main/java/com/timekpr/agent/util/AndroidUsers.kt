@@ -9,8 +9,7 @@ object AndroidUsers {
     fun currentLinuxUsername(context: Context): String {
         return try {
             val userManager = context.getSystemService(UserManager::class.java)
-            val user = userManager?.getUserInfo(android.os.Process.myUserHandle())
-            user?.name?.takeIf { it.isNotBlank() } ?: "android"
+            userManager?.userName?.takeIf { it.isNotBlank() } ?: "android"
         } catch (_: Exception) {
             "android"
         }

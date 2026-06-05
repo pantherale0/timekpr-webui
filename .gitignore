@@ -22,6 +22,10 @@ instance/
 
 agent/target
 agent/Cargo.lock
+agent/config.json
+
+# Local dev artifacts (setup-dev.sh)
+.dev/
 
 server/debug-agent.json
 *.log

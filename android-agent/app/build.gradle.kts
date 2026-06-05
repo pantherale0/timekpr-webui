@@ -17,6 +17,32 @@ android {
         buildConfigField("String", "DEFAULT_AGENT_VERSION", "\"v0.1.0-android\"")
     }
 
+    signingConfigs {
+        val keystorePath = (System.getenv("ANDROID_KEYSTORE_PATH")
+            ?: project.findProperty("android.keystore.path")?.toString()).orEmpty()
+        if (keystorePath.isNotBlank() && file(keystorePath).exists()) {
+            create("release") {
+                storeFile = file(keystorePath)
+                storePassword = (System.getenv("ANDROID_KEYSTORE_PASSWORD")
+                    ?: project.findProperty("android.keystore.password")?.toString()).orEmpty()
+                keyAlias = (System.getenv("ANDROID_KEY_ALIAS")
+                    ?: project.findProperty("android.key.alias")?.toString()).orEmpty()
+                keyPassword = (System.getenv("ANDROID_KEY_PASSWORD")
+                    ?: project.findProperty("android.key.password")?.toString()).orEmpty()
+            }
+        }
+    }
+
+    buildTypes {
+        debug {
+            buildConfigField("String", "DEFAULT_AGENT_VERSION", "\"v0.0.0-dev\"")
+        }
+        release {
+            isMinifyEnabled = false
+            signingConfigs.findByName("release")?.let { signingConfig = it }
+        }
+    }
+
     buildFeatures {
         buildConfig = true
         viewBinding = true

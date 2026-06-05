@@ -1,12 +1,13 @@
 # pylint: disable=unused-argument
 
 import json
+import os
 import hmac
 import hashlib
 from datetime import datetime, timezone
 from unittest.mock import patch
 from sqlalchemy import text
-from app import ws_agent_handler, _get_blocklist_sources, task_manager
+from app import ws_agent_handler, _ensure_database_schema, _get_blocklist_sources, task_manager
 from src.database import (
     AgentAlert,
     AgentDevice,
@@ -220,6 +221,50 @@ def test_settings_page(client, db_session):
     }, follow_redirects=True)
     assert b'Webhook URL is required when alert delivery is enabled' in res.data
 
+    # POST agent pairing URL settings
+    res = client.post('/settings', data={
+        'form_name': 'agent_pairing',
+        'agent_websocket_url': 'wss://agents.example.test/ws',
+    }, follow_redirects=True)
+    assert b'Agent pairing URL updated successfully' in res.data
+    assert Settings.get_value('agent_websocket_url') == 'wss://agents.example.test/ws'
+
+    res = client.post('/settings', data={
+        'form_name': 'agent_pairing',
+        'agent_websocket_url': 'https://agents.example.test/ws',
+    }, follow_redirects=True)
+    assert b'Agent WebSocket URL must use ws:// or wss://' in res.data
+
+    res = client.post('/settings', data={
+        'form_name': 'agent_pairing',
+        'agent_websocket_url': '',
+    }, follow_redirects=True)
+    assert b'Agent pairing URL reset to auto-detect' in res.data
+    assert Settings.get_value('agent_websocket_url') == ''
+
+    from io import BytesIO
+    import zipfile
+    from unittest.mock import patch
+
+    apk_buffer = BytesIO()
+    with zipfile.ZipFile(apk_buffer, 'w') as archive:
+        archive.writestr('AndroidManifest.xml', '<manifest />')
+    apk_buffer.seek(0)
+
+    with patch('src.blueprints.ui.dashboard.save_uploaded_android_apk', return_value=('app-release.apk', 'checksum-abc')):
+        res = client.post(
+            '/settings',
+            data={
+                'form_name': 'android_provisioning',
+                'android_agent_apk': (apk_buffer, 'app-release.apk'),
+            },
+            content_type='multipart/form-data',
+            follow_redirects=True,
+        )
+    assert b'Android APK uploaded successfully' in res.data
+    assert Settings.get_value('android_agent_apk_filename') == 'app-release.apk'
+    assert Settings.get_value('android_agent_signature_checksum') == 'checksum-abc'
+
 
 def test_blocklist_catalog_and_assignment_routes(client, db_session):
     Settings.set_admin_password("admin")
@@ -283,6 +328,24 @@ def test_blocklist_catalog_and_assignment_routes(client, db_session):
     assert device_page.status_code == 200
     assert b'Domain Policy Contributors' in device_page.data
     assert b'Lists: 1' in device_page.data
+
+
+def test_ensure_database_schema_repairs_stamped_empty_database(app, db_session):
+    for table_name in db.inspect(db.engine).get_table_names():
+        db.session.execute(text(f'DROP TABLE IF EXISTS "{table_name}"'))
+    db.session.execute(text(
+        'CREATE TABLE alembic_version (version_num VARCHAR(32) NOT NULL)'
+    ))
+    db.session.execute(text("INSERT INTO alembic_version VALUES ('b3e8a1f04c2d')"))
+    db.session.commit()
+
+    migrations_dir = os.path.join(app.root_path, 'migrations')
+    _ensure_database_schema(migrations_dir)
+
+    table_names = set(db.inspect(db.engine).get_table_names())
+    assert 'blocklist_source' in table_names
+    assert 'settings' in table_names
+    assert table_names >= set(db.metadata.tables.keys())
 
 
 def test_delete_blocklist_source_uses_bulk_delete_path(client, db_session):
@@ -673,6 +736,25 @@ def test_websocket_handshake_saves_linux_users(app, db_session):
         ws_agent_handler(invalid_ws)
 
     assert AgentAlert.query.filter_by(system_id=invalid_system_id).count() == 0
+
+def test_websocket_handler_accepts_mismatched_agent_on_dev_server(app, db_session, monkeypatch):
+    import app as app_module
+    from app import ws_agent_handler
+
+    monkeypatch.setattr(app_module, '__version__', 'v0.0.0-dev')
+
+    ws_dev = MockWS([json.dumps({
+        "type": "hello",
+        "system_id": "sys-dev-android",
+        "agent_version": "v0.1.0-android",
+    })])
+    with app.test_request_context('/ws', environ_base={'REMOTE_ADDR': '127.0.0.1'}):
+        ws_agent_handler(ws_dev)
+
+    assert len(ws_dev.sent_messages) == 1
+    resp = json.loads(ws_dev.sent_messages[0])
+    assert resp['type'] == "pairing_status"
+
 
 def test_websocket_handler_version_checking(app, db_session):
     from app import __version__, ws_agent_handler

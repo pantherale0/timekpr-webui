@@ -39,3 +39,18 @@ def _get_alert_retention_days():
         return max(1, int(raw_value))
     except (TypeError, ValueError):
         return 30
+
+
+def _get_agent_websocket_url():
+    """Get the configured agent WebSocket URL for pairing QR codes."""
+    return (Settings.get_value('agent_websocket_url', '') or '').strip()
+
+
+def _get_android_agent_apk_filename():
+    """Get the original filename of the uploaded Android APK."""
+    return (Settings.get_value('android_agent_apk_filename', '') or '').strip()
+
+
+def _get_android_agent_signature_checksum():
+    """Get the configured Android APK signature checksum override for MDM provisioning."""
+    return (Settings.get_value('android_agent_signature_checksum', '') or '').strip()
