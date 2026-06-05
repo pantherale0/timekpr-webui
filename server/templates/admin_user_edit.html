@@ -43,8 +43,8 @@
         </div>
     </div>
 
-    <!-- Internet Blocklists Section -->
     <div class="col-12 col-lg-8">
+        <!-- Internet Blocklists Section -->
         <div class="card border shadow-sm mb-4">
             <div class="card-header bg-dark text-white py-3">
                 <h5 class="mb-0 fw-bold"><i class="fas fa-globe text-primary me-2"></i>Web Content Filtering</h5>
@@ -131,6 +131,129 @@
                 {% endif %}
             </div>
         </div>
+
+        <!-- Android Device Restrictions -->
+        <div class="card border shadow-sm mb-4">
+            <div class="card-header bg-dark text-white py-3">
+                <h5 class="mb-0 fw-bold"><i class="fas fa-mobile-alt text-info me-2"></i>Android Device Restrictions</h5>
+            </div>
+            <div class="card-body p-4">
+                <p class="text-secondary small fw-medium mb-3">Device-owner restrictions aligned with Android Management API policy fields.</p>
+                {% if android_device_policy_by_mapping %}
+                    <div class="d-flex flex-column gap-3">
+                        {% for mapping in user.device_mappings %}
+                            {% set device_policy = android_device_policy_by_mapping.get(mapping.id) %}
+                            {% if device_policy %}
+                            <div class="border rounded p-3 bg-body-tertiary android-device-policy-card" data-mapping-id="{{ mapping.id }}">
+                                <div class="d-flex justify-content-between align-items-start gap-2 mb-2 flex-wrap">
+                                    <strong class="text-body">{{ mapping.linux_username }}@{{ device_policy.device_label or mapping.system_id }}</strong>
+                                    <span class="badge android-device-policy-sync-badge {% if device_policy.is_synced %}bg-success{% else %}bg-warning text-dark{% endif %}" style="font-size: 0.65rem;">
+                                        {% if device_policy.is_synced %}Synced{% else %}Sync pending{% endif %}
+                                    </span>
+                                </div>
+                                <div class="alert alert-warning py-2 small mb-3">
+                                    <i class="fas fa-info-circle me-1"></i>Requires device-owner provisioning (MDM QR or <code>adb dpm set-device-owner</code>).
+                                </div>
+                                <div class="form-check form-switch mb-2">
+                                    <input class="form-check-input android-screen-capture" type="checkbox" data-mapping-id="{{ mapping.id }}" id="screen-capture-{{ mapping.id }}" {% if device_policy.screen_capture_disabled %}checked{% endif %}>
+                                    <label class="form-check-label small" for="screen-capture-{{ mapping.id }}">Disable screen capture</label>
+                                </div>
+                                <div class="mb-2">
+                                    <label class="form-label fw-bold small text-muted text-uppercase mb-1" style="font-size: 0.7rem;">Camera access</label>
+                                    <select class="form-select form-select-sm android-camera-access" data-mapping-id="{{ mapping.id }}">
+                                        <option value="CAMERA_ACCESS_UNSPECIFIED" {% if device_policy.camera_access == 'CAMERA_ACCESS_UNSPECIFIED' %}selected{% endif %}>Unspecified (no policy)</option>
+                                        <option value="CAMERA_ACCESS_DISABLED" {% if device_policy.camera_access == 'CAMERA_ACCESS_DISABLED' %}selected{% endif %}>Disabled</option>
+                                        <option value="CAMERA_ACCESS_USER_CHOICE" {% if device_policy.camera_access == 'CAMERA_ACCESS_USER_CHOICE' %}selected{% endif %}>User choice</option>
+                                        <option value="CAMERA_ACCESS_ENFORCED" {% if device_policy.camera_access == 'CAMERA_ACCESS_ENFORCED' %}selected{% endif %}>Enforced on</option>
+                                    </select>
+                                </div>
+                                <div class="mb-2">
+                                    <label class="form-label fw-bold small text-muted text-uppercase mb-1" style="font-size: 0.7rem;">Microphone access</label>
+                                    <select class="form-select form-select-sm android-microphone-access" data-mapping-id="{{ mapping.id }}">
+                                        <option value="MICROPHONE_ACCESS_UNSPECIFIED" {% if device_policy.microphone_access == 'MICROPHONE_ACCESS_UNSPECIFIED' %}selected{% endif %}>Unspecified (no policy)</option>
+                                        <option value="MICROPHONE_ACCESS_DISABLED" {% if device_policy.microphone_access == 'MICROPHONE_ACCESS_DISABLED' %}selected{% endif %}>Disabled</option>
+                                        <option value="MICROPHONE_ACCESS_USER_CHOICE" {% if device_policy.microphone_access == 'MICROPHONE_ACCESS_USER_CHOICE' %}selected{% endif %}>User choice</option>
+                                        <option value="MICROPHONE_ACCESS_ENFORCED" {% if device_policy.microphone_access == 'MICROPHONE_ACCESS_ENFORCED' %}selected{% endif %}>Enforced on</option>
+                                    </select>
+                                </div>
+                                <div class="form-check form-switch mb-2">
+                                    <input class="form-check-input android-install-apps" type="checkbox" data-mapping-id="{{ mapping.id }}" id="install-apps-{{ mapping.id }}" {% if device_policy.install_apps_disabled %}checked{% endif %}>
+                                    <label class="form-check-label small" for="install-apps-{{ mapping.id }}">Disable app installation</label>
+                                </div>
+                                <div class="form-check form-switch mb-2">
+                                    <input class="form-check-input android-uninstall-apps" type="checkbox" data-mapping-id="{{ mapping.id }}" id="uninstall-apps-{{ mapping.id }}" {% if device_policy.uninstall_apps_disabled %}checked{% endif %}>
+                                    <label class="form-check-label small" for="uninstall-apps-{{ mapping.id }}">Disable app uninstallation</label>
+                                </div>
+                                <h6 class="fw-bold small text-muted text-uppercase mt-3 mb-2" style="font-size: 0.7rem; letter-spacing: 0.05em;">Communication</h6>
+                                <div class="form-check form-switch mb-2">
+                                    <input class="form-check-input android-outgoing-calls" type="checkbox" data-mapping-id="{{ mapping.id }}" id="outgoing-calls-{{ mapping.id }}" {% if device_policy.outgoing_calls_disabled %}checked{% endif %}>
+                                    <label class="form-check-label small" for="outgoing-calls-{{ mapping.id }}">Disable outgoing calls</label>
+                                </div>
+                                <div class="form-check form-switch mb-2">
+                                    <input class="form-check-input android-sms" type="checkbox" data-mapping-id="{{ mapping.id }}" id="sms-{{ mapping.id }}" {% if device_policy.sms_disabled %}checked{% endif %}>
+                                    <label class="form-check-label small" for="sms-{{ mapping.id }}">Disable SMS</label>
+                                </div>
+                                <h6 class="fw-bold small text-muted text-uppercase mt-3 mb-2" style="font-size: 0.7rem; letter-spacing: 0.05em;">Connectivity</h6>
+                                <div class="form-check form-switch mb-2">
+                                    <input class="form-check-input android-bluetooth" type="checkbox" data-mapping-id="{{ mapping.id }}" id="bluetooth-{{ mapping.id }}" {% if device_policy.bluetooth_disabled %}checked{% endif %}>
+                                    <label class="form-check-label small" for="bluetooth-{{ mapping.id }}">Disable Bluetooth</label>
+                                </div>
+                                <div class="mb-2">
+                                    <label class="form-label fw-bold small text-muted text-uppercase mb-1" style="font-size: 0.7rem;">USB data access</label>
+                                    <select class="form-select form-select-sm android-usb-data-access" data-mapping-id="{{ mapping.id }}">
+                                        <option value="USB_DATA_ACCESS_UNSPECIFIED" {% if device_policy.usb_data_access == 'USB_DATA_ACCESS_UNSPECIFIED' %}selected{% endif %}>Unspecified (no policy)</option>
+                                        <option value="ALLOW_USB_DATA_TRANSFER" {% if device_policy.usb_data_access == 'ALLOW_USB_DATA_TRANSFER' %}selected{% endif %}>Allow USB data transfer</option>
+                                        <option value="DISALLOW_USB_FILE_TRANSFER" {% if device_policy.usb_data_access == 'DISALLOW_USB_FILE_TRANSFER' %}selected{% endif %}>Block USB file transfer</option>
+                                        <option value="DISALLOW_USB_DATA_TRANSFER" {% if device_policy.usb_data_access == 'DISALLOW_USB_DATA_TRANSFER' %}selected{% endif %}>Block all USB data (charging only)</option>
+                                    </select>
+                                </div>
+                                <h6 class="fw-bold small text-muted text-uppercase mt-3 mb-2" style="font-size: 0.7rem; letter-spacing: 0.05em;">Device controls</h6>
+                                <div class="form-check form-switch mb-2">
+                                    <input class="form-check-input android-factory-reset" type="checkbox" data-mapping-id="{{ mapping.id }}" id="factory-reset-{{ mapping.id }}" {% if device_policy.factory_reset_disabled %}checked{% endif %}>
+                                    <label class="form-check-label small" for="factory-reset-{{ mapping.id }}">Disable factory reset from settings</label>
+                                </div>
+                                <div class="form-check form-switch mb-2">
+                                    <input class="form-check-input android-adjust-volume" type="checkbox" data-mapping-id="{{ mapping.id }}" id="adjust-volume-{{ mapping.id }}" {% if device_policy.adjust_volume_disabled %}checked{% endif %}>
+                                    <label class="form-check-label small" for="adjust-volume-{{ mapping.id }}">Disable volume adjustment</label>
+                                </div>
+                                <div class="form-check form-switch mb-2">
+                                    <input class="form-check-input android-modify-accounts" type="checkbox" data-mapping-id="{{ mapping.id }}" id="modify-accounts-{{ mapping.id }}" {% if device_policy.modify_accounts_disabled %}checked{% endif %}>
+                                    <label class="form-check-label small" for="modify-accounts-{{ mapping.id }}">Disable adding or removing accounts</label>
+                                </div>
+                                <div class="form-check form-switch mb-2">
+                                    <input class="form-check-input android-mount-media" type="checkbox" data-mapping-id="{{ mapping.id }}" id="mount-media-{{ mapping.id }}" {% if device_policy.mount_physical_media_disabled %}checked{% endif %}>
+                                    <label class="form-check-label small" for="mount-media-{{ mapping.id }}">Disable external media mounting</label>
+                                </div>
+                                <h6 class="fw-bold small text-muted text-uppercase mt-3 mb-2" style="font-size: 0.7rem; letter-spacing: 0.05em;">Advanced</h6>
+                                <div class="mb-2">
+                                    <label class="form-label fw-bold small text-muted text-uppercase mb-1" style="font-size: 0.7rem;">Developer settings</label>
+                                    <select class="form-select form-select-sm android-developer-settings" data-mapping-id="{{ mapping.id }}">
+                                        <option value="DEVELOPER_SETTINGS_UNSPECIFIED" {% if device_policy.developer_settings == 'DEVELOPER_SETTINGS_UNSPECIFIED' %}selected{% endif %}>Unspecified (default disabled)</option>
+                                        <option value="DEVELOPER_SETTINGS_DISABLED" {% if device_policy.developer_settings == 'DEVELOPER_SETTINGS_DISABLED' %}selected{% endif %}>Disabled</option>
+                                        <option value="DEVELOPER_SETTINGS_ALLOWED" {% if device_policy.developer_settings == 'DEVELOPER_SETTINGS_ALLOWED' %}selected{% endif %}>Allowed</option>
+                                    </select>
+                                </div>
+                                <div class="mb-2">
+                                    <label class="form-label fw-bold small text-muted text-uppercase mb-1" style="font-size: 0.7rem;">Short support message</label>
+                                    <input type="text" class="form-control form-control-sm android-short-support" data-mapping-id="{{ mapping.id }}" maxlength="200" value="{{ device_policy.short_support_message }}">
+                                    <span class="text-secondary d-block mt-1" style="font-size: 0.65rem;">Shown when a restricted setting is tapped (max 200 characters).</span>
+                                </div>
+                                <div class="mb-0">
+                                    <label class="form-label fw-bold small text-muted text-uppercase mb-1" style="font-size: 0.7rem;">Long support message</label>
+                                    <textarea class="form-control form-control-sm android-long-support" data-mapping-id="{{ mapping.id }}" rows="3" maxlength="4096">{{ device_policy.long_support_message }}</textarea>
+                                    <span class="text-secondary d-block mt-1" style="font-size: 0.65rem;">Shown on the device administrator screen.</span>
+                                </div>
+                            </div>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                    <button type="button" class="btn btn-primary btn-sm fw-bold mt-3" onclick="saveAndroidDevicePolicies()">Save Device Restrictions</button>
+                {% else %}
+                    <p class="text-secondary small mb-0">Link an Android device mapping to configure device restrictions.</p>
+                {% endif %}
+            </div>
+        </div>
+
     </div>
 
     <!-- Right Sidebar Content: App Locks & Installed Apps -->
@@ -173,78 +296,7 @@
             </div>
         </div>
 
-        <!-- Android Device Restrictions -->
-        <div class="card border shadow-sm mb-4">
-            <div class="card-header bg-dark text-white py-3">
-                <h5 class="mb-0 fw-bold"><i class="fas fa-mobile-alt text-info me-2"></i>Android Device Restrictions</h5>
-            </div>
-            <div class="card-body p-4">
-                <p class="text-secondary small fw-medium mb-3">Device-owner restrictions aligned with Android Management API policy fields.</p>
-                {% if android_device_policy_by_mapping %}
-                    <div class="d-flex flex-column gap-3">
-                        {% for mapping in user.device_mappings %}
-                            {% set device_policy = android_device_policy_by_mapping.get(mapping.id) %}
-                            {% if device_policy %}
-                            <div class="border rounded p-3 bg-body-tertiary android-device-policy-card" data-mapping-id="{{ mapping.id }}">
-                                <div class="d-flex justify-content-between align-items-start gap-2 mb-2 flex-wrap">
-                                    <strong class="text-body">{{ mapping.linux_username }}@{{ device_policy.device_label or mapping.system_id }}</strong>
-                                    <span class="badge android-device-policy-sync-badge {% if device_policy.is_synced %}bg-success{% else %}bg-warning text-dark{% endif %}" style="font-size: 0.65rem;">
-                                        {% if device_policy.is_synced %}Synced{% else %}Sync pending{% endif %}
-                                    </span>
-                                </div>
-                                <div class="alert alert-warning py-2 small mb-3">
-                                    <i class="fas fa-info-circle me-1"></i>Requires device-owner provisioning (MDM QR or <code>adb dpm set-device-owner</code>).
-                                </div>
-                                <div class="form-check form-switch mb-2">
-                                    <input class="form-check-input android-screen-capture" type="checkbox" data-mapping-id="{{ mapping.id }}" id="screen-capture-{{ mapping.id }}" {% if device_policy.screen_capture_disabled %}checked{% endif %}>
-                                    <label class="form-check-label small" for="screen-capture-{{ mapping.id }}">Disable screen capture</label>
-                                </div>
-                                <div class="mb-2">
-                                    <label class="form-label fw-bold small text-muted text-uppercase mb-1" style="font-size: 0.7rem;">Camera access</label>
-                                    <select class="form-select form-select-sm android-camera-access" data-mapping-id="{{ mapping.id }}">
-                                        <option value="CAMERA_ACCESS_UNSPECIFIED" {% if device_policy.camera_access == 'CAMERA_ACCESS_UNSPECIFIED' %}selected{% endif %}>Unspecified (no policy)</option>
-                                        <option value="CAMERA_ACCESS_DISABLED" {% if device_policy.camera_access == 'CAMERA_ACCESS_DISABLED' %}selected{% endif %}>Disabled</option>
-                                        <option value="CAMERA_ACCESS_USER_CHOICE" {% if device_policy.camera_access == 'CAMERA_ACCESS_USER_CHOICE' %}selected{% endif %}>User choice</option>
-                                        <option value="CAMERA_ACCESS_ENFORCED" {% if device_policy.camera_access == 'CAMERA_ACCESS_ENFORCED' %}selected{% endif %}>Enforced on</option>
-                                    </select>
-                                </div>
-                                <div class="form-check form-switch mb-2">
-                                    <input class="form-check-input android-install-apps" type="checkbox" data-mapping-id="{{ mapping.id }}" id="install-apps-{{ mapping.id }}" {% if device_policy.install_apps_disabled %}checked{% endif %}>
-                                    <label class="form-check-label small" for="install-apps-{{ mapping.id }}">Disable app installation</label>
-                                </div>
-                                <div class="form-check form-switch mb-2">
-                                    <input class="form-check-input android-uninstall-apps" type="checkbox" data-mapping-id="{{ mapping.id }}" id="uninstall-apps-{{ mapping.id }}" {% if device_policy.uninstall_apps_disabled %}checked{% endif %}>
-                                    <label class="form-check-label small" for="uninstall-apps-{{ mapping.id }}">Disable app uninstallation</label>
-                                </div>
-                                <div class="mb-2">
-                                    <label class="form-label fw-bold small text-muted text-uppercase mb-1" style="font-size: 0.7rem;">Developer settings</label>
-                                    <select class="form-select form-select-sm android-developer-settings" data-mapping-id="{{ mapping.id }}">
-                                        <option value="DEVELOPER_SETTINGS_UNSPECIFIED" {% if device_policy.developer_settings == 'DEVELOPER_SETTINGS_UNSPECIFIED' %}selected{% endif %}>Unspecified (default disabled)</option>
-                                        <option value="DEVELOPER_SETTINGS_DISABLED" {% if device_policy.developer_settings == 'DEVELOPER_SETTINGS_DISABLED' %}selected{% endif %}>Disabled</option>
-                                        <option value="DEVELOPER_SETTINGS_ALLOWED" {% if device_policy.developer_settings == 'DEVELOPER_SETTINGS_ALLOWED' %}selected{% endif %}>Allowed</option>
-                                    </select>
-                                </div>
-                                <div class="mb-2">
-                                    <label class="form-label fw-bold small text-muted text-uppercase mb-1" style="font-size: 0.7rem;">Short support message</label>
-                                    <input type="text" class="form-control form-control-sm android-short-support" data-mapping-id="{{ mapping.id }}" maxlength="200" value="{{ device_policy.short_support_message }}">
-                                    <span class="text-secondary d-block mt-1" style="font-size: 0.65rem;">Shown when a restricted setting is tapped (max 200 characters).</span>
-                                </div>
-                                <div class="mb-0">
-                                    <label class="form-label fw-bold small text-muted text-uppercase mb-1" style="font-size: 0.7rem;">Long support message</label>
-                                    <textarea class="form-control form-control-sm android-long-support" data-mapping-id="{{ mapping.id }}" rows="3" maxlength="4096">{{ device_policy.long_support_message }}</textarea>
-                                    <span class="text-secondary d-block mt-1" style="font-size: 0.65rem;">Shown on the device administrator screen.</span>
-                                </div>
-                            </div>
-                            {% endif %}
-                        {% endfor %}
-                    </div>
-                    <button type="button" class="btn btn-primary btn-sm fw-bold mt-3" onclick="saveAndroidDevicePolicies()">Save Device Restrictions</button>
-                {% else %}
-                    <p class="text-secondary small mb-0">Link an Android device mapping to configure device restrictions.</p>
-                {% endif %}
-            </div>
-        </div>
-
+        
         <!-- Application Control & Locks -->
         <div class="card border shadow-sm mb-4">
             <div class="card-header bg-dark text-white py-3">
@@ -412,8 +464,17 @@
         const requests = Array.from(mappingIds).map(mappingId => {
             const screenCapture = document.querySelector(`.android-screen-capture[data-mapping-id="${mappingId}"]`);
             const cameraAccess = document.querySelector(`.android-camera-access[data-mapping-id="${mappingId}"]`);
+            const microphoneAccess = document.querySelector(`.android-microphone-access[data-mapping-id="${mappingId}"]`);
             const installApps = document.querySelector(`.android-install-apps[data-mapping-id="${mappingId}"]`);
             const uninstallApps = document.querySelector(`.android-uninstall-apps[data-mapping-id="${mappingId}"]`);
+            const outgoingCalls = document.querySelector(`.android-outgoing-calls[data-mapping-id="${mappingId}"]`);
+            const sms = document.querySelector(`.android-sms[data-mapping-id="${mappingId}"]`);
+            const bluetooth = document.querySelector(`.android-bluetooth[data-mapping-id="${mappingId}"]`);
+            const usbDataAccess = document.querySelector(`.android-usb-data-access[data-mapping-id="${mappingId}"]`);
+            const factoryReset = document.querySelector(`.android-factory-reset[data-mapping-id="${mappingId}"]`);
+            const adjustVolume = document.querySelector(`.android-adjust-volume[data-mapping-id="${mappingId}"]`);
+            const modifyAccounts = document.querySelector(`.android-modify-accounts[data-mapping-id="${mappingId}"]`);
+            const mountMedia = document.querySelector(`.android-mount-media[data-mapping-id="${mappingId}"]`);
             const developerSettings = document.querySelector(`.android-developer-settings[data-mapping-id="${mappingId}"]`);
             const shortSupport = document.querySelector(`.android-short-support[data-mapping-id="${mappingId}"]`);
             const longSupport = document.querySelector(`.android-long-support[data-mapping-id="${mappingId}"]`);
@@ -423,8 +484,17 @@
                 body: JSON.stringify({
                     screen_capture_disabled: screenCapture ? screenCapture.checked : false,
                     camera_access: cameraAccess ? cameraAccess.value : 'CAMERA_ACCESS_UNSPECIFIED',
+                    microphone_access: microphoneAccess ? microphoneAccess.value : 'MICROPHONE_ACCESS_UNSPECIFIED',
                     install_apps_disabled: installApps ? installApps.checked : false,
                     uninstall_apps_disabled: uninstallApps ? uninstallApps.checked : false,
+                    outgoing_calls_disabled: outgoingCalls ? outgoingCalls.checked : false,
+                    sms_disabled: sms ? sms.checked : false,
+                    bluetooth_disabled: bluetooth ? bluetooth.checked : false,
+                    usb_data_access: usbDataAccess ? usbDataAccess.value : 'USB_DATA_ACCESS_UNSPECIFIED',
+                    factory_reset_disabled: factoryReset ? factoryReset.checked : false,
+                    adjust_volume_disabled: adjustVolume ? adjustVolume.checked : false,
+                    modify_accounts_disabled: modifyAccounts ? modifyAccounts.checked : false,
+                    mount_physical_media_disabled: mountMedia ? mountMedia.checked : false,
                     developer_settings: developerSettings ? developerSettings.value : 'DEVELOPER_SETTINGS_UNSPECIFIED',
                     short_support_message: shortSupport ? shortSupport.value.trim() : '',
                     long_support_message: longSupport ? longSupport.value.trim() : '',

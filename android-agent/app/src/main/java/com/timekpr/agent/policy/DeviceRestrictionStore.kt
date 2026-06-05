@@ -6,8 +6,17 @@ import org.json.JSONObject
 data class DeviceRestrictionPolicy(
     val screenCaptureDisabled: Boolean = false,
     val cameraAccess: String = CAMERA_ACCESS_UNSPECIFIED,
+    val microphoneAccess: String = MICROPHONE_ACCESS_UNSPECIFIED,
     val installAppsDisabled: Boolean = false,
     val uninstallAppsDisabled: Boolean = false,
+    val factoryResetDisabled: Boolean = false,
+    val adjustVolumeDisabled: Boolean = false,
+    val modifyAccountsDisabled: Boolean = false,
+    val mountPhysicalMediaDisabled: Boolean = false,
+    val bluetoothDisabled: Boolean = false,
+    val outgoingCallsDisabled: Boolean = false,
+    val smsDisabled: Boolean = false,
+    val usbDataAccess: String = USB_DATA_ACCESS_UNSPECIFIED,
     val developerSettings: String = DEVELOPER_SETTINGS_UNSPECIFIED,
     val shortSupportMessage: String = DEFAULT_SHORT_SUPPORT_MESSAGE,
     val longSupportMessage: String = DEFAULT_LONG_SUPPORT_MESSAGE,
@@ -22,17 +31,40 @@ data class DeviceRestrictionPolicy(
     val enforceCameraToggle: Boolean
         get() = cameraAccess == CAMERA_ACCESS_ENFORCED
 
+    val microphoneDisabled: Boolean
+        get() = microphoneAccess == MICROPHONE_ACCESS_DISABLED
+
+    val enforceMicrophoneToggle: Boolean
+        get() = microphoneAccess == MICROPHONE_ACCESS_ENFORCED
+
     val developerSettingsDisabled: Boolean
         get() = developerSettings == DEVELOPER_SETTINGS_DISABLED
 
     val developerSettingsAllowed: Boolean
         get() = developerSettings == DEVELOPER_SETTINGS_ALLOWED
 
+    val blockUsbFileTransfer: Boolean
+        get() = usbDataAccess == USB_DATA_ACCESS_DISALLOW_FILE ||
+            usbDataAccess == USB_DATA_ACCESS_DISALLOW_ALL
+
+    val blockAllUsbData: Boolean
+        get() = usbDataAccess == USB_DATA_ACCESS_DISALLOW_ALL
+
     companion object {
         const val CAMERA_ACCESS_UNSPECIFIED = "CAMERA_ACCESS_UNSPECIFIED"
         const val CAMERA_ACCESS_DISABLED = "CAMERA_ACCESS_DISABLED"
         const val CAMERA_ACCESS_USER_CHOICE = "CAMERA_ACCESS_USER_CHOICE"
         const val CAMERA_ACCESS_ENFORCED = "CAMERA_ACCESS_ENFORCED"
+
+        const val MICROPHONE_ACCESS_UNSPECIFIED = "MICROPHONE_ACCESS_UNSPECIFIED"
+        const val MICROPHONE_ACCESS_DISABLED = "MICROPHONE_ACCESS_DISABLED"
+        const val MICROPHONE_ACCESS_USER_CHOICE = "MICROPHONE_ACCESS_USER_CHOICE"
+        const val MICROPHONE_ACCESS_ENFORCED = "MICROPHONE_ACCESS_ENFORCED"
+
+        const val USB_DATA_ACCESS_UNSPECIFIED = "USB_DATA_ACCESS_UNSPECIFIED"
+        const val USB_DATA_ACCESS_ALLOW = "ALLOW_USB_DATA_TRANSFER"
+        const val USB_DATA_ACCESS_DISALLOW_FILE = "DISALLOW_USB_FILE_TRANSFER"
+        const val USB_DATA_ACCESS_DISALLOW_ALL = "DISALLOW_USB_DATA_TRANSFER"
 
         const val DEVELOPER_SETTINGS_UNSPECIFIED = "DEVELOPER_SETTINGS_UNSPECIFIED"
         const val DEVELOPER_SETTINGS_DISABLED = "DEVELOPER_SETTINGS_DISABLED"
@@ -55,11 +87,25 @@ data class DeviceRestrictionPolicy(
                 "developerSettings",
                 DEVELOPER_SETTINGS_UNSPECIFIED,
             ) ?: DEVELOPER_SETTINGS_UNSPECIFIED
+            val connectivity = json.optJSONObject("deviceConnectivityManagement")
+            val usbDataAccess = connectivity?.optString(
+                "usbDataAccess",
+                USB_DATA_ACCESS_UNSPECIFIED,
+            ) ?: USB_DATA_ACCESS_UNSPECIFIED
             return DeviceRestrictionPolicy(
                 screenCaptureDisabled = json.optBoolean("screenCaptureDisabled", false),
                 cameraAccess = json.optString("cameraAccess", CAMERA_ACCESS_UNSPECIFIED),
+                microphoneAccess = json.optString("microphoneAccess", MICROPHONE_ACCESS_UNSPECIFIED),
                 installAppsDisabled = json.optBoolean("installAppsDisabled", false),
                 uninstallAppsDisabled = json.optBoolean("uninstallAppsDisabled", false),
+                factoryResetDisabled = json.optBoolean("factoryResetDisabled", false),
+                adjustVolumeDisabled = json.optBoolean("adjustVolumeDisabled", false),
+                modifyAccountsDisabled = json.optBoolean("modifyAccountsDisabled", false),
+                mountPhysicalMediaDisabled = json.optBoolean("mountPhysicalMediaDisabled", false),
+                bluetoothDisabled = json.optBoolean("bluetoothDisabled", false),
+                outgoingCallsDisabled = json.optBoolean("outgoingCallsDisabled", false),
+                smsDisabled = json.optBoolean("smsDisabled", false),
+                usbDataAccess = usbDataAccess,
                 developerSettings = developerSettings,
                 shortSupportMessage = parseUserFacingMessage(
                     json.optJSONObject("shortSupportMessage"),
@@ -77,11 +123,23 @@ data class DeviceRestrictionPolicy(
         return JSONObject()
             .put("screenCaptureDisabled", screenCaptureDisabled)
             .put("cameraAccess", cameraAccess)
+            .put("microphoneAccess", microphoneAccess)
             .put("installAppsDisabled", installAppsDisabled)
             .put("uninstallAppsDisabled", uninstallAppsDisabled)
+            .put("factoryResetDisabled", factoryResetDisabled)
+            .put("adjustVolumeDisabled", adjustVolumeDisabled)
+            .put("modifyAccountsDisabled", modifyAccountsDisabled)
+            .put("mountPhysicalMediaDisabled", mountPhysicalMediaDisabled)
+            .put("bluetoothDisabled", bluetoothDisabled)
+            .put("outgoingCallsDisabled", outgoingCallsDisabled)
+            .put("smsDisabled", smsDisabled)
             .put(
                 "advancedSecurityOverrides",
                 JSONObject().put("developerSettings", developerSettings),
+            )
+            .put(
+                "deviceConnectivityManagement",
+                JSONObject().put("usbDataAccess", usbDataAccess),
             )
             .put(
                 "shortSupportMessage",

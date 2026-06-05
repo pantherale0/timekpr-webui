@@ -213,10 +213,21 @@ Payload shape (field names match [Android Management API Policy](https://develop
   "device_policy": {
     "screenCaptureDisabled": false,
     "cameraAccess": "CAMERA_ACCESS_DISABLED",
+    "microphoneAccess": "MICROPHONE_ACCESS_DISABLED",
     "installAppsDisabled": true,
     "uninstallAppsDisabled": false,
+    "factoryResetDisabled": true,
+    "adjustVolumeDisabled": false,
+    "modifyAccountsDisabled": true,
+    "mountPhysicalMediaDisabled": false,
+    "bluetoothDisabled": true,
+    "outgoingCallsDisabled": false,
+    "smsDisabled": false,
     "advancedSecurityOverrides": {
       "developerSettings": "DEVELOPER_SETTINGS_DISABLED"
+    },
+    "deviceConnectivityManagement": {
+      "usbDataAccess": "DISALLOW_USB_FILE_TRANSFER"
     },
     "shortSupportMessage": {
       "defaultMessage": "This setting is managed by your parent through TimeKpr."
@@ -229,6 +240,10 @@ Payload shape (field names match [Android Management API Policy](https://develop
 ```
 
 Supported `cameraAccess` values: `CAMERA_ACCESS_UNSPECIFIED`, `CAMERA_ACCESS_DISABLED`, `CAMERA_ACCESS_USER_CHOICE`, `CAMERA_ACCESS_ENFORCED`.
+
+Supported `microphoneAccess` values: `MICROPHONE_ACCESS_UNSPECIFIED`, `MICROPHONE_ACCESS_DISABLED`, `MICROPHONE_ACCESS_USER_CHOICE`, `MICROPHONE_ACCESS_ENFORCED`.
+
+Supported `usbDataAccess` values (under `deviceConnectivityManagement`): `USB_DATA_ACCESS_UNSPECIFIED`, `ALLOW_USB_DATA_TRANSFER`, `DISALLOW_USB_FILE_TRANSFER`, `DISALLOW_USB_DATA_TRANSFER`.
 
 Supported `developerSettings` values: `DEVELOPER_SETTINGS_UNSPECIFIED`, `DEVELOPER_SETTINGS_DISABLED`, `DEVELOPER_SETTINGS_ALLOWED`.
 

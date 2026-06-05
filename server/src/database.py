@@ -1271,6 +1271,28 @@ class MappingAndroidDevicePolicy(db.Model):
         DEVELOPER_SETTINGS_ALLOWED,
     }
 
+    MICROPHONE_ACCESS_UNSPECIFIED = 'MICROPHONE_ACCESS_UNSPECIFIED'
+    MICROPHONE_ACCESS_DISABLED = 'MICROPHONE_ACCESS_DISABLED'
+    MICROPHONE_ACCESS_USER_CHOICE = 'MICROPHONE_ACCESS_USER_CHOICE'
+    MICROPHONE_ACCESS_ENFORCED = 'MICROPHONE_ACCESS_ENFORCED'
+    VALID_MICROPHONE_ACCESS = {
+        MICROPHONE_ACCESS_UNSPECIFIED,
+        MICROPHONE_ACCESS_DISABLED,
+        MICROPHONE_ACCESS_USER_CHOICE,
+        MICROPHONE_ACCESS_ENFORCED,
+    }
+
+    USB_DATA_ACCESS_UNSPECIFIED = 'USB_DATA_ACCESS_UNSPECIFIED'
+    USB_DATA_ACCESS_ALLOW = 'ALLOW_USB_DATA_TRANSFER'
+    USB_DATA_ACCESS_DISALLOW_FILE = 'DISALLOW_USB_FILE_TRANSFER'
+    USB_DATA_ACCESS_DISALLOW_ALL = 'DISALLOW_USB_DATA_TRANSFER'
+    VALID_USB_DATA_ACCESS = {
+        USB_DATA_ACCESS_UNSPECIFIED,
+        USB_DATA_ACCESS_ALLOW,
+        USB_DATA_ACCESS_DISALLOW_FILE,
+        USB_DATA_ACCESS_DISALLOW_ALL,
+    }
+
     DEFAULT_SHORT_SUPPORT_MESSAGE = (
         'This setting is managed by your parent through TimeKpr.'
     )
@@ -1301,6 +1323,23 @@ class MappingAndroidDevicePolicy(db.Model):
         nullable=False,
         default=DEVELOPER_SETTINGS_UNSPECIFIED,
     )
+    microphone_access = db.Column(
+        db.String(40),
+        nullable=False,
+        default=MICROPHONE_ACCESS_UNSPECIFIED,
+    )
+    usb_data_access = db.Column(
+        db.String(40),
+        nullable=False,
+        default=USB_DATA_ACCESS_UNSPECIFIED,
+    )
+    factory_reset_disabled = db.Column(db.Boolean, nullable=False, default=False)
+    adjust_volume_disabled = db.Column(db.Boolean, nullable=False, default=False)
+    modify_accounts_disabled = db.Column(db.Boolean, nullable=False, default=False)
+    mount_physical_media_disabled = db.Column(db.Boolean, nullable=False, default=False)
+    bluetooth_disabled = db.Column(db.Boolean, nullable=False, default=False)
+    outgoing_calls_disabled = db.Column(db.Boolean, nullable=False, default=False)
+    sms_disabled = db.Column(db.Boolean, nullable=False, default=False)
     short_support_message = db.Column(
         db.Text,
         nullable=False,

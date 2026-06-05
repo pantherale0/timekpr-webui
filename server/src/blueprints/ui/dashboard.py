@@ -128,8 +128,17 @@ def edit_user_profile(user_id):
                     'device_label': device_labels.get(mapping.system_id, mapping.system_id),
                     'screen_capture_disabled': device_policy.screen_capture_disabled,
                     'camera_access': device_policy.camera_access,
+                    'microphone_access': device_policy.microphone_access,
                     'install_apps_disabled': device_policy.install_apps_disabled,
                     'uninstall_apps_disabled': device_policy.uninstall_apps_disabled,
+                    'factory_reset_disabled': device_policy.factory_reset_disabled,
+                    'adjust_volume_disabled': device_policy.adjust_volume_disabled,
+                    'modify_accounts_disabled': device_policy.modify_accounts_disabled,
+                    'mount_physical_media_disabled': device_policy.mount_physical_media_disabled,
+                    'bluetooth_disabled': device_policy.bluetooth_disabled,
+                    'outgoing_calls_disabled': device_policy.outgoing_calls_disabled,
+                    'sms_disabled': device_policy.sms_disabled,
+                    'usb_data_access': device_policy.usb_data_access,
                     'developer_settings': device_policy.developer_settings,
                     'short_support_message': (
                         device_policy.short_support_message

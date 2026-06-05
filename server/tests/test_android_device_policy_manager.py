@@ -56,10 +56,21 @@ def test_build_device_policy_payload_defaults(android_mapping):
     assert payload == {
         'screenCaptureDisabled': False,
         'cameraAccess': MappingAndroidDevicePolicy.CAMERA_ACCESS_UNSPECIFIED,
+        'microphoneAccess': MappingAndroidDevicePolicy.MICROPHONE_ACCESS_UNSPECIFIED,
         'installAppsDisabled': False,
         'uninstallAppsDisabled': False,
+        'factoryResetDisabled': False,
+        'adjustVolumeDisabled': False,
+        'modifyAccountsDisabled': False,
+        'mountPhysicalMediaDisabled': False,
+        'bluetoothDisabled': False,
+        'outgoingCallsDisabled': False,
+        'smsDisabled': False,
         'advancedSecurityOverrides': {
             'developerSettings': MappingAndroidDevicePolicy.DEVELOPER_SETTINGS_UNSPECIFIED,
+        },
+        'deviceConnectivityManagement': {
+            'usbDataAccess': MappingAndroidDevicePolicy.USB_DATA_ACCESS_UNSPECIFIED,
         },
         'shortSupportMessage': {
             'defaultMessage': MappingAndroidDevicePolicy.DEFAULT_SHORT_SUPPORT_MESSAGE,
@@ -87,13 +98,21 @@ def test_upsert_policy_updates_fields(android_mapping, monkeypatch):
     policy = upsert_policy(android_mapping, {
         'screen_capture_disabled': True,
         'camera_access': 'CAMERA_ACCESS_DISABLED',
+        'microphone_access': 'MICROPHONE_ACCESS_DISABLED',
         'install_apps_disabled': True,
         'uninstall_apps_disabled': False,
+        'factory_reset_disabled': True,
+        'bluetooth_disabled': True,
+        'usb_data_access': 'DISALLOW_USB_FILE_TRANSFER',
         'developer_settings': 'DEVELOPER_SETTINGS_DISABLED',
     })
     assert policy.screen_capture_disabled is True
     assert policy.camera_access == MappingAndroidDevicePolicy.CAMERA_ACCESS_DISABLED
+    assert policy.microphone_access == MappingAndroidDevicePolicy.MICROPHONE_ACCESS_DISABLED
     assert policy.install_apps_disabled is True
+    assert policy.factory_reset_disabled is True
+    assert policy.bluetooth_disabled is True
+    assert policy.usb_data_access == MappingAndroidDevicePolicy.USB_DATA_ACCESS_DISALLOW_FILE
     assert policy.developer_settings == MappingAndroidDevicePolicy.DEVELOPER_SETTINGS_DISABLED
     assert policy.is_synced is False
     assert policy.last_sync_error == 'Agent offline'
@@ -136,3 +155,12 @@ def test_upsert_rejects_invalid_camera_access(android_mapping, monkeypatch):
     )
     with pytest.raises(ValueError, match='camera_access'):
         upsert_policy(android_mapping, {'camera_access': 'INVALID'})
+
+
+def test_upsert_rejects_invalid_usb_data_access(android_mapping, monkeypatch):
+    monkeypatch.setattr(
+        'src.android_device_policy_manager.push_mapping_device_policy',
+        lambda mapping: (True, 'ok'),
+    )
+    with pytest.raises(ValueError, match='usb_data_access'):
+        upsert_policy(android_mapping, {'usb_data_access': 'INVALID'})

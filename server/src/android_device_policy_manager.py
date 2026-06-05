@@ -44,6 +44,20 @@ def _normalize_developer_settings(value: str | None) -> str:
     return normalized
 
 
+def _normalize_microphone_access(value: str | None) -> str:
+    normalized = (value or MappingAndroidDevicePolicy.MICROPHONE_ACCESS_UNSPECIFIED).strip().upper()
+    if normalized not in MappingAndroidDevicePolicy.VALID_MICROPHONE_ACCESS:
+        raise ValueError(f'Unsupported microphone_access value: {value}')
+    return normalized
+
+
+def _normalize_usb_data_access(value: str | None) -> str:
+    normalized = (value or MappingAndroidDevicePolicy.USB_DATA_ACCESS_UNSPECIFIED).strip().upper()
+    if normalized not in MappingAndroidDevicePolicy.VALID_USB_DATA_ACCESS:
+        raise ValueError(f'Unsupported usb_data_access value: {value}')
+    return normalized
+
+
 def _normalize_support_message(value, field_name: str, max_length: int) -> str:
     normalized = (value or '').strip()
     if not normalized:
@@ -82,10 +96,21 @@ def build_device_policy_payload(policy: MappingAndroidDevicePolicy) -> dict:
     payload = {
         'screenCaptureDisabled': bool(policy.screen_capture_disabled),
         'cameraAccess': policy.camera_access,
+        'microphoneAccess': policy.microphone_access,
         'installAppsDisabled': bool(policy.install_apps_disabled),
         'uninstallAppsDisabled': bool(policy.uninstall_apps_disabled),
+        'factoryResetDisabled': bool(policy.factory_reset_disabled),
+        'adjustVolumeDisabled': bool(policy.adjust_volume_disabled),
+        'modifyAccountsDisabled': bool(policy.modify_accounts_disabled),
+        'mountPhysicalMediaDisabled': bool(policy.mount_physical_media_disabled),
+        'bluetoothDisabled': bool(policy.bluetooth_disabled),
+        'outgoingCallsDisabled': bool(policy.outgoing_calls_disabled),
+        'smsDisabled': bool(policy.sms_disabled),
         'advancedSecurityOverrides': {
             'developerSettings': policy.developer_settings,
+        },
+        'deviceConnectivityManagement': {
+            'usbDataAccess': policy.usb_data_access,
         },
         'shortSupportMessage': _user_facing_message(short_message),
         'longSupportMessage': _user_facing_message(long_message),
@@ -128,8 +153,17 @@ def build_policy_summary(policy: MappingAndroidDevicePolicy, mapping: ManagedUse
         'platform': (device.platform if device else None) or AppPolicy.PLATFORM_LINUX,
         'screen_capture_disabled': policy.screen_capture_disabled,
         'camera_access': policy.camera_access,
+        'microphone_access': policy.microphone_access,
         'install_apps_disabled': policy.install_apps_disabled,
         'uninstall_apps_disabled': policy.uninstall_apps_disabled,
+        'factory_reset_disabled': policy.factory_reset_disabled,
+        'adjust_volume_disabled': policy.adjust_volume_disabled,
+        'modify_accounts_disabled': policy.modify_accounts_disabled,
+        'mount_physical_media_disabled': policy.mount_physical_media_disabled,
+        'bluetooth_disabled': policy.bluetooth_disabled,
+        'outgoing_calls_disabled': policy.outgoing_calls_disabled,
+        'sms_disabled': policy.sms_disabled,
+        'usb_data_access': policy.usb_data_access,
         'developer_settings': policy.developer_settings,
         'short_support_message': (
             policy.short_support_message
@@ -161,6 +195,10 @@ def upsert_policy(mapping: ManagedUserDeviceMap, body: dict) -> MappingAndroidDe
         )
     if 'camera_access' in body:
         policy.camera_access = _normalize_camera_access(body.get('camera_access'))
+    if 'microphone_access' in body:
+        policy.microphone_access = _normalize_microphone_access(body.get('microphone_access'))
+    if 'usb_data_access' in body:
+        policy.usb_data_access = _normalize_usb_data_access(body.get('usb_data_access'))
     if 'install_apps_disabled' in body:
         policy.install_apps_disabled = _coerce_bool(
             body.get('install_apps_disabled'),
@@ -173,6 +211,21 @@ def upsert_policy(mapping: ManagedUserDeviceMap, body: dict) -> MappingAndroidDe
         )
     if 'developer_settings' in body:
         policy.developer_settings = _normalize_developer_settings(body.get('developer_settings'))
+    for bool_field in (
+        'factory_reset_disabled',
+        'adjust_volume_disabled',
+        'modify_accounts_disabled',
+        'mount_physical_media_disabled',
+        'bluetooth_disabled',
+        'outgoing_calls_disabled',
+        'sms_disabled',
+    ):
+        if bool_field in body:
+            setattr(
+                policy,
+                bool_field,
+                _coerce_bool(body.get(bool_field), bool_field),
+            )
     if 'short_support_message' in body:
         policy.short_support_message = _normalize_support_message(
             body.get('short_support_message'),
