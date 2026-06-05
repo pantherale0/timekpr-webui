@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Select Tenant - TimeKpr WebUI</title>
+    <!-- PicoCSS v2 CDN -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+    <!-- Google Fonts: Atkinson Hyperlegible -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap" rel="stylesheet">
+    <!-- Custom CSS variables -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
+    <style>
+        body {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 1rem;
+            background: linear-gradient(135deg, var(--pico-background-color) 0%, var(--pico-card-border-color) 100%);
+        }
+        .switcher-card {
+            max-width: 500px;
+            width: 100%;
+            padding: 2.5rem;
+            background-color: var(--pico-card-background-color);
+            border: 1px solid var(--pico-card-border-color);
+            border-radius: var(--pico-border-radius);
+            box-shadow: var(--shadow-hover);
+        }
+        .tenant-option {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem 1.25rem;
+            background-color: var(--pico-background-color);
+            border: 1px solid var(--pico-card-border-color);
+            border-radius: var(--pico-border-radius);
+            margin-bottom: 0.75rem;
+            transition: all 0.2s ease;
+            text-decoration: none;
+            color: var(--pico-color);
+        }
+        .tenant-option:hover {
+            border-color: var(--pico-primary);
+            background-color: var(--pico-card-background-color);
+            box-shadow: var(--shadow-hover);
+            transform: translateY(-1px);
+        }
+        .tenant-name {
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+        .tenant-slug {
+            font-size: 0.8rem;
+            color: var(--pico-muted-color);
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="switcher-card">
+        <div class="switcher-header" style="text-align: center; margin-bottom: 2rem;">
+            <div style="display: inline-flex; align-items: center; gap: 0.5rem; color: var(--pico-primary); margin-bottom: 0.5rem;">
+                <svg width="32" height="32" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                </svg>
+                <span style="font-size: 1.5rem; font-weight: bold; color: var(--pico-color);">Select Workspace</span>
+            </div>
+            <p style="color: var(--pico-muted-color); font-size: 0.9rem; font-weight: bold; text-transform: uppercase; margin: 0; letter-spacing: 0.05em;">Choose a tenant to manage</p>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="flash-alert flash-alert-{{ category }}" role="alert" style="margin-bottom: 1rem; padding: 0.75rem;">
+                        <span>{{ message }}</span>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <div style="max-height: 350px; overflow-y: auto; padding-right: 0.25rem;">
+            {% for membership in memberships %}
+                <a href="{{ url_for('ui_auth.select_tenant', tenant_id=membership.tenant.id) }}" class="tenant-option">
+                    <div>
+                        <div class="tenant-name">{{ membership.tenant.name }}</div>
+                        <div class="tenant-slug">/t/{{ membership.tenant.slug }}</div>
+                    </div>
+                    <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" style="color: var(--pico-primary);">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+                    </svg>
+                </a>
+            {% else %}
+                <p style="text-align: center; color: var(--pico-muted-color);">You are not mapped to any active tenants.</p>
+            {% endfor %}
+        </div>
+
+        <div style="text-align: center; margin-top: 2rem; padding-top: 1rem; border-top: 1px solid var(--pico-card-border-color);">
+            <a href="{{ url_for('ui_auth.logout') }}" style="font-size: 0.85rem; font-weight: bold; color: var(--pico-muted-color);">
+                Sign out
+            </a>
+        </div>
+    </div>
+</body>
+</html>

@@ -2,7 +2,7 @@ import json
 import logging
 import secrets
 from datetime import datetime, timezone
-from flask import Blueprint, request
+from flask import Blueprint, request, g
 from sqlalchemy.exc import SQLAlchemyError
 from src.database import db, AgentDevice
 from src.agent_helper import AgentConnectionManager, normalize_agent_alert_payload
@@ -87,13 +87,50 @@ def ws_agent_handler(ws):
                 }))
                 return
     
+            from src.tenant_helper import decrypt_tenant_key
+            from src.database import Tenant
+
             expected_reg_token = AgentConnectionManager.registration_token
             
             with app.app_context():
                 device = AgentDevice.query.get(system_id)
+                tenant = None
                 
-                if not device:
-                    if expected_reg_token and reg_token != expected_reg_token:
+                if device:
+                    if device.tenant_id:
+                        tenant = Tenant.query.get(device.tenant_id)
+                    else:
+                        device.tenant_id = 1
+                        tenant = Tenant.query.get(1)
+                        if not tenant:
+                            from src.tenant_helper import encrypt_tenant_key
+                            tenant = Tenant(
+                                id=1,
+                                name="Default Workspace",
+                                slug="default",
+                                registration_token="admin-token",
+                                encrypted_data_key=encrypt_tenant_key(b"devmasterkeydefault32byteslong!!!")
+                            )
+                            db.session.add(tenant)
+                            db.session.commit()
+                else:
+                    if reg_token:
+                        tenant = Tenant.query.filter_by(registration_token=reg_token).first()
+                    if not tenant and (not expected_reg_token or reg_token == expected_reg_token):
+                        tenant = Tenant.query.get(1)
+                        if not tenant:
+                            from src.tenant_helper import encrypt_tenant_key
+                            tenant = Tenant(
+                                id=1,
+                                name="Default Workspace",
+                                slug="default",
+                                registration_token="admin-token",
+                                encrypted_data_key=encrypt_tenant_key(b"devmasterkeydefault32byteslong!!!")
+                            )
+                            db.session.add(tenant)
+                            db.session.commit()
+                        
+                    if not tenant:
                         _LOGGER.warning(
                             "Registration rejected: Invalid registration token from %s",
                             system_id,
@@ -103,20 +140,25 @@ def ws_agent_handler(ws):
                     
                     device = AgentDevice(
                         system_id=system_id,
-                        system_hostname=system_hostname,
-                        system_ip=remote_ip,
+                        tenant_id=tenant.id,
                         status='pending',
                     )
                     db.session.add(device)
                     _LOGGER.info(
-                        "New pending device registered: %s from %s",
+                        "New pending device registered under tenant %s: %s from %s",
+                        tenant.name,
                         system_id,
                         remote_ip,
                     )
-                else:
-                    if "system_hostname" in hello_msg:
-                        device.system_hostname = system_hostname
-                    device.system_ip = remote_ip
+
+                # Initialize tenant cryptographic context in Flask globals for transparent column encryption
+                if tenant:
+                    g.current_tenant_id = tenant.id
+                    g.current_tenant_dek = decrypt_tenant_key(tenant.encrypted_data_key)
+
+                if "system_hostname" in hello_msg:
+                    device.system_hostname = system_hostname
+                device.system_ip = remote_ip
 
                 # Update synced linux users list for all connections
                 linux_users = hello_msg.get("linux_users")

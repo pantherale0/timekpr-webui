@@ -11,6 +11,170 @@ from flask_sqlalchemy import SQLAlchemy
 
 db = SQLAlchemy()
 
+from cryptography.fernet import Fernet
+from sqlalchemy.types import TypeDecorator, Text
+from flask import g
+import base64
+import os
+
+class EncryptedString(TypeDecorator):
+    """SQLAlchemy TypeDecorator that transparently encrypts and decrypts string columns using cryptography.fernet"""
+    impl = Text
+    cache_ok = False
+
+    def process_bind_param(self, value, dialect):
+        if value is None:
+            return None
+        dek = getattr(g, 'current_tenant_dek', None)
+        if not dek:
+            master_key = os.environ.get('MASTER_KEY', 'devmasterkeydefault32byteslong!!!').encode('utf-8')[:32]
+            dek = base64.urlsafe_b64encode(master_key.ljust(32, b'\0')[:32])
+        try:
+            fernet = Fernet(dek)
+            return fernet.encrypt(value.encode('utf-8')).decode('utf-8')
+        except Exception:
+            return value
+
+    def process_result_value(self, value, dialect):
+        if value is None:
+            return None
+        dek = getattr(g, 'current_tenant_dek', None)
+        if not dek:
+            master_key = os.environ.get('MASTER_KEY', 'devmasterkeydefault32byteslong!!!').encode('utf-8')[:32]
+            dek = base64.urlsafe_b64encode(master_key.ljust(32, b'\0')[:32])
+        try:
+            fernet = Fernet(dek)
+            return fernet.decrypt(value.encode('utf-8')).decode('utf-8')
+        except Exception:
+            return value
+
+
+class Tenant(db.Model):
+    __tablename__ = 'tenant'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), unique=True, nullable=False)
+    slug = db.Column(db.String(50), unique=True, nullable=False)
+    registration_token = db.Column(db.String(64), unique=True, nullable=False)
+    encrypted_data_key = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+    settings = db.relationship('TenantSettings', backref='tenant', lazy=True, cascade="all, delete-orphan")
+    console_users = db.relationship('ConsoleUserTenantMap', backref='tenant', lazy=True, cascade="all, delete-orphan")
+    devices = db.relationship('AgentDevice', backref='tenant', lazy=True)
+    managed_users = db.relationship('ManagedUser', backref='tenant', lazy=True)
+    app_policies = db.relationship('AppPolicy', backref='tenant', lazy=True)
+    blocklist_sources = db.relationship('BlocklistSource', backref='tenant', lazy=True)
+
+    def __repr__(self):
+        return f'<Tenant {self.name} [{self.slug}]>'
+
+
+class TenantSettings(db.Model):
+    __tablename__ = 'tenant_settings'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    tenant_id = db.Column(db.Integer, db.ForeignKey('tenant.id'), nullable=False)
+    key = db.Column(db.String(100), nullable=False)
+    value = db.Column(db.Text, nullable=False)
+    is_encrypted = db.Column(db.Boolean, default=False, nullable=False)
+
+    __table_args__ = (
+        db.UniqueConstraint('tenant_id', 'key', name='tenant_key_uc'),
+    )
+
+    @classmethod
+    def get_value(cls, tenant_id, key, default=None):
+        """Get a setting value for a specific tenant, decrypting it if required."""
+        setting = cls.query.filter_by(tenant_id=tenant_id, key=key).first()
+        if not setting:
+            return default
+        
+        if setting.is_encrypted:
+            dek = getattr(g, 'current_tenant_dek', None)
+            if not dek:
+                master_key = os.environ.get('MASTER_KEY', 'devmasterkeydefault32byteslong!!!').encode('utf-8')[:32]
+                dek = base64.urlsafe_b64encode(master_key.ljust(32, b'\0')[:32])
+            try:
+                fernet = Fernet(dek)
+                return fernet.decrypt(setting.value.encode('utf-8')).decode('utf-8')
+            except Exception:
+                return setting.value
+        
+        return setting.value
+
+    @classmethod
+    def set_value(cls, tenant_id, key, value, encrypt=False):
+        """Set a setting value for a specific tenant, optionally encrypting it with their DEK."""
+        setting = cls.query.filter_by(tenant_id=tenant_id, key=key).first()
+        
+        stored_value = value
+        if encrypt:
+            dek = getattr(g, 'current_tenant_dek', None)
+            if not dek:
+                master_key = os.environ.get('MASTER_KEY', 'devmasterkeydefault32byteslong!!!').encode('utf-8')[:32]
+                dek = base64.urlsafe_b64encode(master_key.ljust(32, b'\0')[:32])
+            try:
+                fernet = Fernet(dek)
+                stored_value = fernet.encrypt(value.encode('utf-8')).decode('utf-8')
+            except Exception:
+                pass
+
+        if setting:
+            setting.value = stored_value
+            setting.is_encrypted = encrypt
+        else:
+            setting = cls(
+                tenant_id=tenant_id,
+                key=key,
+                value=stored_value,
+                is_encrypted=encrypt
+            )
+            db.session.add(setting)
+            
+        db.session.commit()
+        return setting
+
+
+class ConsoleUser(db.Model):
+    __tablename__ = 'console_user'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(80), unique=True, nullable=False)
+    email = db.Column(db.String(120), unique=True, nullable=False)
+    password_hash = db.Column(db.String(255), nullable=True)
+    
+    is_super_admin = db.Column(db.Boolean, default=False, nullable=False)
+    is_active = db.Column(db.Boolean, default=True, nullable=False)
+    created_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+    tenant_memberships = db.relationship('ConsoleUserTenantMap', backref='user', lazy=True, cascade="all, delete-orphan")
+
+    def set_password(self, password):
+        salt = bcrypt.gensalt()
+        self.password_hash = bcrypt.hashpw(password.encode('utf-8'), salt).decode('utf-8')
+
+    def check_password(self, password):
+        if not self.password_hash:
+            return False
+        return bcrypt.checkpw(password.encode('utf-8'), self.password_hash.encode('utf-8'))
+
+
+class ConsoleUserTenantMap(db.Model):
+    __tablename__ = 'console_user_tenant_map'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    console_user_id = db.Column(db.Integer, db.ForeignKey('console_user.id'), nullable=False)
+    tenant_id = db.Column(db.Integer, db.ForeignKey('tenant.id'), nullable=False)
+    
+    role = db.Column(db.String(32), nullable=False, default='tenant_admin')
+    created_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+    __table_args__ = (
+        db.UniqueConstraint('console_user_id', 'tenant_id', name='user_tenant_uc'),
+    )
+
+
 
 @event.listens_for(Engine, "connect")
 def set_sqlite_pragma(dbapi_connection, connection_record):
@@ -148,13 +312,15 @@ class Settings(db.Model):
 class AgentDevice(db.Model):
     __tablename__ = 'agent_device'
     system_id = db.Column(db.String(50), primary_key=True)  # Unique Host UUID
-    system_hostname = db.Column(db.String(255), nullable=True)  # Hostname used for human-readable labels
-    system_ip = db.Column(db.String(50), nullable=True)     # Snapshotted connection IP
+    tenant_id = db.Column(db.Integer, db.ForeignKey('tenant.id'), nullable=True)
+    system_hostname = db.Column(EncryptedString, nullable=True)  # Hostname used for human-readable labels
+    system_ip = db.Column(EncryptedString, nullable=True)     # Snapshotted connection IP
     status = db.Column(db.String(20), default='pending')    # pending, approved, rejected
     secure_token = db.Column(db.String(64), nullable=True)  # Dynamically generated token
     date_added = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     last_seen = db.Column(db.DateTime(timezone=True), nullable=True)
     linux_users_json = db.Column(db.Text(), nullable=True)  # JSON list of standard system users
+
 
     # Relationship to per-user Linux account mappings on this device
     user_mappings = db.relationship(
@@ -261,11 +427,12 @@ class AgentAlert(db.Model):
 class ManagedUser(db.Model):
     __tablename__ = 'managed_user'
     id = db.Column(db.Integer, primary_key=True)
+    tenant_id = db.Column(db.Integer, db.ForeignKey('tenant.id'), nullable=True)
     username = db.Column(db.String(50), nullable=False)
     # Legacy fields kept for compatibility during schema migration.
     # New code should use ManagedUserDeviceMap for device/account bindings.
     system_id = db.Column(db.String(50), db.ForeignKey('agent_device.system_id'), nullable=True)
-    system_ip = db.Column(db.String(50), nullable=False)
+    system_ip = db.Column(EncryptedString, nullable=False)
     is_valid = db.Column(db.Boolean, default=False)
     date_added = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     last_checked = db.Column(db.DateTime(timezone=True), nullable=True)
@@ -563,7 +730,8 @@ class BlocklistSource(db.Model):
     SYNC_ERROR = 'error'
 
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(120), unique=True, nullable=False)
+    tenant_id = db.Column(db.Integer, db.ForeignKey('tenant.id'), nullable=True)
+    name = db.Column(db.String(120), nullable=False)
     source_type = db.Column(db.String(32), nullable=False, default=TYPE_MANUAL)
     source_url = db.Column(db.Text, nullable=True)
     is_enabled = db.Column(db.Boolean, default=True, nullable=False)
@@ -574,6 +742,10 @@ class BlocklistSource(db.Model):
     source_last_modified = db.Column(db.String(255), nullable=True)
     content_revision = db.Column(db.String(64), nullable=True)
     created_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+
+    __table_args__ = (
+        db.UniqueConstraint('tenant_id', 'name', name='blocklist_source_tenant_name_uc'),
+    )
     updated_at = db.Column(
         db.DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
@@ -998,13 +1170,18 @@ class AppPolicy(db.Model):
     __tablename__ = 'app_policy'
 
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(120), unique=True, nullable=False)
+    tenant_id = db.Column(db.Integer, db.ForeignKey('tenant.id'), nullable=True)
+    name = db.Column(db.String(120), nullable=False)
     created_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
     updated_at = db.Column(
         db.DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
         onupdate=lambda: datetime.now(timezone.utc),
         nullable=False,
+    )
+
+    __table_args__ = (
+        db.UniqueConstraint('tenant_id', 'name', name='app_policy_tenant_name_uc'),
     )
 
     rules = db.relationship(
