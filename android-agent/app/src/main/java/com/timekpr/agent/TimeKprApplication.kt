@@ -1,6 +1,7 @@
 package com.timekpr.agent
 
 import android.app.Application
+import com.timekpr.agent.admin.DeviceOwnerProvisioner
 import com.timekpr.agent.config.AgentConfigStore
 import com.timekpr.agent.policy.DomainPolicyStore
 import com.timekpr.agent.policy.TimeLimitStore
@@ -18,6 +19,7 @@ class TimeKprApplication : Application() {
         configStore = AgentConfigStore(this)
         timeLimitStore = TimeLimitStore(this)
         domainPolicyStore = DomainPolicyStore(this)
+        DeviceOwnerProvisioner.applyIfDeviceOwner(this)
     }
 
     companion object {

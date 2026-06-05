@@ -7,6 +7,7 @@ import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import com.timekpr.agent.TimeKprApplication
+import com.timekpr.agent.admin.DeviceOwnerProvisioner
 import com.timekpr.agent.enforcement.EnforcementController
 import com.timekpr.agent.monitor.UsageMonitorService
 import com.timekpr.agent.policy.AppPolicyStore
@@ -27,6 +28,7 @@ object AgentSessionCoordinator {
 
     fun startMobileAgent(context: Context) {
         val appContext = context.applicationContext
+        DeviceOwnerProvisioner.applyIfDeviceOwner(appContext)
         AppPolicyStore(appContext).restore()
         TimeKprApplication.from(appContext).domainPolicyStore.restore()
         UsageMonitorService.start(appContext)

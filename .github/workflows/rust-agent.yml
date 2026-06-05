@@ -1,9 +1,10 @@
-name: Rust Agent CI
+name: Agent CI
 
 on:
   pull_request:
     paths:
       - "agent/**"
+      - "android-agent/**"
       - ".github/workflows/rust-agent.yml"
   push:
     branches:
@@ -19,7 +20,8 @@ jobs:
   changes:
     runs-on: ubuntu-latest
     outputs:
-      agent_changed: ${{ steps.filter.outputs.agent }}
+      linux_agent_changed: ${{ steps.filter.outputs.linux_agent }}
+      android_agent_changed: ${{ steps.filter.outputs.android_agent }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -29,13 +31,16 @@ jobs:
         uses: dorny/paths-filter@v3
         with:
           filters: |
-            agent:
+            linux_agent:
               - "agent/**"
               - ".github/workflows/rust-agent.yml"
+            android_agent:
+              - "android-agent/**"
+              - ".github/workflows/rust-agent.yml"
 
-  check:
+  linux-check:
     needs: changes
-    if: startsWith(github.ref, 'refs/tags/v') || needs.changes.outputs.agent_changed == 'true' || github.event_name == 'workflow_dispatch'
+    if: startsWith(github.ref, 'refs/tags/v') || needs.changes.outputs.linux_agent_changed == 'true' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
@@ -52,8 +57,34 @@ jobs:
       - name: Run cargo check
         run: cargo check --manifest-path agent/Cargo.toml
 
-  release-build:
-    needs: check
+  android-check:
+    needs: changes
+    if: startsWith(github.ref, 'refs/tags/v') || needs.changes.outputs.android_agent_changed == 'true' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.9
+
+      - name: Build debug APK
+        working-directory: android-agent
+        run: ./gradlew assembleDebug --no-daemon
+
+  linux-release-build:
+    needs: linux-check
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     strategy:
@@ -100,11 +131,49 @@ jobs:
       - name: Upload packaged asset
         uses: actions/upload-artifact@v4
         with:
-          name: agent-${{ matrix.target }}
+          name: linux-agent-${{ matrix.target }}
           path: dist/timekpr-agent-${{ matrix.target }}.tar.gz
 
+  android-release-build:
+    needs: android-check
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.9
+
+      - name: Build release APK
+        working-directory: android-agent
+        run: ./gradlew assembleRelease --no-daemon
+
+      - name: Package release asset
+        run: |
+          mkdir -p dist
+          apk_path=$(find android-agent/app/build/outputs/apk/release -name '*.apk' | head -n 1)
+          cp "$apk_path" "dist/timekpr-android-agent-${{ github.ref_name }}.apk"
+
+      - name: Upload packaged asset
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-agent-apk
+          path: dist/timekpr-android-agent-${{ github.ref_name }}.apk
+
   publish-release:
-    needs: release-build
+    needs: [linux-release-build, android-release-build]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
@@ -113,11 +182,11 @@ jobs:
       - name: Download release assets
         uses: actions/download-artifact@v4
         with:
-          pattern: agent-*
+          pattern: "*-agent-*"
           path: dist
           merge-multiple: true
 
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/*.tar.gz
+          files: dist/*

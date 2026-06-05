@@ -66,7 +66,13 @@ QR payload schema:
 | Web/domain policies | `VpnService` consent |
 | Boot persistence | `RECEIVE_BOOT_COMPLETED` |
 
-For full MDM-style control (silent installs, kiosk, work profiles), provision the app as **Device Owner** using your EMM or `adb dpm set-device-owner com.timekpr.agent/.admin.TimeKprDeviceAdminReceiver`.
+For full MDM-style control (silent installs, kiosk, work profiles), provision the app as **Device Owner** using your EMM or:
+
+```bash
+adb dpm set-device-owner com.timekpr.agent/.admin.TimeKprDeviceAdminReceiver
+```
+
+When device owner, the app auto-grants itself Usage Access, notification permission (Android 13+), and VPN consent via `DevicePolicyManager` (including always-on VPN) — no manual Settings taps required. Device Admin alone still needs the user to approve Usage Access and VPN in system settings.
 
 ## App policies on Android
 

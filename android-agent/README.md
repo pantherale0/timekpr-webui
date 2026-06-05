@@ -8,7 +8,9 @@ Kotlin/Android port of the TimeKpr Rust Linux agent. See [docs/android-agent.md]
 2. Set server `FCM_SERVER_KEY` or `FIREBASE_CREDENTIALS_JSON`.
 3. Build: `./gradlew assembleDebug`
 4. Install the APK, scan the server Settings QR, approve in Admin → Devices.
-5. Grant Device Admin, Usage Access, and VPN on the phone.
+5. Provision as **Device Owner** so capabilities are granted automatically:
+   `adb dpm set-device-owner com.timekpr.agent/.admin.TimeKprDeviceAdminReceiver`
+   (device must have no accounts; factory reset or new user profile). Without device owner, enable Device Admin, Usage Access, and VPN manually on the phone.
 
 Connectivity uses **FCM + short WebSocket sessions**, not a 24/7 socket. See `docs/android-agent.md`.
 

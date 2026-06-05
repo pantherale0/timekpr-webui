@@ -10,6 +10,7 @@ import android.os.ParcelFileDescriptor
 import androidx.core.app.NotificationCompat
 import com.timekpr.agent.R
 import com.timekpr.agent.TimeKprApplication
+import com.timekpr.agent.admin.DeviceOwnerProvisioner
 import com.timekpr.agent.util.AndroidUsers
 import java.io.FileInputStream
 import java.io.FileOutputStream
@@ -158,6 +159,7 @@ class DomainBlockVpnService : VpnService() {
                 context.stopService(Intent(context, DomainBlockVpnService::class.java).setAction(ACTION_STOP))
                 return
             }
+            DeviceOwnerProvisioner.applyIfDeviceOwner(context)
             val prepare = VpnService.prepare(context)
             if (prepare != null) {
                 prepare.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)

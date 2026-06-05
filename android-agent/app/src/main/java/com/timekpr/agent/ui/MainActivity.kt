@@ -1,11 +1,10 @@
 package com.timekpr.agent.ui
 
-import android.app.AppOpsManager
-import android.content.Context
 import android.content.Intent
 import android.net.VpnService
 import android.os.Bundle
 import android.provider.Settings
+import android.view.View
 import android.widget.Button
 import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
@@ -14,6 +13,7 @@ import androidx.lifecycle.lifecycleScope
 import com.timekpr.agent.R
 import com.timekpr.agent.TimeKprApplication
 import com.timekpr.agent.admin.DeviceAdminActivationActivity
+import com.timekpr.agent.admin.DeviceOwnerProvisioner
 import com.timekpr.agent.service.AgentConnectionState
 import com.timekpr.agent.service.AgentConnectionStatus
 import com.timekpr.agent.service.AgentSessionCoordinator
@@ -80,15 +80,26 @@ class MainActivity : AppCompatActivity() {
         AgentSessionCoordinator.startMobileAgent(this)
     }
 
-    companion object {
-        fun hasUsageAccess(context: Context): Boolean {
-            val appOps = context.getSystemService(AppOpsManager::class.java) ?: return false
-            val mode = appOps.checkOpNoThrow(
-                AppOpsManager.OPSTR_GET_USAGE_STATS,
-                android.os.Process.myUid(),
-                context.packageName,
-            )
-            return mode == AppOpsManager.MODE_ALLOWED
+    override fun onResume() {
+        super.onResume()
+        DeviceOwnerProvisioner.applyIfDeviceOwner(this)
+        refreshCapabilityButtons()
+    }
+
+    private fun refreshCapabilityButtons() {
+        val deviceOwner = DeviceOwnerProvisioner.isDeviceOwner(this)
+        val adminActive = DeviceAdminActivationActivity.isActive(this)
+        val usageGranted = DeviceOwnerProvisioner.hasUsageAccess(this)
+        val vpnGranted = DeviceOwnerProvisioner.hasVpnConsent(this)
+
+        findViewById<Button>(R.id.enableAdminButton).apply {
+            visibility = if (deviceOwner || adminActive) View.GONE else View.VISIBLE
+        }
+        findViewById<Button>(R.id.usageAccessButton).apply {
+            visibility = if (usageGranted) View.GONE else View.VISIBLE
+        }
+        findViewById<Button>(R.id.vpnButton).apply {
+            visibility = if (vpnGranted) View.GONE else View.VISIBLE
         }
     }
 }
