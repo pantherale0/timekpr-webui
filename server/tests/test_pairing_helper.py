@@ -224,3 +224,29 @@ def test_save_uploaded_android_apk_persists_file(mock_checksum, tmp_path, monkey
     assert filename == 'app-release.apk'
     assert checksum == 'checksum-value'
     assert os.path.isfile(get_android_apk_storage_path())
+
+
+def test_validate_signature_checksum_rejects_empty_hash():
+    from src.pairing_helper import _validate_signature_checksum
+
+    with pytest.raises(RuntimeError, match='invalid'):
+        _validate_signature_checksum('47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU')
+
+
+@patch('src.pairing_helper._checksum_from_apksigner', return_value='real-checksum')
+def test_compute_apk_signature_checksum_uses_apksigner(mock_apksigner, tmp_path):
+    from src.pairing_helper import compute_apk_signature_checksum
+
+    apk_path = tmp_path / 'agent.apk'
+    apk_path.write_bytes(b'placeholder')
+    assert compute_apk_signature_checksum(str(apk_path)) == 'real-checksum'
+    mock_apksigner.assert_called_once_with(str(apk_path))
+
+
+def test_fetch_release_signature_checksum_ignores_empty_hash():
+    with patch('src.pairing_helper.requests.get') as mock_get:
+        mock_get.return_value.status_code = 200
+        mock_get.return_value.text = '47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU'
+        from src.pairing_helper import _fetch_release_signature_checksum
+
+        assert _fetch_release_signature_checksum('v0.32') is None

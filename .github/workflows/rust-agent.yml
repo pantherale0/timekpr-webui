@@ -151,6 +151,9 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
+      - name: Install Android build-tools
+        run: sdkmanager "build-tools;35.0.0"
+
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
@@ -167,6 +170,7 @@ jobs:
       - name: Build release APK
         working-directory: android-agent
         env:
+          TIMEKPR_AGENT_VERSION: ${{ github.ref_name }}
           ANDROID_KEYSTORE_PATH: ${{ github.workspace }}/android-agent/release.keystore
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
@@ -182,9 +186,13 @@ jobs:
       - name: Compute APK signature checksum
         run: |
           chmod +x scripts/android-signature-checksum.sh
-          ./scripts/android-signature-checksum.sh \
-            "dist/timekpr-android-agent-${{ github.ref_name }}.apk" \
-            > "dist/timekpr-android-agent-${{ github.ref_name }}.signature-checksum"
+          apk="dist/timekpr-android-agent-${{ github.ref_name }}.apk"
+          checksum_file="dist/timekpr-android-agent-${{ github.ref_name }}.signature-checksum"
+          ./scripts/android-signature-checksum.sh "$apk" > "$checksum_file"
+          if [[ "$(tr -d '[:space:]' < "$checksum_file")" == "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU" ]]; then
+            echo "Refusing to publish the empty SHA-256 checksum; apksigner is required for v2/v3-signed APKs." >&2
+            exit 1
+          fi
 
       - name: Upload packaged asset
         uses: actions/upload-artifact@v4

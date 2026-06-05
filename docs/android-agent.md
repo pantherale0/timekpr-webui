@@ -305,6 +305,13 @@ Set `TIMEKPR_AGENT_WS_URL` on the server when behind reverse proxies so QR codes
 
 Debug APKs cannot be used for MDM QR provisioning; always use a signed release build and matching signature checksum.
 
+Release CI stamps the agent version from the git tag, matching the Rust agent and server:
+
+```bash
+export TIMEKPR_AGENT_VERSION=v1.2.3
+./gradlew assembleRelease
+```
+
 ## Versioning
 
-The Android agent reports `agent_version` (`v0.0.0-dev` for debug builds, `v0.1.0-android` for release). Release agents must match `TIMEKPR_SERVER_VERSION`; dev servers (`v0.0.0-dev`) accept any agent version.
+The Android agent reports `agent_version` from `TIMEKPR_AGENT_VERSION` at build time (`v0.0.0-dev` for debug builds, e.g. `v1.2.3` for tagged release builds). Release agents must match `TIMEKPR_SERVER_VERSION`; dev servers (`v0.0.0-dev`) accept any agent version.

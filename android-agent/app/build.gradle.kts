@@ -4,6 +4,27 @@ plugins {
     id("com.google.gms.google-services")
 }
 
+fun normalizedAgentVersion(raw: String?): String {
+    val trimmed = raw?.trim().orEmpty()
+    if (trimmed.isEmpty()) {
+        return "v0.1.0"
+    }
+    return if (trimmed.startsWith("v")) trimmed else "v$trimmed"
+}
+
+fun versionNameFromTag(tag: String): String = tag.removePrefix("v")
+
+fun versionCodeFromTag(tag: String): Int {
+    val stripped = tag.removePrefix("v")
+    val parts = stripped.split(Regex("[.\\-_+]")).filter { it.isNotEmpty() }
+    val major = parts.getOrNull(0)?.toIntOrNull() ?: 0
+    val minor = parts.getOrNull(1)?.toIntOrNull() ?: 0
+    val patch = parts.getOrNull(2)?.toIntOrNull() ?: 0
+    return major * 1_000_000 + minor * 1_000 + patch
+}
+
+val releaseAgentVersion = normalizedAgentVersion(System.getenv("TIMEKPR_AGENT_VERSION"))
+
 android {
     namespace = "com.timekpr.agent"
     compileSdk = 35
@@ -12,9 +33,9 @@ android {
         applicationId = "com.timekpr.agent"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
-        buildConfigField("String", "DEFAULT_AGENT_VERSION", "\"v0.1.0-android\"")
+        versionCode = versionCodeFromTag(releaseAgentVersion)
+        versionName = versionNameFromTag(releaseAgentVersion)
+        buildConfigField("String", "DEFAULT_AGENT_VERSION", "\"$releaseAgentVersion\"")
     }
 
     signingConfigs {

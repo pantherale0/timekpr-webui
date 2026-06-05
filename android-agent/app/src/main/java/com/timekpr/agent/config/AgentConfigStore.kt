@@ -1,6 +1,7 @@
 package com.timekpr.agent.config
 
 import android.content.Context
+import com.timekpr.agent.BuildConfig
 import java.util.UUID
 
 data class AgentConfig(
@@ -23,7 +24,8 @@ class AgentConfigStore(context: Context) {
             systemId = systemId,
             registrationToken = prefs.getString(KEY_REGISTRATION_TOKEN, null),
             agentToken = prefs.getString(KEY_AGENT_TOKEN, null),
-            agentVersion = prefs.getString(KEY_AGENT_VERSION, DEFAULT_VERSION) ?: DEFAULT_VERSION,
+            agentVersion = prefs.getString(KEY_AGENT_VERSION, null)?.takeIf { it.isNotBlank() }
+                ?: BuildConfig.DEFAULT_AGENT_VERSION,
             pairingComplete = prefs.getBoolean(KEY_PAIRING_COMPLETE, false),
         )
     }
@@ -90,6 +92,5 @@ class AgentConfigStore(context: Context) {
         private const val KEY_AGENT_VERSION = "agent_version"
         private const val KEY_PAIRING_COMPLETE = "pairing_complete"
         private const val KEY_FCM_TOKEN = "fcm_token"
-        private const val DEFAULT_VERSION = "v0.1.0-android"
     }
 }

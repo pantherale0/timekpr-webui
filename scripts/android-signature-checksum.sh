@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# SHA-256 of empty input; must never be treated as a valid signing certificate checksum.
+EMPTY_CHECKSUM='47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU'
+
 apk="${1:-}"
 if [[ -z "$apk" || ! -f "$apk" ]]; then
     cat >&2 <<'EOF'
@@ -65,7 +68,13 @@ checksum_from_apksigner() {
 
 checksum_from_keytool() {
     need_cmd keytool
-    keytool -printcert -jarfile "$apk" -rfc 2>/dev/null \
+    local pem
+
+    pem="$(keytool -printcert -jarfile "$apk" -rfc 2>/dev/null)" || return 1
+    if [[ "$pem" != *"BEGIN CERTIFICATE"* ]]; then
+        return 1
+    fi
+    printf '%s' "$pem" \
         | openssl x509 -inform pem -outform der \
         | openssl dgst -sha256 -binary \
         | openssl base64 \
@@ -80,6 +89,10 @@ fi
 
 if [[ -z "$checksum" ]]; then
     checksum="$(checksum_from_keytool || true)"
+fi
+
+if [[ -z "$checksum" || "$checksum" == "$EMPTY_CHECKSUM" ]]; then
+    checksum=""
 fi
 
 if [[ -z "$checksum" ]]; then

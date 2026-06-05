@@ -34,6 +34,7 @@ _CHECKSUM_CACHE: dict[str, tuple[str, float]] = {}
 _CHECKSUM_CACHE_TTL_SECONDS = 300
 _ANDROID_APK_FILENAME = 'android-agent.apk'
 _MAX_ANDROID_APK_BYTES = 250 * 1024 * 1024
+_EMPTY_SIGNATURE_CHECKSUM = '47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU'
 
 
 def _normalize_ws_path(path: str | None) -> str:
@@ -186,30 +187,108 @@ def build_uploaded_android_apk_url(server_url: str) -> str:
 
 
 def _checksum_script_path() -> str:
-    repo_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-    return os.path.join(repo_root, 'scripts', 'android-signature-checksum.sh')
+    server_root = os.path.dirname(os.path.dirname(__file__))
+    return os.path.join(server_root, 'scripts', 'android-signature-checksum.sh')
 
 
-def compute_apk_signature_checksum(apk_path: str) -> str:
-    """Compute the MDM provisioning signature checksum for an APK file."""
-    script = _checksum_script_path()
-    if not os.path.isfile(script):
-        raise RuntimeError('Checksum script not found')
+def _find_apksigner() -> str | None:
+    """Return the newest available apksigner binary from the Android SDK."""
+    roots: list[str] = []
+    for env_var in ('ANDROID_HOME', 'ANDROID_SDK_ROOT'):
+        value = (os.environ.get(env_var) or '').strip()
+        if value:
+            roots.append(os.path.join(value, 'build-tools'))
+    roots.append(os.path.join(os.path.expanduser('~'), 'Android', 'Sdk', 'build-tools'))
+
+    candidates: list[str] = []
+    for root in roots:
+        if not os.path.isdir(root):
+            continue
+        for entry in os.listdir(root):
+            candidate = os.path.join(root, entry, 'apksigner')
+            if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
+                candidates.append(candidate)
+
+    if not candidates:
+        return None
+    return sorted(candidates)[-1]
+
+
+def _hex_digest_to_checksum(hex_digest: str) -> str:
+    normalized = hex_digest.lower().replace(':', '').strip()
+    if len(normalized) != 64 or any(ch not in '0123456789abcdef' for ch in normalized):
+        raise RuntimeError('Invalid certificate SHA-256 digest')
+    raw = bytes.fromhex(normalized)
+    encoded = base64.urlsafe_b64encode(raw).decode('ascii')
+    return encoded.rstrip('=')
+
+
+def _checksum_from_apksigner(apk_path: str) -> str:
+    apksigner = _find_apksigner()
+    if not apksigner:
+        raise RuntimeError('apksigner not found')
 
     result = subprocess.run(
-        [script, apk_path],
+        [apksigner, 'verify', '--print-certs', apk_path],
         capture_output=True,
         text=True,
         check=False,
     )
-    if result.returncode != 0:
-        message = (result.stderr or result.stdout or '').strip()
-        raise RuntimeError(message or 'Failed to compute APK signature checksum')
+    output = '\n'.join(part for part in (result.stdout, result.stderr) if part).strip()
+    if result.returncode != 0 and 'certificate SHA-256 digest:' not in output:
+        raise RuntimeError(output or 'apksigner verify failed')
 
-    checksum = result.stdout.strip()
-    if not checksum:
-        raise RuntimeError('Checksum script returned an empty value')
-    return checksum
+    hex_digest = ''
+    for line in output.splitlines():
+        marker = 'certificate SHA-256 digest:'
+        if marker in line:
+            hex_digest = line.split(':', 1)[1].strip()
+            break
+    if not hex_digest:
+        raise RuntimeError('apksigner did not report a signing certificate digest')
+    return _hex_digest_to_checksum(hex_digest)
+
+
+def _validate_signature_checksum(checksum: str) -> str:
+    candidate = (checksum or '').strip()
+    if not candidate:
+        raise RuntimeError('APK signature checksum is empty')
+    if candidate == _EMPTY_SIGNATURE_CHECKSUM:
+        raise RuntimeError(
+            'APK signature checksum is invalid; install Android SDK build-tools '
+            'so apksigner can read v2/v3-signed APKs'
+        )
+    return candidate
+
+
+def compute_apk_signature_checksum(apk_path: str) -> str:
+    """Compute the MDM provisioning signature checksum for an APK file."""
+    errors: list[str] = []
+    try:
+        return _validate_signature_checksum(_checksum_from_apksigner(apk_path))
+    except RuntimeError as exc:
+        errors.append(str(exc))
+
+    script = _checksum_script_path()
+    if os.path.isfile(script):
+        result = subprocess.run(
+            [script, apk_path],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if result.returncode == 0:
+            try:
+                return _validate_signature_checksum(result.stdout.strip())
+            except RuntimeError as exc:
+                errors.append(str(exc))
+        else:
+            message = (result.stderr or result.stdout or '').strip()
+            errors.append(message or 'Checksum script failed')
+
+    if errors:
+        raise RuntimeError(errors[-1])
+    raise RuntimeError('Checksum script not found')
 
 
 def _validate_android_apk_upload(file_storage: FileStorage) -> None:
@@ -284,7 +363,7 @@ def _fetch_release_signature_checksum(version: str) -> str | None:
         if response.status_code != 200:
             return None
         checksum = response.text.strip()
-        if not checksum:
+        if not checksum or checksum == _EMPTY_SIGNATURE_CHECKSUM:
             return None
         _CHECKSUM_CACHE[tag] = (checksum, now)
         return checksum
