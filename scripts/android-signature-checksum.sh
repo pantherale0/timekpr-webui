@@ -54,7 +54,11 @@ hex_digest_to_checksum() {
     if [[ ! "$hex" =~ ^[0-9a-f]{64}$ ]]; then
         return 1
     fi
-    printf '%s' "$hex" | xxd -r -p | openssl base64 | tr '+/' '-_' | tr -d '=\n'
+    local packed="" i
+    for ((i = 0; i < 64; i += 2)); do
+        packed+="\\x${hex:i:2}"
+    done
+    printf '%b' "$packed" | openssl base64 | tr '+/' '-_' | tr -d '=\n'
 }
 
 checksum_from_apksigner() {
