@@ -11,6 +11,11 @@ from src.blocklists_manager import (
     _get_blocklist_sources,
 )
 from src.settings_manager import _get_alert_webhook_settings, _get_time_sync_tolerance, _get_alert_retention_days
+from src.pairing_helper import (
+    build_agent_websocket_url,
+    pairing_payload_json,
+    render_pairing_qr_data_uri,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -211,11 +216,19 @@ def settings():
                 flash('Password updated successfully', 'success')
                 return redirect(url_for('ui_dashboard.settings'))
 
+    server_url = build_agent_websocket_url(request)
+    registration_token = AgentConnectionManager.registration_token
+    pairing_payload = pairing_payload_json(server_url, registration_token)
+    pairing_qr_data_uri = render_pairing_qr_data_uri(pairing_payload)
+
     return render_template(
         'settings.html',
         alert_webhook_settings=alert_webhook_settings,
         time_sync_tolerance=time_sync_tolerance,
         alert_retention_days=alert_retention_days,
+        pairing_server_url=server_url,
+        pairing_qr_data_uri=pairing_qr_data_uri,
+        pairing_payload=pairing_payload,
     )
 
 

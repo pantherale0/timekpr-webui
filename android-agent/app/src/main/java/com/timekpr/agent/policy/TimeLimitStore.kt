@@ -1,0 +1,204 @@
+package com.timekpr.agent.policy
+
+import android.content.Context
+import org.json.JSONObject
+import java.time.DayOfWeek
+import java.time.LocalDate
+import java.time.LocalTime
+import java.time.ZoneId
+import java.util.concurrent.ConcurrentHashMap
+
+/**
+ * Local TimeKpr-style screen time state for Android profiles.
+ * Mirrors debug-agent / TimeKpr D-Bus semantics using in-app storage.
+ */
+class TimeLimitStore(context: Context) {
+    private val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    private val users = ConcurrentHashMap<String, UserTimeState>()
+
+    data class UserTimeState(
+        var linuxUid: Int,
+        var timeSpentDay: Int,
+        var timeLeftDay: Int,
+        var limit: Int,
+        var enabled: Boolean,
+        var allowedDays: MutableSet<Int>,
+        var weeklySchedule: MutableMap<String, Double>,
+        var allowedHours: MutableMap<String, MutableMap<String, HourSlot>>,
+    )
+
+    data class HourSlot(
+        var startMin: Int = 0,
+        var endMin: Int = 60,
+        var uacc: Int = 0,
+    )
+
+    fun ensureUser(username: String, defaultUid: Int, defaultSeconds: Int = 2 * 3600): UserTimeState {
+        return users.getOrPut(username) {
+            loadPersisted(username) ?: UserTimeState(
+                linuxUid = defaultUid,
+                timeSpentDay = 0,
+                timeLeftDay = defaultSeconds,
+                limit = defaultSeconds,
+                enabled = true,
+                allowedDays = (1..7).toMutableSet(),
+                weeklySchedule = mutableMapOf(),
+                allowedHours = defaultAllowedHours(),
+            )
+        }
+    }
+
+    fun modifyTimeLeft(username: String, operation: String, seconds: Int): Boolean {
+        val state = users[username] ?: return false
+        when (operation) {
+            "+" -> state.timeLeftDay += seconds
+            "-" -> state.timeLeftDay = maxOf(0, state.timeLeftDay - seconds)
+            else -> return false
+        }
+        persist(username, state)
+        return true
+    }
+
+    fun setWeeklySchedule(username: String, schedule: Map<String, Double>): Boolean {
+        val state = users[username] ?: return false
+        state.weeklySchedule.clear()
+        state.weeklySchedule.putAll(schedule)
+        val today = LocalDate.now().dayOfWeek.name.lowercase()
+        schedule[today]?.let { hours ->
+            val limitSeconds = (hours * 3600).toInt().coerceAtLeast(0)
+            state.limit = limitSeconds
+            state.timeLeftDay = minOf(state.timeLeftDay, state.limit)
+        }
+        persist(username, state)
+        return true
+    }
+
+    fun setAllowedHours(username: String, intervals: Map<String, Map<String, Map<String, Any>>>): Boolean {
+        val state = users[username] ?: return false
+        val normalized = defaultAllowedHours()
+        intervals.forEach { (day, hours) ->
+            val dayMap = mutableMapOf<String, HourSlot>()
+            hours.forEach { (hour, slot) ->
+                dayMap[hour] = HourSlot(
+                    startMin = (slot["STARTMIN"] as? Number)?.toInt() ?: 0,
+                    endMin = (slot["ENDMIN"] as? Number)?.toInt() ?: 60,
+                    uacc = (slot["UACC"] as? Number)?.toInt() ?: 0,
+                )
+            }
+            normalized[day] = dayMap
+        }
+        state.allowedHours = normalized
+        persist(username, state)
+        return true
+    }
+
+    fun recordUsage(username: String, seconds: Int) {
+        val state = users[username] ?: return
+        state.timeSpentDay += seconds
+        state.timeLeftDay = maxOf(0, state.timeLeftDay - seconds)
+        persist(username, state)
+    }
+
+    fun isAccessAllowed(username: String, zoneId: ZoneId = ZoneId.systemDefault()): Boolean {
+        val state = users[username] ?: return true
+        if (!state.enabled) return false
+        if (state.timeLeftDay <= 0) return false
+
+        val now = LocalTime.now(zoneId)
+        val dayIndex = dayOfWeekIndex(LocalDate.now(zoneId).dayOfWeek)
+        if (dayIndex !in state.allowedDays) return false
+
+        val hourKey = now.hour.toString()
+        val dayHours = state.allowedHours[dayIndex.toString()] ?: return true
+        val slot = dayHours[hourKey] ?: return true
+        val minute = now.minute
+        return minute >= slot.startMin && minute < slot.endMin && slot.uacc == 0
+    }
+
+    fun configPayload(username: String, state: UserTimeState): JSONObject {
+        val allowedHoursJson = JSONObject()
+        state.allowedHours.forEach { (day, hours) ->
+            val dayJson = JSONObject()
+            hours.forEach { (hour, slot) ->
+                dayJson.put(
+                    hour,
+                    JSONObject()
+                        .put("STARTMIN", slot.startMin)
+                        .put("ENDMIN", slot.endMin)
+                        .put("UACC", slot.uacc),
+                )
+            }
+            allowedHoursJson.put(day, dayJson)
+        }
+        val weeklyJson = JSONObject()
+        state.weeklySchedule.forEach { (day, hours) -> weeklyJson.put(day, hours) }
+
+        return JSONObject()
+            .put("USERNAME", username)
+            .put("LINUX_UID", state.linuxUid)
+            .put("TIME_SPENT_DAY", state.timeSpentDay)
+            .put("TIME_LEFT_DAY", state.timeLeftDay)
+            .put("LIMIT", state.limit)
+            .put("ENABLED", state.enabled)
+            .put("ALLOWED_DAYS", state.allowedDays.sorted().map { it.toString() })
+            .put("WEEKLY_SCHEDULE", weeklyJson)
+            .put("ALLOWED_HOURS", allowedHoursJson)
+    }
+
+    private fun dayOfWeekIndex(day: DayOfWeek): Int {
+        return when (day) {
+            DayOfWeek.MONDAY -> 1
+            DayOfWeek.TUESDAY -> 2
+            DayOfWeek.WEDNESDAY -> 3
+            DayOfWeek.THURSDAY -> 4
+            DayOfWeek.FRIDAY -> 5
+            DayOfWeek.SATURDAY -> 6
+            DayOfWeek.SUNDAY -> 7
+        }
+    }
+
+    private fun defaultAllowedHours(): MutableMap<String, MutableMap<String, HourSlot>> {
+        val days = mutableMapOf<String, MutableMap<String, HourSlot>>()
+        for (day in 1..7) {
+            val hours = mutableMapOf<String, HourSlot>()
+            for (hour in 0..23) {
+                hours[hour.toString()] = HourSlot()
+            }
+            days[day.toString()] = hours
+        }
+        return days
+    }
+
+    private fun persist(username: String, state: UserTimeState) {
+        val json = JSONObject()
+            .put("linux_uid", state.linuxUid)
+            .put("time_spent_day", state.timeSpentDay)
+            .put("time_left_day", state.timeLeftDay)
+            .put("limit", state.limit)
+            .put("enabled", state.enabled)
+        prefs.edit().putString("user_$username", json.toString()).apply()
+    }
+
+    private fun loadPersisted(username: String): UserTimeState? {
+        val raw = prefs.getString("user_$username", null) ?: return null
+        return try {
+            val json = JSONObject(raw)
+            UserTimeState(
+                linuxUid = json.optInt("linux_uid"),
+                timeSpentDay = json.optInt("time_spent_day"),
+                timeLeftDay = json.optInt("time_left_day"),
+                limit = json.optInt("limit"),
+                enabled = json.optBoolean("enabled", true),
+                allowedDays = (1..7).toMutableSet(),
+                weeklySchedule = mutableMapOf(),
+                allowedHours = defaultAllowedHours(),
+            )
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    companion object {
+        private const val PREFS_NAME = "timekpr_time_limits"
+    }
+}

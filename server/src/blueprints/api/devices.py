@@ -4,6 +4,7 @@ import secrets
 from flask import Blueprint, session, jsonify
 from src.database import db, AgentDevice
 from src.agent_helper import AgentConnectionManager
+from src.agent_push import notify_pairing_approved
 from src.helpers import _device_display_label
 
 _LOGGER = logging.getLogger(__name__)
@@ -30,20 +31,13 @@ def approve_device(system_id):
     db.session.commit()
     device_label = _device_display_label(system_id)
     
-    ws = AgentConnectionManager.get_pending_connection(system_id)
-    if ws:
-        try:
-            ws.send(json.dumps({
-                "type": "pairing_approved",
-                "token": secure_token
-            }))
-            AgentConnectionManager.unregister_pending(system_id)
-        except (OSError, RuntimeError, TypeError, ValueError) as exc:
-            _LOGGER.error(
-                "Failed to send pairing_approved to device %s: %s",
-                system_id,
-                exc,
-            )
+    delivered, delivery_message = notify_pairing_approved(system_id, secure_token)
+    if not delivered:
+        _LOGGER.warning(
+            "pairing_approved not delivered immediately to %s: %s",
+            system_id,
+            delivery_message,
+        )
 
     _LOGGER.info("Approved device %s and generated secure token.", system_id)
     return jsonify({'success': True, 'message': f'Device {device_label} approved successfully.'})

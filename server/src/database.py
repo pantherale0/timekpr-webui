@@ -155,6 +155,9 @@ class AgentDevice(db.Model):
     date_added = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     last_seen = db.Column(db.DateTime(timezone=True), nullable=True)
     linux_users_json = db.Column(db.Text(), nullable=True)  # JSON list of standard system users
+    platform = db.Column(db.String(20), nullable=True)  # linux, android
+    fcm_token = db.Column(db.String(512), nullable=True)
+    fcm_token_updated_at = db.Column(db.DateTime(timezone=True), nullable=True)
 
     # Relationship to per-user Linux account mappings on this device
     user_mappings = db.relationship(
@@ -902,9 +905,10 @@ class AppArmorRule(db.Model):
     PRESET_COMPLAIN = 'complain'
     MATCH_TYPE_EXECUTABLE = 'executable'
     MATCH_TYPE_PATH_PATTERN = 'path_pattern'
+    MATCH_TYPE_PACKAGE = 'package'
 
     VALID_PRESETS = {PRESET_ALLOWED, PRESET_NO_INTERNET, PRESET_BLOCKED, PRESET_COMPLAIN}
-    VALID_MATCH_TYPES = {MATCH_TYPE_EXECUTABLE, MATCH_TYPE_PATH_PATTERN}
+    VALID_MATCH_TYPES = {MATCH_TYPE_EXECUTABLE, MATCH_TYPE_PATH_PATTERN, MATCH_TYPE_PACKAGE}
 
     id = db.Column(db.Integer, primary_key=True)
     device_map_id = db.Column(
