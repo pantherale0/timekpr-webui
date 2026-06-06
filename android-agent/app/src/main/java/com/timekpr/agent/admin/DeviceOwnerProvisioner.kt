@@ -20,6 +20,15 @@ object DeviceOwnerProvisioner {
         return dpm.isDeviceOwnerApp(context.packageName)
     }
 
+    fun isProfileOwner(context: Context): Boolean {
+        val dpm = context.getSystemService(DevicePolicyManager::class.java) ?: return false
+        return dpm.isProfileOwnerApp(context.packageName)
+    }
+
+    fun isDeviceOrProfileOwner(context: Context): Boolean {
+        return isDeviceOwner(context) || isProfileOwner(context)
+    }
+
     /** @return true when this app is device owner (grants may still partially fail). */
     fun applyIfDeviceOwner(context: Context): Boolean {
         if (!isDeviceOwner(context)) return false

@@ -8,6 +8,7 @@ import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.UserManager
+import android.util.Log
 import com.timekpr.agent.TimeKprApplication
 import com.timekpr.agent.admin.DeviceOwnerProvisioner
 import com.timekpr.agent.admin.TimeKprDeviceAdminReceiver
@@ -73,12 +74,8 @@ class EnforcementController(
         }
         val toSuspend = blocked.toTypedArray()
         val toUnsuspendArray = toUnsuspend.toTypedArray()
-        if (toUnsuspendArray.isNotEmpty()) {
-            dpm.setPackagesSuspended(adminComponent, toUnsuspendArray, false)
-        }
-        if (toSuspend.isNotEmpty()) {
-            dpm.setPackagesSuspended(adminComponent, toSuspend, true)
-        }
+        setPackagesSuspended(dpm, toUnsuspendArray, false)
+        setPackagesSuspended(dpm, toSuspend, true)
         appPolicyStore.setLastEnforcedBlockedPackages(username, blocked)
     }
 
@@ -88,9 +85,7 @@ class EnforcementController(
 
         val exempt = timeExemptionResolver.exemptPackages(username)
         val toSuspend = launcherPackages() - exempt
-        if (toSuspend.isNotEmpty()) {
-            dpm.setPackagesSuspended(adminComponent, toSuspend.toTypedArray(), true)
-        }
+        setPackagesSuspended(dpm, toSuspend.toTypedArray(), true)
         lastTimeExhaustionSuspendedByUser[username] = toSuspend
         persistTimeExhaustionSuspended()
     }
@@ -102,9 +97,7 @@ class EnforcementController(
         if (previouslySuspended.isNotEmpty()) {
             val stillBlocked = appPolicyStore.effectiveBlockedPackages(username)
             val toUnsuspend = (previouslySuspended - stillBlocked).toTypedArray()
-            if (toUnsuspend.isNotEmpty()) {
-                dpm.setPackagesSuspended(adminComponent, toUnsuspend, false)
-            }
+            setPackagesSuspended(dpm, toUnsuspend, false)
         }
         persistTimeExhaustionSuspended()
         applyAppPolicies(username)
@@ -193,6 +186,19 @@ class EnforcementController(
         }
     }
 
+    private fun setPackagesSuspended(dpm: DevicePolicyManager, packages: Array<String>, suspended: Boolean) {
+        if (packages.isEmpty()) return
+        if (!DeviceOwnerProvisioner.isDeviceOrProfileOwner(context)) {
+            Log.w(TAG, "Cannot suspend/unsuspend packages: App is not Device Owner or Profile Owner")
+            return
+        }
+        try {
+            dpm.setPackagesSuspended(adminComponent, packages, suspended)
+        } catch (e: SecurityException) {
+            Log.e(TAG, "Failed to set packages suspended (suspended=$suspended) for: ${packages.joinToString()}", e)
+        }
+    }
+
     private fun setUserRestriction(dpm: DevicePolicyManager, restriction: String, enabled: Boolean) {
         if (enabled) {
             dpm.addUserRestriction(adminComponent, restriction)
@@ -246,6 +252,7 @@ class EnforcementController(
     }
 
     companion object {
+        private const val TAG = "EnforcementController"
         private const val PREFS_NAME = "timekpr_enforcement"
         private const val KEY_TIME_EXHAUSTION_SUSPENDED = "time_exhaustion_suspended"
     }
