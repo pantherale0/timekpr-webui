@@ -160,7 +160,7 @@ jobs:
           chmod 600 "$signing_key"
           printf '%s\n' "$MINISIGN_SECRET_KEY" > "$signing_key"
           asset="dist/timekpr-agent-${{ matrix.target }}.tar.gz"
-          rsign sign "$asset" -s "$signing_key" -x "${asset}.minisig" -c "timekpr-agent ${{ github.ref_name }}"
+          rsign sign "$asset" -s "$signing_key" -x "${asset}.minisig" -c "timekpr-agent ${{ github.ref_name }}" -W
           rm -f "$signing_key"
 
       - name: Upload packaged asset
