@@ -6,6 +6,7 @@ import android.os.UserManager
 import android.provider.Settings
 
 object AndroidUsers {
+    @Suppress("MissingPermission")
     fun currentLinuxUsername(context: Context): String {
         return try {
             val userManager = context.getSystemService(UserManager::class.java)
