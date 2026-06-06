@@ -27,6 +27,7 @@ need_cmd() {
     }
 }
 
+need_cmd python3
 need_cmd openssl
 
 find_apksigner() {
@@ -42,32 +43,42 @@ find_apksigner() {
     local root
     for root in "${roots[@]}"; do
         [[ -d "$root" ]] || continue
-        find "$root" -maxdepth 2 -type f -name apksigner -executable 2>/dev/null \
+        find "$root" -maxdepth 2 -type f -name apksigner 2>/dev/null \
             | sort -V \
             | tail -n 1
     done | tail -n 1
 }
 
-hex_digest_to_checksum() {
-    local hex="${1,,}"
-    hex="${hex//:/}"
-    if [[ ! "$hex" =~ ^[0-9a-f]{64}$ ]]; then
-        return 1
-    fi
-    local packed="" i
-    for ((i = 0; i < 64; i += 2)); do
-        packed+="\\x${hex:i:2}"
-    done
-    printf '%b' "$packed" | openssl base64 | tr '+/' '-_' | tr -d '=\n'
-}
-
 checksum_from_apksigner() {
     local apksigner_bin="$1"
-    local hex
+    python3 - "$apksigner_bin" "$apk" <<'PY'
+import base64
+import binascii
+import subprocess
+import sys
 
-    hex=$("$apksigner_bin" verify --print-certs "$apk" 2>&1 \
-        | awk -F': ' '/certificate SHA-256 digest:/ {print $2; exit}')
-    hex_digest_to_checksum "$hex"
+apksigner, apk_path = sys.argv[1], sys.argv[2]
+result = subprocess.run(
+    [apksigner, 'verify', '--print-certs', apk_path],
+    capture_output=True,
+    text=True,
+    check=False,
+)
+output = '\n'.join(part for part in (result.stdout, result.stderr) if part).strip()
+if result.returncode != 0 and 'certificate SHA-256 digest:' not in output:
+    sys.exit(1)
+
+hex_digest = ''
+marker = 'certificate SHA-256 digest:'
+for line in output.splitlines():
+    if marker in line:
+        hex_digest = line.split(marker, 1)[1].strip().replace(':', '')
+        break
+if len(hex_digest) != 64:
+    sys.exit(1)
+
+print(base64.urlsafe_b64encode(binascii.unhexlify(hex_digest)).decode().rstrip('='))
+PY
 }
 
 checksum_from_keytool() {
@@ -87,8 +98,12 @@ checksum_from_keytool() {
 
 checksum=""
 apksigner_bin="$(find_apksigner || true)"
+verify_output=""
 if [[ -n "$apksigner_bin" ]]; then
     checksum="$(checksum_from_apksigner "$apksigner_bin" || true)"
+    if [[ -z "$checksum" ]]; then
+        verify_output="$("$apksigner_bin" verify --print-certs "$apk" 2>&1 || true)"
+    fi
 fi
 
 if [[ -z "$checksum" ]]; then
@@ -111,6 +126,14 @@ Example:
   export ANDROID_HOME=\$HOME/Android/Sdk
   ${0} ${apk}
 EOF
+    if [[ -n "$apksigner_bin" ]]; then
+        printf '\napksigner: %s\n' "$apksigner_bin" >&2
+        if [[ -n "$verify_output" ]]; then
+            printf 'apksigner verify output:\n%s\n' "$verify_output" >&2
+        fi
+    else
+        printf '\napksigner was not found under ANDROID_HOME/ANDROID_SDK_ROOT.\n' >&2
+    fi
     exit 1
 fi
 

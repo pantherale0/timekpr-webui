@@ -73,6 +73,8 @@ jobs:
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          packages: tools platform-tools build-tools;35.0.0
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
@@ -82,6 +84,21 @@ jobs:
       - name: Build debug APK
         working-directory: android-agent
         run: ./gradlew assembleDebug --no-daemon
+
+      - name: Verify APK signature checksum script
+        run: |
+          chmod +x scripts/android-signature-checksum.sh
+          apk="$(find android-agent/app/build/outputs/apk/debug -maxdepth 1 -type f -name '*.apk' | head -n 1)"
+          if [[ -z "$apk" ]]; then
+            echo "Debug APK not found after assembleDebug." >&2
+            exit 1
+          fi
+          checksum="$(./scripts/android-signature-checksum.sh "$apk")"
+          if [[ "$checksum" == "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU" ]]; then
+            echo "Checksum script returned empty digest; apksigner/build-tools may be missing." >&2
+            exit 1
+          fi
+          echo "APK signature checksum: $checksum"
 
   linux-release-build:
     needs: linux-check
@@ -181,9 +198,16 @@ jobs:
       - name: Decode release keystore
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
         run: |
-          if [ -n "$ANDROID_KEYSTORE_BASE64" ]; then
-            echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > android-agent/release.keystore
+          if [ -z "$ANDROID_KEYSTORE_BASE64" ]; then
+            echo "ANDROID_KEYSTORE_BASE64 secret is required for signed release APKs." >&2
+            exit 1
+          fi
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > android-agent/release.keystore
+          if ! keytool -list -keystore android-agent/release.keystore -storepass "$ANDROID_KEYSTORE_PASSWORD" >/dev/null 2>&1; then
+            echo "Failed to load release keystore; check ANDROID_KEYSTORE_* secrets." >&2
+            exit 1
           fi
 
       - name: Build release APK
@@ -194,12 +218,29 @@ jobs:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-        run: ./gradlew assembleRelease --no-daemon
+        run: ./gradlew clean assembleRelease --no-daemon
 
       - name: Package release asset
         run: |
           mkdir -p dist
-          apk_path=$(find android-agent/app/build/outputs/apk/release -name '*.apk' | head -n 1)
+          release_dir="android-agent/app/build/outputs/apk/release"
+          metadata="${release_dir}/output-metadata.json"
+          if [[ ! -f "$metadata" ]]; then
+            echo "Missing ${metadata}" >&2
+            find "$release_dir" -type f -name '*.apk' -ls >&2 || true
+            exit 1
+          fi
+          output_file="$(python3 -c "import json, pathlib; print(json.loads(pathlib.Path('${metadata}').read_text())['elements'][0]['outputFile'])")"
+          if [[ "$output_file" == *unsigned* ]]; then
+            echo "Release build produced unsigned APK (${output_file}); check keystore secrets." >&2
+            exit 1
+          fi
+          apk_path="${release_dir}/${output_file}"
+          if [[ ! -f "$apk_path" ]]; then
+            echo "Signed release APK not found at ${apk_path}" >&2
+            find "$release_dir" -type f -name '*.apk' -ls >&2 || true
+            exit 1
+          fi
           cp "$apk_path" "dist/timekpr-android-agent-${{ github.ref_name }}.apk"
 
       - name: Compute APK signature checksum
