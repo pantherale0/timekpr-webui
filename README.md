@@ -47,7 +47,7 @@ graph TD
 *   **Process Restricting**: Uses netlink process monitoring and SIGKILL to enforce allowed and blocked executable lists.
 *   **Seat0 Active Session Reconciliation**: Restricts polkit permissions (software installs, mount removal media, account modifications, system power commands) and blocks terminal access *only* for the user signed into the active desktop session (logind seat0).
 *   **Local DNS Sinkhole**: Blocks domain access at the DNS level for configured users, showing desktop notifications on block.
-*   **Cryptographically Signed Auto-Updates**: Downloads update binaries and verifies them against an embedded Minisign public key before upgrading.
+*   **SHA-256 Verified Auto-Updates**: Automatically downloads release binaries along with their SHA-256 checksums to verify integrity before upgrading.
 
 ### 🤖 Android Kotlin Agent (`android-agent/`)
 *   **Battery-Efficient Connectivity**: Integrates with Firebase Cloud Messaging (FCM). Instead of maintaining a persistent WebSocket, the server sends FCM wake messages when policy changes are made, prompting the agent to start a brief WebSocket sync session.
@@ -221,7 +221,6 @@ Configure these variables inside your docker compose environment or export them 
 *   If testing without FCM configured, policy updates will not be pushed instantly when the device is idle; they will sync during the WorkManager periodic cycle (every 4 hours) or when the app is manually opened.
 
 ### CI/CD Release Signing Failures
-*   **Linux Agent Signing (`Missing encoded key in secret key`)**: Make sure your `TIMEKPR_AGENT_UPDATE_SIGNING_KEY` secret contains the complete multi-line content of your unencrypted Minisign secret key file (including the `untrusted comment:` header). See [linux-agent.md](docs/linux-agent.md#generating-keys-for-cicd) for key generation steps.
 *   **Android Agent Signing (`unsigned APK / check keystore secrets`)**: Ensure that `ANDROID_KEYSTORE_BASE64` contains the full Base64-encoded output of your `.keystore` file, and that password/alias values match exactly. See [android-agent.md](docs/android-agent.md#generating-and-encoding-the-keystore-for-cicd) for keystore setup steps.
 
 ---

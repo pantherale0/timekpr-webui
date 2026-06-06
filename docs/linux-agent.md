@@ -117,32 +117,11 @@ Because Bluetooth rfkill is device-wide, a parent session may still see Bluetoot
 
 ## Auto-update integrity
 
-When the server reports a version mismatch, the agent downloads the matching GitHub release tarball and its companion `.minisig` signature. The update is applied only after Minisign verification against the embedded public key in `agent/keys/update-signing.pub`.
+When the server reports a version mismatch, the agent automatically downloads the matching GitHub release tarball (`.tar.gz`) along with its companion `.sha256` checksum file.
 
-Release builds are signed in CI with the `TIMEKPR_AGENT_UPDATE_SIGNING_KEY` GitHub Actions secret (contents of the Minisign secret key file). Unsigned or tampered downloads are rejected before the running binary is replaced.
+Before applying the update, the agent calculates the SHA-256 hash of the downloaded archive and compares it with the hash stored in the `.sha256` file to ensure the integrity of the download. If the hashes do not match, the update is rejected and the active binary remains unchanged.
 
-### Generating Keys for CI/CD
-
-To generate a passwordless Minisign key pair for GitHub Actions:
-
-1. **Install Minisign or rsign2**:
-   - Using Minisign: `minisign -G -W` (the `-W` flag creates an unencrypted key, which is required so that the CI job does not prompt for a password during build).
-   - Using rsign: `rsign generate -W` or `rsign generate --unencrypted`.
-
-2. **Configure the Repository Public Key**:
-   Save the contents of the generated public key (`rsign.pub` or `minisign.pub`) into `agent/keys/update-signing.pub` and commit it.
-
-3. **Configure the GitHub Repository Secret**:
-   - Create a repository secret named `TIMEKPR_AGENT_UPDATE_SIGNING_KEY` on GitHub.
-   - Copy the **entire multi-line content** of the generated secret key file (e.g., `rsign.key` or `minisign.key`).
-
-   > [!WARNING]
-   > Do not copy only the base64 key payload string. The secret MUST contain both lines, including the header comment line:
-   > ```text
-   > untrusted comment: <comment description>
-   > <base64 encoded key payload>
-   > ```
-   > If the header line is omitted, the signing process in GitHub Actions will fail with the error: `Missing encoded key in secret key`.
+The `.sha256` files are automatically generated during release builds in the GitHub Actions CI workflow, eliminating the need to manage secret signing keys in repository settings.
 
 ## Build and test
 

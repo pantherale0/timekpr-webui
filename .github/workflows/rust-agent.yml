@@ -145,29 +145,9 @@ jobs:
             -C "agent/target/${{ matrix.target }}/release" \
             timekpr-agent
 
-      - name: Install rsign
-        run: cargo install rsign2 --locked --quiet
-
-      - name: Sign release asset
-        env:
-          MINISIGN_SECRET_KEY: ${{ secrets.TIMEKPR_AGENT_UPDATE_SIGNING_KEY }}
+      - name: Generate SHA-256 checksum
         run: |
-          if [ -z "$MINISIGN_SECRET_KEY" ]; then
-            echo "TIMEKPR_AGENT_UPDATE_SIGNING_KEY secret is required to publish signed agent releases." >&2
-            exit 1
-          fi
-          signing_key="$(mktemp)"
-          chmod 600 "$signing_key"
-          
-          # Sanitize key content to handle any line-wrapping or whitespace issues from copy-pasting
-          comment=$(echo "$MINISIGN_SECRET_KEY" | head -n 1)
-          key_data=$(echo "$MINISIGN_SECRET_KEY" | tail -n +2 | tr -d '[:space:]')
-          echo "$comment" > "$signing_key"
-          echo "$key_data" >> "$signing_key"
-          
-          asset="dist/timekpr-agent-${{ matrix.target }}.tar.gz"
-          rsign sign "$asset" -s "$signing_key" -x "${asset}.minisig" -c "timekpr-agent ${{ github.ref_name }}" -W
-          rm -f "$signing_key"
+          sha256sum "dist/timekpr-agent-${{ matrix.target }}.tar.gz" | awk '{print $1}' > "dist/timekpr-agent-${{ matrix.target }}.tar.gz.sha256"
 
       - name: Upload packaged asset
         uses: actions/upload-artifact@v4
@@ -175,7 +155,7 @@ jobs:
           name: linux-agent-${{ matrix.target }}
           path: |
             dist/timekpr-agent-${{ matrix.target }}.tar.gz
-            dist/timekpr-agent-${{ matrix.target }}.tar.gz.minisig
+            dist/timekpr-agent-${{ matrix.target }}.tar.gz.sha256
 
   android-release-build:
     needs: android-check

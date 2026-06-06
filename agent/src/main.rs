@@ -684,12 +684,12 @@ async fn trigger_auto_update(target_version: &str, github_repo: &str) -> Result<
     };
 
     let asset_name = format!("timekpr-agent-{}.tar.gz", target);
-    let signature_name = format!("{asset_name}.minisig");
+    let checksum_name = format!("{asset_name}.sha256");
     let download_url = format!(
         "https://github.com/{github_repo}/releases/download/{target_version}/{asset_name}"
     );
-    let signature_url = format!(
-        "https://github.com/{github_repo}/releases/download/{target_version}/{signature_name}"
+    let checksum_url = format!(
+        "https://github.com/{github_repo}/releases/download/{target_version}/{checksum_name}"
     );
 
     let client = reqwest::Client::builder()
@@ -698,12 +698,12 @@ async fn trigger_auto_update(target_version: &str, github_repo: &str) -> Result<
         .map_err(|e| format!("Failed to build HTTP client: {}", e))?;
 
     let bytes = download_release_bytes(&client, &download_url, "release archive").await?;
-    let signature_bytes =
-        download_release_bytes(&client, &signature_url, "release signature").await?;
-    let signature_text = String::from_utf8(signature_bytes)
-        .map_err(|error| format!("Release signature is not valid UTF-8: {error}"))?;
+    let checksum_bytes =
+        download_release_bytes(&client, &checksum_url, "release checksum").await?;
+    let checksum_text = String::from_utf8(checksum_bytes)
+        .map_err(|error| format!("Release checksum is not valid UTF-8: {error}"))?;
 
-    update_verify::verify_release_asset(&bytes, &signature_text)?;
+    update_verify::verify_release_asset(&bytes, &checksum_text)?;
     println!(
         "Downloaded and verified {} bytes successfully. Extracting archive...",
         bytes.len()

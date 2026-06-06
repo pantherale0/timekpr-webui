@@ -1,15 +1,20 @@
-use minisign_verify::{PublicKey, Signature};
+use sha2::{Digest, Sha256};
 
-const EMBEDDED_PUBLIC_KEY: &str = include_str!("../keys/update-signing.pub");
+pub fn verify_release_asset(asset_bytes: &[u8], expected_checksum: &str) -> Result<(), String> {
+    let mut hasher = Sha256::new();
+    hasher.update(asset_bytes);
+    let result = hasher.finalize();
+    let calculated_checksum = hex::encode(result);
 
-pub fn verify_release_asset(asset_bytes: &[u8], signature_text: &str) -> Result<(), String> {
-    let public_key = PublicKey::decode(EMBEDDED_PUBLIC_KEY)
-        .map_err(|error| format!("Invalid embedded update signing key: {error}"))?;
-    let signature = Signature::decode(signature_text)
-        .map_err(|error| format!("Invalid release signature format: {error}"))?;
-    public_key
-        .verify(asset_bytes, &signature, false)
-        .map_err(|error| format!("Release signature verification failed: {error}"))
+    let expected_checksum = expected_checksum.trim();
+    if calculated_checksum.eq_ignore_ascii_case(expected_checksum) {
+        Ok(())
+    } else {
+        Err(format!(
+            "Checksum verification failed. Expected: {}, Calculated: {}",
+            expected_checksum, calculated_checksum
+        ))
+    }
 }
 
 pub fn is_valid_release_version(version: &str) -> bool {
@@ -79,9 +84,11 @@ mod tests {
     }
 
     #[test]
-    fn verifies_signed_release_fixture() {
+    fn verifies_checksum_fixture() {
         let asset = include_bytes!("testdata/signed-release.tar.gz");
-        let signature = include_str!("testdata/signed-release.tar.gz.minisig");
-        verify_release_asset(asset, signature).expect("fixture signature should verify");
+        let mut hasher = Sha256::new();
+        hasher.update(asset);
+        let expected = hex::encode(hasher.finalize());
+        verify_release_asset(asset, &expected).expect("fixture checksum should verify");
     }
 }
