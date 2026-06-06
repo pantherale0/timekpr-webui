@@ -158,7 +158,13 @@ jobs:
           fi
           signing_key="$(mktemp)"
           chmod 600 "$signing_key"
-          printf '%s\n' "$MINISIGN_SECRET_KEY" > "$signing_key"
+          
+          # Sanitize key content to handle any line-wrapping or whitespace issues from copy-pasting
+          comment=$(echo "$MINISIGN_SECRET_KEY" | head -n 1)
+          key_data=$(echo "$MINISIGN_SECRET_KEY" | tail -n +2 | tr -d '[:space:]')
+          echo "$comment" > "$signing_key"
+          echo "$key_data" >> "$signing_key"
+          
           asset="dist/timekpr-agent-${{ matrix.target }}.tar.gz"
           rsign sign "$asset" -s "$signing_key" -x "${asset}.minisig" -c "timekpr-agent ${{ github.ref_name }}" -W
           rm -f "$signing_key"
