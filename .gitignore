@@ -1,7 +1,7 @@
 # Private keys and certificates - NEVER commit secrets!
 *.pem
 *.key
-
+!isrg_root_x1.pem
 # LLM Agents
 .agent/
 
