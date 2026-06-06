@@ -10,7 +10,7 @@ ENV ANDROID_SDK_ROOT=/opt/android-sdk
 ENV ANDROID_HOME=/opt/android-sdk
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-        openjdk-17-jre-headless \
+        openjdk-21-jre \
         openssl \
         xxd \
         wget \
