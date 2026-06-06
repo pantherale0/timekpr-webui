@@ -71,6 +71,7 @@
                 </div>
 
                 <form method="POST" action="{{ url_for('login') }}" class="m-0">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <div class="input-group mb-3 shadow-sm rounded">
                         <input type="text" id="username" name="username" class="form-control" placeholder="Admin Username" required autocomplete="username">
                         <span class="input-group-text bg-body text-secondary"><i class="fas fa-user"></i></span>

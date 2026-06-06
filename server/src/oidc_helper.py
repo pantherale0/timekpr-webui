@@ -136,3 +136,65 @@ class OIDCHelper:
     def generate_state():
         """Generates a secure cryptographically random state for CSRF protection."""
         return secrets.token_urlsafe(16)
+
+    @staticmethod
+    def _parse_csv_env(name):
+        value = os.environ.get(name, '')
+        return [item.strip().lower() for item in value.split(',') if item.strip()]
+
+    @staticmethod
+    def _normalize_claim_values(raw_value):
+        if raw_value is None:
+            return []
+        if isinstance(raw_value, str):
+            values = [raw_value]
+        elif isinstance(raw_value, (list, tuple, set)):
+            values = list(raw_value)
+        else:
+            values = [str(raw_value)]
+        return [str(value).strip().lower() for value in values if str(value).strip()]
+
+    def is_authorized_admin(self, user_info):
+        """Return whether the OIDC identity is allowed to access the admin console."""
+        if not user_info:
+            return False, 'Missing user information from identity provider'
+
+        allow_any = os.environ.get('OIDC_ALLOW_ANY_AUTHENTICATED', '').strip().lower()
+        if allow_any in {'true', '1', 'yes', 'on'}:
+            logger.warning(
+                'OIDC_ALLOW_ANY_AUTHENTICATED is enabled; any authenticated identity may access the admin console'
+            )
+            return True, ''
+
+        allowed_emails = self._parse_csv_env('ALLOWED_OIDC_ADMINS')
+        allowed_domains = self._parse_csv_env('ALLOWED_OIDC_ADMIN_DOMAINS')
+        allowed_roles = self._parse_csv_env('ALLOWED_OIDC_ADMIN_ROLES')
+        allowed_groups = self._parse_csv_env('ALLOWED_OIDC_ADMIN_GROUPS')
+
+        if not any((allowed_emails, allowed_domains, allowed_roles, allowed_groups)):
+            return False, (
+                'OIDC admin access is not configured. Set ALLOWED_OIDC_ADMINS, '
+                'ALLOWED_OIDC_ADMIN_DOMAINS, ALLOWED_OIDC_ADMIN_ROLES, or ALLOWED_OIDC_ADMIN_GROUPS.'
+            )
+
+        email = (user_info.get('email') or '').strip().lower()
+        if allowed_emails and email in allowed_emails:
+            return True, ''
+        if allowed_domains and '@' in email:
+            domain = email.rsplit('@', 1)[-1]
+            if domain in allowed_domains:
+                return True, ''
+
+        role_values = self._normalize_claim_values(
+            user_info.get('roles') or user_info.get('role')
+        )
+        if allowed_roles and any(role in allowed_roles for role in role_values):
+            return True, ''
+
+        group_values = self._normalize_claim_values(
+            user_info.get('groups') or user_info.get('group')
+        )
+        if allowed_groups and any(group in allowed_groups for group in group_values):
+            return True, ''
+
+        return False, 'You are not authorized to access the admin console.'

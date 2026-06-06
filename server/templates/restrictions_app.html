@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 
+{% from '_macros.html' import csrf_field %}
 {% block title %}App Locks & Policies - Guardian{% endblock %}
 
 {% block content %}
@@ -30,7 +31,8 @@
             </div>
             <div class="card-body">
                 <form action="{{ url_for('ui_apparmor.create_app_policy') }}" method="POST" class="row g-3 align-items-end m-0">
-                    <div class="col-12 col-md-5">
+
+                {{ csrf_field() }}                    <div class="col-12 col-md-5">
                         <label for="policy_name" class="form-label fw-bold small text-muted text-uppercase mb-1" style="font-size: 0.75rem; letter-spacing: 0.05em;">Policy Name</label>
                         <input type="text" id="policy_name" name="name" class="form-control" placeholder="e.g. Study Time Locks, Gaming Lockout" required>
                     </div>
@@ -84,7 +86,8 @@
                             </div>
                             <div>
                                 <form action="{{ url_for('ui_apparmor.delete_app_policy', policy_id=policy.id) }}" method="POST" onsubmit="return confirm('Delete app policy profile {{ policy.name }}? This will remove all its rules and unassign it from all children.');" class="m-0">
-                                    <button type="submit" class="btn btn-sm btn-outline-danger fw-bold"><i class="fas fa-trash me-1"></i> Delete Policy</button>
+
+                                {{ csrf_field() }}                                    <button type="submit" class="btn btn-sm btn-outline-danger fw-bold"><i class="fas fa-trash me-1"></i> Delete Policy</button>
                                 </form>
                             </div>
                         </div>
@@ -93,7 +96,8 @@
                             <div class="border rounded p-3 bg-body mb-4 shadow-sm">
                                 <h6 class="fw-bold small text-muted text-uppercase mb-3 border-bottom pb-2" style="font-size: 0.7rem; letter-spacing: 0.05em;"><i class="fas fa-plus me-1 text-primary"></i> Add App Lock Rule</h6>
                                 <form action="{{ url_for('ui_apparmor.add_app_policy_rule', policy_id=policy.id) }}" method="POST" class="row g-3 align-items-end m-0" data-policy-platform="{{ policy.platform }}">
-                                    {% if policy.platform == 'linux' %}
+
+                                {{ csrf_field() }}                                    {% if policy.platform == 'linux' %}
                                     <div class="col-12 col-sm-6 col-md-4 col-lg-3">
                                         <label class="form-label fw-bold small text-muted mb-1" style="font-size: 0.75rem;">Select Curated App</label>
                                         <select name="curated_app_choice" class="form-select form-select-sm app-picker-{{ policy.id }}" onchange="toggleCustomFields(this, '{{ policy.id }}')">
@@ -192,7 +196,8 @@
                                                     <code class="small text-muted text-truncate mt-1" style="font-size: 0.7rem;" title="{{ rule.executable_path }}">{{ rule.executable_path }}</code>
                                                 </div>
                                                 <form action="{{ url_for('ui_apparmor.delete_app_policy_rule', rule_id=rule.id) }}" method="POST" class="m-0 flex-shrink-0">
-                                                    <button type="submit" class="btn btn-xs btn-outline-danger p-0 d-flex align-items-center justify-content-center" style="width: 20px; height: 20px; font-size: 0.75rem;" title="Remove this rule">&times;</button>
+
+                                                {{ csrf_field() }}                                                    <button type="submit" class="btn btn-xs btn-outline-danger p-0 d-flex align-items-center justify-content-center" style="width: 20px; height: 20px; font-size: 0.75rem;" title="Remove this rule">&times;</button>
                                                 </form>
                                             </div>
                                         </div>

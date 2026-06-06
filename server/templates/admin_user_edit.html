@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 
+{% from '_macros.html' import csrf_field %}
 {% block title %}Profile Settings - {{ user.username }} - Guardian Parental Controls{% endblock %}
 
 {% block top_nav_extra %}
@@ -75,7 +76,8 @@
                 </div>
 
                 <form action="{{ url_for('update_user_blocklists', user_id=user.id) }}" method="POST">
-                    <div class="row g-3 mb-4">
+
+                {{ csrf_field() }}                    <div class="row g-3 mb-4">
                         {% for source in blocklist_sources %}
                             <div class="col-12 col-md-6">
                                 <div class="border rounded p-3 bg-body-tertiary">
@@ -254,6 +256,87 @@
             </div>
         </div>
 
+        <!-- Linux Device Restrictions -->
+        <div class="card border shadow-sm mb-4">
+            <div class="card-header bg-dark text-white py-3">
+                <h5 class="mb-0 fw-bold"><i class="fas fa-desktop text-success me-2"></i>Linux Device Restrictions</h5>
+            </div>
+            <div class="card-body p-4">
+                <p class="text-secondary small fw-medium mb-3">System privileges via polkit rules and terminal access control for linked Linux accounts.</p>
+                {% if linux_device_policy_by_mapping %}
+                    <div class="d-flex flex-column gap-3">
+                        {% for mapping in user.device_mappings %}
+                            {% set linux_policy = linux_device_policy_by_mapping.get(mapping.id) %}
+                            {% if linux_policy %}
+                            <div class="border rounded p-3 bg-body-tertiary linux-device-policy-card" data-mapping-id="{{ mapping.id }}">
+                                <div class="d-flex justify-content-between align-items-start gap-2 mb-2 flex-wrap">
+                                    <strong class="text-body">{{ mapping.linux_username }}@{{ linux_policy.device_label or mapping.system_id }}</strong>
+                                    <span class="badge linux-device-policy-sync-badge {% if linux_policy.is_synced %}bg-success{% else %}bg-warning text-dark{% endif %}" style="font-size: 0.65rem;">
+                                        {% if linux_policy.is_synced %}Synced{% else %}Sync pending{% endif %}
+                                    </span>
+                                </div>
+                                <div class="alert alert-info py-2 small mb-3">
+                                    <i class="fas fa-info-circle me-1"></i>Requires the Guardian agent running as root. Polkit rules apply on common systemd distros; terminal blocking covers common shells and terminal emulators.
+                                </div>
+                                <h6 class="fw-bold small text-muted text-uppercase mb-2" style="font-size: 0.7rem; letter-spacing: 0.05em;">System privileges (polkit)</h6>
+                                <div class="form-check form-switch mb-2">
+                                    <input class="form-check-input linux-install-software" type="checkbox" data-mapping-id="{{ mapping.id }}" id="linux-install-software-{{ mapping.id }}" {% if linux_policy.install_software_disabled %}checked{% endif %}>
+                                    <label class="form-check-label small" for="linux-install-software-{{ mapping.id }}">Block software installation</label>
+                                </div>
+                                <div class="form-check form-switch mb-2">
+                                    <input class="form-check-input linux-uninstall-software" type="checkbox" data-mapping-id="{{ mapping.id }}" id="linux-uninstall-software-{{ mapping.id }}" {% if linux_policy.uninstall_software_disabled %}checked{% endif %}>
+                                    <label class="form-check-label small" for="linux-uninstall-software-{{ mapping.id }}">Block software removal</label>
+                                </div>
+                                <div class="form-check form-switch mb-2">
+                                    <input class="form-check-input linux-mount-media" type="checkbox" data-mapping-id="{{ mapping.id }}" id="linux-mount-media-{{ mapping.id }}" {% if linux_policy.mount_removable_media_disabled %}checked{% endif %}>
+                                    <label class="form-check-label small" for="linux-mount-media-{{ mapping.id }}">Block removable media mounting</label>
+                                </div>
+                                <div class="form-check form-switch mb-2">
+                                    <input class="form-check-input linux-modify-accounts" type="checkbox" data-mapping-id="{{ mapping.id }}" id="linux-modify-accounts-{{ mapping.id }}" {% if linux_policy.modify_accounts_disabled %}checked{% endif %}>
+                                    <label class="form-check-label small" for="linux-modify-accounts-{{ mapping.id }}">Block account changes</label>
+                                </div>
+                                <div class="form-check form-switch mb-2">
+                                    <input class="form-check-input linux-power-actions" type="checkbox" data-mapping-id="{{ mapping.id }}" id="linux-power-actions-{{ mapping.id }}" {% if linux_policy.system_power_actions_disabled %}checked{% endif %}>
+                                    <label class="form-check-label small" for="linux-power-actions-{{ mapping.id }}">Block reboot / shutdown / suspend</label>
+                                </div>
+                                <div class="form-check form-switch mb-2">
+                                    <input class="form-check-input linux-pkexec" type="checkbox" data-mapping-id="{{ mapping.id }}" id="linux-pkexec-{{ mapping.id }}" {% if linux_policy.pkexec_elevation_disabled %}checked{% endif %}>
+                                    <label class="form-check-label small" for="linux-pkexec-{{ mapping.id }}">Block pkexec elevation</label>
+                                </div>
+                                <div class="form-check form-switch mb-2">
+                                    <input class="form-check-input linux-flatpak" type="checkbox" data-mapping-id="{{ mapping.id }}" id="linux-flatpak-{{ mapping.id }}" {% if linux_policy.flatpak_install_disabled %}checked{% endif %}>
+                                    <label class="form-check-label small" for="linux-flatpak-{{ mapping.id }}">Block Flatpak installation</label>
+                                </div>
+                                <div class="form-check form-switch mb-2">
+                                    <input class="form-check-input linux-snap" type="checkbox" data-mapping-id="{{ mapping.id }}" id="linux-snap-{{ mapping.id }}" {% if linux_policy.snap_install_disabled %}checked{% endif %}>
+                                    <label class="form-check-label small" for="linux-snap-{{ mapping.id }}">Block Snap installation</label>
+                                </div>
+                                <h6 class="fw-bold small text-muted text-uppercase mt-3 mb-2" style="font-size: 0.7rem; letter-spacing: 0.05em;">Connectivity</h6>
+                                <div class="form-check form-switch mb-2">
+                                    <input class="form-check-input linux-bluetooth" type="checkbox" data-mapping-id="{{ mapping.id }}" id="linux-bluetooth-{{ mapping.id }}" {% if linux_policy.bluetooth_disabled %}checked{% endif %}>
+                                    <label class="form-check-label small" for="linux-bluetooth-{{ mapping.id }}">Disable Bluetooth</label>
+                                </div>
+                                <h6 class="fw-bold small text-muted text-uppercase mt-3 mb-2" style="font-size: 0.7rem; letter-spacing: 0.05em;">Terminal access</h6>
+                                <div class="form-check form-switch mb-2">
+                                    <input class="form-check-input linux-terminal-access" type="checkbox" data-mapping-id="{{ mapping.id }}" id="linux-terminal-access-{{ mapping.id }}" {% if linux_policy.terminal_access_disabled %}checked{% endif %}>
+                                    <label class="form-check-label small" for="linux-terminal-access-{{ mapping.id }}">Block terminal emulators and shells</label>
+                                </div>
+                                <div class="mb-0">
+                                    <label class="form-label fw-bold small text-muted text-uppercase mb-1" style="font-size: 0.7rem;">Support message</label>
+                                    <input type="text" class="form-control form-control-sm linux-support-message" data-mapping-id="{{ mapping.id }}" maxlength="500" value="{{ linux_policy.support_message }}">
+                                    <span class="text-secondary d-block mt-1" style="font-size: 0.65rem;">Shown when a restricted action is blocked (max 500 characters).</span>
+                                </div>
+                            </div>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                    <button type="button" class="btn btn-primary btn-sm fw-bold mt-3" onclick="saveLinuxDevicePolicies()">Save Linux Device Restrictions</button>
+                {% else %}
+                    <p class="text-secondary small mb-0">Link a Linux device mapping to configure device restrictions.</p>
+                {% endif %}
+            </div>
+        </div>
+
     </div>
 
     <!-- Right Sidebar Content: App Locks & Installed Apps -->
@@ -305,7 +388,8 @@
             <div class="card-body p-4">
                 <p class="text-secondary small fw-medium mb-3">Assign platform-specific application lock policies to this child.</p>
                 <form action="{{ url_for('ui_apparmor.update_user_app_policies', user_id=user.id) }}" method="POST">
-                    {% if linux_app_policies %}
+
+                {{ csrf_field() }}                    {% if linux_app_policies %}
                     <h6 class="fw-bold small text-muted text-uppercase mb-2" style="font-size: 0.7rem; letter-spacing: 0.05em;">Linux / Desktop Policies</h6>
                     {% if 'linux' not in user_platforms %}
                     <div class="alert alert-warning py-2 small mb-2">No Linux/desktop device linked yet. Assign a Linux agent device to enforce these policies.</div>
@@ -520,6 +604,69 @@
                 );
             })
             .catch(() => showNotification('Failed to save device restrictions', 'error'));
+    }
+
+    function updateLinuxDevicePolicyBadge(mappingId, isSynced) {
+        const card = document.querySelector(`.linux-device-policy-card[data-mapping-id="${mappingId}"]`);
+        if (!card) return;
+        const badge = card.querySelector('.linux-device-policy-sync-badge');
+        if (!badge) return;
+        badge.className = `badge linux-device-policy-sync-badge ${isSynced ? 'bg-success' : 'bg-warning text-dark'}`;
+        badge.textContent = isSynced ? 'Synced' : 'Sync pending';
+    }
+
+    function saveLinuxDevicePolicies() {
+        const mappingIds = new Set();
+        document.querySelectorAll('.linux-device-policy-card').forEach(card => mappingIds.add(card.dataset.mappingId));
+        const requests = Array.from(mappingIds).map(mappingId => {
+            const installSoftware = document.querySelector(`.linux-install-software[data-mapping-id="${mappingId}"]`);
+            const uninstallSoftware = document.querySelector(`.linux-uninstall-software[data-mapping-id="${mappingId}"]`);
+            const mountMedia = document.querySelector(`.linux-mount-media[data-mapping-id="${mappingId}"]`);
+            const modifyAccounts = document.querySelector(`.linux-modify-accounts[data-mapping-id="${mappingId}"]`);
+            const powerActions = document.querySelector(`.linux-power-actions[data-mapping-id="${mappingId}"]`);
+            const pkexec = document.querySelector(`.linux-pkexec[data-mapping-id="${mappingId}"]`);
+            const flatpak = document.querySelector(`.linux-flatpak[data-mapping-id="${mappingId}"]`);
+            const snap = document.querySelector(`.linux-snap[data-mapping-id="${mappingId}"]`);
+            const bluetooth = document.querySelector(`.linux-bluetooth[data-mapping-id="${mappingId}"]`);
+            const terminalAccess = document.querySelector(`.linux-terminal-access[data-mapping-id="${mappingId}"]`);
+            const supportMessage = document.querySelector(`.linux-support-message[data-mapping-id="${mappingId}"]`);
+            return fetch(`/api/mappings/${mappingId}/linux-device-policy`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    install_software_disabled: installSoftware ? installSoftware.checked : false,
+                    uninstall_software_disabled: uninstallSoftware ? uninstallSoftware.checked : false,
+                    mount_removable_media_disabled: mountMedia ? mountMedia.checked : false,
+                    modify_accounts_disabled: modifyAccounts ? modifyAccounts.checked : false,
+                    system_power_actions_disabled: powerActions ? powerActions.checked : false,
+                    pkexec_elevation_disabled: pkexec ? pkexec.checked : false,
+                    flatpak_install_disabled: flatpak ? flatpak.checked : false,
+                    snap_install_disabled: snap ? snap.checked : false,
+                    bluetooth_disabled: bluetooth ? bluetooth.checked : false,
+                    terminal_access_disabled: terminalAccess ? terminalAccess.checked : false,
+                    support_message: supportMessage ? supportMessage.value.trim() : '',
+                }),
+            }).then(response => response.json().then(payload => ({ mappingId, payload })));
+        });
+
+        Promise.all(requests)
+            .then(results => {
+                const failed = results.find(item => !item.payload.success);
+                if (failed) {
+                    showNotification(failed.payload.message || 'Failed to save Linux device restrictions', 'error');
+                    return;
+                }
+                results.forEach(({ mappingId, payload }) => {
+                    updateLinuxDevicePolicyBadge(mappingId, !!payload.policy?.is_synced);
+                });
+                const pending = results.some(({ payload }) => !payload.policy?.is_synced);
+                showNotification(
+                    pending
+                        ? 'Linux device restrictions saved; sync pending until the agent reconnects'
+                        : 'Linux device restrictions saved and synced',
+                );
+            })
+            .catch(() => showNotification('Failed to save Linux device restrictions', 'error'));
     }
 
     function saveApprovalSettings() {

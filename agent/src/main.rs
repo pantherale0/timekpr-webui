@@ -6,9 +6,11 @@ mod domain_notify;
 mod domain_policy;
 mod firewall;
 mod installed_apps;
+mod linux_device_policy;
 mod local_dns;
 mod netlink;
 mod timekpr_dbus;
+mod update_verify;
 
 use chrono::{SecondsFormat, Utc};
 use futures_util::{SinkExt, StreamExt};
@@ -338,7 +340,58 @@ fn schedule_to_day_limits(
     Ok((allowed_days, day_limits))
 }
 
+fn is_valid_linux_username(username: &str) -> bool {
+    if username.is_empty() || username.len() > 32 {
+        return false;
+    }
+    let mut chars = username.chars();
+    let Some(first) = chars.next() else {
+        return false;
+    };
+    if !matches!(first, 'a'..='z' | '_') {
+        return false;
+    }
+    for ch in chars {
+        if !(ch.is_ascii_lowercase() || ch.is_ascii_digit() || matches!(ch, '_' | '-')) {
+            return false;
+        }
+    }
+    true
+}
+
+fn command_requires_linux_username(action: &str) -> bool {
+    !matches!(
+        action,
+        "get_domain_policy_state"
+            | "begin_domain_policy_sync"
+            | "delete_domain_policy_sources"
+            | "sync_domain_policy_chunk"
+            | "update_domain_policy_manifest"
+            | "finalize_domain_policy_sync"
+            | "abort_domain_policy_sync"
+            | "sync_domain_policy"
+            | "unenroll"
+    )
+}
+
+fn validate_command_username(action: &str, username: &str) -> Result<(), String> {
+    if !command_requires_linux_username(action) {
+        return Ok(());
+    }
+    if !is_valid_linux_username(username) {
+        return Err(format!("Invalid Linux username '{}'", username));
+    }
+    if users::get_user_by_name(username).is_none() {
+        return Err(format!("Linux user '{}' does not exist on this system", username));
+    }
+    Ok(())
+}
+
 async fn handle_command(action: &str, username: &str, args: &serde_json::Value) -> (bool, String, serde_json::Value) {
+    if let Err(message) = validate_command_username(action, username) {
+        return (false, message, serde_json::json!({}));
+    }
+
     match action {
         "get_domain_policy_state" => match domain_policy::get_state_summary().await {
             Ok(data) => (true, "Fetched domain policy state".to_string(), data),
@@ -555,66 +608,106 @@ async fn handle_command(action: &str, username: &str, args: &serde_json::Value) 
                 Err(e) => (false, e, serde_json::json!({})),
             }
         }
+        "sync_linux_device_policy" => {
+            let device_policy_val = args.get("device_policy");
+            let payload = linux_device_policy::parse_device_policy(device_policy_val);
+            match linux_device_policy::sync_user_policy(username, payload).await {
+                Ok(()) => (
+                    true,
+                    "Linux device policy synchronized".to_string(),
+                    serde_json::json!({}),
+                ),
+                Err(message) => (false, message, serde_json::json!({})),
+            }
+        }
         "refresh_installed_apps" => (
             true,
             "Installed apps refresh queued".to_string(),
             serde_json::json!({ "queued": true, "linux_username": username }),
         ),
-        "unenroll" => match clear_agent_enrollment() {
-            Ok(()) => (
-                true,
-                "Device unenrolled locally; agent token cleared".to_string(),
-                serde_json::json!({}),
-            ),
-            Err(message) => (false, message, serde_json::json!({})),
-        },
+        "unenroll" => {
+            if let Err(message) = linux_device_policy::clear_on_unenroll().await {
+                eprintln!("Warning: failed to clear linux device policy on unenroll: {message}");
+            }
+            match clear_agent_enrollment() {
+                Ok(()) => (
+                    true,
+                    "Device unenrolled locally; agent token cleared".to_string(),
+                    serde_json::json!({}),
+                ),
+                Err(message) => (false, message, serde_json::json!({})),
+            }
+        }
         _ => (false, format!("Unknown action '{}'", action), serde_json::json!({})),
     }
 }
 
+async fn download_release_bytes(
+    client: &reqwest::Client,
+    url: &str,
+    label: &str,
+) -> Result<Vec<u8>, String> {
+    println!("Downloading {label} from: {url}");
+    let response = client
+        .get(url)
+        .send()
+        .await
+        .map_err(|error| format!("HTTP request failed for {label}: {error}"))?;
+    if !response.status().is_success() {
+        return Err(format!(
+            "Server returned error code {} for {label}: {url}",
+            response.status()
+        ));
+    }
+    response
+        .bytes()
+        .await
+        .map_err(|error| format!("Failed to read {label} download stream: {error}"))
+        .map(|bytes| bytes.to_vec())
+}
+
 async fn trigger_auto_update(target_version: &str, github_repo: &str) -> Result<(), String> {
     println!("Initializing auto-update to version {}...", target_version);
-    
+
+    if !update_verify::is_valid_release_version(target_version) {
+        return Err(format!("Refusing auto-update: invalid release version '{target_version}'"));
+    }
+    if !update_verify::is_valid_github_repo(github_repo) {
+        return Err(format!("Refusing auto-update: invalid GitHub repository '{github_repo}'"));
+    }
+
     let arch = std::env::consts::ARCH;
     let target = match arch {
         "x86_64" => "x86_64-unknown-linux-gnu",
         "aarch64" => "aarch64-unknown-linux-gnu",
         other => return Err(format!("Unsupported architecture for auto-update: {}", other)),
     };
-    
+
     let asset_name = format!("timekpr-agent-{}.tar.gz", target);
+    let signature_name = format!("{asset_name}.minisig");
     let download_url = format!(
-        "https://github.com/{}/releases/download/{}/{}",
-        github_repo, target_version, asset_name
+        "https://github.com/{github_repo}/releases/download/{target_version}/{asset_name}"
     );
-    
-    println!("Downloading release asset from: {}", download_url);
-    
+    let signature_url = format!(
+        "https://github.com/{github_repo}/releases/download/{target_version}/{signature_name}"
+    );
+
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(60))
         .build()
         .map_err(|e| format!("Failed to build HTTP client: {}", e))?;
-        
-    let response = client
-        .get(&download_url)
-        .send()
-        .await
-        .map_err(|e| format!("HTTP request failed: {}", e))?;
-        
-    if !response.status().is_success() {
-        return Err(format!(
-            "Server returned error code {}: {}",
-            response.status(),
-            download_url
-        ));
-    }
-    
-    let bytes = response
-        .bytes()
-        .await
-        .map_err(|e| format!("Failed to read download stream: {}", e))?;
-        
-    println!("Downloaded {} bytes successfully. Extracting archive...", bytes.len());
+
+    let bytes = download_release_bytes(&client, &download_url, "release archive").await?;
+    let signature_bytes =
+        download_release_bytes(&client, &signature_url, "release signature").await?;
+    let signature_text = String::from_utf8(signature_bytes)
+        .map_err(|error| format!("Release signature is not valid UTF-8: {error}"))?;
+
+    update_verify::verify_release_asset(&bytes, &signature_text)?;
+    println!(
+        "Downloaded and verified {} bytes successfully. Extracting archive...",
+        bytes.len()
+    );
     
     let cursor = std::io::Cursor::new(bytes);
     let tar = flate2::read::GzDecoder::new(cursor);
@@ -873,6 +966,14 @@ async fn run_session_listener(
                                         eprintln!("Failed to load AppArmor profiles for {}: {}", uname, e);
                                     }
                                 }
+                                if let Err(message) =
+                                    linux_device_policy::refresh_active_session_from_logind(&connection).await
+                                {
+                                    eprintln!(
+                                        "Failed to reconcile linux device policy after session start: {}",
+                                        message
+                                    );
+                                }
                                 let details = serde_json::json!({
                                     "session_id": session_id,
                                     "session_class": snapshot.session_class.clone(),
@@ -904,6 +1005,14 @@ async fn run_session_listener(
                             if let Err(e) = apparmor::unload_profiles_for_user(uname).await {
                                 eprintln!("Failed to unload AppArmor profiles for {}: {}", uname, e);
                             }
+                        }
+                        if let Err(message) =
+                            linux_device_policy::refresh_active_session_from_logind(&connection).await
+                        {
+                            eprintln!(
+                                "Failed to reconcile linux device policy after session end: {}",
+                                message
+                            );
                         }
                         let details = serde_json::json!({
                             "session_id": session_id,
@@ -1066,6 +1175,9 @@ async fn main() {
     }
     if let Err(message) = apparmor::initialize_runtime().await {
         eprintln!("Failed to restore persisted AppArmor policy: {}", message);
+    }
+    if let Err(message) = linux_device_policy::initialize_runtime().await {
+        eprintln!("Failed to restore persisted Linux device policy: {}", message);
     }
 
     // Set up global AppAlert channel for process monitor & denial log tailer

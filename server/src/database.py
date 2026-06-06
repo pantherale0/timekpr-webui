@@ -1375,6 +1375,61 @@ class MappingAndroidDevicePolicy(db.Model):
         return f'<MappingAndroidDevicePolicy map={self.device_map_id} revision={self.revision}>'
 
 
+class MappingLinuxDevicePolicy(db.Model):
+    __tablename__ = 'mapping_linux_device_policy'
+
+    DEFAULT_SUPPORT_MESSAGE = (
+        'This setting is managed by your parent through TimeKpr.'
+    )
+    MAX_SUPPORT_MESSAGE_LENGTH = 500
+
+    id = db.Column(db.Integer, primary_key=True)
+    device_map_id = db.Column(
+        db.Integer,
+        db.ForeignKey('managed_user_device_map.id'),
+        nullable=False,
+        unique=True,
+    )
+    install_software_disabled = db.Column(db.Boolean, nullable=False, default=False)
+    uninstall_software_disabled = db.Column(db.Boolean, nullable=False, default=False)
+    mount_removable_media_disabled = db.Column(db.Boolean, nullable=False, default=False)
+    modify_accounts_disabled = db.Column(db.Boolean, nullable=False, default=False)
+    system_power_actions_disabled = db.Column(db.Boolean, nullable=False, default=False)
+    pkexec_elevation_disabled = db.Column(db.Boolean, nullable=False, default=False)
+    bluetooth_disabled = db.Column(db.Boolean, nullable=False, default=False)
+    flatpak_install_disabled = db.Column(db.Boolean, nullable=False, default=False)
+    snap_install_disabled = db.Column(db.Boolean, nullable=False, default=False)
+    terminal_access_disabled = db.Column(db.Boolean, nullable=False, default=False)
+    support_message = db.Column(
+        db.Text,
+        nullable=False,
+        default=DEFAULT_SUPPORT_MESSAGE,
+    )
+    revision = db.Column(db.String(64), nullable=False, default='')
+    is_synced = db.Column(db.Boolean, nullable=False, default=False)
+    last_synced_at = db.Column(db.DateTime(timezone=True), nullable=True)
+    last_sync_error = db.Column(db.Text, nullable=True)
+    created_at = db.Column(
+        db.DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+    updated_at = db.Column(
+        db.DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+    device_map = db.relationship(
+        'ManagedUserDeviceMap',
+        backref=db.backref('linux_device_policy', uselist=False, cascade='all, delete-orphan'),
+    )
+
+    def __repr__(self):
+        return f'<MappingLinuxDevicePolicy map={self.device_map_id} revision={self.revision}>'
+
+
 class ApprovalRequest(db.Model):
     __tablename__ = 'approval_request'
 

@@ -138,6 +138,35 @@ def test_get_user_info(mock_get):
     with pytest.raises(RuntimeError, match="OIDC user info retrieval failed"):
         helper.get_user_info("access-token")
 
+def test_is_authorized_admin_requires_configuration():
+    helper = OIDCHelper()
+    allowed, message = helper.is_authorized_admin({'email': 'child@school.edu'})
+    assert not allowed
+    assert 'not configured' in message.lower()
+
+
+def test_is_authorized_admin_accepts_whitelisted_email():
+    with patch.dict('os.environ', {'ALLOWED_OIDC_ADMINS': 'parent@example.com'}):
+        helper = OIDCHelper()
+        allowed, message = helper.is_authorized_admin({'email': 'parent@example.com'})
+        assert allowed
+        assert message == ''
+
+
+def test_is_authorized_admin_accepts_matching_domain():
+    with patch.dict('os.environ', {'ALLOWED_OIDC_ADMIN_DOMAINS': 'example.com'}):
+        helper = OIDCHelper()
+        allowed, _ = helper.is_authorized_admin({'email': 'admin@example.com'})
+        assert allowed
+
+
+def test_is_authorized_admin_accepts_matching_role_claim():
+    with patch.dict('os.environ', {'ALLOWED_OIDC_ADMIN_ROLES': 'admin'}):
+        helper = OIDCHelper()
+        allowed, _ = helper.is_authorized_admin({'roles': ['viewer', 'admin']})
+        assert allowed
+
+
 def test_generate_state():
     state1 = OIDCHelper.generate_state()
     state2 = OIDCHelper.generate_state()

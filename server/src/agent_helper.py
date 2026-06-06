@@ -655,6 +655,19 @@ class AgentClient:
         )
         return success, message
 
+    def sync_linux_device_policy(self, username, device_policy):
+        """Synchronize Linux device restrictions (polkit + terminal) through the agent."""
+        payload = {
+            "device_policy": device_policy or {},
+        }
+        success, message, _ = AgentConnectionManager.send_command_sync(
+            self.system_id,
+            "sync_linux_device_policy",
+            username,
+            payload,
+        )
+        return success, message
+
     def refresh_installed_apps(self, username):
         """Ask the connected agent to scan and push installed application inventory."""
         success, message, data = AgentConnectionManager.send_command_sync(

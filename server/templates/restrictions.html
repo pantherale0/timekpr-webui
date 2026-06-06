@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 
+{% from '_macros.html' import csrf_field %}
 {% block title %}Internet Restrictions - Guardian{% endblock %}
 
 {% block content %}
@@ -30,7 +31,8 @@
             </div>
             <div class="card-body">
                 <form action="{{ url_for('create_blocklist_source') }}" method="POST" class="m-0">
-                    <div class="row g-3 mb-3">
+
+                {{ csrf_field() }}                    <div class="row g-3 mb-3">
                         <div class="col-12 col-md-6">
                             <label for="blocklist_name" class="form-label fw-bold small text-muted text-uppercase mb-1" style="font-size: 0.75rem; letter-spacing: 0.05em;">Catalog Label Name</label>
                             <input type="text" id="blocklist_name" name="name" class="form-control" placeholder="e.g. Social Hours Blocklist" required>
@@ -100,18 +102,21 @@
                         </div>
                         <div class="d-flex align-items-center gap-2 flex-wrap">
                             <form action="{{ url_for('toggle_blocklist_source', source_id=source.id) }}" method="POST" class="m-0 border rounded px-2 py-1 bg-body d-flex align-items-center">
-                                <div class="form-check form-switch m-0 d-flex align-items-center gap-1">
+
+                            {{ csrf_field() }}                                <div class="form-check form-switch m-0 d-flex align-items-center gap-1">
                                     <input class="form-check-input m-0 cursor-pointer" type="checkbox" role="switch" id="switch-{{ source.id }}" name="is_enabled" onchange="this.form.submit()" {% if source.is_enabled %}checked{% endif %} style="width: 2.2em; height: 1.1em;">
                                     <label class="form-check-label small fw-bold cursor-pointer" for="switch-{{ source.id }}">Enforce</label>
                                 </div>
                             </form>
                             {% if source.source_type == 'external_url' %}
                             <form action="{{ url_for('refresh_blocklist_source', source_id=source.id) }}" method="POST" class="m-0">
-                                <button type="submit" class="btn btn-sm btn-outline-secondary fw-bold"><i class="fas fa-sync-alt me-1"></i> Force sync</button>
+
+                            {{ csrf_field() }}                                <button type="submit" class="btn btn-sm btn-outline-secondary fw-bold"><i class="fas fa-sync-alt me-1"></i> Force sync</button>
                             </form>
                             {% endif %}
                             <form action="{{ url_for('delete_blocklist_source', source_id=source.id) }}" method="POST" onsubmit="return confirm('Delete blocklist catalog {{ source.name }}?');" class="m-0">
-                                <button type="submit" class="btn btn-sm btn-outline-danger fw-bold"><i class="fas fa-trash me-1"></i> Delete</button>
+
+                            {{ csrf_field() }}                                <button type="submit" class="btn btn-sm btn-outline-danger fw-bold"><i class="fas fa-trash me-1"></i> Delete</button>
                             </form>
                         </div>
                     </div>
@@ -120,7 +125,8 @@
                     <div class="card-body bg-body-tertiary border-top">
                         <!-- Manual domain adder form -->
                         <form action="{{ url_for('add_blocklist_domain', source_id=source.id) }}" method="POST" class="row g-2 align-items-end mb-3">
-                            <div class="col-12 col-md-9">
+
+                        {{ csrf_field() }}                            <div class="col-12 col-md-9">
                                 <label class="form-label fw-bold small text-muted text-uppercase mb-1" style="font-size: 0.7rem; letter-spacing: 0.05em;">Add New Blocked Domain</label>
                                 <input type="text" name="domain" class="form-control form-control-sm" placeholder="e.g. reddit.com, instagram.com" required>
                             </div>
@@ -136,7 +142,8 @@
                                 <div class="d-flex justify-content-between align-items-center p-2 border rounded bg-body shadow-sm">
                                     <code class="small text-body fw-bold text-truncate" style="max-width: 80%;">{{ domain.domain }}</code>
                                     <form action="{{ url_for('delete_blocklist_domain', source_id=source.id, domain_id=domain.id) }}" method="POST" class="m-0">
-                                        <button type="submit" class="btn btn-xs btn-outline-danger p-0 d-flex align-items-center justify-content-center" style="width: 20px; height: 20px; font-size: 0.75rem;" title="Remove domain restriction">&times;</button>
+
+                                    {{ csrf_field() }}                                        <button type="submit" class="btn btn-xs btn-outline-danger p-0 d-flex align-items-center justify-content-center" style="width: 20px; height: 20px; font-size: 0.75rem;" title="Remove domain restriction">&times;</button>
                                     </form>
                                 </div>
                             </div>

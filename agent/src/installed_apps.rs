@@ -84,7 +84,7 @@ pub fn discover_for_user(linux_username: &str) -> Vec<DiscoveredApp> {
             if path.extension().and_then(|ext| ext.to_str()) != Some("desktop") {
                 continue;
             }
-            if let Some(app) = parse_desktop_file(&path) {
+            if let Some(app) = parse_desktop_file(&path, linux_username) {
                 by_identifier.insert(app.identifier.clone(), app);
             }
         }
@@ -95,7 +95,7 @@ pub fn discover_for_user(linux_username: &str) -> Vec<DiscoveredApp> {
     apps
 }
 
-pub fn parse_desktop_file(path: &Path) -> Option<DiscoveredApp> {
+pub fn parse_desktop_file(path: &Path, linux_username: &str) -> Option<DiscoveredApp> {
     let contents = fs::read_to_string(path).ok()?;
     let mut in_desktop_entry = false;
     let mut name: Option<String> = None;
@@ -147,7 +147,10 @@ pub fn parse_desktop_file(path: &Path) -> Option<DiscoveredApp> {
     let application_name = name?;
     let exec_line = exec?;
     let identifier = normalize_exec_to_path(&exec_line)?;
-    let icon_png = icon.as_deref().and_then(resolve_icon_png);
+    let user_home = users::get_user_by_name(linux_username).map(|user| user.home_dir().to_path_buf());
+    let icon_png = icon
+        .as_deref()
+        .and_then(|icon_name| resolve_icon_png(icon_name, user_home.as_deref()));
     let icon_hash = icon_png.as_ref().map(|bytes| sha256_hex(bytes));
 
     Some(DiscoveredApp {
@@ -173,7 +176,46 @@ pub fn normalize_exec_to_path(exec_line: &str) -> Option<String> {
     None
 }
 
-fn resolve_icon_png(icon_name: &str) -> Option<Vec<u8>> {
+const ICON_SYSTEM_PREFIXES: &[&str] = &["/usr/share/pixmaps", "/usr/share/icons"];
+
+fn is_allowed_icon_path(canonical: &Path, user_home: Option<&Path>) -> bool {
+    if ICON_SYSTEM_PREFIXES
+        .iter()
+        .any(|prefix| canonical.starts_with(prefix))
+    {
+        return true;
+    }
+    if let Some(home) = user_home {
+        if canonical.starts_with(home) {
+            return true;
+        }
+    }
+    false
+}
+
+fn read_allowed_png_icon(candidate: &Path, user_home: Option<&Path>) -> Option<Vec<u8>> {
+    if candidate.extension().and_then(|ext| ext.to_str()) != Some("png") {
+        return None;
+    }
+
+    let metadata = fs::symlink_metadata(candidate).ok()?;
+    if metadata.is_symlink() || !metadata.is_file() {
+        return None;
+    }
+
+    let canonical = fs::canonicalize(candidate).ok()?;
+    if !is_allowed_icon_path(&canonical, user_home) {
+        return None;
+    }
+
+    let bytes = fs::read(&canonical).ok()?;
+    if bytes.len() > ICON_MAX_BYTES {
+        return None;
+    }
+    Some(bytes)
+}
+
+fn resolve_icon_png(icon_name: &str, user_home: Option<&Path>) -> Option<Vec<u8>> {
     let trimmed = icon_name.trim();
     if trimmed.is_empty() {
         return None;
@@ -184,7 +226,6 @@ fn resolve_icon_png(icon_name: &str) -> Option<Vec<u8>> {
     } else {
         vec![
             PathBuf::from(format!("/usr/share/pixmaps/{}.png", trimmed)),
-            PathBuf::from(format!("/usr/share/pixmaps/{}.svg", trimmed)),
             PathBuf::from(format!("/usr/share/icons/hicolor/48x48/apps/{}.png", trimmed)),
             PathBuf::from(format!("/usr/share/icons/hicolor/64x64/apps/{}.png", trimmed)),
             PathBuf::from(format!("/usr/share/icons/Adwaita/48x48/apps/{}.png", trimmed)),
@@ -192,17 +233,9 @@ fn resolve_icon_png(icon_name: &str) -> Option<Vec<u8>> {
     };
 
     for candidate in candidates {
-        if candidate.extension().and_then(|ext| ext.to_str()) != Some("png") {
-            continue;
+        if let Some(bytes) = read_allowed_png_icon(&candidate, user_home) {
+            return Some(bytes);
         }
-        if !candidate.is_file() {
-            continue;
-        }
-        let bytes = fs::read(&candidate).ok()?;
-        if bytes.len() > ICON_MAX_BYTES {
-            continue;
-        }
-        return Some(bytes);
     }
     None
 }
@@ -291,8 +324,29 @@ mod tests {
             "[Desktop Entry]\nName=Hidden App\nExec=/usr/bin/hidden\nHidden=true\n",
         )
         .unwrap();
-        assert!(parse_desktop_file(&path).is_none());
+        assert!(parse_desktop_file(&path, "testuser").is_none());
         let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn resolve_icon_png_rejects_symlinks_outside_allowed_roots() {
+        let base = std::env::temp_dir().join(format!("timekpr-icon-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&base);
+        fs::create_dir_all(&base).unwrap();
+
+        let secret = base.join("secret.txt");
+        fs::write(&secret, b"top-secret").unwrap();
+        let symlink = base.join("shadow.png");
+        std::os::unix::fs::symlink(&secret, &symlink).unwrap();
+
+        assert!(read_allowed_png_icon(&symlink, Some(base.as_path())).is_none());
+
+        let _ = fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn resolve_icon_png_rejects_paths_outside_allowed_roots() {
+        assert!(read_allowed_png_icon(Path::new("/etc/passwd"), None).is_none());
     }
 
     #[test]
@@ -303,7 +357,7 @@ mod tests {
             "[Desktop Entry]\nName=Demo App\nExec=/usr/bin/demo\nVersion=1.2.3\nIcon=demo\n",
         )
         .unwrap();
-        let app = parse_desktop_file(&path).unwrap();
+        let app = parse_desktop_file(&path, "testuser").unwrap();
         assert_eq!(app.application_name, "Demo App");
         assert_eq!(app.identifier, "/usr/bin/demo");
         assert_eq!(app.version_name.as_deref(), Some("1.2.3"));

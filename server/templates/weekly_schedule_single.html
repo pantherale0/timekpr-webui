@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 
+{% from '_macros.html' import csrf_field %}
 {% block title %}Weekly Schedule - {{ user.username }} - Guardian{% endblock %}
 
 {% block top_nav_extra %}
@@ -109,7 +110,8 @@
 
     <!-- Main Scheduler Form -->
     <form id="schedule-form" method="POST" action="{{ url_for('update_weekly_schedule') }}">
-        <input type="hidden" name="user_id" value="{{ user.id }}">
+
+    {{ csrf_field() }}        <input type="hidden" name="user_id" value="{{ user.id }}">
 
         <div class="days-schedules-container">
             {% set days = [

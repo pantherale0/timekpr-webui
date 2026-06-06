@@ -82,7 +82,17 @@ def oidc_callback():
         
         # Get user details from userinfo endpoint
         user_info = oidc_helper.get_user_info(access_token)
-        
+
+        authorized, denial_message = oidc_helper.is_authorized_admin(user_info)
+        if not authorized:
+            _LOGGER.warning(
+                "OIDC login denied for identity %s: %s",
+                user_info.get('email') or user_info.get('preferred_username') or user_info.get('sub'),
+                denial_message,
+            )
+            flash(denial_message, 'danger')
+            return redirect(url_for('ui_auth.login'))
+
         # Extract details and log in
         session['logged_in'] = True
         session['user'] = {

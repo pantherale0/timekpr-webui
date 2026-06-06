@@ -199,6 +199,8 @@ class BlocklistStreamParser:
 
 def validate_external_source_url(raw_url):
     """Validate and normalize an external blocklist URL."""
+    from src.url_safety import validate_safe_outbound_url
+
     normalized = (raw_url or '').strip()
     if not normalized:
         raise ValueError('External blocklist URL is required')
@@ -207,7 +209,7 @@ def validate_external_source_url(raw_url):
     if parsed.scheme not in {'http', 'https'} or not parsed.netloc:
         raise ValueError('External blocklist URL must use http:// or https://')
 
-    return normalized
+    return validate_safe_outbound_url(normalized)
 
 
 def compute_source_revision(domains):

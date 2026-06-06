@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 
+{% from '_macros.html' import csrf_field %}
 {% block title %}Settings - Guardian Parental Controls{% endblock %}
 
 {% block content %}
@@ -24,7 +25,8 @@
                     Scan the pairing QR from the Guardian Android app during setup, or use the WebSocket URL when installing Linux agents.
                 </p>
                 <form action="{{ url_for('ui_dashboard.settings') }}" method="POST" class="mb-4">
-                    <input type="hidden" name="form_name" value="agent_pairing">
+
+                {{ csrf_field() }}                    <input type="hidden" name="form_name" value="agent_pairing">
                     <label for="agent_websocket_url" class="form-label fw-bold small text-muted">AGENT WEBSOCKET URL</label>
                     <input
                         type="text"
@@ -74,7 +76,8 @@
                     <div class="form-text text-secondary small mt-1">Signature checksum computed automatically on upload.</div>
                     {% endif %}
                     <form action="{{ url_for('ui_dashboard.settings') }}" method="POST" class="mt-2">
-                        <input type="hidden" name="form_name" value="android_provisioning">
+
+                    {{ csrf_field() }}                        <input type="hidden" name="form_name" value="android_provisioning">
                         <input type="hidden" name="remove_android_apk" value="1">
                         <button type="submit" class="btn btn-outline-danger btn-sm fw-bold">Remove Uploaded APK</button>
                     </form>
@@ -82,7 +85,8 @@
                 {% endif %}
 
                 <form action="{{ url_for('ui_dashboard.settings') }}" method="POST" enctype="multipart/form-data">
-                    <input type="hidden" name="form_name" value="android_provisioning">
+
+                {{ csrf_field() }}                    <input type="hidden" name="form_name" value="android_provisioning">
                     <label for="android_agent_apk" class="form-label fw-bold small text-muted">
                         {% if android_agent_apk_uploaded %}REPLACE ANDROID APK{% else %}UPLOAD ANDROID APK{% endif %}
                     </label>
@@ -164,7 +168,8 @@
                 {% else %}
                     <p class="text-secondary small fw-medium mb-3">Update the local parent administrator password for the Guardian web panel.</p>
                     <form action="{{ url_for('settings') }}" method="POST">
-                        <input type="hidden" name="form_name" value="password">
+
+                    {{ csrf_field() }}                        <input type="hidden" name="form_name" value="password">
                         <div class="mb-3">
                             <label for="current_password" class="form-label fw-bold small text-muted">CURRENT PASSWORD</label>
                             <input type="password" id="current_password" name="current_password" class="form-control" placeholder="Enter current password" required autocomplete="current-password">
@@ -197,7 +202,8 @@
             <div class="card-body p-4">
                 <p class="text-secondary small fw-medium mb-3">Guardian can dispatch alerts and limits infractions to an external Slack, Discord, or custom server endpoint.</p>
                 <form action="{{ url_for('ui_dashboard.settings') }}" method="POST">
-                    <input type="hidden" name="form_name" value="alert_webhook">
+
+                {{ csrf_field() }}                    <input type="hidden" name="form_name" value="alert_webhook">
                     
                     <div class="form-check form-switch mb-3">
                         <input class="form-check-input" type="checkbox" id="alert_webhook_enabled" name="alert_webhook_enabled" {% if alert_webhook_settings.enabled %}checked{% endif %}>
@@ -236,7 +242,8 @@
             </div>
             <div class="card-body p-4">
                 <form action="{{ url_for('ui_dashboard.settings') }}" method="POST">
-                    <input type="hidden" name="form_name" value="application_settings">
+
+                {{ csrf_field() }}                    <input type="hidden" name="form_name" value="application_settings">
                     
                     <div class="row g-3">
                         <div class="col-12 col-md-6">

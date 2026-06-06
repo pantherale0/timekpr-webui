@@ -8,6 +8,7 @@ use tokio::time::Instant;
 
 use crate::apparmor;
 use crate::approval_deduper;
+use crate::linux_device_policy;
 
 /// Alert payload ready to be forwarded to the server.
 #[derive(Debug, Clone)]
@@ -429,6 +430,29 @@ async fn run_monitor_inner(
                             kill_pid(pid);
                             continue;
                         }
+                    }
+                }
+
+                // 1b. Linux device policy terminal blocking
+                if let Some(ref username) = username {
+                    if !exe_path.is_empty()
+                        && linux_device_policy::check_terminal_exec_block(username, &exe_path).await
+                    {
+                        let _ = alert_tx.send(AppAlert {
+                            event_type: "app_blocked".to_string(),
+                            linux_username: username.clone(),
+                            payload: json!({
+                                "reason": "terminal_disabled",
+                                "application_name": &comm,
+                                "executable_path": &exe_path,
+                                "target_kind": "executable",
+                                "pid": pid,
+                                "enforcement_source": "linux_device_policy",
+                                "disposition": "DENIED",
+                            }),
+                        });
+                        kill_pid(pid);
+                        continue;
                     }
                 }
 

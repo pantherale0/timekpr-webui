@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 
+{% from '_macros.html' import csrf_field %}
 {% block title %}Manage Devices - Guardian Parental Controls{% endblock %}
 
 {% block content %}
@@ -166,7 +167,8 @@
                                                 </a>
                                                 {% if device.user_mappings and AgentConnectionManager.is_online(device.system_id) %}
                                                 <form action="{{ url_for('ui_dashboard.refresh_device_installed_apps_ui', system_id=device.system_id) }}" method="POST" class="m-0">
-                                                    <input type="hidden" name="linux_username" value="{{ device.user_mappings[0].linux_username }}">
+
+                                                {{ csrf_field() }}                                                    <input type="hidden" name="linux_username" value="{{ device.user_mappings[0].linux_username }}">
                                                     <button type="submit" class="btn btn-sm btn-outline-secondary fw-bold">
                                                         <i class="fas fa-sync-alt me-1"></i> Refresh Inventory
                                                     </button>

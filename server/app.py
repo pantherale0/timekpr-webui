@@ -6,6 +6,7 @@ import threading
 from datetime import datetime, timezone
 import pytz
 from flask import Flask, url_for
+from flask_wtf.csrf import CSRFProtect
 
 # Initialize WebSocket support
 from flask_sock import Sock
@@ -35,9 +36,36 @@ _LOGGER = logging.getLogger(__name__)
 # Version metadata
 __version__ = os.environ.get("TIMEKPR_SERVER_VERSION", "v0.0.0-dev")
 
+def _load_secret_key(flask_app):
+    """Load a stable Flask secret key for signed sessions across restarts/workers."""
+    if os.environ.get('TESTING'):
+        return 'timekpr-test-secret-key'
+
+    env_key = (os.environ.get('FLASK_SECRET_KEY') or '').strip()
+    if env_key:
+        return env_key
+
+    os.makedirs(flask_app.instance_path, exist_ok=True)
+    key_file = os.path.join(flask_app.instance_path, 'secret.key')
+    if os.path.exists(key_file):
+        with open(key_file, 'rb') as handle:
+            return handle.read()
+
+    secret_key = os.urandom(32)
+    with open(key_file, 'wb') as handle:
+        handle.write(secret_key)
+    try:
+        os.chmod(key_file, 0o600)
+    except OSError:
+        pass
+    return secret_key
+
+
 # Initialize Flask app
 app = Flask(__name__)
-app.secret_key = os.urandom(24)
+app.secret_key = _load_secret_key(app)
+app.config.setdefault('WTF_CSRF_TIME_LIMIT', None)
+CSRFProtect(app)
 _default_db_uri = 'sqlite:///:memory:' if os.environ.get('TESTING') else 'sqlite:///timekpr.db'
 app.config['SQLALCHEMY_DATABASE_URI'] = (
     os.environ.get('DATABASE_URL')
@@ -123,6 +151,7 @@ from src.blueprints import (
     api_installed_apps_bp,
     api_approvals_bp,
     api_android_device_policy_bp,
+    api_linux_device_policy_bp,
     websocket_bp,
 )
 
@@ -142,6 +171,7 @@ app.register_blueprint(api_dashboard_bp)
 app.register_blueprint(api_installed_apps_bp, url_prefix='/api')
 app.register_blueprint(api_approvals_bp)
 app.register_blueprint(api_android_device_policy_bp)
+app.register_blueprint(api_linux_device_policy_bp)
 app.register_blueprint(websocket_bp)
 
 # Register WebSocket endpoint via Flask-Sock

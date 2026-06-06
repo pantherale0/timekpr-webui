@@ -729,6 +729,52 @@ def test_task_manager_syncs_android_device_policy(app, db_session):
     AgentConnectionManager.unregister(device.system_id)
 
 
+def test_task_manager_syncs_linux_device_policy(app, db_session):
+    from src.linux_device_policy_manager import upsert_policy
+
+    manager = BackgroundTaskManager(app)
+    user = ManagedUser(username="linux-policy-user", system_ip="Unassigned", is_valid=True)
+    device = AgentDevice(
+        system_id="sys-linux-device-policy-sync",
+        status="approved",
+        secure_token="tok",
+    )
+    db_session.add_all([user, device])
+    db_session.flush()
+    mapping = ManagedUserDeviceMap(
+        managed_user_id=user.id,
+        system_id=device.system_id,
+        linux_username="linux-child",
+        is_valid=True,
+    )
+    db_session.add(mapping)
+    db_session.commit()
+
+    upsert_policy(mapping, {
+        'install_software_disabled': True,
+        'terminal_access_disabled': True,
+    })
+
+    ws = DummyWS()
+    AgentConnectionManager.register(device.system_id, ws, "10.0.0.23")
+
+    with app.app_context():
+        success, message = manager._sync_linux_device_policy_system(device.system_id)
+
+    assert success is True
+    sent_payloads = [json.loads(message) for message in ws.sent_messages]
+    device_policy_payload = next(
+        payload for payload in sent_payloads
+        if payload.get("action") == "sync_linux_device_policy"
+    )
+    assert device_policy_payload["username"] == "linux-child"
+    assert device_policy_payload["args"]["device_policy"]["polkit"]["installSoftwareDisabled"] is True
+    assert device_policy_payload["args"]["device_policy"]["exec"]["terminalAccessDisabled"] is True
+    assert "Pushed device policy" in message
+
+    AgentConnectionManager.unregister(device.system_id)
+
+
 def test_task_manager_manifest_includes_domain_access_mode(app, db_session):
     from src.approvals_manager import upsert_settings
 
@@ -981,7 +1027,9 @@ def test_task_manager_refreshes_external_blocklists_in_chunks(app, db_session):
 
     response = StreamingResponse()
 
-    with app.app_context(), patch('src.task_manager.requests.get', return_value=response):
+    with app.app_context(), \
+         patch('src.url_safety.is_safe_outbound_url', return_value=True), \
+         patch('src.task_manager.requests.get', return_value=response):
         success, message = manager.refresh_external_blocklist_source(source.id, force=True)
 
     assert success
@@ -1030,7 +1078,9 @@ def test_task_manager_delivers_pending_alerts(app, db_session):
         status_code = 204
         text = ''
 
-    with app.app_context(), patch('src.task_manager.requests.post', return_value=DummyResponse()) as mock_post:
+    with app.app_context(), \
+         patch('src.url_safety.is_safe_outbound_url', return_value=True), \
+         patch('src.task_manager.requests.post', return_value=DummyResponse()) as mock_post:
         manager._deliver_pending_alerts()
 
     delivered_alert = AgentAlert.query.get(alert.id)
@@ -1072,7 +1122,9 @@ def test_task_manager_retries_failed_alert_deliveries(app, db_session):
     Settings.set_value('alert_webhook_enabled', '1')
     Settings.set_value('alert_webhook_url', 'https://hooks.example.test/timekpr')
 
-    with app.app_context(), patch('src.task_manager.requests.post', side_effect=RuntimeError('boom')):
+    with app.app_context(), \
+         patch('src.url_safety.is_safe_outbound_url', return_value=True), \
+         patch('src.task_manager.requests.post', side_effect=RuntimeError('boom')):
         manager._deliver_pending_alerts()
 
     refreshed_retry = AgentAlert.query.get(retry_alert.id)

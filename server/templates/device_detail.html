@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 
+{% from '_macros.html' import csrf_field %}
 {% block title %}{{ device_label }} - Device Details - Guardian{% endblock %}
 
 {% block content %}
@@ -121,7 +122,8 @@
                     </div>
                     {% if mapped_accounts and agent_online %}
                         <form action="{{ url_for('ui_dashboard.refresh_device_installed_apps_ui', system_id=device.system_id) }}" method="POST" class="m-0">
-                            <input type="hidden" name="linux_username" value="{{ mapped_accounts[0].linux_username }}">
+
+                        {{ csrf_field() }}                            <input type="hidden" name="linux_username" value="{{ mapped_accounts[0].linux_username }}">
                             <button type="submit" class="btn btn-sm btn-primary fw-bold">
                                 <i class="fas fa-sync-alt me-1"></i> Refresh Inventory
                             </button>

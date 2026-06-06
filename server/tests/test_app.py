@@ -102,7 +102,8 @@ def test_oidc_callback_route(client, db_session):
             sess['oidc_state'] = 'state123'
         
         with patch('src.oidc_helper.OIDCHelper.exchange_code') as mock_exchange, \
-             patch('src.oidc_helper.OIDCHelper.get_user_info') as mock_userinfo:
+             patch('src.oidc_helper.OIDCHelper.get_user_info') as mock_userinfo, \
+             patch.dict('os.environ', {'ALLOWED_OIDC_ADMINS': 'admin@oidc.com'}):
             mock_exchange.return_value = {'access_token': 'access-token'}
             mock_userinfo.return_value = {'preferred_username': 'oidc-admin', 'email': 'admin@oidc.com'}
 
@@ -110,6 +111,17 @@ def test_oidc_callback_route(client, db_session):
             assert b"Dashboard" in res.data
             # Clean session
             client.get('/logout')
+
+        with client.session_transaction() as sess:
+            sess['oidc_state'] = 'state456'
+        with patch('src.oidc_helper.OIDCHelper.exchange_code') as mock_exchange, \
+             patch('src.oidc_helper.OIDCHelper.get_user_info') as mock_userinfo, \
+             patch.dict('os.environ', {'ALLOWED_OIDC_ADMINS': 'admin@oidc.com'}):
+            mock_exchange.return_value = {'access_token': 'access-token'}
+            mock_userinfo.return_value = {'preferred_username': 'child', 'email': 'child@school.edu'}
+
+            res = client.get('/callback?state=state456&code=code456', follow_redirects=True)
+            assert b"not authorized" in res.data.lower()
 
 def test_dashboard_routes(client, db_session):
     # Try accessing when not logged in
@@ -209,12 +221,13 @@ def test_settings_page(client, db_session):
     assert b"updated successfully" in res.data
 
     # POST alert webhook settings
-    res = client.post('/settings', data={
-        'form_name': 'alert_webhook',
-        'alert_webhook_enabled': 'on',
-        'alert_webhook_url': 'https://hooks.example.test/timekpr',
-        'alert_webhook_secret': 'secret-value',
-    }, follow_redirects=True)
+    with patch('src.url_safety.is_safe_outbound_url', return_value=True):
+        res = client.post('/settings', data={
+            'form_name': 'alert_webhook',
+            'alert_webhook_enabled': 'on',
+            'alert_webhook_url': 'https://hooks.example.test/timekpr',
+            'alert_webhook_secret': 'secret-value',
+        }, follow_redirects=True)
     assert b"Alert webhook settings updated successfully" in res.data
     assert Settings.get_value('alert_webhook_enabled') == '1'
     assert Settings.get_value('alert_webhook_url') == 'https://hooks.example.test/timekpr'
@@ -252,7 +265,6 @@ def test_settings_page(client, db_session):
 
     from io import BytesIO
     import zipfile
-    from unittest.mock import patch
 
     apk_buffer = BytesIO()
     with zipfile.ZipFile(apk_buffer, 'w') as archive:
@@ -1317,7 +1329,9 @@ def test_delete_app_policy_rule_recompiles_and_resyncs(client, db_session):
     assert db_session.get(AppPolicyRule, rule.id) is None
     # Verify compiled AppArmorRule was cleaned up after re-compilation
     assert AppArmorRule.query.filter_by(device_map_id=mapping.id, executable_path='/usr/bin/obs').first() is None
-    mock_sync.assert_called_once_with('nina', [])
+    mock_sync.assert_called_once()
+    assert mock_sync.call_args.args[0] == 'nina'
+    assert mock_sync.call_args.args[1] == []
 
 
 def test_modify_time_tracks_server_daily_adjustment_for_scheduled_users(client, db_session):

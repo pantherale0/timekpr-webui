@@ -104,13 +104,15 @@ def edit_user_profile(user_id):
         else:
             user_platforms.add(AppPolicy.PLATFORM_LINUX)
 
-    from src.android_device_policy_manager import get_or_create_policy
-    from src.database import MappingAndroidDevicePolicy
+    from src.android_device_policy_manager import get_or_create_policy as get_or_create_android_policy
+    from src.linux_device_policy_manager import get_or_create_policy as get_or_create_linux_policy
+    from src.database import MappingAndroidDevicePolicy, MappingLinuxDevicePolicy
     from src.approvals_manager import get_or_create_settings, grant_status_for_apps
     from src.installed_apps_manager import list_installed_apps_for_device
 
     approval_settings_by_mapping = {}
     android_device_policy_by_mapping = {}
+    linux_device_policy_by_mapping = {}
     installed_apps_enriched = []
     seen_apps = set()
     for mapping in user.device_mappings:
@@ -123,7 +125,7 @@ def edit_user_profile(user_id):
         mapping_platform = (mapping.device.platform if mapping.device else None) or AppPolicy.PLATFORM_LINUX
         if mapping_platform == AppPolicy.PLATFORM_ANDROID:
             try:
-                device_policy = get_or_create_policy(mapping)
+                device_policy = get_or_create_android_policy(mapping)
                 android_device_policy_by_mapping[mapping.id] = {
                     'device_label': device_labels.get(mapping.system_id, mapping.system_id),
                     'screen_capture_disabled': device_policy.screen_capture_disabled,
@@ -150,6 +152,30 @@ def edit_user_profile(user_id):
                     ),
                     'is_synced': device_policy.is_synced,
                     'last_sync_error': device_policy.last_sync_error,
+                }
+            except ValueError:
+                pass
+        else:
+            try:
+                linux_policy = get_or_create_linux_policy(mapping)
+                linux_device_policy_by_mapping[mapping.id] = {
+                    'device_label': device_labels.get(mapping.system_id, mapping.system_id),
+                    'install_software_disabled': linux_policy.install_software_disabled,
+                    'uninstall_software_disabled': linux_policy.uninstall_software_disabled,
+                    'mount_removable_media_disabled': linux_policy.mount_removable_media_disabled,
+                    'modify_accounts_disabled': linux_policy.modify_accounts_disabled,
+                    'system_power_actions_disabled': linux_policy.system_power_actions_disabled,
+                    'pkexec_elevation_disabled': linux_policy.pkexec_elevation_disabled,
+                    'bluetooth_disabled': linux_policy.bluetooth_disabled,
+                    'flatpak_install_disabled': linux_policy.flatpak_install_disabled,
+                    'snap_install_disabled': linux_policy.snap_install_disabled,
+                    'terminal_access_disabled': linux_policy.terminal_access_disabled,
+                    'support_message': (
+                        linux_policy.support_message
+                        or MappingLinuxDevicePolicy.DEFAULT_SUPPORT_MESSAGE
+                    ),
+                    'is_synced': linux_policy.is_synced,
+                    'last_sync_error': linux_policy.last_sync_error,
                 }
             except ValueError:
                 pass
@@ -188,6 +214,7 @@ def edit_user_profile(user_id):
         user_platforms=user_platforms,
         approval_settings_by_mapping=approval_settings_by_mapping,
         android_device_policy_by_mapping=android_device_policy_by_mapping,
+        linux_device_policy_by_mapping=linux_device_policy_by_mapping,
         device_labels=device_labels,
     )
 
@@ -313,11 +340,18 @@ def settings():
             if webhook_enabled and not webhook_url:
                 flash('Webhook URL is required when alert delivery is enabled', 'danger')
             else:
-                Settings.set_value('alert_webhook_enabled', '1' if webhook_enabled else '0')
-                Settings.set_value('alert_webhook_url', webhook_url)
-                Settings.set_value('alert_webhook_secret', webhook_secret)
-                flash('Alert webhook settings updated successfully', 'success')
-                return redirect(url_for('ui_dashboard.settings'))
+                try:
+                    if webhook_url:
+                        from src.url_safety import validate_safe_outbound_url
+                        webhook_url = validate_safe_outbound_url(webhook_url)
+                except ValueError as exc:
+                    flash(str(exc), 'danger')
+                else:
+                    Settings.set_value('alert_webhook_enabled', '1' if webhook_enabled else '0')
+                    Settings.set_value('alert_webhook_url', webhook_url)
+                    Settings.set_value('alert_webhook_secret', webhook_secret)
+                    flash('Alert webhook settings updated successfully', 'success')
+                    return redirect(url_for('ui_dashboard.settings'))
 
             alert_webhook_settings = {
                 'enabled': webhook_enabled,

@@ -30,6 +30,32 @@ DEFAULT_SEND_POLICY_SYNC_CHECK_ON_AUTH = False
 DEFAULT_SEND_INSTALLED_APPS_ON_AUTH = True
 SECONDS_PER_HOUR = 60 * 60
 
+LINUX_DEVICE_POLICY_DEFAULT_SUPPORT_MESSAGE = (
+    'This setting is managed by your parent through TimeKpr.'
+)
+LINUX_DEVICE_POLICY_POLKIT_RULES_DIR = '/etc/polkit-1/rules.d'
+LINUX_DEVICE_POLICY_RULE_PREFIX = '50-timekpr-'
+LINUX_DEVICE_POLICY_TERMINAL_EXECUTABLES = (
+    '/bin/sh',
+    '/usr/bin/sh',
+    '/bin/bash',
+    '/usr/bin/bash',
+    '/usr/bin/zsh',
+    '/usr/bin/fish',
+    '/usr/bin/dash',
+    '/usr/bin/konsole',
+    '/usr/bin/gnome-terminal',
+    '/usr/bin/xfce4-terminal',
+    '/usr/bin/xterm',
+    '/usr/bin/alacritty',
+    '/usr/bin/kitty',
+    '/usr/bin/wezterm',
+    '/usr/bin/tilix',
+    '/usr/bin/qterminal',
+    '/usr/bin/terminator',
+    '/usr/bin/x-terminal-emulator',
+)
+
 # 1x1 PNG used for synthetic app icons in debug reports.
 _DEBUG_ICON_PNG = base64.b64decode(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
@@ -64,6 +90,271 @@ def _stable_source_revision(domains):
     ]
     digest = hashlib.sha256("\n".join(sorted(normalized)).encode("utf-8"))
     return digest.hexdigest()
+
+
+def _default_linux_device_policy_payload():
+    return {
+        'polkit': {
+            'installSoftwareDisabled': False,
+            'uninstallSoftwareDisabled': False,
+            'mountRemovableMediaDisabled': False,
+            'modifyAccountsDisabled': False,
+            'systemPowerActionsDisabled': False,
+            'pkexecElevationDisabled': False,
+            'flatpakInstallDisabled': False,
+            'snapInstallDisabled': False,
+        },
+        'connectivity': {
+            'bluetoothDisabled': False,
+        },
+        'exec': {
+            'terminalAccessDisabled': False,
+        },
+        'supportMessage': LINUX_DEVICE_POLICY_DEFAULT_SUPPORT_MESSAGE,
+    }
+
+
+def _coerce_linux_device_policy_bool(value, default=False):
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().lower() in {'1', 'true', 'yes', 'on'}
+    if value is None:
+        return default
+    return bool(value)
+
+
+def _parse_linux_device_policy(raw):
+    payload = _default_linux_device_policy_payload()
+    if not isinstance(raw, dict):
+        return payload
+
+    polkit = raw.get('polkit') if isinstance(raw.get('polkit'), dict) else {}
+    connectivity = raw.get('connectivity') if isinstance(raw.get('connectivity'), dict) else {}
+    exec_policy = raw.get('exec') if isinstance(raw.get('exec'), dict) else {}
+
+    payload['polkit']['installSoftwareDisabled'] = _coerce_linux_device_policy_bool(
+        polkit.get('installSoftwareDisabled'),
+        payload['polkit']['installSoftwareDisabled'],
+    )
+    payload['polkit']['uninstallSoftwareDisabled'] = _coerce_linux_device_policy_bool(
+        polkit.get('uninstallSoftwareDisabled'),
+        payload['polkit']['uninstallSoftwareDisabled'],
+    )
+    payload['polkit']['mountRemovableMediaDisabled'] = _coerce_linux_device_policy_bool(
+        polkit.get('mountRemovableMediaDisabled'),
+        payload['polkit']['mountRemovableMediaDisabled'],
+    )
+    payload['polkit']['modifyAccountsDisabled'] = _coerce_linux_device_policy_bool(
+        polkit.get('modifyAccountsDisabled'),
+        payload['polkit']['modifyAccountsDisabled'],
+    )
+    payload['polkit']['systemPowerActionsDisabled'] = _coerce_linux_device_policy_bool(
+        polkit.get('systemPowerActionsDisabled'),
+        payload['polkit']['systemPowerActionsDisabled'],
+    )
+    payload['polkit']['pkexecElevationDisabled'] = _coerce_linux_device_policy_bool(
+        polkit.get('pkexecElevationDisabled'),
+        payload['polkit']['pkexecElevationDisabled'],
+    )
+    payload['polkit']['flatpakInstallDisabled'] = _coerce_linux_device_policy_bool(
+        polkit.get('flatpakInstallDisabled'),
+        payload['polkit']['flatpakInstallDisabled'],
+    )
+    payload['polkit']['snapInstallDisabled'] = _coerce_linux_device_policy_bool(
+        polkit.get('snapInstallDisabled'),
+        payload['polkit']['snapInstallDisabled'],
+    )
+    payload['connectivity']['bluetoothDisabled'] = _coerce_linux_device_policy_bool(
+        connectivity.get('bluetoothDisabled'),
+        payload['connectivity']['bluetoothDisabled'],
+    )
+    payload['exec']['terminalAccessDisabled'] = _coerce_linux_device_policy_bool(
+        exec_policy.get('terminalAccessDisabled'),
+        payload['exec']['terminalAccessDisabled'],
+    )
+
+    support_message = (raw.get('supportMessage') or '').strip()
+    if support_message:
+        payload['supportMessage'] = support_message
+
+    return payload
+
+
+def _linux_device_policy_any_polkit_restrictions(polkit):
+    return any(
+        _coerce_linux_device_policy_bool(polkit.get(field), False)
+        for field in (
+            'installSoftwareDisabled',
+            'uninstallSoftwareDisabled',
+            'mountRemovableMediaDisabled',
+            'modifyAccountsDisabled',
+            'systemPowerActionsDisabled',
+            'pkexecElevationDisabled',
+            'flatpakInstallDisabled',
+            'snapInstallDisabled',
+        )
+    )
+
+
+def _linux_device_policy_rule_path(username):
+    sanitized = ''.join(
+        char if char.isalnum() or char in {'-', '_'} else '_'
+        for char in username
+    )
+    return (
+        f'{LINUX_DEVICE_POLICY_POLKIT_RULES_DIR}/'
+        f'{LINUX_DEVICE_POLICY_RULE_PREFIX}{sanitized}.rules'
+    )
+
+
+def _render_linux_device_polkit_rules(username, payload):
+    escaped_user = username.replace('\\', '\\\\').replace('"', '\\"')
+    polkit = payload.get('polkit') or {}
+    checks = []
+
+    if _coerce_linux_device_policy_bool(polkit.get('installSoftwareDisabled')):
+        checks.append(
+            'action.id.indexOf("org.freedesktop.packagekit.") === 0 ||\n'
+            '      action.id.indexOf("com.ubuntu.softwarecenter.") === 0'
+        )
+    if _coerce_linux_device_policy_bool(polkit.get('uninstallSoftwareDisabled')):
+        checks.append(
+            '(action.id.indexOf("org.freedesktop.packagekit.") === 0 &&\n'
+            '       (action.id.indexOf("remove") !== -1 || action.id.indexOf("uninstall") !== -1))'
+        )
+    if _coerce_linux_device_policy_bool(polkit.get('mountRemovableMediaDisabled')):
+        checks.append('action.id.indexOf("org.freedesktop.udisks2.") === 0')
+    if _coerce_linux_device_policy_bool(polkit.get('modifyAccountsDisabled')):
+        checks.append(
+            'action.id.indexOf("org.freedesktop.accounts.") === 0 ||\n'
+            '      action.id.indexOf("org.freedesktop.Accounts.") === 0'
+        )
+    if _coerce_linux_device_policy_bool(polkit.get('systemPowerActionsDisabled')):
+        checks.append(
+            'action.id === "org.freedesktop.login1.reboot" ||\n'
+            '      action.id === "org.freedesktop.login1.power-off" ||\n'
+            '      action.id === "org.freedesktop.login1.suspend" ||\n'
+            '      action.id === "org.freedesktop.login1.hibernate"'
+        )
+    if _coerce_linux_device_policy_bool(polkit.get('pkexecElevationDisabled')):
+        checks.append('action.id === "org.freedesktop.policykit.exec"')
+    if _coerce_linux_device_policy_bool(polkit.get('flatpakInstallDisabled')):
+        checks.append('action.id.indexOf("org.freedesktop.Flatpak.") === 0')
+    if _coerce_linux_device_policy_bool(polkit.get('snapInstallDisabled')):
+        checks.append('action.id.indexOf("io.snapcraft.") === 0')
+
+    combined = ' ||\n      '.join(checks)
+    return (
+        f'// TimeKpr managed polkit rules for user "{escaped_user}"\n'
+        'polkit.addRule(function(action, subject) {\n'
+        f'  if (subject.user !== "{escaped_user}") {{\n'
+        '    return polkit.Result.NOT_HANDLED;\n'
+        '  }\n'
+        f'  if ({combined}) {{\n'
+        '    return polkit.Result.NO;\n'
+        '  }\n'
+        '});\n'
+    )
+
+
+def _is_linux_device_terminal_executable(exe_path):
+    normalized = (exe_path or '').strip()
+    return normalized in LINUX_DEVICE_POLICY_TERMINAL_EXECUTABLES
+
+
+def _linux_device_policy_enforcement_snapshot(username, payload):
+    polkit = payload.get('polkit') or {}
+    connectivity = payload.get('connectivity') or {}
+    exec_policy = payload.get('exec') or {}
+    has_polkit_rules = _linux_device_policy_any_polkit_restrictions(polkit)
+    return {
+        'polkit_rules_path': _linux_device_policy_rule_path(username) if has_polkit_rules else None,
+        'polkit_rules': (
+            _render_linux_device_polkit_rules(username, payload)
+            if has_polkit_rules
+            else None
+        ),
+        'bluetooth_blocked': _coerce_linux_device_policy_bool(
+            connectivity.get('bluetoothDisabled'),
+        ),
+        'terminal_access_disabled': _coerce_linux_device_policy_bool(
+            exec_policy.get('terminalAccessDisabled'),
+        ),
+    }
+
+
+def _linux_device_policy_catalog_entry(payload):
+    return {
+        'device_policy': _parse_linux_device_policy(payload),
+    }
+
+
+def _normalize_linux_device_policy_state_entry(username, value):
+    if not isinstance(value, dict):
+        return None
+    if isinstance(value.get('device_policy'), dict):
+        return {
+            'device_policy': _parse_linux_device_policy(value.get('device_policy')),
+        }
+    return {
+        'device_policy': _parse_linux_device_policy(value),
+    }
+
+
+def _reconcile_linux_device_enforcement_state(config):
+    catalog = config.get('linux_device_policy_state')
+    if not isinstance(catalog, dict):
+        catalog = {}
+        config['linux_device_policy_state'] = catalog
+
+    active = (config.get('active_session_username') or '').strip()
+    enforced = None
+    if active:
+        catalog_entry = catalog.get(active)
+        if isinstance(catalog_entry, dict):
+            device_policy = catalog_entry.get('device_policy')
+            if isinstance(device_policy, dict):
+                enforced = {
+                    'username': active,
+                    'device_policy': _json_clone(device_policy),
+                    'enforcement': _linux_device_policy_enforcement_snapshot(active, device_policy),
+                }
+
+    config['enforced_linux_device_policy'] = enforced
+    for uname, state in (config.get('users') or {}).items():
+        if not isinstance(state, dict):
+            continue
+        if enforced and uname == active:
+            state['linux_device_policy'] = _json_clone(enforced)
+        else:
+            state['linux_device_policy'] = None
+    return enforced
+
+
+def _linux_device_policy_entry_for_user(username, payload):
+    device_policy = _parse_linux_device_policy(payload)
+    return {
+        'device_policy': device_policy,
+        'enforcement': _linux_device_policy_enforcement_snapshot(username, device_policy),
+    }
+
+
+def _linux_device_policy_summary(entry):
+    if not isinstance(entry, dict):
+        return {
+            'LINUX_DEVICE_POLKIT_ACTIVE': False,
+            'LINUX_DEVICE_BLUETOOTH_BLOCKED': False,
+            'LINUX_DEVICE_TERMINAL_BLOCKED': False,
+            'LINUX_DEVICE_ACTIVE_SESSION': None,
+        }
+    enforcement = entry.get('enforcement') if isinstance(entry.get('enforcement'), dict) else {}
+    return {
+        'LINUX_DEVICE_POLKIT_ACTIVE': bool(enforcement.get('polkit_rules_path')),
+        'LINUX_DEVICE_BLUETOOTH_BLOCKED': bool(enforcement.get('bluetooth_blocked')),
+        'LINUX_DEVICE_TERMINAL_BLOCKED': bool(enforcement.get('terminal_access_disabled')),
+        'LINUX_DEVICE_ACTIVE_SESSION': entry.get('username'),
+    }
 
 
 def _coerce_non_negative_int(value, default):
@@ -104,6 +395,7 @@ def _default_user_state(linux_uid, time_left_day):
         "weekly_schedule": {},
         "domain_policy_source_ids": [],
         "apparmor_policies": [],
+        "linux_device_policy": None,
     }
 
 
@@ -267,6 +559,9 @@ def _default_config():
         },
         "domain_policy_syncs": {},
         "apparmor_state": {},
+        "linux_device_policy_state": {},
+        "active_session_username": None,
+        "enforced_linux_device_policy": None,
     }
 
 
@@ -384,8 +679,31 @@ def normalize_config(config):
             state["domain_policy_source_ids"] = []
         if not isinstance(state.get("apparmor_policies"), list):
             state["apparmor_policies"] = []
+        if "linux_device_policy" not in state:
+            state["linux_device_policy"] = None
         if not isinstance(state.get("allowed_hours"), dict):
             state["allowed_hours"] = _default_allowed_hours()
+
+    linux_device_policy_state = normalized.get("linux_device_policy_state")
+    if not isinstance(linux_device_policy_state, dict):
+        linux_device_policy_state = {}
+    normalized_linux_device_policy_state = {}
+    for username, entry in linux_device_policy_state.items():
+        normalized_entry = _normalize_linux_device_policy_state_entry(username, entry)
+        if normalized_entry is not None:
+            normalized_linux_device_policy_state[str(username)] = normalized_entry
+            user_state = users.get(str(username))
+            if isinstance(user_state, dict):
+                user_state["linux_device_policy"] = _json_clone(normalized_entry)
+    normalized["linux_device_policy_state"] = normalized_linux_device_policy_state
+
+    active_session_username = normalized.get("active_session_username")
+    normalized["active_session_username"] = (
+        active_session_username.strip()
+        if isinstance(active_session_username, str) and active_session_username.strip()
+        else None
+    )
+    _reconcile_linux_device_enforcement_state(normalized)
 
     domain_policy_state = normalized.get("domain_policy_state")
     if not isinstance(domain_policy_state, dict):
@@ -671,12 +989,32 @@ class DebugAgentProtocol:
         if not username:
             return self._random_system_event()
 
-        application_name, executable_path = self.random.choice([
+        terminal_candidates = [
+            ("Bash", "/usr/bin/bash"),
+            ("Konsole", "/usr/bin/konsole"),
+            ("GNOME Terminal", "/usr/bin/gnome-terminal"),
+        ]
+        generic_candidates = [
             ("Discord", "/usr/bin/discord"),
             ("Steam", "/usr/bin/steam"),
             ("Firefox", "/usr/bin/firefox"),
             ("Chromium", "/usr/bin/chromium"),
-        ])
+        ]
+
+        terminal_blocked_candidates = [
+            candidate
+            for candidate in terminal_candidates
+            if self._linux_device_terminal_blocked(username, candidate[1])
+        ]
+        if terminal_blocked_candidates and self.random.random() < 0.5:
+            application_name, executable_path = self.random.choice(terminal_blocked_candidates)
+            reason = "terminal_disabled"
+            enforcement_source = "linux_device_policy"
+        else:
+            application_name, executable_path = self.random.choice(generic_candidates)
+            reason = "Periodic synthetic block event"
+            enforcement_source = "python-debug-agent"
+
         return (
             self.build_alert_event(
                 "app_blocked",
@@ -684,7 +1022,9 @@ class DebugAgentProtocol:
                 details={
                     "application_name": application_name,
                     "executable_path": executable_path,
-                    "reason": "Periodic synthetic block event",
+                    "reason": reason,
+                    "enforcement_source": enforcement_source,
+                    "disposition": "DENIED",
                 },
             ),
             False,
@@ -760,7 +1100,12 @@ class DebugAgentProtocol:
         return users[username]
 
     def _user_config_payload(self, username, state):
-        return {
+        enforced_entry = self.config.get("enforced_linux_device_policy")
+        if isinstance(enforced_entry, dict) and enforced_entry.get("username") == username:
+            linux_policy_entry = enforced_entry
+        else:
+            linux_policy_entry = None
+        payload = {
             "USERNAME": username,
             "LINUX_UID": state["linux_uid"],
             "TIME_SPENT_DAY": state["time_spent_day"],
@@ -773,6 +1118,46 @@ class DebugAgentProtocol:
             "DOMAIN_POLICY_SOURCE_IDS": list(state["domain_policy_source_ids"]),
             "APPARMOR_POLICY_COUNT": len(state["apparmor_policies"]),
         }
+        payload.update(_linux_device_policy_summary(linux_policy_entry))
+        return payload
+
+    def _apply_linux_device_policy(self, username, device_policy):
+        normalized_username = (username or "").strip()
+        if not normalized_username:
+            raise ValueError("username must not be empty")
+
+        self.config["linux_device_policy_state"][normalized_username] = _linux_device_policy_catalog_entry(
+            device_policy,
+        )
+        if not (self.config.get("active_session_username") or "").strip():
+            self.config["active_session_username"] = normalized_username
+        return self._reconcile_linux_device_enforcement()
+
+    def _reconcile_linux_device_enforcement(self):
+        enforced = _reconcile_linux_device_enforcement_state(self.config)
+        if enforced is None:
+            return {
+                'device_policy': _default_linux_device_policy_payload(),
+                'enforcement': _linux_device_policy_enforcement_snapshot('', _default_linux_device_policy_payload()),
+            }
+        return enforced
+
+    def _set_active_session_username(self, username):
+        normalized = (username or "").strip()
+        self.config["active_session_username"] = normalized or None
+        return self._reconcile_linux_device_enforcement()
+
+    def _linux_device_terminal_blocked(self, username, exe_path):
+        active = (self.config.get("active_session_username") or "").strip()
+        if not active or username != active:
+            return False
+        enforced = self.config.get("enforced_linux_device_policy")
+        if not isinstance(enforced, dict):
+            return False
+        enforcement = enforced.get("enforcement") if isinstance(enforced.get("enforcement"), dict) else {}
+        if not enforcement.get("terminal_access_disabled"):
+            return False
+        return _is_linux_device_terminal_executable(exe_path)
 
     def _handle_command_request(self, message):
         correlation_id = message.get("correlation_id")
@@ -994,6 +1379,47 @@ class DebugAgentProtocol:
                 "approval_policy": _json_clone(approval_policy) if approval_policy is not None else None,
             }
             return True, f"Stored {len(policies)} AppArmor policies", {}, True
+
+        if action == "sync_linux_device_policy":
+            device_policy = args.get("device_policy")
+            if not isinstance(device_policy, dict):
+                return False, "Missing 'device_policy' argument", {}, False
+
+            user_state = self._ensure_user(username)
+            if user_state is None:
+                return False, f"Unknown user '{username}'", {}, False
+
+            try:
+                enforced = self._apply_linux_device_policy(username, device_policy)
+            except ValueError as exc:
+                return False, str(exc), {}, False
+
+            enforcement = enforced.get("enforcement") or {}
+            applied = []
+            if enforcement.get("polkit_rules_path"):
+                applied.append("polkit")
+            if enforcement.get("bluetooth_blocked"):
+                applied.append("bluetooth")
+            if enforcement.get("terminal_access_disabled"):
+                applied.append("terminal")
+            active = self.config.get("active_session_username") or "none"
+            summary = ", ".join(applied) if applied else "defaults"
+            return (
+                True,
+                f"Linux device policy synchronized for active session {active} ({summary})",
+                {},
+                True,
+            )
+
+        if action == "unenroll":
+            self.config["linux_device_policy_state"] = {}
+            self.config["active_session_username"] = None
+            self.config["enforced_linux_device_policy"] = None
+            for state in self.config.get("users", {}).values():
+                if isinstance(state, dict):
+                    state["linux_device_policy"] = None
+            self.config["agent_token"] = None
+            return True, "Device unenrolled locally; agent token cleared", {}, True
 
         if action == "refresh_installed_apps":
             user_state = self._ensure_user(username)

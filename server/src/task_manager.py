@@ -624,6 +624,16 @@ class BackgroundTaskManager:
         if source.source_last_modified:
             headers['If-Modified-Since'] = source.source_last_modified
 
+        from src.url_safety import is_safe_outbound_url
+
+        if not is_safe_outbound_url(source.source_url):
+            message = (
+                f'Blocked refresh for "{source.name}": URL resolves to a private or internal host'
+            )
+            source.mark_sync_error(message)
+            db.session.commit()
+            return False, message
+
         try:
             response = requests.get(
                 source.source_url,
@@ -828,6 +838,23 @@ class BackgroundTaskManager:
                             reason,
                             android_message,
                         )
+                    linux_success, linux_message = self._sync_linux_device_policy_system(
+                        system_id,
+                    )
+                    if linux_success:
+                        logger.info(
+                            "Completed Linux device policy sync for %s (%s): %s",
+                            system_id,
+                            reason,
+                            linux_message,
+                        )
+                    else:
+                        logger.warning(
+                            "Linux device policy sync failed for %s (%s): %s",
+                            system_id,
+                            reason,
+                            linux_message,
+                        )
                 finally:
                     db.session.remove()
         except (RuntimeError, TypeError, ValueError, SQLAlchemyError):
@@ -983,6 +1010,11 @@ class BackgroundTaskManager:
 
         return sync_android_device_policies_for_system(system_id)
 
+    def _sync_linux_device_policy_system(self, system_id):
+        from src.linux_device_policy_manager import sync_linux_device_policies_for_system
+
+        return sync_linux_device_policies_for_system(system_id)
+
     def _sync_domain_policy_system(self, system_id, agent_source_revisions=None):
         mapping_state, source_state_map = self._build_domain_policy_mapping_state(system_id)
         if not mapping_state:
@@ -1055,6 +1087,14 @@ class BackgroundTaskManager:
                 AgentAlert.DELIVERY_RETRYING,
             ]),
         ).order_by(AgentAlert.created_at.asc(), AgentAlert.id.asc()).all()
+
+        from src.url_safety import is_safe_outbound_url
+
+        if not is_safe_outbound_url(webhook_settings['url']):
+            logger.warning(
+                "Alert webhook delivery skipped: configured URL resolves to a private or internal host"
+            )
+            return
 
         logger.info("Found %d pending alert(s) for webhook delivery", len(pending_alerts))
         for alert in pending_alerts:

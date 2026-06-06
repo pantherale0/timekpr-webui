@@ -140,7 +140,7 @@ async fn run_dns_listener(
     linux_username: Arc<RwLock<String>>,
     mut shutdown_rx: oneshot::Receiver<()>,
 ) -> Result<(), String> {
-    let bind_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), port);
+    let bind_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), port);
     let udp_socket = UdpSocket::bind(bind_addr)
         .await
         .map_err(|error| format!("failed to bind UDP DNS socket on {}: {}", port, error))?;
