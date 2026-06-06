@@ -259,7 +259,7 @@ class DomainBlockVpnService : VpnService() {
         }
 
         private fun setAlwaysOnVpnIfDeviceOwner(context: Context) {
-            if (!DeviceOwnerProvisioner.isDeviceOwner(context)) return
+            if (!DeviceOwnerProvisioner.isDeviceOrProfileOwner(context)) return
             val dpm = context.getSystemService(DevicePolicyManager::class.java) ?: return
             val admin = ComponentName(context, TimeKprDeviceAdminReceiver::class.java)
             try {
@@ -270,7 +270,7 @@ class DomainBlockVpnService : VpnService() {
         }
 
         private fun clearAlwaysOnVpnIfDeviceOwner(context: Context) {
-            if (!DeviceOwnerProvisioner.isDeviceOwner(context)) return
+            if (!DeviceOwnerProvisioner.isDeviceOrProfileOwner(context)) return
             val dpm = context.getSystemService(DevicePolicyManager::class.java) ?: return
             val admin = ComponentName(context, TimeKprDeviceAdminReceiver::class.java)
             try {

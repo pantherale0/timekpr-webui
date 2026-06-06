@@ -89,7 +89,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun refreshCapabilityButtons() {
-        val deviceOwner = DeviceOwnerProvisioner.isDeviceOwner(this)
+        val deviceOwner = DeviceOwnerProvisioner.isDeviceOrProfileOwner(this)
         val adminActive = DeviceAdminActivationActivity.isActive(this)
         val usageGranted = DeviceOwnerProvisioner.hasUsageAccess(this)
         val vpnGranted = DeviceOwnerProvisioner.hasVpnConsent(this)

@@ -106,7 +106,7 @@ class AgentUpdater(private val context: Context) {
     }
 
     private fun canInstallPackages(): Boolean {
-        if (DeviceOwnerProvisioner.isDeviceOwner(context)) {
+        if (DeviceOwnerProvisioner.isDeviceOrProfileOwner(context)) {
             return true
         }
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -169,7 +169,7 @@ class AgentUpdater(private val context: Context) {
                 setAppPackageName(context.packageName)
             }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
-                DeviceOwnerProvisioner.isDeviceOwner(context)
+                DeviceOwnerProvisioner.isDeviceOrProfileOwner(context)
             ) {
                 setRequireUserAction(PackageInstaller.SessionParams.USER_ACTION_NOT_REQUIRED)
             }
@@ -210,7 +210,7 @@ class AgentUpdater(private val context: Context) {
     }
 
     private fun temporarilyAllowSelfInstall() {
-        if (!DeviceOwnerProvisioner.isDeviceOwner(context)) {
+        if (!DeviceOwnerProvisioner.isDeviceOrProfileOwner(context)) {
             return
         }
         val dpm = context.getSystemService(android.app.admin.DevicePolicyManager::class.java) ?: return

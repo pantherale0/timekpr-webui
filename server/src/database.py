@@ -1371,6 +1371,8 @@ class MappingAndroidDevicePolicy(db.Model):
         backref=db.backref('android_device_policy', uselist=False, cascade='all, delete-orphan'),
     )
 
+    block_wifi_tethering = db.Column(db.Boolean, nullable=False, default=False)
+
     def __repr__(self):
         return f'<MappingAndroidDevicePolicy map={self.device_map_id} revision={self.revision}>'
 

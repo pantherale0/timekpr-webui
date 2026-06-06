@@ -106,6 +106,7 @@ def build_device_policy_payload(policy: MappingAndroidDevicePolicy) -> dict:
         'bluetoothDisabled': bool(policy.bluetooth_disabled),
         'outgoingCallsDisabled': bool(policy.outgoing_calls_disabled),
         'smsDisabled': bool(policy.sms_disabled),
+        'blockWifiTethering': bool(policy.block_wifi_tethering),
         'advancedSecurityOverrides': {
             'developerSettings': policy.developer_settings,
         },
@@ -165,6 +166,7 @@ def build_policy_summary(policy: MappingAndroidDevicePolicy, mapping: ManagedUse
         'sms_disabled': policy.sms_disabled,
         'usb_data_access': policy.usb_data_access,
         'developer_settings': policy.developer_settings,
+        'block_wifi_tethering': policy.block_wifi_tethering,
         'short_support_message': (
             policy.short_support_message
             or MappingAndroidDevicePolicy.DEFAULT_SHORT_SUPPORT_MESSAGE
@@ -237,6 +239,11 @@ def upsert_policy(mapping: ManagedUserDeviceMap, body: dict) -> MappingAndroidDe
             body.get('long_support_message'),
             'long_support_message',
             MappingAndroidDevicePolicy.MAX_LONG_SUPPORT_MESSAGE_LENGTH,
+        )
+    if 'block_wifi_tethering' in body:
+        policy.block_wifi_tethering = _coerce_bool(
+            body.get('block_wifi_tethering'),
+            'block_wifi_tethering',
         )
 
     payload = build_device_policy_payload(policy)

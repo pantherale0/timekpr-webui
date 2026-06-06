@@ -31,7 +31,7 @@ object DeviceOwnerProvisioner {
 
     /** @return true when this app is device owner (grants may still partially fail). */
     fun applyIfDeviceOwner(context: Context): Boolean {
-        if (!isDeviceOwner(context)) return false
+        if (!isDeviceOrProfileOwner(context)) return false
         val dpm = context.getSystemService(DevicePolicyManager::class.java) ?: return true
         val admin = ComponentName(context, TimeKprDeviceAdminReceiver::class.java)
         val packageName = context.packageName

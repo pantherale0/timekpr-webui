@@ -122,7 +122,7 @@ class EnforcementController(
     }
 
     fun applyDeviceRestrictions(username: String) {
-        if (!DeviceOwnerProvisioner.isDeviceOwner(context)) return
+        if (!DeviceOwnerProvisioner.isDeviceOrProfileOwner(context)) return
         val dpm = context.getSystemService(DevicePolicyManager::class.java) ?: return
         if (!dpm.isAdminActive(adminComponent)) return
 
@@ -131,58 +131,64 @@ class EnforcementController(
     }
 
     private fun applyDeviceRestrictionPolicy(dpm: DevicePolicyManager, policy: DeviceRestrictionPolicy) {
-        dpm.setShortSupportMessage(adminComponent, policy.shortSupportMessage)
-        dpm.setLongSupportMessage(adminComponent, policy.longSupportMessage)
-        dpm.setScreenCaptureDisabled(adminComponent, policy.screenCaptureDisabled)
-        dpm.setCameraDisabled(adminComponent, policy.cameraDisabled)
+        try {
+            dpm.setShortSupportMessage(adminComponent, policy.shortSupportMessage)
+            dpm.setLongSupportMessage(adminComponent, policy.longSupportMessage)
+            dpm.setScreenCaptureDisabled(adminComponent, policy.screenCaptureDisabled)
+            dpm.setCameraDisabled(adminComponent, policy.cameraDisabled)
 
-        setUserRestriction(dpm, UserManager.DISALLOW_INSTALL_APPS, policy.installAppsDisabled)
-        setUserRestriction(dpm, UserManager.DISALLOW_UNINSTALL_APPS, policy.uninstallAppsDisabled)
-        setUserRestriction(dpm, UserManager.DISALLOW_FACTORY_RESET, policy.factoryResetDisabled)
-        setUserRestriction(dpm, UserManager.DISALLOW_ADJUST_VOLUME, policy.adjustVolumeDisabled)
-        setUserRestriction(dpm, UserManager.DISALLOW_MODIFY_ACCOUNTS, policy.modifyAccountsDisabled)
-        setUserRestriction(
-            dpm,
-            UserManager.DISALLOW_MOUNT_PHYSICAL_MEDIA,
-            policy.mountPhysicalMediaDisabled,
-        )
-        setUserRestriction(dpm, UserManager.DISALLOW_BLUETOOTH, policy.bluetoothDisabled)
-        setUserRestriction(dpm, UserManager.DISALLOW_OUTGOING_CALLS, policy.outgoingCallsDisabled)
-        setUserRestriction(dpm, UserManager.DISALLOW_SMS, policy.smsDisabled)
-        setUserRestriction(dpm, UserManager.DISALLOW_UNMUTE_MICROPHONE, policy.microphoneDisabled)
-        setUserRestriction(dpm, UserManager.DISALLOW_USB_FILE_TRANSFER, policy.blockUsbFileTransfer)
-
-        when {
-            policy.developerSettingsDisabled -> {
-                setUserRestriction(dpm, UserManager.DISALLOW_DEBUGGING_FEATURES, true)
-                setUserRestriction(dpm, UserManager.DISALLOW_SAFE_BOOT, true)
-            }
-            policy.developerSettingsAllowed -> {
-                setUserRestriction(dpm, UserManager.DISALLOW_DEBUGGING_FEATURES, false)
-                setUserRestriction(dpm, UserManager.DISALLOW_SAFE_BOOT, false)
-            }
-            else -> {
-                setUserRestriction(dpm, UserManager.DISALLOW_DEBUGGING_FEATURES, false)
-                setUserRestriction(dpm, UserManager.DISALLOW_SAFE_BOOT, false)
-            }
-        }
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            setUserRestriction(dpm, UserManager.DISALLOW_CAMERA_TOGGLE, policy.enforceCameraToggle)
+            setUserRestriction(dpm, UserManager.DISALLOW_INSTALL_APPS, policy.installAppsDisabled)
+            setUserRestriction(dpm, UserManager.DISALLOW_UNINSTALL_APPS, policy.uninstallAppsDisabled)
+            setUserRestriction(dpm, UserManager.DISALLOW_FACTORY_RESET, policy.factoryResetDisabled)
+            setUserRestriction(dpm, UserManager.DISALLOW_ADJUST_VOLUME, policy.adjustVolumeDisabled)
+            setUserRestriction(dpm, UserManager.DISALLOW_MODIFY_ACCOUNTS, policy.modifyAccountsDisabled)
             setUserRestriction(
                 dpm,
-                UserManager.DISALLOW_MICROPHONE_TOGGLE,
-                policy.enforceMicrophoneToggle,
+                UserManager.DISALLOW_MOUNT_PHYSICAL_MEDIA,
+                policy.mountPhysicalMediaDisabled,
             )
-        }
+            setUserRestriction(dpm, UserManager.DISALLOW_BLUETOOTH, policy.bluetoothDisabled)
+            setUserRestriction(dpm, UserManager.DISALLOW_OUTGOING_CALLS, policy.outgoingCallsDisabled)
+            setUserRestriction(dpm, UserManager.DISALLOW_SMS, policy.smsDisabled)
+            setUserRestriction(dpm, UserManager.DISALLOW_UNMUTE_MICROPHONE, policy.microphoneDisabled)
+            setUserRestriction(dpm, UserManager.DISALLOW_USB_FILE_TRANSFER, policy.blockUsbFileTransfer)
+            setUserRestriction(dpm, UserManager.DISALLOW_WIFI_TETHERING, policy.blockWifiTethering)
+            setUserRestriction(dpm, UserManager.DISALLOW_CONFIG_TETHERING, policy.blockWifiTethering)
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && dpm.canUsbDataSignalingBeDisabled()) {
             when {
-                policy.blockAllUsbData -> dpm.setUsbDataSignalingEnabled(false)
-                policy.usbDataAccess == DeviceRestrictionPolicy.USB_DATA_ACCESS_ALLOW ||
-                    policy.usbDataAccess == DeviceRestrictionPolicy.USB_DATA_ACCESS_UNSPECIFIED ->
-                    dpm.setUsbDataSignalingEnabled(true)
+                policy.developerSettingsDisabled -> {
+                    setUserRestriction(dpm, UserManager.DISALLOW_DEBUGGING_FEATURES, true)
+                    setUserRestriction(dpm, UserManager.DISALLOW_SAFE_BOOT, true)
+                }
+                policy.developerSettingsAllowed -> {
+                    setUserRestriction(dpm, UserManager.DISALLOW_DEBUGGING_FEATURES, false)
+                    setUserRestriction(dpm, UserManager.DISALLOW_SAFE_BOOT, false)
+                }
+                else -> {
+                    setUserRestriction(dpm, UserManager.DISALLOW_DEBUGGING_FEATURES, false)
+                    setUserRestriction(dpm, UserManager.DISALLOW_SAFE_BOOT, false)
+                }
             }
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                setUserRestriction(dpm, UserManager.DISALLOW_CAMERA_TOGGLE, policy.enforceCameraToggle)
+                setUserRestriction(
+                    dpm,
+                    UserManager.DISALLOW_MICROPHONE_TOGGLE,
+                    policy.enforceMicrophoneToggle,
+                )
+            }
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && dpm.canUsbDataSignalingBeDisabled()) {
+                when {
+                    policy.blockAllUsbData -> dpm.setUsbDataSignalingEnabled(false)
+                    policy.usbDataAccess == DeviceRestrictionPolicy.USB_DATA_ACCESS_ALLOW ||
+                        policy.usbDataAccess == DeviceRestrictionPolicy.USB_DATA_ACCESS_UNSPECIFIED ->
+                        dpm.setUsbDataSignalingEnabled(true)
+                }
+            }
+        } catch (e: SecurityException) {
+            Log.w(TAG, "Failed to apply some device restrictions (requires Device Owner)", e)
         }
     }
 
