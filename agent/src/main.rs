@@ -100,6 +100,22 @@ enum ServerMessage {
     PolicySyncHint {
         reason: Option<String>,
     },
+    #[serde(rename = "installed_apps_report_ack")]
+    InstalledAppsReportAck {
+        #[serde(default)]
+        report_id: Option<String>,
+        success: bool,
+        #[serde(default)]
+        apps_upserted: Option<u64>,
+        #[serde(default)]
+        apps_removed: Option<u64>,
+        #[serde(default)]
+        apps_total: Option<u64>,
+        #[serde(default)]
+        pending: bool,
+        #[serde(default)]
+        message: Option<String>,
+    },
 }
 
 #[derive(Serialize, Debug, Clone)]
@@ -1350,6 +1366,14 @@ async fn main() {
                             Ok(ServerMessage::PolicySyncHint { .. }) => {
                                 eprintln!("Ignoring policy sync hint during handshake.");
                             }
+                            Ok(ServerMessage::InstalledAppsReportAck { success, message, .. }) => {
+                                if !success {
+                                    eprintln!(
+                                        "Installed apps report rejected during handshake: {}",
+                                        message.as_deref().unwrap_or("unknown error")
+                                    );
+                                }
+                            }
                             Ok(ServerMessage::CommandRequest { .. }) => {
                                 eprintln!("Received command request before the message loop was ready.");
                             }
@@ -1481,6 +1505,14 @@ async fn main() {
                                 );
                                 let _ = policy_sync_tx.send(());
                             }
+                            Ok(ServerMessage::InstalledAppsReportAck { success, message, .. }) => {
+                                if !success {
+                                    eprintln!(
+                                        "Installed apps report rejected: {}",
+                                        message.as_deref().unwrap_or("unknown error")
+                                    );
+                                }
+                            }
                             Ok(other) => {
                                 eprintln!("Ignoring unexpected server message after authentication: {:?}", other);
                             }
@@ -1535,7 +1567,7 @@ async fn main() {
 mod tests {
     use super::{
         build_alert_message, is_user_session_class, parse_day_hours, schedule_to_day_limits,
-        ClientMessage,
+        ClientMessage, ServerMessage,
     };
 
     #[test]
@@ -1585,6 +1617,40 @@ mod tests {
         let (allowed_days, day_limits) = schedule_to_day_limits(schedule.as_object().unwrap()).unwrap();
         assert_eq!(allowed_days, vec!["1", "3", "7"]);
         assert_eq!(day_limits, vec![7200, 0, 5400, 0, 0, 0, 900]);
+    }
+
+    #[test]
+    fn installed_apps_report_ack_deserializes() {
+        let success_ack = r#"{"type":"installed_apps_report_ack","report_id":"abc","success":true,"apps_upserted":12,"apps_removed":1,"apps_total":12,"pending":false}"#;
+        match serde_json::from_str::<ServerMessage>(success_ack).unwrap() {
+            ServerMessage::InstalledAppsReportAck {
+                report_id,
+                success,
+                apps_upserted,
+                apps_removed,
+                apps_total,
+                pending,
+                message,
+            } => {
+                assert_eq!(report_id.as_deref(), Some("abc"));
+                assert!(success);
+                assert_eq!(apps_upserted, Some(12));
+                assert_eq!(apps_removed, Some(1));
+                assert_eq!(apps_total, Some(12));
+                assert!(!pending);
+                assert!(message.is_none());
+            }
+            other => panic!("unexpected message: {other:?}"),
+        }
+
+        let failure_ack = r#"{"type":"installed_apps_report_ack","report_id":"abc","success":false,"message":"bad payload"}"#;
+        match serde_json::from_str::<ServerMessage>(failure_ack).unwrap() {
+            ServerMessage::InstalledAppsReportAck { success, message, .. } => {
+                assert!(!success);
+                assert_eq!(message.as_deref(), Some("bad payload"));
+            }
+            other => panic!("unexpected message: {other:?}"),
+        }
     }
 
     #[test]
