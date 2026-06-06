@@ -46,6 +46,7 @@ def _build_alert_entry(alert, device_labels):
         'delivery_attempts': alert.delivery_attempts,
         'last_delivery_error': alert.last_delivery_error,
         'details_text': details_text,
+        'details': alert.payload.get('details', {}) if isinstance(alert.payload, dict) else {},
         'search_blob': ' '.join(
             part for part in [
                 str(alert.id),
@@ -101,7 +102,8 @@ def _build_user_alert_groups(user, search_query=''):
     matching_entries = []
     normalized_query = (search_query or '').strip().lower()
     alerts = AgentAlert.query.filter(
-        AgentAlert.system_id.in_(system_ids)
+        AgentAlert.system_id.in_(system_ids),
+        AgentAlert.event_type != 'terminal_command'
     ).order_by(AgentAlert.occurred_at.desc(), AgentAlert.id.desc()).all()
 
     for alert in alerts:
@@ -138,7 +140,9 @@ def _build_device_alert_entries(device, search_query=''):
     device_labels = _get_device_label_map()
     normalized_query = (search_query or '').strip().lower()
     entries = []
-    alerts = AgentAlert.query.filter_by(system_id=device.system_id).order_by(
+    alerts = AgentAlert.query.filter_by(system_id=device.system_id).filter(
+        AgentAlert.event_type != 'terminal_command'
+    ).order_by(
         AgentAlert.occurred_at.desc(),
         AgentAlert.id.desc(),
     ).all()

@@ -11,6 +11,7 @@ mod local_dns;
 mod netlink;
 mod timekpr_dbus;
 mod update_verify;
+mod terminal_monitor;
 
 use chrono::{SecondsFormat, Utc};
 use futures_util::{SinkExt, StreamExt};
@@ -774,8 +775,18 @@ fn current_timestamp() -> String {
 fn build_alert_message(
     event_type: &str,
     linux_username: Option<String>,
-    details: serde_json::Value,
+    mut details: serde_json::Value,
 ) -> ClientMessage {
+    let occurred_at = if let Some(obj) = details.as_object_mut() {
+        if let Some(ts_val) = obj.remove("_occurred_at") {
+            ts_val.as_str().map(|s| s.to_string()).unwrap_or_else(current_timestamp)
+        } else {
+            current_timestamp()
+        }
+    } else {
+        current_timestamp()
+    };
+
     let normalized_details = if details.is_object() {
         details
     } else {
@@ -784,7 +795,7 @@ fn build_alert_message(
 
     ClientMessage::AlertEvent {
         event_type: event_type.to_string(),
-        occurred_at: current_timestamp(),
+        occurred_at,
         linux_username,
         details: normalized_details,
     }
@@ -1192,7 +1203,8 @@ async fn main() {
     };
     netlink::register_alert_sender(alert_tx.clone());
     tokio::spawn(netlink::run_process_monitor(netlink_config, alert_tx.clone()));
-    tokio::spawn(audit_monitor::run_audit_monitor(users_map, alert_tx));
+    tokio::spawn(audit_monitor::run_audit_monitor(users_map.clone(), alert_tx.clone()));
+    tokio::spawn(terminal_monitor::run_terminal_monitor(users_map, alert_tx));
 
     // Channel forwarder that forwards background AppAlerts to current websocket sender
     let active_client_tx = Arc::new(Mutex::new(None::<mpsc::UnboundedSender<ClientMessage>>));

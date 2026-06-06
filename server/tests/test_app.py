@@ -1211,6 +1211,76 @@ def test_alert_pages_for_user_and_device(client, db_session):
     assert 'user_signed_in' not in device_filtered_event_types
 
 
+def test_alerts_endpoint_filters_terminal_commands(client, db_session):
+    Settings.set_admin_password("admin")
+    client.post('/', data={'username': 'admin', 'password': 'admin'})
+
+    device = AgentDevice(
+        system_id="device-alert-term",
+        status="approved",
+        secure_token="tok",
+    )
+    user = ManagedUser(username="jack", system_ip="Unassigned", is_valid=True)
+    db_session.add_all([device, user])
+    db_session.flush()
+    db_session.add(ManagedUserDeviceMap(
+        managed_user_id=user.id,
+        system_id=device.system_id,
+        linux_username="jack",
+        is_valid=True,
+    ))
+    db_session.add_all([
+        AgentAlert(
+            system_id=device.system_id,
+            event_type='user_signed_in',
+            linux_username='jack',
+            occurred_at=datetime.now(timezone.utc),
+            payload_json=json.dumps({
+                'system_id': device.system_id,
+                'event_type': 'user_signed_in',
+                'linux_username': 'jack',
+                'details': {},
+            }),
+            webhook_enabled_snapshot=False,
+            delivery_status=AgentAlert.DELIVERY_DISABLED,
+        ),
+        AgentAlert(
+            system_id=device.system_id,
+            event_type='terminal_command',
+            linux_username='jack',
+            occurred_at=datetime.now(timezone.utc),
+            payload_json=json.dumps({
+                'system_id': device.system_id,
+                'event_type': 'terminal_command',
+                'linux_username': 'jack',
+                'details': {'cmd': 'ls -l'},
+            }),
+            webhook_enabled_snapshot=False,
+            delivery_status=AgentAlert.DELIVERY_DISABLED,
+        ),
+    ])
+    db_session.commit()
+
+    # 1. Querying /api/alerts by default should filter out terminal_command
+    res = client.get(f'/api/alerts?managed_user_id={user.id}')
+    assert res.status_code == 200
+    data = json.loads(res.data)
+    event_types = [a['event_type'] for a in data['data']['alerts']]
+    assert 'user_signed_in' in event_types
+    assert 'terminal_command' not in event_types
+    # terminal_command should also be filtered out from dropdown options
+    dropdown_values = [et['value'] for et in data['data']['filters']['event_types']]
+    assert 'terminal_command' not in dropdown_values
+
+    # 2. Querying with explicit event_type=terminal_command should return it
+    res_term = client.get(f'/api/alerts?managed_user_id={user.id}&event_type=terminal_command')
+    assert res_term.status_code == 200
+    data_term = json.loads(res_term.data)
+    event_types_term = [a['event_type'] for a in data_term['data']['alerts']]
+    assert 'terminal_command' in event_types_term
+    assert 'user_signed_in' not in event_types_term
+
+
 def test_apparmor_policy_rejects_globbed_custom_paths(client, db_session):
     Settings.set_admin_password("admin")
     client.post('/', data={'username': 'admin', 'password': 'admin'})

@@ -940,6 +940,7 @@ class DebugAgentProtocol:
             self._random_session_event,
             self._random_app_blocked_event,
             self._random_app_usage_event,
+            self._random_terminal_command_event,
         ])
         return generator()
 
@@ -1063,6 +1064,38 @@ class DebugAgentProtocol:
                 },
             ),
             True,
+        )
+
+    def _random_terminal_command_event(self):
+        username = self._random_username()
+        if not username:
+            return self._random_system_event()
+
+        cmd = self.random.choice([
+            "ls -la /home",
+            "git status",
+            "cargo build --release",
+            "sudo apt update",
+            "curl -s https://google.com",
+            "rm -rf ./tmp",
+        ])
+        tty = self.random.choice(["pts/0", "pts/1", "pts/2"])
+        pwd = self.random.choice(["/home/" + username, "/home/" + username + "/projects", "/tmp"])
+        session_id = f"debug-sess-{self.random.randint(1000, 9999)}"
+
+        return (
+            self.build_alert_event(
+                "terminal_command",
+                linux_username=username,
+                details={
+                    "cmd": cmd,
+                    "tty": tty,
+                    "pwd": pwd,
+                    "session_id": session_id,
+                    "source": "debug_agent",
+                },
+            ),
+            False,
         )
 
     def _build_register_message(self, message):

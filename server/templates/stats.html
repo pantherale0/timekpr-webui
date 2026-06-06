@@ -187,6 +187,67 @@
             </div>
         </div>
     </div>
+
+    <!-- Terminal Command History Logs -->
+    <div class="card shadow-sm border mb-4">
+        <div class="card-header py-3 bg-body-secondary d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <div>
+                <h5 class="mb-0 fw-bold"><i class="fas fa-terminal text-primary me-2"></i>Terminal Logs</h5>
+                <span class="text-secondary small fw-medium">Log of interactive terminal commands executed by the child</span>
+            </div>
+            <div id="terminal-summary-stats">
+                <!-- Injected by JS -->
+            </div>
+        </div>
+        <div class="card-body">
+            <!-- toolbar -->
+            <div class="d-flex gap-2 mb-3 flex-wrap align-items-center justify-content-between">
+                <div class="d-flex gap-2 flex-wrap flex-grow-1">
+                    <input type="text" id="terminal-search-input" class="form-control form-control-sm" placeholder="Search commands..." style="max-width: 250px;">
+                    <select id="terminal-sort-dir" class="form-select form-select-sm" style="max-width: 130px;">
+                        <option value="desc">Newest First</option>
+                        <option value="asc">Oldest First</option>
+                    </select>
+                </div>
+            </div>
+
+            <div id="terminal-loading" class="text-center py-5" style="display: none;">
+                <div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div>
+                <span class="small text-secondary fw-semibold">Loading terminal logs...</span>
+            </div>
+
+            <div id="terminal-table-container" class="table-responsive" style="display: none;">
+                <table class="table table-hover table-striped align-middle small mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th style="width: 15%;">Date &amp; Time</th>
+                            <th style="width: 15%;">TTY / Session</th>
+                            <th style="width: 15%;">Target Device</th>
+                            <th style="width: 20%;">Working Dir (pwd)</th>
+                            <th style="width: 35%;">Command Line</th>
+                        </tr>
+                    </thead>
+                    <tbody id="terminal-tbody">
+                        <!-- Injected by JS -->
+                    </tbody>
+                </table>
+            </div>
+
+            <div id="terminal-empty" class="text-center text-secondary py-5 fw-medium" style="display: none;">
+                No terminal command logs found matching the current filters.
+            </div>
+
+            <div id="terminal-pagination" class="d-flex justify-content-between align-items-center mt-3 pt-3 border-top" style="display: none;">
+                <div class="small text-secondary fw-semibold" id="terminal-pagination-info">
+                    Showing 0-0 of 0 commands
+                </div>
+                <div class="d-flex gap-1">
+                    <button id="terminal-prev-page" class="btn btn-outline-secondary btn-sm fw-bold" disabled>Previous</button>
+                    <button id="terminal-next-page" class="btn btn-outline-secondary btn-sm fw-bold" disabled>Next</button>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 {% endblock %}
 
@@ -605,8 +666,166 @@
         }
     });
 
+    // ── Dynamic Terminal Logs Logic ──────────────────────────────────────────
+    const terminalConfig = {
+        managedUserId: {{ user.id }},
+        systemId: null,
+        page: 1,
+        perPage: 50,
+        search: '',
+        eventType: 'terminal_command',
+        sortBy: 'date',
+        sortDir: 'desc'
+    };
+
+    const terminalElements = {
+        tbody: document.getElementById('terminal-tbody'),
+        loading: document.getElementById('terminal-loading'),
+        empty: document.getElementById('terminal-empty'),
+        table: document.getElementById('terminal-table-container'),
+        summary: document.getElementById('terminal-summary-stats'),
+        paginationInfo: document.getElementById('terminal-pagination-info'),
+        prevBtn: document.getElementById('terminal-prev-page'),
+        nextBtn: document.getElementById('terminal-next-page'),
+        searchInput: document.getElementById('terminal-search-input'),
+        sortDirSelect: document.getElementById('terminal-sort-dir')
+    };
+
+    let terminalSearchTimeout = null;
+
+    async function fetchTerminalLogs() {
+        terminalElements.loading.style.display = 'block';
+        terminalElements.table.style.display = 'none';
+        terminalElements.empty.style.display = 'none';
+
+        const params = new URLSearchParams({
+            page: terminalConfig.page,
+            per_page: terminalConfig.perPage,
+            search: terminalConfig.search,
+            event_type: terminalConfig.eventType,
+            sort_by: terminalConfig.sortBy,
+            sort_dir: terminalConfig.sortDir
+        });
+        if (terminalConfig.managedUserId) params.append('managed_user_id', terminalConfig.managedUserId);
+        if (terminalConfig.systemId) params.append('system_id', terminalConfig.systemId);
+
+        try {
+            const response = await fetch(`/api/alerts?${params.toString()}`);
+            const result = await response.json();
+            
+            if (result.success) {
+                renderTerminalLogs(result.data.alerts);
+                updateTerminalPagination(result.data.pagination);
+                updateTerminalSummaryStats(result.data.pagination.total_items);
+            }
+        } catch (error) {
+            console.error('Failed to fetch terminal logs:', error);
+        } finally {
+            terminalElements.loading.style.display = 'none';
+        }
+    }
+
+    function renderTerminalLogs(logs) {
+        if (!logs || logs.length === 0) {
+            terminalElements.empty.style.display = 'block';
+            return;
+        }
+
+        terminalElements.table.style.display = 'block';
+        terminalElements.tbody.innerHTML = logs.map(log => {
+            const details = log.details || {};
+            const cmd = details.cmd || '';
+            const pwd = details.pwd || '';
+            const tty = details.tty || '';
+            const sessionId = details.session_id || '';
+            const shortSession = sessionId ? ` (${sessionId.slice(0, 8)})` : '';
+            
+            const sessionDisplay = tty ? `<code>${tty}</code>${shortSession}` : `<code>session</code>${shortSession}`;
+
+            return `
+                <tr>
+                    <td class="fw-bold text-secondary text-nowrap" style="font-size: 0.8rem;">
+                        ${log.occurred_at ? formatDate(log.occurred_at) : 'Unknown'}
+                    </td>
+                    <td>${sessionDisplay}</td>
+                    <td>
+                        <a href="/devices/${log.system_id}" class="fw-bold">${log.device_label}</a>
+                    </td>
+                    <td><code class="text-secondary small">${pwd || '/'}</code></td>
+                    <td>
+                        <div class="p-2 rounded bg-dark text-white font-monospace small" style="white-space: pre-wrap; font-family: monospace;">${escapeHtml(cmd)}</div>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    function escapeHtml(str) {
+        if (!str) return '';
+        return str
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
+    function updateTerminalPagination(pagination) {
+        const start = (pagination.page - 1) * pagination.per_page + 1;
+        const end = Math.min(pagination.page * pagination.per_page, pagination.total_items);
+        
+        terminalElements.paginationInfo.textContent = pagination.total_items > 0 
+            ? `Showing ${start}-${end} of ${pagination.total_items} commands`
+            : 'No commands found';
+            
+        terminalElements.prevBtn.disabled = !pagination.has_prev;
+        terminalElements.nextBtn.disabled = !pagination.has_next;
+        
+        const pagSection = document.getElementById('terminal-pagination');
+        if (pagSection) {
+            pagSection.style.display = pagination.total_items > 0 ? 'flex' : 'none';
+        }
+    }
+
+    function updateTerminalSummaryStats(total) {
+        terminalElements.summary.innerHTML = `
+            <span class="badge bg-primary px-3 py-2 fw-bold" style="font-size: 0.85rem;">
+                ${total} Command(s) Logged
+            </span>
+        `;
+    }
+
+    // Event Listeners
+    terminalElements.prevBtn.addEventListener('click', () => {
+        if (terminalConfig.page > 1) {
+            terminalConfig.page--;
+            fetchTerminalLogs();
+        }
+    });
+
+    terminalElements.nextBtn.addEventListener('click', () => {
+        terminalConfig.page++;
+        fetchTerminalLogs();
+    });
+
+    terminalElements.searchInput.addEventListener('input', (e) => {
+        clearTimeout(terminalSearchTimeout);
+        terminalSearchTimeout = setTimeout(() => {
+            terminalConfig.search = e.target.value;
+            terminalConfig.page = 1;
+            fetchTerminalLogs();
+        }, 400);
+    });
+
+    terminalElements.sortDirSelect.addEventListener('change', (e) => {
+        terminalConfig.sortDir = e.target.value;
+        terminalConfig.page = 1;
+        fetchTerminalLogs();
+    });
+
     // Initial load
     fetchAlerts();
+    fetchTerminalLogs();
 
 })();
 </script>

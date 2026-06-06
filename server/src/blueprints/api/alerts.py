@@ -52,6 +52,8 @@ def get_alerts():
 
     if event_type:
         query = query.filter(AgentAlert.event_type == event_type)
+    else:
+        query = query.filter(AgentAlert.event_type != 'terminal_command')
 
     if search:
         search_filter = f"%{search}%"
@@ -88,7 +90,7 @@ def get_alerts():
     # But for performance, maybe we only do this if requested or once
     
     # Types for filtering dropdown
-    all_types = db.session.query(AgentAlert.event_type).distinct().all()
+    all_types = db.session.query(AgentAlert.event_type).filter(AgentAlert.event_type != 'terminal_command').distinct().all()
     event_types = sorted([t[0] for t in all_types if t[0]])
 
     return jsonify({

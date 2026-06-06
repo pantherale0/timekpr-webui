@@ -438,3 +438,21 @@ def test_normalize_agent_alert_payload():
 
     with pytest.raises(ValueError):
         normalize_agent_alert_payload("sys-1", {"event_type": "system_startup", "occurred_at": "2026-05-25T21:05:00Z", "details": []})
+
+
+def test_terminal_command_alert_type():
+    payload = normalize_agent_alert_payload("sys-1", {
+        "type": "alert_event",
+        "event_type": "terminal_command",
+        "occurred_at": "2026-06-06T21:00:00Z",
+        "linux_username": "alice",
+        "details": {
+            "cmd": "git status",
+            "pwd": "/home/alice/project",
+            "tty": "pts/1",
+            "session_id": "test-session-uuid",
+        },
+    })
+    assert payload["event_type"] == "terminal_command"
+    assert payload["linux_username"] == "alice"
+    assert payload["details"]["cmd"] == "git status"
