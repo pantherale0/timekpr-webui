@@ -477,3 +477,15 @@ def resolve_android_provisioning(
         'payload_json': payload_json,
         'is_dev_version': is_dev_server_version(version),
     }
+
+
+def resolve_android_update_info(version: str, server_url: str = '') -> dict:
+    """Resolve APK download metadata for Android agent auto-update."""
+    apk_url = resolve_android_apk_url(version, server_url=server_url)
+    signature_checksum = resolve_android_signature_checksum(version)
+    update_available = bool(apk_url and signature_checksum)
+    return {
+        'apk_url': apk_url or '',
+        'signature_checksum': signature_checksum or '',
+        'update_available': update_available,
+    }

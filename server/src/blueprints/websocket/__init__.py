@@ -14,8 +14,19 @@ from src.agent_push import update_device_push_metadata
 from src.alerts_manager import _store_agent_alert
 from src.apparmor_manager import _store_app_usage_from_alert
 from src.installed_apps_manager import handle_app_icon_report, handle_installed_apps_report
+from src.pairing_helper import resolve_android_update_info
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def _agent_server_url_from_request() -> str:
+    """Build the WebSocket URL agents use to reach this server."""
+    proto = request.headers.get('X-Forwarded-Proto')
+    if not proto:
+        proto = 'https' if request.is_secure else 'http'
+    host = request.headers.get('Host', request.host)
+    ws_scheme = 'wss' if proto == 'https' else 'ws'
+    return f'{ws_scheme}://{host}/ws'
 
 websocket_bp = Blueprint('websocket', __name__)
 
@@ -82,13 +93,21 @@ def ws_agent_handler(ws):
                     agent_version or "unknown",
                     __version__,
                 )
-                ws.send(json.dumps({
+                rejection = {
                     "type": "auth_result",
                     "success": False,
                     "message": f"Incompatible agent version. Please update to {__version__}.",
                     "update_required": True,
-                    "target_version": __version__
-                }))
+                    "target_version": __version__,
+                }
+                platform = hello_msg.get("platform")
+                if isinstance(platform, str) and platform.strip().lower() == "android":
+                    update_info = resolve_android_update_info(
+                        __version__,
+                        server_url=_agent_server_url_from_request(),
+                    )
+                    rejection.update(update_info)
+                ws.send(json.dumps(rejection))
                 return
     
             expected_reg_token = AgentConnectionManager.registration_token

@@ -10,6 +10,7 @@ import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
+import com.timekpr.agent.BuildConfig
 import com.timekpr.agent.R
 import com.timekpr.agent.TimeKprApplication
 import com.timekpr.agent.admin.DeviceAdminActivationActivity
@@ -44,7 +45,8 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
         val statusView = findViewById<TextView>(R.id.statusText)
         val deviceIdView = findViewById<TextView>(R.id.deviceIdText)
-        deviceIdView.text = getString(R.string.status_connected) + ": " + config.systemId
+        deviceIdView.text = getString(R.string.status_connected) + ": " + config.systemId +
+            "\n" + getString(R.string.agent_version_label, BuildConfig.DEFAULT_AGENT_VERSION)
 
         findViewById<Button>(R.id.scanQrButton).setOnClickListener {
             qrLauncher.launch(Intent(this, QrScanActivity::class.java))

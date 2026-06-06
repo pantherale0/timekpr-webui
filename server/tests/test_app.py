@@ -816,10 +816,10 @@ def test_websocket_handler_accepts_mismatched_agent_on_dev_server(app, db_sessio
     assert resp['type'] == "pairing_status"
 
 
-def test_websocket_handler_version_checking(app, db_session):
+def test_websocket_handler_version_checking(app, db_session, monkeypatch):
     from app import __version__, ws_agent_handler
 
-    # 1. Test mismatched agent version
+    # 1. Test mismatched agent version (non-android: no APK fields)
     ws_mismatch = MockWS([json.dumps({
         "type": "hello",
         "system_id": "sys-mismatch",
@@ -834,6 +834,36 @@ def test_websocket_handler_version_checking(app, db_session):
     assert resp['success'] is False
     assert resp['update_required'] is True
     assert resp['target_version'] == __version__
+    assert 'apk_url' not in resp
+    assert 'signature_checksum' not in resp
+
+    # 1b. Android mismatch includes update metadata when available
+    def _mock_update_info(version, server_url=''):
+        return {
+            'apk_url': 'https://example.com/agent.apk',
+            'signature_checksum': 'abc123checksum',
+            'update_available': True,
+        }
+
+    monkeypatch.setattr(
+        'src.blueprints.websocket.resolve_android_update_info',
+        _mock_update_info,
+    )
+    ws_android_mismatch = MockWS([json.dumps({
+        "type": "hello",
+        "system_id": "sys-android-mismatch",
+        "agent_version": "v0.0.1",
+        "platform": "android",
+    })])
+    with app.test_request_context('/ws', environ_base={'REMOTE_ADDR': '127.0.0.1'}):
+        ws_agent_handler(ws_android_mismatch)
+
+    assert len(ws_android_mismatch.sent_messages) == 1
+    resp_android = json.loads(ws_android_mismatch.sent_messages[0])
+    assert resp_android['update_required'] is True
+    assert resp_android['apk_url'] == 'https://example.com/agent.apk'
+    assert resp_android['signature_checksum'] == 'abc123checksum'
+    assert resp_android['update_available'] is True
 
     # 2. Test missing agent version
     ws_missing_ver = MockWS([json.dumps({

@@ -23,7 +23,11 @@ class AgentSyncWorker(
             AgentWebSocketClient.SessionMode.SYNC
         }
         val result = AgentSessionCoordinator.runSyncSession(applicationContext, mode)
-        return if (result.success) Result.success() else Result.retry()
+        return when {
+            result.success -> Result.success()
+            result.reason == "update_scheduled" -> Result.success()
+            else -> Result.retry()
+        }
     }
 
     companion object {

@@ -28,6 +28,7 @@ from src.pairing_helper import (
     resolve_android_apk_url,
     resolve_android_provisioning,
     resolve_android_signature_checksum,
+    resolve_android_update_info,
 )
 
 
@@ -178,6 +179,23 @@ def test_resolve_android_provisioning_not_ready_for_dev_without_overrides():
     context = resolve_android_provisioning('wss://example.com/ws', 'v0.0.0-dev')
     assert context['provisioning_ready'] is False
     assert context['is_dev_version'] is True
+
+
+@patch('src.pairing_helper.has_uploaded_android_apk', return_value=False)
+@patch('src.pairing_helper._fetch_release_signature_checksum', return_value='release-checksum')
+def test_resolve_android_update_info_with_release_assets(mock_fetch, mock_uploaded):
+    info = resolve_android_update_info('v0.10', server_url='wss://example.com/ws')
+    assert info['update_available'] is True
+    assert info['apk_url'] == default_android_apk_url('v0.10')
+    assert info['signature_checksum'] == 'release-checksum'
+
+
+@patch('src.pairing_helper.has_uploaded_android_apk', return_value=False)
+def test_resolve_android_update_info_not_available_for_dev_without_upload(mock_uploaded):
+    info = resolve_android_update_info('v0.0.0-dev', server_url='wss://example.com/ws')
+    assert info['update_available'] is False
+    assert info['apk_url'] == ''
+    assert info['signature_checksum'] == ''
 
 
 @patch('src.pairing_helper.has_uploaded_android_apk', return_value=True)

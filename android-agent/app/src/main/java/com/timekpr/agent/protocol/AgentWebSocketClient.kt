@@ -12,6 +12,8 @@ import com.timekpr.agent.policy.AppPolicyStore
 import com.timekpr.agent.push.PushTokenProvider
 import com.timekpr.agent.service.AgentConnectionState
 import com.timekpr.agent.service.AgentConnectionStatus
+import com.timekpr.agent.update.AgentUpdateRequest
+import com.timekpr.agent.update.AgentUpdateWorker
 import com.timekpr.agent.util.AndroidUsers
 import com.timekpr.agent.vpn.DomainBlockVpnService
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -156,6 +158,18 @@ class AgentWebSocketClient(
             }
             "auth_result" -> {
                 if (!message.optBoolean("success", false)) {
+                    if (message.optBoolean("update_required", false)) {
+                        val updateRequest = AgentUpdateRequest.from(message)
+                        if (updateRequest.targetVersion.isNotBlank()) {
+                            AgentUpdateWorker.enqueue(context, updateRequest)
+                            AgentConnectionState.update(
+                                AgentConnectionStatus.ERROR,
+                                "Updating to ${updateRequest.targetVersion}…",
+                            )
+                            onComplete(SessionResult(success = false, reason = "update_scheduled"))
+                            return
+                        }
+                    }
                     AgentConnectionState.update(
                         AgentConnectionStatus.ERROR,
                         message.optString("message", "authentication failed"),

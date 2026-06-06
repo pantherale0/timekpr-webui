@@ -29,4 +29,5 @@
     <string name="status_connected">Connected</string>
     <string name="status_pending">Awaiting admin approval</string>
     <string name="status_disconnected">Disconnected</string>
+    <string name="agent_version_label">Agent version: %1$s</string>
 </resources>

@@ -12,5 +12,6 @@
     ],
     "pylint.cwd": "${workspaceFolder}/server",
     "rust-analyzer.testExplorer": true,
-    "debug.allowBreakpointsEverywhere": true
+    "debug.allowBreakpointsEverywhere": true,
+    "kotlin.java.home": "/usr/lib/jvm/java-17-openjdk"
 }

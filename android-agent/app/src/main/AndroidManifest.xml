@@ -14,7 +14,7 @@
         tools:ignore="ProtectedPermissions" />
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"
         tools:ignore="QueryAllPackagesPermission" />
-    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <application
         android:name=".TimeKprApplication"
@@ -101,6 +101,10 @@
                 <data android:scheme="package" />
             </intent-filter>
         </receiver>
+
+        <receiver
+            android:name=".update.AgentUpdateReceiver"
+            android:exported="false" />
 
         <service
             android:name=".push.TimeKprMessagingService"

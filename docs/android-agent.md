@@ -343,3 +343,26 @@ export TIMEKPR_AGENT_VERSION=v1.2.3
 ## Versioning
 
 The Android agent reports `agent_version` from `TIMEKPR_AGENT_VERSION` at build time (`v0.0.0-dev` for debug builds, e.g. `v1.2.3` for tagged release builds). Release agents must match `TIMEKPR_SERVER_VERSION`; dev servers (`v0.0.0-dev`) accept any agent version.
+
+### Automatic updates
+
+When a release server rejects a mismatched `agent_version` at WebSocket `hello`, it responds with `auth_result` containing:
+
+- `update_required: true`
+- `target_version` — the server's `TIMEKPR_SERVER_VERSION`
+- `apk_url` — GitHub release APK or server-uploaded dev APK URL
+- `signature_checksum` — signing certificate checksum for verification
+- `update_available` — whether both URL and checksum are available
+
+The Android agent handles this automatically:
+
+1. Downloads the APK (from server-provided URL, or GitHub release fallback for older servers)
+2. Verifies the APK signing certificate checksum (same format as MDM provisioning QR)
+3. Installs via `PackageInstaller` (silent when device owner; may prompt on sideload-only installs per Android platform rules)
+4. Reconnects after install via `PACKAGE_REPLACED` / install callback
+
+**Release servers:** APK from `https://github.com/pantherale0/timekpr-webui/releases/download/{tag}/timekpr-android-agent-{tag}.apk` with companion `.signature-checksum` asset.
+
+**Development servers:** Upload a signed release APK in **Settings → Android MDM provisioning QR**; the server serves it at `/api/pairing/provisioning/apk` and includes that URL in the update response.
+
+If `update_available` is false (dev server without uploaded APK), the agent shows the server error message and retries on the next sync cycle.

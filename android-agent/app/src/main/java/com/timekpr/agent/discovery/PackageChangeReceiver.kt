@@ -19,7 +19,15 @@ class PackageChangeReceiver : BroadcastReceiver() {
             return
         }
         val packageName = intent.data?.schemeSpecificPart?.trim().orEmpty()
-        if (packageName.isBlank() || packageName == context.packageName) {
+        if (packageName.isBlank()) {
+            return
+        }
+        if (packageName == context.packageName) {
+            if (action == Intent.ACTION_PACKAGE_REPLACED) {
+                val pendingResult = goAsync()
+                AgentSessionCoordinator.scheduleSync(context.applicationContext, reason = "agent_updated")
+                pendingResult.finish()
+            }
             return
         }
 
