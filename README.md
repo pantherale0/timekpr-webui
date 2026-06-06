@@ -1,322 +1,231 @@
 # TimeKpr WebUI
 
-A modern, web-based interface for managing TimeKpr-nExT parental controls across multiple computers in your network.
+A unified, secure, and modern parental controls dashboard for managing screen time, application execution, and domain policies across Linux and Android devices.
 
-This project uses a server-agent architecture: the Flask server hosts the Web UI and WebSocket hub, while each managed Linux machine runs a lightweight Rust agent (`timekpr-agent`) that connects outbound to the server. That removes the need for inbound management ports on client machines, but it still requires normal secret handling and transport security.
-
-![Timekpr Dashboard](docs/dashboard.png)
+This project implements a secure **server-agent architecture**. The Flask server hosts the Web UI, REST APIs, and a WebSocket hub, while each managed device runs a client agent (a compiled Rust agent for Linux, a Kotlin agent for Android, or a Python simulator for debugging) that connects outbound to the server. This outbound-only architecture eliminates the need to expose inbound management ports on child devices.
 
 ---
 
-## Key Architectural Features
-
-- **Outbound agent connections**: Client agents connect outbound to the server WebSocket endpoint (`/ws`), so managed devices do not need an inbound management daemon or open admin port.
-- **Challenge-response device authentication**: Approved agents authenticate by signing a server challenge with HMAC-SHA256 using a per-device secret. The shared bootstrap token is not sent over the wire.
-- **Persistent host identity**: Each client stores a generated UUID (`system_id`), so DHCP and other IP changes do not break mappings, while the UI prefers the current hostname for readability.
-- **Pending-device approval flow**: New devices can remain in a pending state until an administrator approves them in the Web UI.
-- **Offline-safe command queueing**: The server can queue changes for offline systems and apply them when the agent reconnects.
-- **D-Bus-backed client control**: The agent maps a fixed set of TimeKpr-related actions onto the upstream TimeKpr D-Bus API instead of executing `timekpra` commands.
-- **Flask-Migrate & Alembic Migrations**: Structured migrations folder with auto-generated Python schema version scripts. Auto-detects, stamps, and programmatically upgrades database schema states seamlessly on application boot.
-- **PostgreSQL & Dialect-Agnosticism**: Native compatibility for both SQLite and PostgreSQL, fully resolving standard `DATABASE_URL` environment variables passed in at runtime (ideal for Kubernetes and advanced Docker deployments).
-- **SQLite-to-PostgreSQL Zero-Downtime Data Migration**: Automatically detects existing local SQLite database files, bulk-migrates all tables in strict topological dependency order in memory-efficient, chunked batches of 10,000 (OOM-safe) into PostgreSQL, stamps Alembic versioning as head, and securely removes old SQLite files from disk.
-- **Timezone-Aware Consistency**: Native timezone-aware date/time tracking (`DateTime(timezone=True)`) across all database columns to eliminate Python 3.12+ `datetime.utcnow()` deprecation warnings and ensure absolute database engine alignment.
-- **Standardized Production Logging**: Comprehensive logging using Python's standard `logging` library with a global `_LOGGER = logging.getLogger(__name__)` configured across all core components, replacing all standard `print()` statements for modular production-grade log streaming.
-
----
-
-## Getting Started
+## Architecture Overview
 
 ```mermaid
 graph TD
-    subgraph Client Machine
-        Agent[Rust Client Agent]
+    Parent[Parent / Administrator] -->|1. Configure Policies / Approve| WebUI[Flask Web UI]
+    subgraph Server Stack
+        WebUI <--> DB[(SQLite / PostgreSQL)]
+        Worker[Background Task Worker] <--> DB
     end
-    subgraph Server Machine
-        Server[Flask Web Server /ws]
-        DB[(SQLite DB)]
+    subgraph Linux Client
+        RustAgent[Rust Agent] <-->|2. WS Connection /ws| WebUI
+        RustAgent -->|Enforces| AppArmor[AppArmor / SIGKILL]
+        RustAgent -->|Enforces| Polkit[Polkit / Seat0 Session]
+        RustAgent -->|Enforces| LinuxDNS[Local DNS Sinkhole]
     end
-    Agent -->|1. Outbound WS Connection| Server
-    Server -->|2. HMAC Challenge| Agent
-    Agent -->|3. Signed Challenge + UUID| Server
-    Server -->|4. Authenticated Session| DB
+    subgraph Android Client
+        KotlinAgent[Kotlin Agent] <-->|3. Ephemeral WS Connection| WebUI
+        Firebase[Firebase Cloud Messaging FCM] -.->|4. Push Wake Message| KotlinAgent
+        WebUI -.->|Trigger Wake| Firebase
+        KotlinAgent -->|Enforces| DeviceOwner[Device Owner / Package Suspensions]
+        KotlinAgent -->|Enforces| AndroidVPN[DNS VPN Service]
+    end
 ```
 
-### Prerequisites
+### Key System Features
 
-- **Docker and Docker Compose** on the server machine, unless you are doing a manual server install
-- **TimeKpr-nExT** installed on each client machine you want to manage, with its system D-Bus service available to privileged callers
-- **Rust toolchain** only if you plan to build the agent from source instead of downloading a release
+*   **Outbound-Only Connections**: Client agents connect outbound to the server WebSocket endpoint (`/ws`), bypassing firewall constraints on client machines or mobile networks.
+*   **HMAC Challenge-Response Authentication**: Enrolled agents authenticate by signing a server-issued challenge with HMAC-SHA256 using a unique per-device secret. The shared bootstrap token is never sent over the wire.
+*   **Pending-Device Approval Flow**: Newly registered agents enter a `pending` state. An administrator must approve them in the Web UI before any policies are issued.
+*   **Offline-Safe Command Queueing**: Configuration changes and remote commands are queued on the server and applied automatically when the agent next connects.
+*   **Deduplicated App Discovery & Inventory**: Agents scan installed applications (launcher-visible packages on Android, desktop entries on Linux) and push metadata along with content-addressed 64x64 PNG icons, which are used to configure app policies in the UI.
+
+---
+
+## Platform Features
+
+### 🐧 Linux Rust Agent (`agent/`)
+*   **D-Bus Enforced Controls**: Maps time management actions onto the upstream TimeKpr-nExT D-Bus API.
+*   **Process Restricting**: Uses netlink process monitoring and SIGKILL to enforce allowed and blocked executable lists.
+*   **Seat0 Active Session Reconciliation**: Restricts polkit permissions (software installs, mount removal media, account modifications, system power commands) and blocks terminal access *only* for the user signed into the active desktop session (logind seat0).
+*   **Local DNS Sinkhole**: Blocks domain access at the DNS level for configured users, showing desktop notifications on block.
+*   **Cryptographically Signed Auto-Updates**: Downloads update binaries and verifies them against an embedded Minisign public key before upgrading.
+
+### 🤖 Android Kotlin Agent (`android-agent/`)
+*   **Battery-Efficient Connectivity**: Integrates with Firebase Cloud Messaging (FCM). Instead of maintaining a persistent WebSocket, the server sends FCM wake messages when policy changes are made, prompting the agent to start a brief WebSocket sync session.
+*   **Screen Lockout Overlay**: Displays a persistent overlay banner (`TimeExhaustedOverlay`) when daily limits are exhausted, while allowing phone calls to go through if an active SIM is present.
+*   **Package Suspension**: Suspends non-exempt apps via Device Owner `setPackagesSuspended` during lockout or app restriction windows.
+*   **DNS Filtering VPN**: Runs a local `VpnService` that intercepts DNS queries and blocks blacklisted domains, offering "Request access" alerts.
+*   **AMAPI-Aligned Restrictions**: Restricts system options (disable camera, microphone, screen capture, USB data transfer, bluetooth, app installs/uninstalls, and developer settings) and applies custom parent messages.
+*   **Remote Factory Reset**: Supports remote data wiping (`wipeData`) from the parent dashboard when provisioned as Device Owner.
+
+### 🛠️ Server & Database Engine (`server/`)
+*   **Multi-Database Support**: Fully compatible with SQLite and PostgreSQL out-of-the-box.
+*   **Zero-Downtime Migration Helper**: Auto-detects local SQLite files on boot, migrates all tables to PostgreSQL in memory-efficient chunked batches (10,000 rows, OOM-safe) in topological order, updates Alembic status, and cleans up old database files.
+*   **Database Schema Versioning**: Powered by Flask-Migrate & Alembic for programmatic database upgrades on app launch.
+*   **Timezone-Aware Consistency**: Fully timezone-aware date and time tracking across all schema models (`DateTime(timezone=True)`) to support global scheduling without offset bugs.
+*   **Separated Worker Threading**: A dedicated worker (`task_worker.py`) handles external blocklist syncs, domain policy updates, and FCM pushes to prevent blocking Gunicorn workers.
 
 ---
 
 ## 1. Server Deployment
 
-1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/adambie/timekpr-webui.git
-   cd timekpr-webui
-   ```
+### Prerequisites
+*   Docker and Docker Compose.
+*   (For Android Provisioning) `apksigner` in `ANDROID_HOME` or `~/Android/Sdk/build-tools` on the server host to automatically sign release APKs during dev provisioning.
 
-2. **Configure the environment:**
-   Set a strong bootstrap token, timezone, and database URL. You can configure `DATABASE_URL` to point to a PostgreSQL server to enable native high-performance PostgreSQL backend execution. You can also enable an optional registration firewall token to stop unknown clients from creating pending device records.
-   ```yaml
-   environment:
-     - TZ=Europe/London
-     - AGENT_TOKEN=replace-with-a-long-random-bootstrap-token
-     # Optional: configure PostgreSQL connection at runtime
-     # - DATABASE_URL=postgresql://user:password@postgres-host:5432/dbname
-     # Optional: require new clients to know this extra pairing token
-     # - REGISTRATION_TOKEN=replace-with-a-second-random-token
-   ```
-
-3. **Start the server stack:**
-   ```bash
-   docker-compose up -d --build
-   ```
-   The Compose file starts:
-   - `web`: the Flask/Gunicorn UI on port `5000`
-   - `tasks`: a dedicated background worker for sync, blocklist refreshes, and alert delivery
-
-   Running background work in a separate process prevents large sync jobs from stalling or timing out the Gunicorn web worker.
-
-4. **Expose the Web UI and WebSocket endpoint securely:**
-   Prefer terminating TLS in a reverse proxy and pointing clients at `wss://YOUR_HOST/ws`.
-
-   Use `ws://SERVER_IP:5000/ws` only on a trusted local network or for testing. Without TLS, the client does not authenticate the server, so an on-path attacker could spoof the server and send allowed commands to the agent.
-
-5. **Initialize credentials:**
-   Browse to the Web UI, sign in with the default admin account, and change it immediately:
-   - **Username**: `admin`
-   - **Password**: `admin`
+### Docker Compose Run (Recommended)
+1.  **Clone the Repository**:
+    ```bash
+    git clone https://github.com/adambie/timekpr-webui.git
+    cd timekpr-webui
+    ```
+2.  **Configure `.env`**:
+    Copy `.env.example` to `.env` and configure your settings:
+    ```env
+    TZ=Europe/London
+    AGENT_TOKEN=your-random-bootstrap-token
+    # Optional pairing firewall token
+    REGISTRATION_TOKEN=your-pairing-token
+    # Optional Database (defaults to SQLite if commented out)
+    # DATABASE_URL=postgresql://user:password@postgres-host:5432/dbname
+    # Optional FCM Integration for Android Agent
+    # FIREBASE_CREDENTIALS_JSON=instance/firebase_service_account.json
+    ```
+3.  **Start the Stack**:
+    ```bash
+    docker-compose up -d --build
+    ```
+    This launches the Flask application (`web`) and the background task worker (`tasks`).
+4.  **Log In**:
+    Navigate to the dashboard and log in with default credentials. Change the password immediately:
+    *   **Username**: `admin`
+    *   **Password**: `admin`
 
 ---
 
 ## 2. Client Agent Deployment
 
-Run the following on each client machine that already has TimeKpr-nExT installed.
-
-### Option A: Install From the Latest GitHub Release
-
-The repository includes `scripts/install-agent.sh`, which downloads the correct release asset for the machine architecture, installs the binary, writes a root-only config file, and installs a systemd service.
-
-Download the script, review it, then run it:
+### Option A: Linux Agent (Automatic script)
+We provide an interactive script `install-agent.sh` that detects your architecture, downloads the release, writes the root config, and registers the systemd service.
 
 ```bash
 curl -fsSLo /tmp/install-timekpr-agent.sh \
   https://raw.githubusercontent.com/pantherale0/timekpr-webui/master/scripts/install-agent.sh
 chmod 0755 /tmp/install-timekpr-agent.sh
-sudo /tmp/install-timekpr-agent.sh --server-url "wss://timekpr.example.com/ws"
+
+# Run the installer
+sudo /tmp/install-timekpr-agent.sh --server-url "wss://your-domain.com/ws"
 ```
+#### Options:
+*   `--server-url`: Public URL of your server's WebSocket endpoint.
+*   `--agent-token-file`: Path to a file containing the bootstrap `AGENT_TOKEN`.
+*   `--registration-token-file`: Path to a file containing the `REGISTRATION_TOKEN`.
+*   `--replace-agent-token`: Re-writes the per-device secret (for repair/re-enrolling).
 
-The installer prompts for the bootstrap `AGENT_TOKEN` if it is not already present in `/etc/timekpr-agent/config.json`. You can also provide values non-interactively:
+### Option B: Android Agent (Pairing & Provisioning)
 
+#### 1. In-App QR Code Pairing
+Use this flow if the agent application is already installed on the target device:
+1.  Navigate to **Settings → Agent pairing** in the Web UI.
+2.  Open the TimeKpr agent app on the phone, choose **Scan server QR code**, and scan the displayed QR code.
+3.  Approve the device in **Admin → Devices**. The agent receives a per-device token and establishes secure communications.
+
+#### 2. Android MDM Provisioning QR (Zero-Touch Device Owner)
+To block app uninstalls and lock down settings completely, the agent must be set as the **Device Owner**. On a factory-reset device:
+1.  Navigate to **Settings → Agent pairing → Android MDM provisioning QR** on the server.
+2.  Tap the welcome screen of the factory-reset device 6 times to activate the QR scanner.
+3.  Scan the displayed MDM QR code.
+4.  The device downloads the APK, sets it as Device Owner, applies the server WebSocket URL, and opens a pending connection. Approve the device under **Admin → Devices**.
+
+*For local testing without release assets*, compile the release APK locally and upload it on the MDM QR page:
 ```bash
-sudo /tmp/install-timekpr-agent.sh \
-  --server-url "wss://timekpr.example.com/ws" \
-  --agent-token-file /root/timekpr-bootstrap-token.txt \
-  --registration-token-file /root/timekpr-registration-token.txt
+cd android-agent
+./gradlew assembleRelease
 ```
 
-Notes:
+---
 
-- The script preserves an existing `agent_token` by default so that upgrades do not overwrite the per-device secret stored after approval.
-- Use `--replace-agent-token` only when you intentionally want to reconfigure the client token.
-- The script downloads GitHub release assets over HTTPS. If you require stronger release provenance, publish signed checksums or build from source instead.
-- If you are testing from a checkout before the first tagged release exists, use the manual build flow below.
+### Option C: Python Debug Agent (Simulator)
+For developers testing policies, schedule synchronizations, or alerts without physical devices:
 
-### Option B: Build the Agent From Source
-
-1. **Compile the agent:**
-   ```bash
-   cd agent
-   cargo build --release
-   ```
-
-2. **Install the binary:**
-   ```bash
-   sudo install -d -m 0755 /usr/local/bin
-   sudo install -m 0755 target/release/timekpr-agent /usr/local/bin/timekpr-agent
-   ```
-
-3. **Create the configuration directory with root-only access:**
-   ```bash
-   sudo install -d -m 0700 -o root -g root /etc/timekpr-agent
-   ```
-
-4. **Create `/etc/timekpr-agent/config.json`:**
-   ```json
-   {
-     "server_url": "wss://YOUR_HOST/ws",
-     "system_id": null,
-     "registration_token": "optional-registration-firewall-token",
-     "agent_token": "your-bootstrap-agent-token"
-   }
-   ```
-
-5. **Lock down the config file permissions:**
-   ```bash
-   sudo chown root:root /etc/timekpr-agent/config.json
-   sudo chmod 0600 /etc/timekpr-agent/config.json
-   ```
-
-6. **Start the agent once to generate a host UUID:**
-   ```bash
-   sudo /usr/local/bin/timekpr-agent
-   ```
-
-   On first launch, the agent generates and persists a unique `system_id`. It also reports the machine hostname to the server so the admin UI can show a readable device name:
-
-   ```text
-   ------------------------------------------------------------
-   GENERATE NEW HOST UUID: 8f88c3a1-7ab3-4b68-b7eb-116b47cbf2fb
-   PLEASE REGISTER THIS HOST UUID IN THE SERVER WEB UI PANEL!
-   ------------------------------------------------------------
-   ```
-
-7. **Install the systemd service:**
-   Create `/etc/systemd/system/timekpr-agent.service`:
-   ```ini
-   [Unit]
-   Description=Timekpr WebSocket Client Agent
-   After=network-online.target
-   Wants=network-online.target
-
-   [Service]
-   Type=simple
-   User=root
-   Group=root
-   UMask=0077
-   ExecStart=/usr/local/bin/timekpr-agent
-   Restart=always
-   RestartSec=5
-
-   [Install]
-   WantedBy=multi-user.target
-   ```
-
-   Then enable and start it:
-
-   ```bash
-   sudo systemctl daemon-reload
-   sudo systemctl enable timekpr-agent.service
-   sudo systemctl start timekpr-agent.service
-   ```
-
-### Option C: Run the Python Debug Agent
-
-If you want to debug server-side flows without a separate Linux client, TimeKpr D-Bus, or a second computer on the network, the repository includes a lightweight Python simulator at `server/debug_agent.py`.
-
-It speaks the same WebSocket protocol as the Rust agent, persists its state in a JSON file, auto-creates users on first validation by default, and supports the server actions used for:
-
-- user validation
-- time-left adjustments
-- weekly schedule sync
-- allowed-hours sync
-- domain-policy sync
-- AppArmor policy sync
-
-Run it from the repository checkout:
-
-```bash
-cd server
-pip install -r requirements.txt
-python debug_agent.py --server-url "ws://127.0.0.1:5000/ws" --agent-version "v0.10"
-```
-
-Notes:
-
-- The script creates `server/debug-agent.json` automatically and stores the generated `system_id`, paired `agent_token`, fake user state, and synced policy state there.
-- A fresh config starts with three fake users (`alice`, `bob`, and `charlie`) so validation, schedule sync, and time adjustments have something to operate on immediately.
-- On first start, the server will usually register it as a pending device. Approve it in the admin UI once, and the script will store the issued device token and reconnect automatically.
-- After the first successful authentication, it also sends a small one-shot set of synthetic alerts so the device and alert views have sample activity to inspect.
-- Once authenticated, the connection now stays open and the agent emits a random synthetic alert or policy-sync check on a timer. Use `--activity-interval 5` to make it chattier during debugging, or `--activity-interval 0` to disable that background traffic.
-- The `agent_version` must match the server version reported by the running server, just like the Rust agent.
-- Add `--strict-users` if you want validation to fail for usernames that are not already present in the JSON state file.
-- Add `--emit-startup-alert` if you also want to exercise the alert-ingest path on each successful authentication.
-
-### Important Token Lifecycle Notes
-
-- `AGENT_TOKEN` on the server is a **bootstrap token** used to enroll or recover clients before approval.
-- After a device is approved, the server generates a **device-specific secret** and sends it to that agent. The agent stores that new secret back into `/etc/timekpr-agent/config.json`.
-- After approval, the client `agent_token` will usually **no longer match** the server-wide `AGENT_TOKEN`. That is expected.
-- If a client's config file is exposed, treat the stored `agent_token` as compromised. Reject and re-approve the device to mint a new per-device secret.
+1.  Navigate to the `server/` directory:
+    ```bash
+    cd server
+    pip install -r requirements.txt
+    ```
+2.  Start the debug agent:
+    ```bash
+    python debug_agent.py --server-url "ws://127.0.0.1:5000/ws" --agent-version "v0.0.0-dev"
+    ```
+#### Debug Agent CLI Options:
+*   `--strict-users`: Rejects validation requests for user profiles not configured in the local `debug-agent.json`.
+*   `--emit-startup-alert`: Sends synthetic alerts immediately upon successful handshake.
+*   `--activity-interval <seconds>`: Sends a mock alert or policy check on a set interval (default: random). Use `0` to disable background traffic.
 
 ---
 
-## 3. Approve Devices and Map Users
+## Policy and Restriction Matrix
 
-1. Start the agent and open the Web UI.
-2. In the admin panel, approve the pending device. The UI shows the hostname when available, and appends the final two UUID characters if multiple devices share the same hostname.
-3. Add or map users to the approved device entry. Internally, mappings still use the stable `system_id`.
-4. Once the device is approved, the next successful challenge-response handshake marks it online and ready for remote actions.
+The Web UI manages policies that map differently onto each OS layer:
 
----
-
-## 4. Manual Server Setup (Without Docker)
-
-1. **Install Python dependencies:**
-   ```bash
-   cd server
-   pip install -r requirements.txt
-   ```
-
-2. **Set environment variables:**
-   ```bash
-   export AGENT_TOKEN="replace-with-a-long-random-bootstrap-token"
-   export TZ="Europe/London"
-   # Optional:
-   # export REGISTRATION_TOKEN="replace-with-a-second-random-token"
-   ```
-
-3. **Start the Flask web application:**
-   ```bash
-   python app.py
-   ```
-
-4. **Start the background task worker in a separate process:**
-   ```bash
-   python task_worker.py
-   ```
-
-   Do not run the background task manager inside a Gunicorn worker process. Keeping it separate prevents long-running blocklist refreshes and other sync work from taking down the web worker.
-
-5. **Still place it behind TLS if clients connect across anything other than a trusted local network.**
+| Policy Area | Linux Agent (Rust) | Android Agent (Kotlin) |
+|---|---|---|
+| **Daily Limits & Schedule** | Enforced via TimeKpr-nExT system D-Bus. | Enforced via local `UsageMonitorService` tracking screen state. |
+| **Lockout Action** | Handled by TimeKpr-nExT logind session locking. | Displays fullscreen `TimeExhaustedOverlay`; suspends all non-exempt packages. |
+| **App Execution** | Netlink process monitor sends `SIGKILL` to blocked binaries. | Device Owner suspends packages via `setPackagesSuspended()`. |
+| **App Approval Mode** | Kills unapproved paths; requests logged in the Web UI. | Launches Request Access overlays; blocks startup of unapproved packages. |
+| **Domain Blocklists** | Local DNS resolution sinkhole per user. | Runs a local loopback `VpnService` with custom DNS filtering. |
+| **Hardware Restrictions** | rfkill blocks Bluetooth; polkit rules block removable media. | Disables Camera, Microphone, Bluetooth, and USB data transfer. |
+| **System Restrictions** | polkit restricts package managers (apt, snap, flatpak). | Blocks app installation/uninstallation and developer settings. |
 
 ---
 
-## Security Configuration
+## Configuration Variables
 
-- **Use `wss://` whenever possible**: The HMAC handshake prevents simple replay and keeps the token out of the handshake itself, but it does not replace TLS. Without TLS, the client cannot authenticate the server.
-- **Protect `/etc/timekpr-agent/config.json`**: Keep it owned by `root:root` with mode `0600`. That file contains either the bootstrap token or, after approval, the per-device secret used for authentication.
-- **Consider enabling `REGISTRATION_TOKEN`**: This optional second secret blocks unauthorized clients from creating new pending device entries.
-- **Do not expose port `5000` directly to the internet without a reverse proxy**: Restrict access to trusted clients or terminate HTTPS/WSS in front of the app.
-- **Change the default admin password immediately**: The default `admin` / `admin` credentials are only for first boot.
-- **Understand the command model**: The agent only handles a fixed allow-list of TimeKpr-related commands, but those commands are privileged and the service normally runs as `root`.
-- **Treat release downloads as transport-authenticated, not content-signed**: The install script uses GitHub Releases over HTTPS. If you need cryptographic artifact verification, publish checksums/signatures or build locally.
+Configure these variables inside your docker compose environment or export them in your terminal session:
+
+| Variable | Description | Default / Requirement |
+|---|---|---|
+| `AGENT_TOKEN` | Server bootstrap token. Used to establish the first pairing handshake. | **Required** |
+| `REGISTRATION_TOKEN` | Optional firewall token. Restricts pairing requests to authorized agents. | Optional |
+| `DATABASE_URL` | SQLAlchemy URI (e.g. `postgresql://...` or `sqlite:///timekpr.db`). | SQLite file fallback |
+| `TZ` | System timezone (e.g. `Europe/London`). | UTC |
+| `TIMEKPR_SERVER_VERSION` | Version indicator for server-agent handshake validations. | `v0.0.0-dev` |
+| `TIMEKPR_AGENT_WS_URL` | Public WebSockets endpoint URL shown in pairing QR codes. | Auto-resolved |
+| `FCM_SERVER_KEY` | Firebase legacy HTTP API server key. | Optional |
+| `FIREBASE_CREDENTIALS_JSON` | Path or JSON string for Firebase HTTP v1 service accounts. | Optional |
+
+---
+
+## Security Recommendations
+
+1.  **Always Terminate TLS**: Handshakes avoid plain-text token exchanges, but payloads (such as commands or configuration updates) require transport security. Point agents to a `wss://` endpoint backed by a secure reverse proxy (e.g. Nginx, Caddy, Traefik).
+2.  **Lock Config Permissions**: Keep the `/etc/timekpr-agent/config.json` file on client machines owned by `root:root` with permissions set to `0600`.
+3.  **Use a Registration Token**: Enabling `REGISTRATION_TOKEN` prevents rogue devices on the network from generating spam pending approval requests on the dashboard.
+4.  **Understand the Token Lifecycle**: The bootstrap `AGENT_TOKEN` is only used for pairing. Once approved, the agent config updates to a per-device token. If a client configuration file is leaked, revoke and delete that device mapping in the Web UI.
 
 ---
 
 ## Troubleshooting
 
-- **Agent remains offline in the dashboard**:
-  - Verify that `server_url` points to the correct server and path, preferably `wss://YOUR_HOST/ws`.
-  - For a new or re-paired client, verify that `agent_token` matches the server `AGENT_TOKEN`.
-  - If `REGISTRATION_TOKEN` is enabled on the server, make sure the client config includes the matching `registration_token`.
-  - If the device was already approved, do not replace the config token with the bootstrap token unless you are intentionally re-pairing it.
-  - Check the service logs: `journalctl -u timekpr-agent.service -n 50 --no-pager`
+### Agent remains offline in dashboard
+*   Check client logs:
+    ```bash
+    # Linux
+    journalctl -u timekpr-agent.service -n 50 --no-pager
+    ```
+*   Verify the endpoint is accessible from the client: `curl -i http://<your-server-ip>:5000/ws`
+*   Ensure that the `agent_version` of your agent matches the server's version. If running a development server (`v0.0.0-dev`), it will bypass version mismatch blocks.
 
-- **Commands are not applied**:
-  - Ensure the agent service is running as `root`, because TimeKpr administrative changes require elevated privileges.
-  - Confirm that TimeKpr-nExT is installed and the `com.timekpr.server` system-bus service is reachable on the client.
-  - Review recent agent logs for D-Bus or permission errors.
+### Policy adjustments do not sync (Android)
+*   Ensure the background task worker (`task_worker.py`) is running.
+*   If testing without FCM configured, policy updates will not be pushed instantly when the device is idle; they will sync during the WorkManager periodic cycle (every 4 hours) or when the app is manually opened.
+
+### CI/CD Release Signing Failures
+*   **Linux Agent Signing (`Missing encoded key in secret key`)**: Make sure your `TIMEKPR_AGENT_UPDATE_SIGNING_KEY` secret contains the complete multi-line content of your unencrypted Minisign secret key file (including the `untrusted comment:` header). See [linux-agent.md](docs/linux-agent.md#generating-keys-for-cicd) for key generation steps.
+*   **Android Agent Signing (`unsigned APK / check keystore secrets`)**: Ensure that `ANDROID_KEYSTORE_BASE64` contains the full Base64-encoded output of your `.keystore` file, and that password/alias values match exactly. See [android-agent.md](docs/android-agent.md#generating-and-encoding-the-keystore-for-cicd) for keystore setup steps.
 
 ---
 
 ## License
 
-MIT License. See `LICENSE` for details.
-
-## Acknowledgements
-
-- Works in tandem with [Timekpr-nExT](https://mjasnik.gitlab.io/timekpr-next/), a parental control tool for Linux.
-- Built with Flask, Flask-Sock, gevent, and Rust.
+This project is licensed under the MIT License. See `LICENSE` for details.

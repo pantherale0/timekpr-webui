@@ -122,6 +122,34 @@ Release CI publishes the checksum asset when these GitHub Actions secrets are co
 - `ANDROID_KEY_ALIAS`
 - `ANDROID_KEY_PASSWORD`
 
+### Generating and Encoding the Keystore for CI/CD
+
+To generate a keystore and convert it to Base64 for GitHub Secrets:
+
+1. **Generate the Keystore File**:
+   Use Java's `keytool` to generate a new key pair in a keystore:
+   ```bash
+   keytool -genkeypair -v \
+     -keystore release.keystore \
+     -alias timekpr-alias \
+     -keyalg RSA \
+     -keysize 2048 \
+     -validity 10000
+   ```
+   Provide a keystore password and key password when prompted.
+
+2. **Encode the Keystore File to Base64**:
+   Convert the generated binary `.keystore` file to a single Base64-encoded string:
+   ```bash
+   base64 -w 0 release.keystore > keystore_base64.txt
+   ```
+
+3. **Configure the GitHub Repository Secrets**:
+   - `ANDROID_KEYSTORE_BASE64`: Paste the entire content of `keystore_base64.txt`.
+   - `ANDROID_KEYSTORE_PASSWORD`: The password you set for the keystore.
+   - `ANDROID_KEY_ALIAS`: The alias you used (e.g., `timekpr-alias`).
+   - `ANDROID_KEY_PASSWORD`: The password you set for the specific key alias.
+
 Local release signing uses the same variables via `ANDROID_KEYSTORE_PATH` or `android.keystore.*` Gradle properties.
 
 ## Required permissions
