@@ -31,7 +31,7 @@ android {
 
     defaultConfig {
         applicationId = "com.timekpr.agent"
-        minSdk = 26
+        minSdk = 24
         targetSdk = 35
         versionCode = versionCodeFromTag(releaseAgentVersion)
         versionName = versionNameFromTag(releaseAgentVersion)
@@ -70,6 +70,7 @@ android {
     }
 
     compileOptions {
+        isCoreLibraryDesugaringEnabled = true
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
@@ -80,6 +81,7 @@ android {
 }
 
 dependencies {
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
     implementation("androidx.core:core-ktx:1.15.0")
     implementation("androidx.appcompat:appcompat:1.7.0")
     implementation("com.google.android.material:material:1.12.0")

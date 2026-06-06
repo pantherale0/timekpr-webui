@@ -9,6 +9,7 @@ import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import com.timekpr.agent.R
@@ -209,12 +210,14 @@ class UsageMonitorService : Service() {
     }
 
     private fun createNotificationChannel() {
-        val channel = NotificationChannel(
-            CHANNEL_ID,
-            "TimeKpr Usage Monitor",
-            NotificationManager.IMPORTANCE_LOW,
-        )
-        getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                CHANNEL_ID,
+                "TimeKpr Usage Monitor",
+                NotificationManager.IMPORTANCE_LOW,
+            )
+            getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
+        }
     }
 
     companion object {
@@ -222,7 +225,11 @@ class UsageMonitorService : Service() {
         private const val NOTIFICATION_ID = 1003
 
         fun start(context: Context) {
-            context.startForegroundService(Intent(context, UsageMonitorService::class.java))
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                context.startForegroundService(Intent(context, UsageMonitorService::class.java))
+            } else {
+                context.startService(Intent(context, UsageMonitorService::class.java))
+            }
         }
     }
 }

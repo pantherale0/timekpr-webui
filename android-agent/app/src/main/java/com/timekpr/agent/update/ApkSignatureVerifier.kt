@@ -5,7 +5,7 @@ import android.content.pm.Signature
 import android.os.Build
 import java.io.File
 import java.security.MessageDigest
-import java.util.Base64
+import android.util.Base64
 
 object ApkSignatureVerifier {
     /**
@@ -18,7 +18,7 @@ object ApkSignatureVerifier {
     }
 
     fun encodeUrlSafeBase64(raw: ByteArray): String {
-        return Base64.getUrlEncoder().withoutPadding().encodeToString(raw)
+        return Base64.encodeToString(raw, Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING)
     }
 
     fun hexDigestToChecksum(hexDigest: String): String {

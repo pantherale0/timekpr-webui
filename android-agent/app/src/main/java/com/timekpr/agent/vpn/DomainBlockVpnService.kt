@@ -84,8 +84,11 @@ class DomainBlockVpnService : VpnService() {
             .setSession("TimeKpr Web Policy")
             .addAddress(VPN_ADDRESS, VPN_PREFIX)
             .setBlocking(true)
-            .setMetered(false)
             .allowFamily(android.system.OsConstants.AF_INET)
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            builder.setMetered(false)
+        }
 
         for (dnsServer in dnsServers) {
             val host = dnsServer.hostAddress ?: continue
@@ -209,12 +212,14 @@ class DomainBlockVpnService : VpnService() {
     }
 
     private fun createNotificationChannel() {
-        val channel = NotificationChannel(
-            CHANNEL_ID,
-            "TimeKpr VPN",
-            NotificationManager.IMPORTANCE_LOW,
-        )
-        getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                CHANNEL_ID,
+                "TimeKpr VPN",
+                NotificationManager.IMPORTANCE_LOW,
+            )
+            getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
+        }
     }
 
     companion object {
@@ -246,7 +251,11 @@ class DomainBlockVpnService : VpnService() {
             val upstreamNetwork = VpnNetworkCapture.findUnderlyingNetwork(context)
             val serviceIntent = Intent(context, DomainBlockVpnService::class.java)
                 .putExtra(EXTRA_UPSTREAM_NETWORK, upstreamNetwork)
-            context.startForegroundService(serviceIntent)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                context.startForegroundService(serviceIntent)
+            } else {
+                context.startService(serviceIntent)
+            }
         }
 
         private fun setAlwaysOnVpnIfDeviceOwner(context: Context) {
