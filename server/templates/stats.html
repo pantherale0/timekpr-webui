@@ -599,7 +599,7 @@
         
         const card = document.getElementById('app-usage-card');
         if (card) {
-            card.classList.remove('d-none');
+            card.style.display = '';
         }
         document.getElementById('app-usage-loading').style.display = 'block';
         document.getElementById('app-usage-container').style.display = 'none';
@@ -724,10 +724,10 @@
         if (!card) return;
 
         if (state.appsData.length === 0) {
-            card.classList.add('d-none');
+            card.style.display = 'none';
             return;
         }
-        card.classList.remove('d-none');
+        card.style.display = '';
 
         const tbody = document.getElementById('app-usage-tbody');
         const searchVal = state.appSearch.toLowerCase().trim();
@@ -736,13 +736,13 @@
             app.executable_path.toLowerCase().includes(searchVal)
         );
 
-        if (state.appsData.length === 0) {
-            document.getElementById('app-usage-container').classList.add('d-none');
+        if (filteredApps.length === 0) {
+            document.getElementById('app-usage-container').style.display = 'none';
             document.getElementById('app-usage-empty').style.display = 'block';
             return;
         }
 
-        document.getElementById('app-usage-container').classList.remove('d-none');
+        document.getElementById('app-usage-container').style.display = '';
         document.getElementById('app-usage-empty').style.display = 'none';
 
         const totalSecs = state.appsData.reduce((acc, app) => acc + app.total_seconds, 0);
