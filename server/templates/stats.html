@@ -5,6 +5,177 @@
 {% block extra_head %}
 <!-- Include Chart.js for analytics tab visualization -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+<style>
+    /* Premium visual styles for filter dropdown */
+    .date-preset-btn {
+        border: none;
+        background: transparent;
+        color: var(--bs-body-color);
+        border-radius: 4px;
+        transition: all 0.15s ease;
+        text-align: left;
+    }
+    .date-preset-btn:hover {
+        background-color: var(--bs-secondary-bg);
+    }
+    .date-preset-btn.active {
+        background-color: var(--bs-primary);
+        color: #fff !important;
+    }
+    /* App usage list container */
+    .app-icon-img {
+        width: 32px;
+        height: 32px;
+        object-fit: contain;
+        border-radius: 6px;
+        background-color: var(--bs-secondary-bg);
+        padding: 2px;
+    }
+    .app-icon-placeholder {
+        width: 32px;
+        height: 32px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 6px;
+        background-color: var(--bs-secondary-bg);
+        font-weight: bold;
+        color: var(--bs-secondary-color);
+    }
+    .app-progress-bar {
+        height: 4px;
+        border-radius: 2px;
+        background-color: var(--bs-secondary-bg);
+        overflow: hidden;
+    }
+    .app-progress-fill {
+        height: 100%;
+        background-color: var(--bs-primary);
+        border-radius: 2px;
+        transition: width 0.6s ease;
+    }
+    /* Timeline adjustments */
+    .timeline {
+        margin: 0 0 30px 0;
+        padding: 0;
+        position: relative;
+    }
+    .timeline::before {
+        border-radius: 4px;
+        content: "";
+        bottom: 0;
+        left: 31px;
+        position: absolute;
+        top: 0;
+        width: 4px;
+        background-color: var(--bs-border-color);
+    }
+    .timeline > div {
+        margin-right: 10px;
+        margin-bottom: 15px;
+        position: relative;
+    }
+    .timeline > div::after, .timeline > div::before {
+        content: "";
+        display: table;
+    }
+    .timeline > div > .timeline-item {
+        border-radius: 8px;
+        background-color: var(--bs-card-bg) !important;
+        color: var(--bs-card-color) !important;
+        border: 1px solid var(--bs-border-color) !important;
+        margin-left: 60px;
+        margin-right: 15px;
+        padding: 0;
+        position: relative;
+    }
+    .timeline > div > .timeline-item > .time {
+        color: var(--bs-secondary-color) !important;
+        float: right;
+        font-size: 12px;
+        padding: 10px;
+    }
+    .timeline > div > .timeline-item > .timeline-header {
+        border-bottom: 1px solid var(--bs-border-color) !important;
+        color: var(--bs-body-color) !important;
+        font-size: 16px;
+        line-height: 1.1;
+        margin: 0;
+        padding: 10px;
+    }
+    .timeline > div > .timeline-item > .timeline-body {
+        padding: 10px;
+        background-color: transparent !important;
+        color: var(--bs-body-color) !important;
+    }
+    .timeline > div > .timeline-item > .timeline-footer {
+        padding: 10px;
+        background-color: var(--bs-secondary-bg) !important;
+        border-top: 1px solid var(--bs-border-color) !important;
+        color: var(--bs-secondary-color) !important;
+    }
+    .timeline > div > i {
+        background-color: var(--bs-secondary-bg);
+        border-radius: 50%;
+        font-size: 16px;
+        height: 30px;
+        left: 18px;
+        line-height: 30px;
+        position: absolute;
+        text-align: center;
+        top: 0;
+        width: 30px;
+        color: var(--bs-body-color);
+        box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+    }
+    .timeline > .time-label > span {
+        border-radius: 4px;
+        display: inline-block;
+        font-weight: 600;
+        padding: 5px 10px;
+    }
+    /* Skeleton loading animation */
+    .skeleton-loader {
+        background: linear-gradient(90deg, var(--bs-secondary-bg) 25%, var(--bs-border-color) 50%, var(--bs-secondary-bg) 75%);
+        background-size: 200% 100%;
+        animation: loading-pulse 1.5s infinite;
+        border-radius: 4px;
+    }
+    @keyframes loading-pulse {
+        0% { background-position: 200% 0; }
+        100% { background-position: -200% 0; }
+    }
+</style>
+{% endblock %}
+
+{% block top_nav_extra %}
+<!-- Global Advanced Date Range Dropdown in top header -->
+<li class="nav-item dropdown me-2">
+    <button class="btn btn-sm btn-outline-secondary dropdown-toggle d-flex align-items-center gap-1 fw-bold" id="dateFilterDropdown" type="button" data-bs-toggle="dropdown" aria-expanded="false" data-bs-auto-close="outside">
+        <i class="fas fa-calendar-alt text-primary"></i> <span id="current-date-range-label">Last 7 Days</span>
+    </button>
+    <div class="dropdown-menu dropdown-menu-end p-3 shadow border" style="width: 280px; font-family: inherit; z-index: 1050;">
+        <h6 class="dropdown-header px-0 mb-2 fw-bold text-uppercase tracking-wider" style="font-size: 0.7rem; color: var(--bs-secondary-color);">Select Period</h6>
+        <div class="d-flex flex-column gap-1 mb-2">
+            <button class="btn btn-sm text-start py-1.5 px-2 fw-semibold date-preset-btn" data-preset="today">Today</button>
+            <button class="btn btn-sm text-start py-1.5 px-2 fw-semibold date-preset-btn" data-preset="yesterday">Yesterday</button>
+            <button class="btn btn-sm text-start py-1.5 px-2 fw-semibold date-preset-btn active" data-preset="7days">Last 7 Days</button>
+            <button class="btn btn-sm text-start py-1.5 px-2 fw-semibold date-preset-btn" data-preset="30days">Last 30 Days</button>
+            <button class="btn btn-sm text-start py-1.5 px-2 fw-semibold date-preset-btn" data-preset="thismonth">This Month</button>
+        </div>
+        <div class="dropdown-divider"></div>
+        <h6 class="dropdown-header px-0 my-2 fw-bold text-uppercase tracking-wider" style="font-size: 0.7rem; color: var(--bs-secondary-color);">Custom Range</h6>
+        <div class="mb-2">
+            <label class="form-label small fw-bold text-secondary mb-1">Start Date</label>
+            <input type="date" id="filter-start-date" class="form-control form-control-sm">
+        </div>
+        <div class="mb-3">
+            <label class="form-label small fw-bold text-secondary mb-1">End Date</label>
+            <input type="date" id="filter-end-date" class="form-control form-control-sm">
+        </div>
+        <button id="apply-custom-date" class="btn btn-sm btn-primary w-100 py-1.5 fw-bold">Apply Custom Range</button>
+    </div>
+</li>
 {% endblock %}
 
 {% block content %}
@@ -43,208 +214,121 @@
         </div>
     </div>
 
-    <!-- Period Tabs using Bootstrap Nav Pills -->
+    <!-- Daily usage trend chart -->
     <div class="card shadow-sm border mb-4">
-        <div class="card-body p-2">
-            <ul class="nav nav-pills nav-fill gap-1" id="periodTabs" role="tablist">
-                <li class="nav-item">
-                    <button class="nav-link active fw-bold small py-2 period-tab" data-period="daily" type="button">Last 30 Days</button>
-                </li>
-                <li class="nav-item">
-                    <button class="nav-link fw-bold small py-2 period-tab" data-period="weekly" type="button">Last 3 Months</button>
-                </li>
-                <li class="nav-item">
-                    <button class="nav-link fw-bold small py-2 period-tab" data-period="monthly" type="button">Last 12 Months</button>
-                </li>
-                <li class="nav-item">
-                    <button class="nav-link fw-bold small py-2 period-tab" data-period="alltime" type="button">All Time</button>
-                </li>
-            </ul>
-        </div>
-    </div>
-
-    <!-- Chart Panels Redesigned -->
-    <div class="card shadow-sm border mb-4 chart-panel active" id="panel-daily">
-        <div class="card-header py-3 bg-body-secondary">
-            <h6 class="mb-0 fw-bold text-secondary text-uppercase tracking-wider" style="font-size: 0.75rem; letter-spacing: 0.05em;">Daily usage &mdash; last 30 days</h6>
+        <div class="card-header py-3 bg-body-secondary d-flex justify-content-between align-items-center">
+            <h6 class="mb-0 fw-bold text-secondary text-uppercase tracking-wider" style="font-size: 0.75rem; letter-spacing: 0.05em;">Daily usage trend</h6>
+            <div id="trend-period-label" class="small text-muted fw-bold"></div>
         </div>
         <div class="card-body">
-            {% if daily_30 %}
-                <div class="chart-wrapper" style="height: 280px; position: relative;"><canvas id="chart-daily"></canvas></div>
-            {% else %}
-                <div class="text-center text-secondary py-5">No usage records found.</div>
-            {% endif %}
+            <div id="chart-loading" class="text-center py-5" style="display: none;">
+                <div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div>
+                <span class="small text-secondary fw-semibold">Loading chart trend...</span>
+            </div>
+            <div id="chart-wrapper" style="height: 280px; position: relative;">
+                <canvas id="chart-daily-trend"></canvas>
+            </div>
         </div>
     </div>
 
-    <div class="card shadow-sm border mb-4 chart-panel" id="panel-weekly" style="display: none;">
+    <!-- Per-Application Usage Card -->
+    <div id="app-usage-card" class="card shadow-sm border mb-4">
         <div class="card-header py-3 bg-body-secondary">
-            <h6 class="mb-0 fw-bold text-secondary text-uppercase tracking-wider" style="font-size: 0.75rem; letter-spacing: 0.05em;">Weekly totals &mdash; last 13 weeks</h6>
+            <h5 class="mb-0 fw-bold">Per-Application Usage</h5>
+            <span class="text-secondary small fw-medium">Time spent inside verified active applications for the selected period</span>
         </div>
         <div class="card-body">
-            {% if weekly_13 %}
-                <div class="chart-wrapper" style="height: 280px; position: relative;"><canvas id="chart-weekly"></canvas></div>
-            {% else %}
-                <div class="text-center text-secondary py-5">No usage records found.</div>
-            {% endif %}
+            <div id="app-usage-loading" class="text-center py-5" style="display: none;">
+                <div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div>
+                <span class="small text-secondary fw-semibold">Loading application analytics...</span>
+            </div>
+            <div id="app-usage-container" class="row g-4 align-items-center">
+                <!-- Left Column: Doughnut Chart -->
+                <div class="col-12 col-md-5 d-flex justify-content-center">
+                    <div style="width: 100%; max-width: 250px; height: 250px; position: relative;">
+                        <canvas id="chart-app-usage"></canvas>
+                    </div>
+                </div>
+                <!-- Right Column: List and search -->
+                <div class="col-12 col-md-7">
+                    <div class="d-flex mb-3">
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text bg-body-secondary border"><i class="fas fa-search"></i></span>
+                            <input type="text" id="app-search-input" class="form-control" placeholder="Search applications...">
+                        </div>
+                    </div>
+                    <div class="table-responsive" style="max-height: 280px; overflow-y: auto;">
+                        <table class="table table-hover align-middle small mb-0">
+                            <thead class="sticky-top" style="background-color: var(--bs-secondary-bg); z-index: 2;">
+                                <tr>
+                                    <th style="width: 8%;"></th>
+                                    <th style="width: 47%;">Application</th>
+                                    <th style="width: 25%;">Platform / Details</th>
+                                    <th style="width: 20%;" class="text-end">Time Spent</th>
+                                </tr>
+                            </thead>
+                            <tbody id="app-usage-tbody">
+                                <!-- Injected dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <div id="app-usage-empty" class="text-center text-secondary py-5 fw-medium" style="display: none;">
+                No application usage records found for this period.
+            </div>
         </div>
     </div>
 
-    <div class="card shadow-sm border mb-4 chart-panel" id="panel-monthly" style="display: none;">
-        <div class="card-header py-3 bg-body-secondary">
-            <h6 class="mb-0 fw-bold text-secondary text-uppercase tracking-wider" style="font-size: 0.75rem; letter-spacing: 0.05em;">Monthly totals &mdash; last 12 months</h6>
-        </div>
-        <div class="card-body">
-            {% if monthly_12 %}
-                <div class="chart-wrapper" style="height: 280px; position: relative;"><canvas id="chart-monthly"></canvas></div>
-            {% else %}
-                <div class="text-center text-secondary py-5">No usage records found.</div>
-            {% endif %}
-        </div>
-    </div>
-
-    <div class="card shadow-sm border mb-4 chart-panel" id="panel-alltime" style="display: none;">
-        <div class="card-header py-3 bg-body-secondary">
-            <h6 class="mb-0 fw-bold text-secondary text-uppercase tracking-wider" style="font-size: 0.75rem; letter-spacing: 0.05em;">All recorded history by month</h6>
-        </div>
-        <div class="card-body">
-            {% if all_monthly %}
-                <div class="chart-wrapper" style="height: 280px; position: relative;"><canvas id="chart-alltime"></canvas></div>
-            {% else %}
-                <div class="text-center text-secondary py-5">No usage records found.</div>
-            {% endif %}
-        </div>
-    </div>
-
-    <!-- Alerts Audits System -->
+    <!-- Unified Activity Timeline -->
     <div class="card shadow-sm border mb-4">
         <div class="card-header py-3 bg-body-secondary d-flex justify-content-between align-items-center flex-wrap gap-2">
             <div>
-                <h5 class="mb-0 fw-bold">Alert Audit Trail</h5>
-                <span class="text-secondary small fw-medium">Log of parent alerts, blocklist violations, and local device events</span>
+                <h5 class="mb-0 fw-bold">Activity Feed</h5>
+                <span class="text-secondary small fw-medium">Chronological feed of device alerts, blocklist violations, and terminal commands</span>
             </div>
-            <div id="alert-summary-stats">
-                <!-- Injected by JS -->
+            <div id="timeline-summary-stats">
+                <!-- Injected dynamically -->
             </div>
         </div>
         <div class="card-body">
-            <!-- toolbar -->
-            <div class="d-flex gap-2 mb-3 flex-wrap align-items-center justify-content-between">
+            <!-- Timeline toolbar -->
+            <div class="d-flex gap-2 mb-4 flex-wrap align-items-center justify-content-between border-bottom pb-3">
                 <div class="d-flex gap-2 flex-wrap flex-grow-1">
-                    <input type="text" id="alert-search-input" class="form-control form-control-sm" placeholder="Search events..." style="max-width: 250px;">
-                    <select id="alert-type-filter" class="form-select form-select-sm" style="max-width: 180px;">
-                        <option value="">All Event Types</option>
-                    </select>
-                    <select id="alert-sort-by" class="form-select form-select-sm" style="max-width: 140px;">
-                        <option value="date">Sort by Date</option>
-                        <option value="type">Sort by Type</option>
-                    </select>
-                    <select id="alert-sort-dir" class="form-select form-select-sm" style="max-width: 100px;">
-                        <option value="desc">Desc</option>
-                        <option value="asc">Asc</option>
+                    <input type="text" id="timeline-search-input" class="form-control form-control-sm" placeholder="Search activities..." style="max-width: 250px;">
+                    <select id="timeline-category-filter" class="form-select form-select-sm" style="max-width: 200px;">
+                        <option value="all">All Activities</option>
+                        <option value="alerts">Alerts Only</option>
+                        <option value="commands">Terminal Commands Only</option>
                     </select>
                 </div>
                 <div>
-                    <button id="alert-prune-btn" class="btn btn-sm btn-outline-danger fw-bold"><i class="fas fa-trash-alt me-1"></i> Prune Old Alerts</button>
+                    <button id="timeline-prune-btn" class="btn btn-sm btn-outline-danger fw-bold"><i class="fas fa-trash-alt me-1"></i> Prune Old Activities</button>
                 </div>
             </div>
 
-            <div id="alerts-loading" class="text-center py-5" style="display: none;">
+            <!-- Loader -->
+            <div id="timeline-loading" class="text-center py-5" style="display: none;">
                 <div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div>
-                <span class="small text-secondary fw-semibold">Loading alert history...</span>
+                <span class="small text-secondary fw-semibold">Loading activity feed...</span>
             </div>
 
-            <div id="alerts-table-container" class="table-responsive" style="display: none;">
-                <table class="table table-hover table-striped align-middle small mb-0">
-                    <thead class="table-light">
-                        <tr>
-                            <th>Date &amp; Time</th>
-                            <th>Event Type</th>
-                            <th>Scope</th>
-                            <th>Target Device</th>
-                            <th>Webhook Delivery</th>
-                            <th>Diagnostic Details</th>
-                        </tr>
-                    </thead>
-                    <tbody id="alerts-tbody">
-                        <!-- Injected by JS -->
-                    </tbody>
-                </table>
-            </div>
-
-            <div id="alerts-empty" class="text-center text-secondary py-5 fw-medium" style="display: none;">
-                No audit records found matching the current filters.
-            </div>
-
-            <div id="alerts-pagination" class="d-flex justify-content-between align-items-center mt-3 pt-3 border-top" style="display: none;">
-                <div class="small text-secondary fw-semibold" id="pagination-info">
-                    Showing 0-0 of 0 alerts
+            <!-- Timeline Outer Container -->
+            <div id="timeline-container" style="display: none;">
+                <div class="timeline" id="timeline-events-list">
+                    <!-- Event items injected dynamically -->
                 </div>
-                <div class="d-flex gap-1">
-                    <button id="prev-page" class="btn btn-outline-secondary btn-sm fw-bold" disabled>Previous</button>
-                    <button id="next-page" class="btn btn-outline-secondary btn-sm fw-bold" disabled>Next</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Terminal Command History Logs -->
-    <div class="card shadow-sm border mb-4">
-        <div class="card-header py-3 bg-body-secondary d-flex justify-content-between align-items-center flex-wrap gap-2">
-            <div>
-                <h5 class="mb-0 fw-bold"><i class="fas fa-terminal text-primary me-2"></i>Terminal Logs</h5>
-                <span class="text-secondary small fw-medium">Log of interactive terminal commands executed by the child</span>
-            </div>
-            <div id="terminal-summary-stats">
-                <!-- Injected by JS -->
-            </div>
-        </div>
-        <div class="card-body">
-            <!-- toolbar -->
-            <div class="d-flex gap-2 mb-3 flex-wrap align-items-center justify-content-between">
-                <div class="d-flex gap-2 flex-wrap flex-grow-1">
-                    <input type="text" id="terminal-search-input" class="form-control form-control-sm" placeholder="Search commands..." style="max-width: 250px;">
-                    <select id="terminal-sort-dir" class="form-select form-select-sm" style="max-width: 130px;">
-                        <option value="desc">Newest First</option>
-                        <option value="asc">Oldest First</option>
-                    </select>
+                
+                <!-- Infinite Scroll Loader at bottom -->
+                <div id="timeline-bottom-loader" class="text-center py-3" style="display: none;">
+                    <div class="spinner-border spinner-border-sm text-primary me-1" role="status"></div>
+                    <span class="small text-secondary fw-semibold">Loading older activities...</span>
                 </div>
             </div>
 
-            <div id="terminal-loading" class="text-center py-5" style="display: none;">
-                <div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div>
-                <span class="small text-secondary fw-semibold">Loading terminal logs...</span>
-            </div>
-
-            <div id="terminal-table-container" class="table-responsive" style="display: none;">
-                <table class="table table-hover table-striped align-middle small mb-0">
-                    <thead class="table-light">
-                        <tr>
-                            <th style="width: 15%;">Date &amp; Time</th>
-                            <th style="width: 15%;">TTY / Session</th>
-                            <th style="width: 15%;">Target Device</th>
-                            <th style="width: 20%;">Working Dir (pwd)</th>
-                            <th style="width: 35%;">Command Line</th>
-                        </tr>
-                    </thead>
-                    <tbody id="terminal-tbody">
-                        <!-- Injected by JS -->
-                    </tbody>
-                </table>
-            </div>
-
-            <div id="terminal-empty" class="text-center text-secondary py-5 fw-medium" style="display: none;">
-                No terminal command logs found matching the current filters.
-            </div>
-
-            <div id="terminal-pagination" class="d-flex justify-content-between align-items-center mt-3 pt-3 border-top" style="display: none;">
-                <div class="small text-secondary fw-semibold" id="terminal-pagination-info">
-                    Showing 0-0 of 0 commands
-                </div>
-                <div class="d-flex gap-1">
-                    <button id="terminal-prev-page" class="btn btn-outline-secondary btn-sm fw-bold" disabled>Previous</button>
-                    <button id="terminal-next-page" class="btn btn-outline-secondary btn-sm fw-bold" disabled>Next</button>
-                </div>
+            <!-- Empty state -->
+            <div id="timeline-empty" class="text-center text-secondary py-5 fw-medium" style="display: none;">
+                No activities found matching the current criteria.
             </div>
         </div>
     </div>
@@ -254,68 +338,50 @@
 {% block extra_js %}
 <script>
 (function() {
-    // ── Local Dataset bindings ──────────────────────────────────────────────
-    const datasets = {
-        daily: {
-            labels: [],
-            values: [],
-            daysInPeriod: 30,
-            granularity: 'day',
-        },
-        weekly: {
-            labels: [],
-            values: [],
-            weekStarts: [],
-            daysInPeriod: 91,
-            granularity: 'week',
-        },
-        monthly: {
-            labels: [],
-            values: [],
-            months: [],
-            daysInPeriod: 365,
-            granularity: 'month',
-        },
-        alltime: {
-            labels: [],
-            values: [],
-            months: [],
-            daysInPeriod: null,
-            granularity: 'month',
-        },
+    // ── Configuration State ─────────────────────────────────────────────────
+    const state = {
+        userId: {{ user.id }},
+        startDate: '',
+        endDate: '',
+        preset: '7days',
+        appSearch: '',
+        appsData: []
     };
 
-    // Load data from Jinja loop bindings
-    {% for date, seconds in daily_30.items() %}
-    datasets.daily.labels.push('{{ date }}');
-    datasets.daily.values.push({{ seconds / 3600 }});
-    {% endfor %}
+    const timelineState = {
+        page: 1,
+        perPage: 25,
+        search: '',
+        category: 'all', // all, alerts, commands
+        loadingMore: false,
+        hasMore: true
+    };
 
-    {% for w in weekly_13 %}
-    datasets.weekly.labels.push('{{ w.label }}');
-    datasets.weekly.values.push({{ w.total / 3600 }});
-    datasets.weekly.weekStarts.push('{{ w.week_start }}');
-    {% endfor %}
+    // Chart instances
+    let trendChart = null;
+    let appDoughnutChart = null;
 
-    {% for m in monthly_12 %}
-    datasets.monthly.labels.push('{{ m.label }}');
-    datasets.monthly.values.push({{ m.total / 3600 }});
-    datasets.monthly.months.push('{{ m.month }}');
-    {% endfor %}
+    // HSL harmonized theme colors (Purple Ban compliant)
+    const chartPalette = [
+        'rgba(16, 185, 129, 0.75)',  // Emerald Green
+        'rgba(245, 158, 11, 0.75)',   // Signal Orange
+        'rgba(14, 165, 233, 0.75)',   // Ocean Blue
+        'rgba(239, 68, 68, 0.75)',    // Crimson Red
+        'rgba(234, 179, 8, 0.75)',     // Bright Yellow
+        'rgba(13, 148, 136, 0.75)',    // Dark Teal
+        'rgba(100, 116, 139, 0.75)'    // Slate Gray
+    ];
+    const chartBorderPalette = [
+        'rgb(16, 185, 129)',
+        'rgb(245, 158, 11)',
+        'rgb(14, 165, 233)',
+        'rgb(239, 68, 68)',
+        'rgb(234, 179, 8)',
+        'rgb(13, 148, 136)',
+        'rgb(100, 116, 139)'
+    ];
 
-    {% for m in all_monthly %}
-    datasets.alltime.labels.push('{{ m.label }}');
-    datasets.alltime.values.push({{ m.total / 3600 }});
-    datasets.alltime.months.push('{{ m.month }}');
-    {% endfor %}
-
-    // Weekend checker
-    function isWeekend(label, granularity) {
-        if (granularity !== 'day') return false;
-        const d = new Date(label + 'T00:00:00');
-        return d.getDay() === 0 || d.getDay() === 6;
-    }
-
+    // ── Helper Utilities ───────────────────────────────────────────────────
     function fmtHours(h) {
         if (h === 0) return '0h';
         if (h < 1) return Math.round(h * 60) + 'm';
@@ -323,11 +389,277 @@
         return Math.floor(h) + 'h ' + Math.round((h % 1) * 60) + 'm';
     }
 
-    function buildChart(canvasId, data) {
-        const canvas = document.getElementById(canvasId);
-        if (!canvas) return null;
-        const ctx = canvas.getContext('2d');
-        const { labels, values, granularity } = data;
+    function fmtSeconds(s) {
+        return fmtHours(s / 3600);
+    }
+
+    function formatDate(dateStr) {
+        const date = new Date(dateStr);
+        return date.getFullYear() + '-' + 
+               String(date.getMonth() + 1).padStart(2, '0') + '-' + 
+               String(date.getDate()).padStart(2, '0') + ' ' + 
+               String(date.getHours()).padStart(2, '0') + ':' + 
+               String(date.getMinutes()).padStart(2, '0');
+    }
+
+    function formatTimeLabel(dateStr) {
+        if (!dateStr || dateStr === 'Unknown') return 'Unknown Date';
+        const parts = dateStr.split('-');
+        if (parts.length !== 3) return dateStr;
+        const year = parseInt(parts[0], 10);
+        const month = parseInt(parts[1], 10) - 1;
+        const day = parseInt(parts[2], 10);
+        const date = new Date(year, month, day);
+        return date.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' });
+    }
+
+    function escapeHtml(str) {
+        if (!str) return '';
+        return str
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
+    function formatStatusBadge(status) {
+        if (!status) return '<span class="badge bg-secondary">Unknown</span>';
+        const label = status.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+        if (status === 'delivered') return `<span class="badge bg-success">${label}</span>`;
+        if (status === 'failed') return `<span class="badge bg-danger">${label}</span>`;
+        return `<span class="badge bg-warning text-dark">${label}</span>`;
+    }
+
+    function renderAlertDetailsHtml(event) {
+        let details = event.details;
+        if (!details) {
+            try {
+                details = JSON.parse(event.details_text);
+            } catch (e) {
+                details = {};
+            }
+        }
+        
+        if (!details || typeof details !== 'object' || Object.keys(details).length === 0) {
+            return `<div class="text-muted small">${escapeHtml(event.details_text || 'No additional details available')}</div>`;
+        }
+
+        const type = event.event_type;
+
+        // 1. App Usage
+        if (type === 'app_usage') {
+            const app = details.application_name || details.executable_path || 'Unknown App';
+            const duration = details.duration_seconds ? fmtSeconds(details.duration_seconds) : '—';
+            let timeSpanStr = '';
+            if (details.start_time && details.end_time) {
+                const start = details.start_time.split(/[T ]/)[1]?.substring(0, 5) || '';
+                const end = details.end_time.split(/[T ]/)[1]?.substring(0, 5) || '';
+                if (start && end) {
+                    timeSpanStr = `<span class="text-muted ms-2">(from ${start} to ${end})</span>`;
+                }
+            }
+            return `
+                <div class="d-flex align-items-center justify-content-between flex-wrap gap-2" style="font-size: 0.85rem;">
+                    <div>
+                        <i class="fas fa-hourglass-half text-warning me-1.5"></i>
+                        Used <strong class="text-dark-emphasis">${escapeHtml(app)}</strong> for <strong>${duration}</strong>${timeSpanStr}
+                    </div>
+                    <div class="font-monospace text-secondary extra-small" style="font-size: 0.7rem; max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(details.executable_path || '')}">${escapeHtml(details.executable_path || '')}</div>
+                </div>
+            `;
+        }
+
+        // 2. App Blocked
+        if (type === 'app_blocked') {
+            const app = details.application_name || details.executable_path || 'Unknown App';
+            let reasonLabel = details.reason || 'Blocked by policy';
+            if (details.reason === 'not_approved') {
+                reasonLabel = 'Application is not approved';
+            } else if (details.reason === 'terminal_disabled') {
+                reasonLabel = 'Terminal/CLI access is disabled for this user';
+            }
+            return `
+                <div style="font-size: 0.85rem;">
+                    <div class="text-danger fw-semibold mb-1">
+                        <i class="fas fa-ban me-1.5"></i>Blocked attempt to launch <strong class="text-dark-emphasis">${escapeHtml(app)}</strong>
+                    </div>
+                    <div class="text-secondary" style="font-size: 0.78rem;">
+                        <strong>Reason:</strong> ${escapeHtml(reasonLabel)}
+                        ${details.enforcement_source ? ` &bull; <strong>Enforced via:</strong> ${escapeHtml(details.enforcement_source)}` : ''}
+                    </div>
+                </div>
+            `;
+        }
+
+        // 3. Access Requested
+        if (type === 'access_requested') {
+            const target = details.display_label || details.target_value || 'Unknown Target';
+            const reqType = details.request_type ? details.request_type.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') : 'Access';
+            return `
+                <div style="font-size: 0.85rem;">
+                    <div class="text-primary fw-semibold mb-1">
+                        <i class="fas fa-question-circle me-1.5"></i>Requested approval for <strong>${escapeHtml(target)}</strong>
+                    </div>
+                    <div class="text-secondary small">
+                        <strong>Request Type:</strong> ${escapeHtml(reqType)} (${escapeHtml(details.target_kind || 'unknown')})
+                    </div>
+                </div>
+            `;
+        }
+
+        // 4. Session sign in/out
+        if (type === 'user_signed_in' || type === 'user_signed_out') {
+            const action = type === 'user_signed_in' ? 'signed in' : 'signed out';
+            const icon = type === 'user_signed_in' ? 'fa-sign-in-alt text-success' : 'fa-sign-out-alt text-secondary';
+            return `
+                <div style="font-size: 0.85rem;" class="text-secondary">
+                    <i class="fas ${icon} me-1.5"></i>User <strong>${escapeHtml(event.linux_username)}</strong> ${action} of the session.
+                    ${details.session_id ? `<span class="ms-2 font-monospace extra-small">(Session: ${escapeHtml(details.session_id.substring(0, 12))}...)</span>` : ''}
+                </div>
+            `;
+        }
+
+        // 5. System startups/shutdowns/resume etc
+        if (type.startsWith('system_')) {
+            const systemActions = {
+                'system_startup': 'started up',
+                'system_shutdown': 'shut down',
+                'system_restart': 'restarted',
+                'system_sleep': 'entered sleep mode',
+                'system_resume': 'woke up / resumed'
+            };
+            const action = systemActions[type] || 'status event';
+            const note = details.note ? ` (${details.note})` : '';
+            return `
+                <div style="font-size: 0.85rem;" class="text-secondary">
+                    <i class="fas fa-laptop-code me-1.5"></i>Device ${action}${escapeHtml(note)}
+                </div>
+            `;
+        }
+
+        // Fallback generic pretty printer
+        return `
+            <div class="small">
+                ${Object.keys(details).map(key => {
+                    const val = details[key];
+                    const valStr = typeof val === 'object' ? JSON.stringify(val) : String(val);
+                    return `<div class="mb-1"><strong>${escapeHtml(key)}:</strong> <span class="text-secondary">${escapeHtml(valStr)}</span></div>`;
+                }).join('')}
+            </div>
+        `;
+    }
+
+    // Determine presets
+    function applyPresetDates(presetName) {
+        const today = new Date();
+        let start = new Date();
+        let end = new Date();
+
+        if (presetName === 'today') {
+            start = today;
+            end = today;
+        } else if (presetName === 'yesterday') {
+            start.setDate(today.getDate() - 1);
+            end.setDate(today.getDate() - 1);
+        } else if (presetName === '7days') {
+            start.setDate(today.getDate() - 6);
+            end = today;
+        } else if (presetName === '30days') {
+            start.setDate(today.getDate() - 29);
+            end = today;
+        } else if (presetName === 'thismonth') {
+            start = new Date(today.getFullYear(), today.getMonth(), 1);
+            end = today;
+        }
+
+        state.startDate = start.toISOString().split('T')[0];
+        state.endDate = end.toISOString().split('T')[0];
+        state.preset = presetName;
+
+        // Set inputs UI
+        document.getElementById('filter-start-date').value = state.startDate;
+        document.getElementById('filter-end-date').value = state.endDate;
+
+        // Update Nav button label
+        const presetLabels = {
+            'today': 'Today',
+            'yesterday': 'Yesterday',
+            '7days': 'Last 7 Days',
+            '30days': 'Last 30 Days',
+            'thismonth': 'This Month'
+        };
+        document.getElementById('current-date-range-label').textContent = presetLabels[presetName];
+    }
+
+    // ── AJAX Data Loading ──────────────────────────────────────────────────
+    async function loadStats() {
+        document.getElementById('chart-loading').style.display = 'block';
+        document.getElementById('chart-wrapper').style.display = 'none';
+        
+        const card = document.getElementById('app-usage-card');
+        if (card) {
+            card.classList.remove('d-none');
+        }
+        document.getElementById('app-usage-loading').style.display = 'block';
+        document.getElementById('app-usage-container').style.display = 'none';
+        document.getElementById('app-usage-empty').style.display = 'none';
+
+        const params = new URLSearchParams({
+            start_date: state.startDate,
+            end_date: state.endDate
+        });
+
+        try {
+            const res = await fetch(`/api/user/${state.userId}/stats?${params.toString()}`);
+            const data = await res.json();
+
+            if (data.success) {
+                renderSummary(data.summary);
+                renderTrendChart(data.daily_usage);
+                
+                state.appsData = data.app_usage || [];
+                renderAppUsage();
+            }
+        } catch (e) {
+            console.error('Failed to load stats details:', e);
+        } finally {
+            document.getElementById('chart-loading').style.display = 'none';
+            document.getElementById('chart-wrapper').style.display = 'block';
+            document.getElementById('app-usage-loading').style.display = 'none';
+        }
+    }
+
+    // Render stats summary cards
+    function renderSummary(summary) {
+        const totalHours = summary.total_seconds / 3600;
+        const avgHours = summary.daily_average_seconds / 3600;
+        const peakHours = summary.peak_seconds / 3600;
+
+        document.getElementById('stat-total').textContent = fmtHours(Math.round(totalHours * 10) / 10);
+        document.getElementById('stat-avg').textContent = fmtHours(Math.round(avgHours * 10) / 10);
+        document.getElementById('stat-peak').textContent = fmtHours(Math.round(peakHours * 10) / 10);
+        document.getElementById('stat-peak-label').textContent = summary.peak_date || '—';
+
+        // Period trend subtitle
+        const totalDays = Math.ceil((new Date(state.endDate) - new Date(state.startDate)) / (1000 * 60 * 60 * 24)) + 1;
+        document.getElementById('stat-total-sub').textContent = `over ${totalDays} day(s)`;
+        document.getElementById('trend-period-label').textContent = `${state.startDate} to ${state.endDate}`;
+    }
+
+    // Render trend chart using Chart.js
+    function renderTrendChart(dailyUsage) {
+        const labels = Object.keys(dailyUsage).sort();
+        const values = labels.map(l => dailyUsage[l] / 3600);
+
+        if (trendChart) trendChart.destroy();
+
+        const ctx = document.getElementById('chart-daily-trend').getContext('2d');
+        
+        function isWeekend(label) {
+            const d = new Date(label + 'T00:00:00');
+            return d.getDay() === 0 || d.getDay() === 6;
+        }
 
         const maxVal = Math.max(...values, 0.1);
         const niceSteps = [0.1, 0.2, 0.25, 0.5, 1, 2, 3, 4, 6, 8, 12, 24];
@@ -335,32 +667,27 @@
         const stepSize = niceSteps.find(s => s >= minStep) || niceSteps[niceSteps.length - 1];
         const yMax = Math.ceil(maxVal / stepSize) * stepSize;
 
-        return new Chart(ctx, {
+        trendChart = new Chart(ctx, {
             type: 'bar',
             data: {
                 labels: labels,
                 datasets: [{
                     label: 'Hours Used',
                     data: values,
-                    backgroundColor: labels.map((l, i) =>
-                        isWeekend(l, granularity)
-                            ? 'rgba(245, 158, 11, 0.6)'
-                            : 'rgba(59, 130, 246, 0.6)'
+                    backgroundColor: labels.map(l =>
+                        isWeekend(l) ? 'rgba(245, 158, 11, 0.6)' : 'rgba(59, 130, 246, 0.6)'
                     ),
-                    borderColor: labels.map((l, i) =>
-                        isWeekend(l, granularity)
-                            ? 'rgb(245, 158, 11)'
-                            : 'rgb(59, 130, 246)'
+                    borderColor: labels.map(l =>
+                        isWeekend(l) ? 'rgb(245, 158, 11)' : 'rgb(59, 130, 246)'
                     ),
                     borderWidth: 2,
-                    borderRadius: 8,
+                    borderRadius: 6,
                     borderSkipped: false,
                 }]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                interaction: { intersect: false, mode: 'index' },
                 scales: {
                     y: {
                         beginAtZero: true,
@@ -375,9 +702,9 @@
                         grid: { display: false },
                         ticks: {
                             font: { size: 10, weight: 'bold' },
-                            maxRotation: granularity === 'day' ? 45 : 0,
-                        },
-                    },
+                            maxRotation: labels.length > 15 ? 45 : 0,
+                        }
+                    }
                 },
                 plugins: {
                     legend: { display: false },
@@ -391,441 +718,434 @@
         });
     }
 
-    function updateSummary(key) {
-        const d = datasets[key];
-        const values = d.values;
-        const total = values.reduce((a, b) => a + b, 0);
-        const days = d.daysInPeriod || (values.length * 30);
-        const avg = days > 0 ? total / days : 0;
-        const peakVal = Math.max(...values, 0);
-        const peakIdx = values.indexOf(peakVal);
-        const peakLabel = peakIdx >= 0 ? d.labels[peakIdx] : '—';
+    // Render applications usage pie chart & detailed table
+    function renderAppUsage() {
+        const card = document.getElementById('app-usage-card');
+        if (!card) return;
 
-        const granularityLabel = {
-            day: 'in 30 days',
-            week: 'in 13 weeks',
-            month: 'in 12 months',
-        }[d.granularity] || 'recorded';
-
-        document.getElementById('stat-total').textContent = fmtHours(Math.round(total * 10) / 10);
-        document.getElementById('stat-total-sub').textContent = granularityLabel;
-        document.getElementById('stat-avg').textContent = fmtHours(Math.round(avg * 10) / 10);
-        document.getElementById('stat-peak').textContent = fmtHours(Math.round(peakVal * 10) / 10);
-        document.getElementById('stat-peak-label').textContent = peakLabel;
-    }
-
-    // Tab toggler bindings
-    const chartInstances = {};
-    let activePeriod = 'daily';
-
-    function switchPeriod(period) {
-        document.querySelectorAll('.period-tab').forEach(t => {
-            t.classList.toggle('active', t.dataset.period === period);
-        });
-        
-        document.querySelectorAll('.chart-panel').forEach(p => {
-            if (p.id === 'panel-' + period) {
-                p.style.display = 'block';
-            } else {
-                p.style.display = 'none';
-            }
-        });
-        
-        if (!chartInstances[period] && datasets[period].values.length > 0) {
-            chartInstances[period] = buildChart('chart-' + period, datasets[period]);
+        if (state.appsData.length === 0) {
+            card.classList.add('d-none');
+            return;
         }
-        updateSummary(period);
-        activePeriod = period;
-    }
+        card.classList.remove('d-none');
 
-    document.querySelectorAll('.period-tab').forEach(btn => {
-        btn.addEventListener('click', () => switchPeriod(btn.dataset.period));
-    });
+        const tbody = document.getElementById('app-usage-tbody');
+        const searchVal = state.appSearch.toLowerCase().trim();
+        const filteredApps = state.appsData.filter(app => 
+            app.application_name.toLowerCase().includes(searchVal) || 
+            app.executable_path.toLowerCase().includes(searchVal)
+        );
 
-    // Start with default daily
-    switchPeriod('daily');
-
-    // ── Dynamic Alerts Logic ────────────────────────────────────────────────
-    const alertConfig = {
-        managedUserId: {{ user.id }},
-        systemId: null,
-        page: 1,
-        perPage: 50,
-        search: '',
-        eventType: '',
-        sortBy: 'date',
-        sortDir: 'desc'
-    };
-
-    const elements = {
-        tbody: document.getElementById('alerts-tbody'),
-        loading: document.getElementById('alerts-loading'),
-        empty: document.getElementById('alerts-empty'),
-        table: document.getElementById('alerts-table-container'),
-        summary: document.getElementById('alert-summary-stats'),
-        paginationInfo: document.getElementById('pagination-info'),
-        prevBtn: document.getElementById('prev-page'),
-        nextBtn: document.getElementById('next-page'),
-        searchInput: document.getElementById('alert-search-input'),
-        typeFilter: document.getElementById('alert-type-filter'),
-        sortBySelect: document.getElementById('alert-sort-by'),
-        sortDirSelect: document.getElementById('alert-sort-dir'),
-        pruneBtn: document.getElementById('alert-prune-btn')
-    };
-
-    let searchTimeout = null;
-
-    async function fetchAlerts() {
-        elements.loading.style.display = 'block';
-        elements.table.style.display = 'none';
-        elements.empty.style.display = 'none';
-
-        const params = new URLSearchParams({
-            page: alertConfig.page,
-            per_page: alertConfig.perPage,
-            search: alertConfig.search,
-            event_type: alertConfig.eventType,
-            sort_by: alertConfig.sortBy,
-            sort_dir: alertConfig.sortDir
-        });
-        if (alertConfig.managedUserId) params.append('managed_user_id', alertConfig.managedUserId);
-        if (alertConfig.systemId) params.append('system_id', alertConfig.systemId);
-
-        try {
-            const response = await fetch(`/api/alerts?${params.toString()}`);
-            const result = await response.json();
-            
-            if (result.success) {
-                renderAlerts(result.data.alerts);
-                updatePagination(result.data.pagination);
-                updateFilters(result.data.filters);
-                updateSummaryStats(result.data.pagination.total_items);
-            }
-        } catch (error) {
-            console.error('Failed to fetch alerts:', error);
-        } finally {
-            elements.loading.style.display = 'none';
-        }
-    }
-
-    function formatStatusBadge(status) {
-        if (!status) return '<span class="badge bg-secondary">Unknown</span>';
-        const label = status.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
-        if (status === 'delivered') return `<span class="badge bg-success">${label}</span>`;
-        if (status === 'failed') return `<span class="badge bg-danger">${label}</span>`;
-        return `<span class="badge bg-warning text-dark">${label}</span>`;
-    }
-
-    function renderAlerts(alerts) {
-        if (!alerts || alerts.length === 0) {
-            elements.empty.style.display = 'block';
+        if (state.appsData.length === 0) {
+            document.getElementById('app-usage-container').classList.add('d-none');
+            document.getElementById('app-usage-empty').style.display = 'block';
             return;
         }
 
-        elements.table.style.display = 'block';
-        elements.tbody.innerHTML = alerts.map(alert => `
-            <tr>
-                <td class="fw-bold text-secondary text-nowrap" style="font-size: 0.8rem;">
-                    ${alert.occurred_at ? formatDate(alert.occurred_at) : 'Unknown'}
-                </td>
-                <td>
-                    <strong style="font-size: 0.9rem;">${alert.event_label}</strong>
-                    <div class="text-secondary small fw-bold" style="font-size: 0.7rem;">ID: #${alert.id}</div>
-                </td>
-                <td><span class="badge bg-secondary">${alert.scope_label}</span></td>
-                <td>
-                    <a href="/devices/${alert.system_id}" class="fw-bold">${alert.device_label}</a>
-                </td>
-                <td>
-                    <div class="mb-1">${formatStatusBadge(alert.delivery_status)}</div>
-                    <div class="text-secondary small fw-bold" style="font-size: 0.7rem;">
-                        ${alert.delivery_attempts} attempt(s)
-                        ${alert.last_delivery_error ? `<br><span class="text-danger">Error: ${alert.last_delivery_error}</span>` : ''}
-                    </div>
-                </td>
-                <td class="alerts-details" style="font-size: 0.75rem; max-width: 280px; overflow-wrap: break-word;"><code class="small text-secondary">${alert.details_text}</code></td>
-            </tr>
-        `).join('');
-    }
+        document.getElementById('app-usage-container').classList.remove('d-none');
+        document.getElementById('app-usage-empty').style.display = 'none';
 
-    function formatDate(dateStr) {
-        const date = new Date(dateStr);
-        return date.getFullYear() + '-' + 
-               String(date.getMonth() + 1).padStart(2, '0') + '-' + 
-               String(date.getDate()).padStart(2, '0') + ' ' + 
-               String(date.getHours()).padStart(2, '0') + ':' + 
-               String(date.getMinutes()).padStart(2, '0');
-    }
+        const totalSecs = state.appsData.reduce((acc, app) => acc + app.total_seconds, 0);
 
-    function updatePagination(pagination) {
-        const start = (pagination.page - 1) * pagination.per_page + 1;
-        const end = Math.min(pagination.page * pagination.per_page, pagination.total_items);
-        
-        elements.paginationInfo.textContent = pagination.total_items > 0 
-            ? `Showing ${start}-${end} of ${pagination.total_items} alerts`
-            : 'No alerts found';
+        // Populate Table
+        tbody.innerHTML = filteredApps.map(app => {
+            const percentage = totalSecs > 0 ? Math.round((app.total_seconds / totalSecs) * 100) : 0;
+            const iconHtml = app.icon_hash 
+                ? `<img src="/api/apps/icons/${app.icon_hash}" class="app-icon-img" alt="">`
+                : `<div class="app-icon-placeholder">${app.application_name.charAt(0).toUpperCase()}</div>`;
             
-        elements.prevBtn.disabled = !pagination.has_prev;
-        elements.nextBtn.disabled = !pagination.has_next;
-        
-        // Show/hide pagination section based on total items
-        const pagSection = document.getElementById('alerts-pagination');
-        if (pagSection) {
-            pagSection.style.display = pagination.total_items > 0 ? 'flex' : 'none';
-        }
-    }
-
-    function updateFilters(filters) {
-        const currentType = elements.typeFilter.value;
-        const options = ['<option value="">All Event Types</option>'];
-        filters.event_types.forEach(et => {
-            options.push(`<option value="${et.value}" ${et.value === currentType ? 'selected' : ''}>${et.label}</option>`);
-        });
-        elements.typeFilter.innerHTML = options.join('');
-    }
-
-    function updateSummaryStats(total) {
-        elements.summary.innerHTML = `
-            <span class="badge bg-primary px-3 py-2 fw-bold" style="font-size: 0.85rem;">
-                ${total} Event(s) Found
-            </span>
-        `;
-    }
-
-    // Event Listeners
-    elements.prevBtn.addEventListener('click', () => {
-        if (alertConfig.page > 1) {
-            alertConfig.page--;
-            fetchAlerts();
-        }
-    });
-
-    elements.nextBtn.addEventListener('click', () => {
-        alertConfig.page++;
-        fetchAlerts();
-    });
-
-    elements.searchInput.addEventListener('input', (e) => {
-        clearTimeout(searchTimeout);
-        searchTimeout = setTimeout(() => {
-            alertConfig.search = e.target.value;
-            alertConfig.page = 1;
-            fetchAlerts();
-        }, 400);
-    });
-
-    elements.typeFilter.addEventListener('change', (e) => {
-        alertConfig.eventType = e.target.value;
-        alertConfig.page = 1;
-        fetchAlerts();
-    });
-
-    elements.sortBySelect.addEventListener('change', (e) => {
-        alertConfig.sortBy = e.target.value;
-        alertConfig.page = 1;
-        fetchAlerts();
-    });
-
-    elements.sortDirSelect.addEventListener('change', (e) => {
-        alertConfig.sortDir = e.target.value;
-        alertConfig.page = 1;
-        fetchAlerts();
-    });
-
-    elements.pruneBtn.addEventListener('click', async () => {
-        const days = prompt('Prune alerts older than how many days?', '30');
-        if (days === null) return;
-        
-        const daysInt = parseInt(days);
-        if (isNaN(daysInt) || daysInt < 0) {
-            alert('Please enter a valid number of days.');
-            return;
-        }
-
-        if (!confirm(`Are you sure you want to permanently delete all alerts older than ${daysInt} days for this user?`)) {
-            return;
-        }
-
-        try {
-            const response = await fetch('/api/alerts/prune', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    older_than_days: daysInt,
-                    managed_user_id: alertConfig.managedUserId
-                })
-            });
-            const result = await response.json();
-            if (result.success) {
-                alert(result.message);
-                alertConfig.page = 1;
-                fetchAlerts();
-            }
-        } catch (error) {
-            alert('Failed to prune alerts.');
-        }
-    });
-
-    // ── Dynamic Terminal Logs Logic ──────────────────────────────────────────
-    const terminalConfig = {
-        managedUserId: {{ user.id }},
-        systemId: null,
-        page: 1,
-        perPage: 50,
-        search: '',
-        eventType: 'terminal_command',
-        sortBy: 'date',
-        sortDir: 'desc'
-    };
-
-    const terminalElements = {
-        tbody: document.getElementById('terminal-tbody'),
-        loading: document.getElementById('terminal-loading'),
-        empty: document.getElementById('terminal-empty'),
-        table: document.getElementById('terminal-table-container'),
-        summary: document.getElementById('terminal-summary-stats'),
-        paginationInfo: document.getElementById('terminal-pagination-info'),
-        prevBtn: document.getElementById('terminal-prev-page'),
-        nextBtn: document.getElementById('terminal-next-page'),
-        searchInput: document.getElementById('terminal-search-input'),
-        sortDirSelect: document.getElementById('terminal-sort-dir')
-    };
-
-    let terminalSearchTimeout = null;
-
-    async function fetchTerminalLogs() {
-        terminalElements.loading.style.display = 'block';
-        terminalElements.table.style.display = 'none';
-        terminalElements.empty.style.display = 'none';
-
-        const params = new URLSearchParams({
-            page: terminalConfig.page,
-            per_page: terminalConfig.perPage,
-            search: terminalConfig.search,
-            event_type: terminalConfig.eventType,
-            sort_by: terminalConfig.sortBy,
-            sort_dir: terminalConfig.sortDir
-        });
-        if (terminalConfig.managedUserId) params.append('managed_user_id', terminalConfig.managedUserId);
-        if (terminalConfig.systemId) params.append('system_id', terminalConfig.systemId);
-
-        try {
-            const response = await fetch(`/api/alerts?${params.toString()}`);
-            const result = await response.json();
-            
-            if (result.success) {
-                renderTerminalLogs(result.data.alerts);
-                updateTerminalPagination(result.data.pagination);
-                updateTerminalSummaryStats(result.data.pagination.total_items);
-            }
-        } catch (error) {
-            console.error('Failed to fetch terminal logs:', error);
-        } finally {
-            terminalElements.loading.style.display = 'none';
-        }
-    }
-
-    function renderTerminalLogs(logs) {
-        if (!logs || logs.length === 0) {
-            terminalElements.empty.style.display = 'block';
-            return;
-        }
-
-        terminalElements.table.style.display = 'block';
-        terminalElements.tbody.innerHTML = logs.map(log => {
-            const details = log.details || {};
-            const cmd = details.cmd || '';
-            const pwd = details.pwd || '';
-            const tty = details.tty || '';
-            const sessionId = details.session_id || '';
-            const shortSession = sessionId ? ` (${sessionId.slice(0, 8)})` : '';
-            
-            const sessionDisplay = tty ? `<code>${tty}</code>${shortSession}` : `<code>session</code>${shortSession}`;
+            const platformIcon = app.platform === 'android' ? 'fab fa-android text-success' : 'fab fa-linux text-primary';
+            const platformLabel = app.platform === 'android' ? 'Android' : 'Linux';
 
             return `
                 <tr>
-                    <td class="fw-bold text-secondary text-nowrap" style="font-size: 0.8rem;">
-                        ${log.occurred_at ? formatDate(log.occurred_at) : 'Unknown'}
-                    </td>
-                    <td>${sessionDisplay}</td>
+                    <td>${iconHtml}</td>
                     <td>
-                        <a href="/devices/${log.system_id}" class="fw-bold">${log.device_label}</a>
+                        <div class="fw-bold text-body" style="font-size: 0.9rem;">${escapeHtml(app.application_name)}</div>
+                        <div class="text-secondary font-monospace" style="font-size: 0.7rem; max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${app.executable_path}">
+                            ${escapeHtml(app.executable_path)}
+                        </div>
                     </td>
-                    <td><code class="text-secondary small">${pwd || '/'}</code></td>
                     <td>
-                        <div class="p-2 rounded bg-dark text-white font-monospace small" style="white-space: pre-wrap; font-family: monospace;">${escapeHtml(cmd)}</div>
+                        <span class="badge bg-secondary"><i class="${platformIcon} me-1"></i>${platformLabel}</span>
+                        <div class="text-secondary extra-small fw-semibold mt-1" style="font-size: 0.7rem;">${app.session_count} active session(s)</div>
+                    </td>
+                    <td class="text-end">
+                        <strong class="fs-6 text-dark d-block">${fmtSeconds(app.total_seconds)}</strong>
+                        <div class="d-flex align-items-center justify-content-end gap-2 mt-1">
+                            <span class="extra-small text-muted fw-bold">${percentage}%</span>
+                            <div class="app-progress-bar" style="width: 50px;">
+                                <div class="app-progress-fill" style="width: ${percentage}%;"></div>
+                            </div>
+                        </div>
                     </td>
                 </tr>
             `;
         }).join('');
-    }
 
-    function escapeHtml(str) {
-        if (!str) return '';
-        return str
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#039;');
-    }
-
-    function updateTerminalPagination(pagination) {
-        const start = (pagination.page - 1) * pagination.per_page + 1;
-        const end = Math.min(pagination.page * pagination.per_page, pagination.total_items);
+        // Prepare Doughnut Chart Data (Top 5 + Other)
+        const sortedApps = [...state.appsData].sort((a, b) => b.total_seconds - a.total_seconds);
+        const topApps = sortedApps.slice(0, 5);
+        const otherApps = sortedApps.slice(5);
         
-        terminalElements.paginationInfo.textContent = pagination.total_items > 0 
-            ? `Showing ${start}-${end} of ${pagination.total_items} commands`
-            : 'No commands found';
+        const doughnutLabels = topApps.map(a => a.application_name);
+        const doughnutValues = topApps.map(a => a.total_seconds / 3600);
+        
+        if (otherApps.length > 0) {
+            doughnutLabels.push('Other');
+            const otherSum = otherApps.reduce((acc, a) => acc + a.total_seconds, 0) / 3600;
+            doughnutValues.push(otherSum);
+        }
+
+        if (appDoughnutChart) appDoughnutChart.destroy();
+
+        const canvas = document.getElementById('chart-app-usage');
+        if (!canvas) return;
+
+        const ctx = canvas.getContext('2d');
+        appDoughnutChart = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: doughnutLabels,
+                datasets: [{
+                    data: doughnutValues,
+                    backgroundColor: chartPalette.slice(0, doughnutLabels.length),
+                    borderColor: chartBorderPalette.slice(0, doughnutLabels.length),
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: ctx => {
+                                const val = ctx.raw;
+                                const total = doughnutValues.reduce((a, b) => a + b, 0);
+                                const pct = total > 0 ? Math.round((val / total) * 100) : 0;
+                                return ` ${ctx.label}: ${fmtHours(val)} (${pct}%)`;
+                            }
+                        }
+                    }
+                },
+                cutout: '60%'
+            }
+        });
+    }
+
+    // ── Activity Timeline & Lazy Loading ──────────────────────────────────
+    async function loadTimeline(isAppend = false) {
+        if (!isAppend) {
+            timelineState.page = 1;
+            timelineState.hasMore = true;
+            document.getElementById('timeline-loading').style.display = 'block';
+            document.getElementById('timeline-container').style.display = 'none';
+            document.getElementById('timeline-empty').style.display = 'none';
+        } else {
+            timelineState.loadingMore = true;
+            document.getElementById('timeline-bottom-loader').style.display = 'block';
+        }
+
+        const params = new URLSearchParams({
+            page: timelineState.page,
+            per_page: timelineState.perPage,
+            search: timelineState.search,
+            start_date: state.startDate,
+            end_date: state.endDate
+        });
+
+        if (state.userId) params.append('managed_user_id', state.userId);
+
+        if (timelineState.category === 'alerts') {
+            // Simply let standard endpoint load alerts, excluding commands
+            params.append('include_commands', 'false');
+        } else if (timelineState.category === 'commands') {
+            params.append('event_type', 'terminal_command');
+        } else {
+            // Load both alerts and terminal commands
+            params.append('include_commands', 'true');
+        }
+
+        try {
+            const res = await fetch(`/api/alerts?${params.toString()}`);
+            const result = await res.json();
+
+            if (result.success) {
+                renderTimelineEvents(result.data.alerts, isAppend);
+                
+                const pagination = result.data.pagination;
+                timelineState.hasMore = pagination.has_next;
+                
+                // Update Badge Counts
+                updateTimelineSummary(pagination.total_items);
+            }
+        } catch (e) {
+            console.error('Failed to load activity timeline:', e);
+        } finally {
+            document.getElementById('timeline-loading').style.display = 'none';
+            document.getElementById('timeline-bottom-loader').style.display = 'none';
+            timelineState.loadingMore = false;
+        }
+    }
+
+    function updateTimelineSummary(total) {
+        const badge = document.getElementById('timeline-summary-stats');
+        if (badge) {
+            badge.innerHTML = `<span class="badge bg-primary px-3 py-2 fw-bold">${total} Activities</span>`;
+        }
+    }
+
+    // Keep track of date grouping headings
+    let renderedDays = new Set();
+
+    function renderTimelineEvents(events, isAppend) {
+        const listContainer = document.getElementById('timeline-events-list');
+        
+        if (!isAppend) {
+            listContainer.innerHTML = '';
+            renderedDays.clear();
+        }
+
+        if (!events || events.length === 0) {
+            if (!isAppend) {
+                document.getElementById('timeline-empty').style.display = 'block';
+            }
+            return;
+        }
+
+        document.getElementById('timeline-container').style.display = 'block';
+        document.getElementById('timeline-empty').style.display = 'none';
+
+        const fragment = document.createDocumentFragment();
+
+        events.forEach(event => {
+            const eventDateStr = event.occurred_at ? event.occurred_at.substring(0, 10) : 'Unknown';
             
-        terminalElements.prevBtn.disabled = !pagination.has_prev;
-        terminalElements.nextBtn.disabled = !pagination.has_next;
-        
-        const pagSection = document.getElementById('terminal-pagination');
-        if (pagSection) {
-            pagSection.style.display = pagination.total_items > 0 ? 'flex' : 'none';
-        }
+            // Add date grouping label if date changes
+            if (!renderedDays.has(eventDateStr)) {
+                renderedDays.add(eventDateStr);
+                const timeLabelDiv = document.createElement('div');
+                timeLabelDiv.className = 'time-label';
+                timeLabelDiv.innerHTML = `<span class="bg-primary text-white">${formatTimeLabel(eventDateStr)}</span>`;
+                fragment.appendChild(timeLabelDiv);
+            }
+
+            const itemDiv = document.createElement('div');
+            
+            let eventTime = '—';
+            if (event.occurred_at) {
+                const parts = event.occurred_at.replace('T', ' ').split(' ');
+                if (parts.length > 1) {
+                    eventTime = parts[1].substring(0, 5);
+                }
+            }
+            
+            if (event.event_type === 'terminal_command') {
+                // Render terminal command timeline item
+                const details = event.details || {};
+                const cmd = details.cmd || '';
+                const pwd = details.pwd || '';
+                const tty = details.tty || '';
+                const sessionId = details.session_id || '';
+                const shortSession = sessionId ? ` (${sessionId.slice(0, 8)})` : '';
+                const sessionDisplay = tty ? `<code>${tty}</code>${shortSession}` : `<code>session</code>${shortSession}`;
+
+                itemDiv.innerHTML = `
+                    <i class="fas fa-terminal bg-dark text-white"></i>
+                    <div class="timeline-item shadow-sm border">
+                        <span class="time text-secondary small"><i class="fas fa-clock me-1"></i>${eventTime}</span>
+                        <h3 class="timeline-header fw-bold" style="font-size: 0.9rem;">
+                            Terminal Command executed by <strong>${escapeHtml(event.linux_username)}</strong> on <a href="/devices/${event.system_id}" class="fw-bold">${escapeHtml(event.device_label)}</a>
+                        </h3>
+                        <div class="timeline-body p-0">
+                            <div class="p-2 border-bottom bg-body-secondary d-flex justify-content-between align-items-center" style="font-size: 0.72rem;">
+                                <span>TTY: ${sessionDisplay}</span>
+                                <span>PWD: <code class="text-secondary">${escapeHtml(pwd || '/')}</code></span>
+                            </div>
+                            <div class="p-2 bg-dark text-white font-monospace small" style="white-space: pre-wrap; font-family: monospace; border-bottom-left-radius: 6px; border-bottom-right-radius: 6px;">${escapeHtml(cmd)}</div>
+                        </div>
+                    </div>
+                `;
+            } else {
+                // Render alert events (e.g. blocklist blocks, app locks, etc.)
+                let iconClass = 'fas fa-info-circle bg-secondary text-white';
+                if (event.event_type.includes('blocked') || event.event_type.includes('violation') || event.event_type.includes('lock')) {
+                    iconClass = 'fas fa-shield-alt bg-danger text-white';
+                } else if (event.event_type.includes('alert') || event.event_type.includes('warning')) {
+                    iconClass = 'fas fa-exclamation-triangle bg-warning text-dark';
+                }
+
+                itemDiv.innerHTML = `
+                    <i class="${iconClass}"></i>
+                    <div class="timeline-item shadow-sm border">
+                        <span class="time text-secondary small"><i class="fas fa-clock me-1"></i>${eventTime}</span>
+                        <h3 class="timeline-header fw-bold" style="font-size: 0.9rem;">
+                            <span class="badge bg-secondary me-2">${escapeHtml(event.scope_label)}</span>
+                            ${escapeHtml(event.event_label)} on <a href="/devices/${event.system_id}" class="fw-bold">${escapeHtml(event.device_label)}</a>
+                        </h3>
+                        <div class="timeline-body py-2 px-3">
+                            ${renderAlertDetailsHtml(event)}
+                        </div>
+                        <div class="timeline-footer py-1.5 px-3 bg-body-secondary border-top d-flex justify-content-between align-items-center" style="font-size: 0.72rem;">
+                            <span>Webhook Delivery: ${formatStatusBadge(event.delivery_status)}</span>
+                            <span class="text-muted fw-bold">${event.delivery_attempts} attempt(s)</span>
+                        </div>
+                    </div>
+                `;
+            }
+
+            fragment.appendChild(itemDiv);
+        });
+
+        listContainer.appendChild(fragment);
+
+        // Add trailing clock node at the very end
+        const endNode = document.getElementById('timeline-end-clock-node');
+        if (endNode) endNode.remove();
+
+        const clockDiv = document.createElement('div');
+        clockDiv.id = 'timeline-end-clock-node';
+        clockDiv.innerHTML = `<i class="fas fa-clock bg-secondary text-white"></i>`;
+        listContainer.appendChild(clockDiv);
     }
 
-    function updateTerminalSummaryStats(total) {
-        terminalElements.summary.innerHTML = `
-            <span class="badge bg-primary px-3 py-2 fw-bold" style="font-size: 0.85rem;">
-                ${total} Command(s) Logged
-            </span>
-        `;
+    // Load next page of infinite scroll
+    function loadMoreTimelineEvents() {
+        timelineState.page++;
+        loadTimeline(true);
     }
 
-    // Event Listeners
-    terminalElements.prevBtn.addEventListener('click', () => {
-        if (terminalConfig.page > 1) {
-            terminalConfig.page--;
-            fetchTerminalLogs();
+    // Unified scroll trigger loader
+    let timelineObserver = null;
+    function setupTimelineInfiniteScroll() {
+        if (timelineObserver) {
+            timelineObserver.disconnect();
         }
-    });
 
-    terminalElements.nextBtn.addEventListener('click', () => {
-        terminalConfig.page++;
-        fetchTerminalLogs();
-    });
+        const loader = document.getElementById('timeline-bottom-loader');
+        if (!loader) return;
 
-    terminalElements.searchInput.addEventListener('input', (e) => {
-        clearTimeout(terminalSearchTimeout);
-        terminalSearchTimeout = setTimeout(() => {
-            terminalConfig.search = e.target.value;
-            terminalConfig.page = 1;
-            fetchTerminalLogs();
-        }, 400);
-    });
+        timelineObserver = new IntersectionObserver(entries => {
+            if (entries[0].isIntersecting && !timelineState.loadingMore && timelineState.hasMore) {
+                loadMoreTimelineEvents();
+            }
+        }, { rootMargin: '120px' });
 
-    terminalElements.sortDirSelect.addEventListener('change', (e) => {
-        terminalConfig.sortDir = e.target.value;
-        terminalConfig.page = 1;
-        fetchTerminalLogs();
-    });
+        timelineObserver.observe(loader);
+    }
 
-    // Initial load
-    fetchAlerts();
-    fetchTerminalLogs();
+    // ── Setup UI Event Listeners ───────────────────────────────────────────
+    function initEvents() {
+        // Date Presets Click Handlers
+        document.querySelectorAll('.date-preset-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.date-preset-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+
+                applyPresetDates(btn.dataset.preset);
+                
+                // Refresh all content
+                loadStats();
+                loadTimeline(false);
+            });
+        });
+
+        // Apply Custom Range button
+        document.getElementById('apply-custom-date').addEventListener('click', () => {
+            const startVal = document.getElementById('filter-start-date').value;
+            const endVal = document.getElementById('filter-end-date').value;
+
+            if (!startVal || !endVal) {
+                alert('Please pick both start and end dates.');
+                return;
+            }
+            if (new Date(startVal) > new Date(endVal)) {
+                alert('Start Date must be on or before End Date.');
+                return;
+            }
+
+            state.startDate = startVal;
+            state.endDate = endVal;
+            state.preset = 'custom';
+
+            document.querySelectorAll('.date-preset-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById('current-date-range-label').textContent = `${startVal} to ${endVal}`;
+
+            // Close bootstrap dropdown
+            const dropdownEl = document.getElementById('dateFilterDropdown');
+            const dropdown = bootstrap.Dropdown.getInstance(dropdownEl);
+            if (dropdown) dropdown.hide();
+
+            loadStats();
+            loadTimeline(false);
+        });
+
+        // App search bar
+        document.getElementById('app-search-input').addEventListener('input', (e) => {
+            state.appSearch = e.target.value;
+            renderAppUsage();
+        });
+
+        // Timeline Category Filter
+        document.getElementById('timeline-category-filter').addEventListener('change', (e) => {
+            timelineState.category = e.target.value;
+            loadTimeline(false);
+        });
+
+        // Timeline search input
+        let timelineSearchTimeout = null;
+        document.getElementById('timeline-search-input').addEventListener('input', (e) => {
+            clearTimeout(timelineSearchTimeout);
+            timelineSearchTimeout = setTimeout(() => {
+                timelineState.search = e.target.value;
+                loadTimeline(false);
+            }, 400);
+        });
+
+        // Timeline prune button
+        document.getElementById('timeline-prune-btn').addEventListener('click', async () => {
+            const days = prompt('Prune activity records older than how many days?', '30');
+            if (days === null) return;
+            
+            const daysInt = parseInt(days);
+            if (isNaN(daysInt) || daysInt < 0) {
+                alert('Please enter a valid number of days.');
+                return;
+            }
+
+            if (!confirm(`Are you sure you want to permanently delete all activities older than ${daysInt} days for this child profile?`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/alerts/prune', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        older_than_days: daysInt,
+                        managed_user_id: state.userId
+                    })
+                });
+                const result = await response.json();
+                if (result.success) {
+                    alert(result.message);
+                    loadTimeline(false);
+                }
+            } catch (error) {
+                alert('Failed to prune activity logs.');
+            }
+        });
+    }
+
+    // ── Initial Setup ───────────────────────────────────────────────────────
+    applyPresetDates('7days'); // Default to last 7 days range
+    initEvents();
+
+    loadStats();
+    loadTimeline(false);
+    setupTimelineInfiniteScroll();
 
 })();
 </script>

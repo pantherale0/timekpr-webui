@@ -1162,9 +1162,8 @@ def test_alert_pages_for_user_and_device(client, db_session):
 
     res = client.get(f'/stats/{user.id}')
     assert res.status_code == 200
-    assert b'Alert Audit' in res.data
+    assert b'Activity Feed' in res.data
 
-    # Query alerts API instead of checking HTML directly (since page uses AJAX)
     api_res = client.get(f'/api/alerts?managed_user_id={user.id}')
     assert api_res.status_code == 200
     api_data = json.loads(api_res.data)

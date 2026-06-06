@@ -27,8 +27,25 @@ def get_alerts():
     sort_dir = request.args.get('sort_dir', 'desc')
     page = int(request.args.get('page', 1))
     per_page = int(request.args.get('per_page', 50))
+    start_date_str = request.args.get('start_date')
+    end_date_str = request.args.get('end_date')
+    include_commands = request.args.get('include_commands', 'false').lower() == 'true'
 
     query = AgentAlert.query
+
+    if start_date_str:
+        try:
+            start_date = datetime.strptime(start_date_str, '%Y-%m-%d').replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=timezone.utc)
+            query = query.filter(AgentAlert.occurred_at >= start_date)
+        except ValueError:
+            pass
+
+    if end_date_str:
+        try:
+            end_date = datetime.strptime(end_date_str, '%Y-%m-%d').replace(hour=23, minute=59, second=59, microsecond=999999, tzinfo=timezone.utc)
+            query = query.filter(AgentAlert.occurred_at <= end_date)
+        except ValueError:
+            pass
 
     if system_id:
         query = query.filter(AgentAlert.system_id == system_id)
@@ -52,7 +69,7 @@ def get_alerts():
 
     if event_type:
         query = query.filter(AgentAlert.event_type == event_type)
-    else:
+    elif not include_commands:
         query = query.filter(AgentAlert.event_type != 'terminal_command')
 
     if search:

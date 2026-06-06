@@ -1,11 +1,12 @@
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta, time
 from flask import Blueprint, session, request, jsonify, flash, redirect, url_for
-from src.database import db, ManagedUser, AgentDevice, ManagedUserDeviceMap
+from src.database import db, ManagedUser, AgentDevice, ManagedUserDeviceMap, UserTimeUsage, AppUsageHistory
 from src.helpers import _device_display_label, _get_device_label_map, _mapping_display_label
 from src.users_manager import _refresh_managed_user_summary
 from src.agent_helper import AgentClient
+from src.installed_apps_manager import list_installed_apps_for_managed_user
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -341,6 +342,113 @@ def api_create_user():
     return jsonify({
         'success': True,
         'user': {'id': user.id, 'username': user.username}
+    })
+
+
+@api_users_bp.route('/api/user/<int:user_id>/stats')
+def get_user_stats(user_id):
+    """API endpoint to get user usage analytics, including daily totals and per-app usage in a date range."""
+    if not session.get('logged_in'):
+        return jsonify({'success': False, 'message': 'Not authenticated'}), 401
+
+    user = ManagedUser.query.get_or_404(user_id)
+    start_date_str = request.args.get('start_date')
+    end_date_str = request.args.get('end_date')
+
+    today = datetime.now(timezone.utc).date()
+    try:
+        if start_date_str:
+            start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+        else:
+            start_date = today - timedelta(days=29)
+
+        if end_date_str:
+            end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+        else:
+            end_date = today
+    except ValueError:
+        return jsonify({'success': False, 'message': 'Invalid date format. Use YYYY-MM-DD'}), 400
+
+    # 1. Query overall system/device usage
+    records = UserTimeUsage.query.filter_by(user_id=user.id).filter(
+        UserTimeUsage.date >= start_date,
+        UserTimeUsage.date <= end_date
+    ).order_by(UserTimeUsage.date).all()
+
+    num_days = (end_date - start_date).days + 1
+    daily_usage = {}
+    for i in range(num_days):
+        d = start_date + timedelta(days=i)
+        daily_usage[d.strftime('%Y-%m-%d')] = 0
+
+    for r in records:
+        daily_usage[r.date.strftime('%Y-%m-%d')] = r.time_spent
+
+    total_seconds = sum(r.time_spent for r in records)
+    daily_average_seconds = total_seconds / max(1, num_days)
+    peak_record = max(records, key=lambda r: r.time_spent) if records else None
+    peak_seconds = peak_record.time_spent if peak_record else 0
+    peak_date = peak_record.date.strftime('%Y-%m-%d') if peak_record else '—'
+
+    # 2. Query per-application usage
+    mapping_ids = [m.id for m in user.device_mappings]
+    app_list = []
+    if mapping_ids:
+        start_dt = datetime.combine(start_date, time.min).replace(tzinfo=timezone.utc)
+        end_dt = datetime.combine(end_date, time.max).replace(tzinfo=timezone.utc)
+
+        app_records = AppUsageHistory.query.filter(
+            AppUsageHistory.device_map_id.in_(mapping_ids),
+            AppUsageHistory.start_time >= start_dt,
+            AppUsageHistory.start_time <= end_dt
+        ).all()
+
+        app_aggregates = {}
+        for r in app_records:
+            key = r.executable_path or r.application_name
+            entry = app_aggregates.setdefault(key, {
+                'application_name': r.application_name,
+                'executable_path': r.executable_path,
+                'total_seconds': 0,
+                'session_count': 0,
+            })
+            entry['total_seconds'] += r.duration_seconds
+            entry['session_count'] += 1
+
+        # Retrieve app metadata (icons, platform)
+        installed_apps = list_installed_apps_for_managed_user(user.id, present_only=False)
+        app_meta = {}
+        for app in installed_apps:
+            identifier = app.get('identifier')
+            if identifier:
+                app_meta[identifier] = {
+                    'icon_hash': app.get('icon_hash'),
+                    'platform': app.get('platform'),
+                }
+
+        for key, data in app_aggregates.items():
+            meta = app_meta.get(data['executable_path'], {})
+            app_list.append({
+                'application_name': data['application_name'],
+                'executable_path': data['executable_path'],
+                'total_seconds': data['total_seconds'],
+                'session_count': data['session_count'],
+                'icon_hash': meta.get('icon_hash'),
+                'platform': meta.get('platform') or 'linux',
+            })
+        app_list.sort(key=lambda x: -x['total_seconds'])
+
+    return jsonify({
+        'success': True,
+        'username': user.username,
+        'summary': {
+            'total_seconds': total_seconds,
+            'daily_average_seconds': daily_average_seconds,
+            'peak_seconds': peak_seconds,
+            'peak_date': peak_date,
+        },
+        'daily_usage': daily_usage,
+        'app_usage': app_list,
     })
 
 
