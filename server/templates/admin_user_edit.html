@@ -204,6 +204,10 @@
                                     <input class="form-check-input android-block-wifi-tethering" type="checkbox" data-mapping-id="{{ mapping.id }}" id="block-wifi-tethering-{{ mapping.id }}" {% if device_policy.block_wifi_tethering %}checked{% endif %}>
                                     <label class="form-check-label small" for="block-wifi-tethering-{{ mapping.id }}">Block Wi-Fi tethering</label>
                                 </div>
+                                <div class="form-check form-switch mb-2">
+                                    <input class="form-check-input android-block-nfc" type="checkbox" data-mapping-id="{{ mapping.id }}" id="block-nfc-{{ mapping.id }}" {% if device_policy.block_nfc %}checked{% endif %}>
+                                    <label class="form-check-label small" for="block-nfc-{{ mapping.id }}">Block NFC</label>
+                                </div>
                                 <div class="mb-2">
                                     <label class="form-label fw-bold small text-muted text-uppercase mb-1" style="font-size: 0.7rem;">USB data access</label>
                                     <select class="form-select form-select-sm android-usb-data-access" data-mapping-id="{{ mapping.id }}">

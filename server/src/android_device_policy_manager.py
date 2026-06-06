@@ -107,6 +107,7 @@ def build_device_policy_payload(policy: MappingAndroidDevicePolicy) -> dict:
         'outgoingCallsDisabled': bool(policy.outgoing_calls_disabled),
         'smsDisabled': bool(policy.sms_disabled),
         'blockWifiTethering': bool(policy.block_wifi_tethering),
+        'blockNfc': bool(policy.block_nfc),
         'advancedSecurityOverrides': {
             'developerSettings': policy.developer_settings,
         },
@@ -167,6 +168,7 @@ def build_policy_summary(policy: MappingAndroidDevicePolicy, mapping: ManagedUse
         'usb_data_access': policy.usb_data_access,
         'developer_settings': policy.developer_settings,
         'block_wifi_tethering': policy.block_wifi_tethering,
+        'block_nfc': policy.block_nfc,
         'short_support_message': (
             policy.short_support_message
             or MappingAndroidDevicePolicy.DEFAULT_SHORT_SUPPORT_MESSAGE
@@ -244,6 +246,11 @@ def upsert_policy(mapping: ManagedUserDeviceMap, body: dict) -> MappingAndroidDe
         policy.block_wifi_tethering = _coerce_bool(
             body.get('block_wifi_tethering'),
             'block_wifi_tethering',
+        )
+    if 'block_nfc' in body:
+        policy.block_nfc = _coerce_bool(
+            body.get('block_nfc'),
+            'block_nfc',
         )
 
     payload = build_device_policy_payload(policy)

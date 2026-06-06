@@ -1372,6 +1372,7 @@ class MappingAndroidDevicePolicy(db.Model):
     )
 
     block_wifi_tethering = db.Column(db.Boolean, nullable=False, default=False)
+    block_nfc = db.Column(db.Boolean, nullable=False, default=False)
 
     def __repr__(self):
         return f'<MappingAndroidDevicePolicy map={self.device_map_id} revision={self.revision}>'

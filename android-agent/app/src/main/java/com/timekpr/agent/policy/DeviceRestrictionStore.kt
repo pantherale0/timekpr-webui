@@ -17,6 +17,7 @@ data class DeviceRestrictionPolicy(
     val outgoingCallsDisabled: Boolean = false,
     val smsDisabled: Boolean = false,
     val blockWifiTethering: Boolean = false,
+    val blockNfc: Boolean = false,
     val usbDataAccess: String = USB_DATA_ACCESS_UNSPECIFIED,
     val developerSettings: String = DEVELOPER_SETTINGS_UNSPECIFIED,
     val shortSupportMessage: String = DEFAULT_SHORT_SUPPORT_MESSAGE,
@@ -107,6 +108,7 @@ data class DeviceRestrictionPolicy(
                 outgoingCallsDisabled = json.optBoolean("outgoingCallsDisabled", false),
                 smsDisabled = json.optBoolean("smsDisabled", false),
                 blockWifiTethering = json.optBoolean("blockWifiTethering", false),
+                blockNfc = json.optBoolean("blockNfc", false),
                 usbDataAccess = usbDataAccess,
                 developerSettings = developerSettings,
                 shortSupportMessage = parseUserFacingMessage(
@@ -136,6 +138,7 @@ data class DeviceRestrictionPolicy(
             .put("outgoingCallsDisabled", outgoingCallsDisabled)
             .put("smsDisabled", smsDisabled)
             .put("blockWifiTethering", blockWifiTethering)
+            .put("blockNfc", blockNfc)
             .put(
                 "advancedSecurityOverrides",
                 JSONObject().put("developerSettings", developerSettings),

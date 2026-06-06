@@ -154,6 +154,7 @@ class EnforcementController(
             setUserRestriction(dpm, UserManager.DISALLOW_USB_FILE_TRANSFER, policy.blockUsbFileTransfer)
             setUserRestriction(dpm, UserManager.DISALLOW_WIFI_TETHERING, policy.blockWifiTethering)
             setUserRestriction(dpm, UserManager.DISALLOW_CONFIG_TETHERING, policy.blockWifiTethering)
+            setUserRestriction(dpm, UserManager.DISALLOW_NEAR_FIELD_COMMUNICATION_RADIO, policy.blockNfc)
 
             when {
                 policy.developerSettingsDisabled -> {
