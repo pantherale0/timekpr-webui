@@ -24,6 +24,8 @@ object CrossUserStoreSync {
         "timekpr_profile_provisioning",
     )
 
+    fun replicatedPrefNames(): List<String> = REPLICATED_PREFS
+
     private val REPLICATED_FILE_DIRS = listOf(
         "domain_policy",
     )
@@ -71,24 +73,34 @@ object CrossUserStoreSync {
     }
 
     private fun copySharedPreferences(from: Context, to: Context, name: String) {
-        val source = from.getSharedPreferences(name, Context.MODE_PRIVATE)
-        if (source.all.isEmpty()) return
-        val editor = to.getSharedPreferences(name, Context.MODE_PRIVATE).edit()
-        editor.clear()
-        for ((key, value) in source.all) {
-            when (value) {
-                is String -> editor.putString(key, value)
-                is Boolean -> editor.putBoolean(key, value)
-                is Int -> editor.putInt(key, value)
-                is Long -> editor.putLong(key, value)
-                is Float -> editor.putFloat(key, value)
-                is Set<*> -> {
-                    @Suppress("UNCHECKED_CAST")
-                    editor.putStringSet(key, value as Set<String>)
+        val sourceFile = File(from.applicationInfo.dataDir, "shared_prefs/$name.xml")
+        if (!sourceFile.exists()) {
+            val source = from.getSharedPreferences(name, Context.MODE_PRIVATE)
+            if (source.all.isEmpty()) return
+        }
+        val targetDir = File(to.applicationInfo.dataDir, "shared_prefs")
+        targetDir.mkdirs()
+        val targetFile = File(targetDir, "$name.xml")
+        if (sourceFile.exists()) {
+            sourceFile.copyTo(targetFile, overwrite = true)
+        } else {
+            val source = from.getSharedPreferences(name, Context.MODE_PRIVATE)
+            val editor = to.getSharedPreferences(name, Context.MODE_PRIVATE).edit().clear()
+            for ((key, value) in source.all) {
+                when (value) {
+                    is String -> editor.putString(key, value)
+                    is Boolean -> editor.putBoolean(key, value)
+                    is Int -> editor.putInt(key, value)
+                    is Long -> editor.putLong(key, value)
+                    is Float -> editor.putFloat(key, value)
+                    is Set<*> -> {
+                        @Suppress("UNCHECKED_CAST")
+                        editor.putStringSet(key, value as Set<String>)
+                    }
                 }
             }
+            editor.commit()
         }
-        editor.apply()
     }
 
     private fun copyFilesDirectory(from: Context, to: Context, relativePath: String) {

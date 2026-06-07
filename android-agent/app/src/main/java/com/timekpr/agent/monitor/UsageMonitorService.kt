@@ -22,6 +22,7 @@ import com.timekpr.agent.admin.SecondaryUserProvisioner
 import com.timekpr.agent.boot.SecondaryUserInitService
 import com.timekpr.agent.enforcement.EnforcementController
 import com.timekpr.agent.policy.PolicyPayloadPush
+import com.timekpr.agent.policy.PolicyStorePayloadPush
 import com.timekpr.agent.vpn.DomainBlockVpnService
 import com.timekpr.agent.policy.AppPolicyStore
 import com.timekpr.agent.util.AndroidUsers
@@ -83,6 +84,7 @@ class UsageMonitorService : Service() {
             if (Process.myUid() / 100_000 == 0 && activeUid != 0 && activeUid != lastBootstrappedForegroundUser) {
                 lastBootstrappedForegroundUser = activeUid
                 CrossUserStoreSync.replicateFromPrimaryToUser(this, activeUid)
+                PolicyStorePayloadPush.pushToUser(this, activeUid)
                 PolicyPayloadPush.pushToUser(this, activeUid, activeUid)
                 SecondaryUserInitService.startOnUser(this, activeUid)
                 userHandleForId(activeUid)?.let { handle ->

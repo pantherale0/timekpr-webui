@@ -3,7 +3,9 @@ package com.timekpr.agent.policy
 import android.content.Context
 import com.timekpr.agent.discovery.InstalledAppsDiscovery
 import com.timekpr.agent.monitor.ApprovalRequestDeduper
+import com.timekpr.agent.util.PrefXmlReader
 import org.json.JSONArray
+import java.io.File
 import org.json.JSONObject
 
 data class AppPolicyRule(
@@ -93,18 +95,17 @@ class AppPolicyStore(context: Context) {
             .toSet()
     }
 
-    fun effectiveBlockedPackages(username: String): Set<String> {
+    fun effectiveBlockedPackages(username: String, discoveryContext: Context = appContext): Set<String> {
         val rulesBlocked = blockedPackages(username)
         val approval = approvalPolicyForUser(username) ?: return rulesBlocked
         if (approval.appLaunchMode == "allowlist") {
-            val installed = InstalledAppsDiscovery.discover(appContext)
+            val installed = InstalledAppsDiscovery.discover(discoveryContext)
                 .mapNotNull { app ->
                     app.identifier.removePrefix(InstalledAppsDiscovery.ANDROID_PACKAGE_PREFIX)
                         .takeIf { it.isNotBlank() }
                 }
                 .toSet()
-            val blocked = installed - approval.approvedPackages
-            return blocked
+            return installed - approval.approvedPackages
         }
         return ApprovalPolicy.effectiveBlockedPackages(rulesBlocked, approval)
     }
@@ -196,7 +197,7 @@ class AppPolicyStore(context: Context) {
     fun restore() {
         policiesByUser.clear()
         packagesReleasedBySync.clear()
-        val raw = prefs.getString(KEY_RULES, null)
+        val raw = readPrefJson(KEY_RULES)
         if (raw != null) {
             try {
                 val root = JSONObject(raw)
@@ -208,8 +209,15 @@ class AppPolicyStore(context: Context) {
                 policiesByUser.clear()
             }
         }
-        restoreApprovalPolicies(prefs.getString(KEY_APPROVAL_POLICIES, null))
-        restoreLastEnforcedBlocked(prefs.getString(KEY_LAST_ENFORCED_BLOCKED, null))
+        restoreApprovalPolicies(readPrefJson(KEY_APPROVAL_POLICIES))
+        restoreLastEnforcedBlocked(readPrefJson(KEY_LAST_ENFORCED_BLOCKED))
+    }
+
+    private fun readPrefJson(key: String): String? {
+        PrefXmlReader.stringValues(
+            File(appContext.applicationInfo.dataDir, "shared_prefs/$PREFS_NAME.xml"),
+        )[key]?.let { return it }
+        return prefs.getString(key, null)
     }
 
     private fun parseRulesArray(array: JSONArray): MutableList<AppPolicyRule> {

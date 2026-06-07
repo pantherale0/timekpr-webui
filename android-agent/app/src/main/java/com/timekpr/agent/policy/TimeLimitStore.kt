@@ -3,6 +3,8 @@ package com.timekpr.agent.policy
 import android.content.Context
 import org.json.JSONArray
 import org.json.JSONObject
+import com.timekpr.agent.util.PrefXmlReader
+import java.io.File
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.LocalTime
@@ -14,7 +16,8 @@ import java.util.concurrent.ConcurrentHashMap
  * Mirrors debug-agent / TimeKpr D-Bus semantics using in-app storage.
  */
 class TimeLimitStore(context: Context) {
-    private val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    private val appContext = context.applicationContext
+    private val prefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     private val users = ConcurrentHashMap<String, UserTimeState>()
     private val screentimeExemptByUser = ConcurrentHashMap<String, Set<String>>()
 
@@ -39,15 +42,33 @@ class TimeLimitStore(context: Context) {
         return null
     }
 
+    fun reloadFromPrefs() {
+        users.clear()
+    }
+
     fun allUsernames(): Set<String> {
         val names = mutableSetOf<String>()
         names.addAll(users.keys)
+        readUsernamesFromPrefsStore(names)
+        readUsernamesFromPrefsFile(names)
+        return names
+    }
+
+    private fun readUsernamesFromPrefsStore(names: MutableSet<String>) {
         prefs.all.keys.forEach { key ->
             if (key.startsWith("user_")) {
                 names.add(key.substring(5))
             }
         }
-        return names
+    }
+
+    private fun readUsernamesFromPrefsFile(names: MutableSet<String>) {
+        val file = File(appContext.applicationInfo.dataDir, "shared_prefs/$PREFS_NAME.xml")
+        PrefXmlReader.stringValues(file).keys.forEach { key ->
+            if (key.startsWith("user_")) {
+                names.add(key.substring(5))
+            }
+        }
     }
 
     data class UserTimeState(
@@ -81,7 +102,9 @@ class TimeLimitStore(context: Context) {
                 allowedHours = defaultAllowedHours(),
             )
         }
-        if (defaultUid > 0 && state.linuxUid != defaultUid) {
+        if (loaded != null && loaded.linuxUid > 0) {
+            state.linuxUid = loaded.linuxUid
+        } else if (defaultUid > 0 && state.linuxUid <= 0) {
             state.linuxUid = defaultUid
             persist(username, state)
         }
@@ -233,7 +256,19 @@ class TimeLimitStore(context: Context) {
     }
 
     private fun loadPersisted(username: String): UserTimeState? {
-        val raw = prefs.getString("user_$username", null) ?: return null
+        val raw = readPersistedRaw(username) ?: return null
+        return parsePersistedState(raw)
+    }
+
+    private fun readPersistedRaw(username: String): String? {
+        val key = "user_$username"
+        PrefXmlReader.stringValues(
+            File(appContext.applicationInfo.dataDir, "shared_prefs/$PREFS_NAME.xml"),
+        )[key]?.let { return it }
+        return prefs.getString(key, null)
+    }
+
+    private fun parsePersistedState(raw: String): UserTimeState? {
         return try {
             val json = JSONObject(raw)
             UserTimeState(

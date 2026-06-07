@@ -8,7 +8,7 @@ import android.util.Log
 import com.timekpr.agent.TimeKprApplication
 import com.timekpr.agent.admin.CrossUserStoreSync
 import com.timekpr.agent.admin.DeviceOwnerProvisioner
-import com.timekpr.agent.admin.SecondaryUserProvisioner
+import com.timekpr.agent.policy.PolicyStorePayloadPush
 import com.timekpr.agent.enforcement.EnforcementController
 import com.timekpr.agent.boot.SecondaryUserInitService
 import com.timekpr.agent.monitor.UsageMonitorService
@@ -22,6 +22,7 @@ class UserSwitchedReceiver : BroadcastReceiver() {
         val userId = readSwitchedUserId(intent)
         if (userId != null && userId != 0 && android.os.Process.myUid() / 100_000 == 0) {
             CrossUserStoreSync.replicateFromPrimaryToUser(context, userId)
+            PolicyStorePayloadPush.pushToUser(context, userId)
             bootstrapSecondaryUser(context, userId)
             SecondaryUserInitService.startOnUser(context, userId)
         }

@@ -37,9 +37,9 @@ class TimeKprApplication : Application() {
         if (isUserZero) {
             policyIpcServer.start()
             com.timekpr.agent.admin.SecondaryUserProvisioner.ensurePrimaryUiVisible(this)
-        } else {
-            com.timekpr.agent.admin.SecondaryUserProvisioner.prepareAtLaunch(this)
         }
+        // Managed secondary profiles are initialized by SecondaryUserInitService
+        // after the device owner replicates policy stores from user 0.
         
         DeviceOwnerProvisioner.applyIfDeviceOwner(this)
     }

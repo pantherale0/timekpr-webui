@@ -144,6 +144,14 @@
             </intent-filter>
         </receiver>
 
+        <receiver
+            android:name=".policy.PolicyStoreReloadReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.timekpr.agent.policy.ACTION_RELOAD_STORES" />
+            </intent-filter>
+        </receiver>
+
         <service
             android:name=".boot.SecondaryUserInitService"
             android:exported="false" />

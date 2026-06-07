@@ -13,16 +13,20 @@ import android.os.UserManager
 import android.provider.Settings
 import android.util.Log
 import com.timekpr.agent.TimeKprApplication
+import com.timekpr.agent.admin.CrossUserStoreSync
 import com.timekpr.agent.admin.DeviceOwnerProvisioner
 import com.timekpr.agent.admin.SecondaryUserProvisioner
 import com.timekpr.agent.admin.TimeKprDeviceAdminReceiver
+import com.timekpr.agent.boot.SecondaryUserInitService
 import com.timekpr.agent.monitor.UsageMonitorService
 import com.timekpr.agent.policy.AppPolicyStore
 import com.timekpr.agent.policy.DeviceRestrictionPolicy
+import com.timekpr.agent.policy.PolicyStorePayloadPush
 import com.timekpr.agent.policy.ProfileProvisioningStore
 import com.timekpr.agent.ui.TimeExhaustedOverlay
 import com.timekpr.agent.util.AndroidUsers
 import com.timekpr.agent.vpn.DomainBlockVpnService
+import android.os.Process
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -46,9 +50,16 @@ class EnforcementController(
     }
 
     fun reconcileAllUsers() {
+        val callingUserId = Process.myUid() / 100_000
         val allUsers = TimeKprApplication.from(context).timeLimitStore.allUsernames()
         allUsers.forEach { username ->
             val uid = getUidForUsername(username)
+            if (uid != callingUserId) {
+                if (callingUserId == 0 && uid > 0) {
+                    delegateEnforcementToUser(uid)
+                }
+                return@forEach
+            }
             applyTimePoliciesForUser(username, uid)
             applyAppPoliciesForUser(username, uid)
             applyDeviceRestrictionsForUser(username, uid)
@@ -83,11 +94,19 @@ class EnforcementController(
             return
         }
 
+        val callingUserId = Process.myUid() / 100_000
+        if (uid != callingUserId) {
+            if (callingUserId == 0 && uid > 0) {
+                delegateEnforcementToUser(uid)
+            }
+            return
+        }
+
         val userContext = AndroidUsers.getUserContext(context, uid) ?: context
         val dpm = userContext.getSystemService(DevicePolicyManager::class.java) ?: return
         if (!dpm.isAdminActive(adminComponent)) return
 
-        val blocked = appPolicyStore.effectiveBlockedPackages(username)
+        val blocked = appPolicyStore.effectiveBlockedPackages(username, userContext)
         val previouslyEnforced = appPolicyStore.lastEnforcedBlockedPackages(username)
         val releasedBySync = appPolicyStore.consumePackagesReleasedBySync(username)
         var toUnsuspend = (previouslyEnforced + releasedBySync - blocked).toMutableSet()
@@ -121,7 +140,8 @@ class EnforcementController(
 
         val previouslySuspended = lastTimeExhaustionSuspendedByUser.remove(username) ?: emptySet()
         if (previouslySuspended.isNotEmpty()) {
-            val stillBlocked = appPolicyStore.effectiveBlockedPackages(username)
+            val userContext = AndroidUsers.getUserContext(context, uid) ?: context
+            val stillBlocked = appPolicyStore.effectiveBlockedPackages(username, userContext)
             val toUnsuspend = (previouslySuspended - stillBlocked).toTypedArray()
             setPackagesSuspended(dpm, toUnsuspend, false)
         }
@@ -130,7 +150,15 @@ class EnforcementController(
     }
 
     private fun getUidForUsername(username: String): Int {
-        return TimeKprApplication.from(context).timeLimitStore.ensureUser(username, AndroidUsers.currentLinuxUid(context)).linuxUid
+        val hintedUid = ProfileProvisioningStore(context).userIdFor(username)
+        val resolvedUid = AndroidUsers.resolveUidForUsername(context, username, hintedUid)
+        return timeLimitStore.ensureUser(username, resolvedUid).linuxUid
+    }
+
+    private fun delegateEnforcementToUser(targetUserId: Int) {
+        CrossUserStoreSync.replicateFromPrimaryToUser(context, targetUserId)
+        PolicyStorePayloadPush.pushToUser(context, targetUserId)
+        SecondaryUserInitService.startOnUser(context, targetUserId)
     }
 
     private fun launcherPackagesForUser(uid: Int): Set<String> {
@@ -364,7 +392,11 @@ class EnforcementController(
         }
     }
 
-    private fun setPackagesSuspended(dpm: DevicePolicyManager, packages: Array<String>, suspended: Boolean) {
+    private fun setPackagesSuspended(
+        dpm: DevicePolicyManager,
+        packages: Array<String>,
+        suspended: Boolean,
+    ) {
         if (packages.isEmpty()) return
         if (!DeviceOwnerProvisioner.isDeviceOrProfileOwner(context)) {
             Log.w(TAG, "Cannot suspend/unsuspend packages: App is not Device Owner or Profile Owner")

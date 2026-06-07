@@ -132,10 +132,10 @@ object SecondaryUserProvisioner {
         val appContext = context.applicationContext
         if (!isManagedSecondaryUser(appContext)) return
 
-        CrossUserStoreSync.replicateFromPrimaryToCurrentUser(appContext)
         DeviceOwnerProvisioner.applyManagedCapabilities(appContext)
 
         val app = TimeKprApplication.from(appContext)
+        app.timeLimitStore.reloadFromPrefs()
         app.appPolicyStore.restore()
         app.domainPolicyStore.restore()
         app.deviceRestrictionStore.restore()
