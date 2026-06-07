@@ -84,6 +84,8 @@ Reports are sent after authentication, every 24 hours while connected, and when 
 
 Uses `PackageManager` to enumerate launcher-visible applications. Identifiers use the `/android/package/<packageName>` convention with `match_type: package`.
 
+On multi-user devices, the device-owner process (user 0) reports inventory separately for each managed profile using `createPackageContextAsUser`, matching the `linux_username` values advertised in the hello `linux_users` payload. Secondary profile processes report only their own user when they connect independently.
+
 Icons are rendered to 64×64 PNG and hashed before upload. Inventory is pushed after each authenticated sync session and on `refresh_installed_apps`.
 
 ## Server storage

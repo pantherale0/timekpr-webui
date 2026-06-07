@@ -83,6 +83,25 @@ def _coerce_bool(value, field_name: str) -> bool:
     raise ValueError(f'{field_name} must be a boolean')
 
 
+def _owner_lockdown_flags(system_id: str) -> tuple[bool, list[int]]:
+    """Return (lock_owner_profile, managed_child_uids) for Android multi-user devices."""
+    mappings = ManagedUserDeviceMap.query.filter_by(system_id=system_id).all()
+    owner_mapped_to_child = any(m.linux_uid == 0 for m in mappings)
+    managed_child_uids = sorted(
+        {
+            int(m.linux_uid)
+            for m in mappings
+            if m.linux_uid is not None and int(m.linux_uid) > 0
+        }
+    )
+    has_managed_children = bool(managed_child_uids) or any(
+        m.android_profile_type in ('restricted', 'standard')
+        for m in mappings
+    )
+    lock_owner_profile = has_managed_children and not owner_mapped_to_child
+    return lock_owner_profile, managed_child_uids
+
+
 def build_device_policy_payload(policy: MappingAndroidDevicePolicy) -> dict:
     """Build canonical AMAPI-shaped device policy JSON for agent sync."""
     short_message = (
@@ -94,6 +113,8 @@ def build_device_policy_payload(policy: MappingAndroidDevicePolicy) -> dict:
         or MappingAndroidDevicePolicy.DEFAULT_LONG_SUPPORT_MESSAGE
     )
     
+    lock_owner_profile, managed_child_uids = _owner_lockdown_flags(policy.system_id)
+
     # Query profiles to provision (skip once linked to a device UID)
     mappings = ManagedUserDeviceMap.query.filter_by(system_id=policy.system_id).all()
     profiles = []
@@ -131,6 +152,8 @@ def build_device_policy_payload(policy: MappingAndroidDevicePolicy) -> dict:
         'shortSupportMessage': _user_facing_message(short_message),
         'longSupportMessage': _user_facing_message(long_message),
         'profiles': profiles,
+        'lockOwnerProfile': lock_owner_profile,
+        'managedProfileUids': managed_child_uids,
     }
     return payload
 

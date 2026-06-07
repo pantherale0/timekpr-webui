@@ -6,25 +6,30 @@ import android.content.Intent
 import android.os.UserHandle
 import android.util.Log
 import com.timekpr.agent.TimeKprApplication
-import com.timekpr.agent.admin.CrossUserStoreSync
 import com.timekpr.agent.admin.DeviceOwnerProvisioner
 import com.timekpr.agent.policy.PolicyStorePayloadPush
 import com.timekpr.agent.enforcement.EnforcementController
 import com.timekpr.agent.boot.SecondaryUserInitService
 import com.timekpr.agent.monitor.UsageMonitorService
+import com.timekpr.agent.service.AgentPersistentConnectionService
 import com.timekpr.agent.vpn.DomainBlockVpnService
 
 class UserSwitchedReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent?) {
         if (intent?.action != ACTION_USER_SWITCHED) return
-        Log.i(TAG, "User switched broadcast received.")
 
         val userId = readSwitchedUserId(intent)
+        Log.i(TAG, "User switched to user ${userId ?: "unknown"}")
         if (userId != null && userId != 0 && android.os.Process.myUid() / 100_000 == 0) {
-            CrossUserStoreSync.replicateFromPrimaryToUser(context, userId)
             PolicyStorePayloadPush.pushToUser(context, userId)
             bootstrapSecondaryUser(context, userId)
             SecondaryUserInitService.startOnUser(context, userId)
+        }
+
+        // Keep user-0 usage monitor alive for cross-profile reporting over the WebSocket.
+        if (android.os.Process.myUid() / 100_000 == 0) {
+            UsageMonitorService.start(context)
+            AgentPersistentConnectionService.start(context)
         }
 
         val app = TimeKprApplication.from(context)
@@ -54,8 +59,6 @@ class UserSwitchedReceiver : BroadcastReceiver() {
         if (!DeviceOwnerProvisioner.isDeviceOwner(context)) return
         val userHandle = userHandleForId(userId) ?: return
         try {
-            val monitorIntent = Intent(context, UsageMonitorService::class.java)
-            startForegroundServiceAsUser(context, monitorIntent, userHandle)
             val reloadIntent = Intent(DomainBlockVpnService.ACTION_RELOAD_POLICY)
             context.sendBroadcastAsUser(reloadIntent, userHandle)
         } catch (e: Exception) {

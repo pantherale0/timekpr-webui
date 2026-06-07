@@ -1,6 +1,8 @@
 package com.timekpr.agent.discovery
 
+import android.content.Context
 import com.timekpr.agent.protocol.AgentMessages
+import com.timekpr.agent.util.AndroidUsers
 import okhttp3.WebSocket
 import org.json.JSONObject
 import java.time.Instant
@@ -8,6 +10,14 @@ import java.time.format.DateTimeFormatter
 import java.util.UUID
 
 object InstalledAppsReporter {
+    /** Scan launcher apps for each managed Android user and push chunked inventory reports. */
+    fun reportAllManagedUsers(context: Context, webSocket: WebSocket) {
+        for ((linuxUsername, userContext) in AndroidUsers.inventoryTargets(context)) {
+            val apps = InstalledAppsDiscovery.discover(userContext)
+            sendInventory(webSocket, linuxUsername, apps)
+        }
+    }
+
     fun sendInventory(webSocket: WebSocket, linuxUsername: String, apps: List<DiscoveredApp>) {
         if (apps.isEmpty()) {
             webSocket.send(

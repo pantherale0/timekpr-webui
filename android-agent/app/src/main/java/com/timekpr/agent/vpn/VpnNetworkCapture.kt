@@ -4,7 +4,7 @@ import android.content.Context
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
-import android.util.Log
+import com.timekpr.agent.util.AgentLog
 
 internal object VpnNetworkCapture {
     private const val TAG = "VpnNetworkCapture"
@@ -14,7 +14,7 @@ internal object VpnNetworkCapture {
 
         manager.activeNetwork?.let { active ->
             if (!isVpnNetwork(manager, active) && hasInternet(manager, active)) {
-                Log.i(TAG, "Using active underlying network $active")
+                AgentLog.d(TAG, "Using active underlying network $active")
                 return active
             }
         }
@@ -22,12 +22,12 @@ internal object VpnNetworkCapture {
         for (candidate in manager.allNetworks) {
             if (isVpnNetwork(manager, candidate)) continue
             if (hasInternet(manager, candidate)) {
-                Log.i(TAG, "Using scanned underlying network $candidate")
+                AgentLog.d(TAG, "Using scanned underlying network $candidate")
                 return candidate
             }
         }
 
-        Log.w(TAG, "No underlying network found for DNS resolution")
+        AgentLog.wOnce(TAG, "no_underlying", "No underlying network found for DNS resolution")
         return null
     }
 

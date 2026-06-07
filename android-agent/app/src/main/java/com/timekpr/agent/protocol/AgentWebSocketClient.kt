@@ -6,7 +6,6 @@ import com.timekpr.agent.TimeKprApplication
 import com.timekpr.agent.admin.CrossUserStoreSync
 import com.timekpr.agent.admin.DeviceOwnerProvisioner
 import com.timekpr.agent.config.AgentConfig
-import com.timekpr.agent.discovery.InstalledAppsDiscovery
 import com.timekpr.agent.discovery.InstalledAppsReporter
 import com.timekpr.agent.enforcement.EnforcementController
 import com.timekpr.agent.monitor.AlertEventBus
@@ -194,23 +193,26 @@ class AgentWebSocketClient(
                 activeWebSocket = webSocket
                 AlertEventBus.setListener { pending ->
                     activeWebSocket?.let { socket ->
-                        sendAlert(socket, pending.eventType, pending.details)
+                        sendAlert(socket, pending.eventType, pending.linuxUsername, pending.details)
                     }
                 }
-                sendAlert(webSocket, "system_startup", JSONObject().put("platform", "android"))
+                sendAlert(
+                    webSocket,
+                    "system_startup",
+                    AndroidUsers.currentLinuxUsername(context),
+                    JSONObject().put("platform", "android"),
+                )
                 sendPolicySyncCheck(webSocket)
                 enforcement.startAll()
                 CrossUserStoreSync.replicateToAllSecondaryUsers(context)
                 DomainBlockVpnService.reconcile(context)
 
                 AlertEventBus.drain().forEach { pending ->
-                    sendAlert(webSocket, pending.eventType, pending.details)
+                    sendAlert(webSocket, pending.eventType, pending.linuxUsername, pending.details)
                 }
 
-                val linuxUsername = AndroidUsers.currentLinuxUsername(context)
-                val discoveredApps = InstalledAppsDiscovery.discover(context)
-                InstalledAppsReporter.sendInventory(webSocket, linuxUsername, discoveredApps)
-                enforcement.applyAppPolicies(linuxUsername)
+                InstalledAppsReporter.reportAllManagedUsers(context, webSocket)
+                // reconcileAllUsers in startAll() already applied policies for all local users.
 
                 if (mode == SessionMode.PERSISTENT || message.optBoolean("persistent_connection", false)) {
                     if (mode != SessionMode.PERSISTENT) {
@@ -259,12 +261,17 @@ class AgentWebSocketClient(
         AlertEventBus.setListener(null)
     }
 
-    private fun sendAlert(webSocket: WebSocket, eventType: String, details: JSONObject) {
+    private fun sendAlert(
+        webSocket: WebSocket,
+        eventType: String,
+        linuxUsername: String,
+        details: JSONObject,
+    ) {
         webSocket.send(
             AgentMessages.alertEvent(
                 eventType = eventType,
                 occurredAt = DateTimeFormatter.ISO_INSTANT.format(Instant.now()),
-                linuxUsername = AndroidUsers.currentLinuxUsername(context),
+                linuxUsername = linuxUsername,
                 details = details,
             ),
         )

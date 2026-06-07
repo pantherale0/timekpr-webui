@@ -460,6 +460,58 @@
 
         <!-- Right Column: Device management, filtering profiles -->
         <div class="col-12 col-lg-4">
+            {% if parental_access_code %}
+            <div class="card shadow-sm border mb-4">
+                <div class="card-header bg-primary text-white py-3 d-flex align-items-center gap-2">
+                    <div class="bg-white text-primary p-2 rounded d-flex align-items-center justify-content-center" style="width: 38px; height: 38px;">
+                        <i class="fas fa-key fs-5"></i>
+                    </div>
+                    <div>
+                        <h5 class="mb-0 fw-bold">Parental Access Code</h5>
+                        <span class="text-white-50 text-wrap small fw-medium">Use offline to reset lock screen PIN</span>
+                    </div>
+                </div>
+                <div class="card-body text-center">
+                    <div class="display-4 fw-bold my-3 text-primary font-monospace" style="letter-spacing: 0.1em;">
+                        {{ parental_access_code }}
+                    </div>
+                    <p class="small text-secondary mb-0">
+                        Enter this 6-digit code on the device lock screen. It rotates every 30 minutes.
+                        If the current code fails, try the codes from the previous one or two windows as well.
+                    </p>
+                </div>
+            </div>
+            {% if device.secure_token and android_recovery_ws_url %}
+            <div class="card shadow-sm border mb-4">
+                <div class="card-header bg-dark text-white py-3 d-flex align-items-center gap-2">
+                    <div class="bg-white text-dark p-2 rounded d-flex align-items-center justify-content-center" style="width: 38px; height: 38px;">
+                        <i class="fas fa-terminal fs-5"></i>
+                    </div>
+                    <div>
+                        <h5 class="mb-0 fw-bold">Locked Device Recovery</h5>
+                        <span class="text-white-50 text-wrap small fw-medium">Use when the phone cannot unlock after reboot</span>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <p class="small text-secondary">
+                        The <strong>device token</strong> below is not the 6-digit code above. It is the secret the agent
+                        uses to sync with this server. Run these commands from a computer with ADB access:
+                    </p>
+                    <label class="form-label small fw-bold text-secondary mb-1">Device token</label>
+                    <div class="font-monospace small bg-light border rounded p-2 mb-3 user-select-all">{{ device.secure_token }}</div>
+                    <label class="form-label small fw-bold text-secondary mb-1">Recovery commands</label>
+                    <pre class="small bg-light border rounded p-2 mb-0 user-select-all" style="white-space: pre-wrap;">adb install -r app-debug.apk
+adb shell am broadcast --user 0 \
+  -a com.timekpr.agent.LOCKED_BOOT_SEED_CONFIG \
+  -n com.timekpr.agent/.boot.LockedBootRecoveryReceiver \
+  --es agent_token "{{ device.secure_token }}" \
+  --es server_url "{{ android_recovery_ws_url }}"
+adb reboot</pre>
+                </div>
+            </div>
+            {% endif %}
+            {% endif %}
+
             {% if device.status == 'approved' %}
             <div class="card shadow-sm border border-danger mb-4">
                 <div class="card-header bg-danger-subtle py-3 d-flex align-items-center gap-2">

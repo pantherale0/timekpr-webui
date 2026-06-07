@@ -85,6 +85,8 @@ def test_build_device_policy_payload_defaults(android_device):
             'defaultMessage': MappingAndroidDevicePolicy.DEFAULT_LONG_SUPPORT_MESSAGE,
         },
         'profiles': [],
+        'lockOwnerProfile': False,
+        'managedProfileUids': [],
     }
 
 
@@ -97,6 +99,47 @@ def test_build_device_policy_payload_with_profiles(android_device, android_mappi
             'profile_type': 'restricted'
         }
     ]
+
+
+def test_build_device_policy_payload_locks_unassigned_owner(android_device, android_mapping, db_session):
+    android_mapping.linux_uid = 15
+    db_session.commit()
+    policy = get_or_create_policy(android_device)
+    payload = build_device_policy_payload(policy)
+    assert payload['managedProfileUids'] == [15]
+    assert payload['lockOwnerProfile'] is True
+
+
+def test_build_device_policy_payload_skips_owner_lock_when_owner_mapped(android_device, db_session):
+    user = ManagedUser(username='owner-child', system_ip='Unassigned', is_valid=True)
+    db_session.add(user)
+    db_session.flush()
+    child = ManagedUser(username='other-child', system_ip='Unassigned', is_valid=True)
+    db_session.add(child)
+    db_session.flush()
+    db_session.add_all([
+        ManagedUserDeviceMap(
+            managed_user_id=user.id,
+            system_id=android_device.system_id,
+            linux_username='Owner',
+            linux_uid=0,
+            is_valid=True,
+            android_profile_type='standard',
+        ),
+        ManagedUserDeviceMap(
+            managed_user_id=child.id,
+            system_id=android_device.system_id,
+            linux_username='Child',
+            linux_uid=15,
+            is_valid=True,
+            android_profile_type='restricted',
+        ),
+    ])
+    db_session.commit()
+    policy = get_or_create_policy(android_device)
+    payload = build_device_policy_payload(policy)
+    assert payload['managedProfileUids'] == [15]
+    assert payload['lockOwnerProfile'] is False
 
 
 def test_build_device_policy_payload_skips_linked_profiles(android_device, android_mapping, db_session):

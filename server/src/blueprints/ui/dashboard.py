@@ -3,7 +3,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 from src.database import db, ManagedUser, AgentDevice, Settings, AppPolicy
 from src.agent_helper import AgentConnectionManager, refresh_installed_apps
 from src.installed_apps_manager import list_installed_apps_for_device, list_installed_apps_for_managed_user
-from src.helpers import _get_device_label_map
+from src.helpers import _get_device_label_map, generate_parental_access_code
 from src.dashboard_helper import build_dashboard_snapshot
 from src.alerts_manager import _build_user_alert_groups, _build_device_alert_entries
 from src.apparmor_manager import _get_apparmor_usage_summary
@@ -482,12 +482,20 @@ def device_detail(system_id):
         )
 
     android_device_policy = None
+    parental_access_code = None
+    android_recovery_ws_url = None
     if (device.platform or '').strip().lower() == 'android':
         from src.android_device_policy_manager import get_or_create_policy as get_or_create_android_policy
         try:
             android_device_policy = get_or_create_android_policy(device)
         except ValueError:
             pass
+        if device.status == 'approved' and device.secure_token:
+            parental_access_code = generate_parental_access_code(device.secure_token)
+            android_recovery_ws_url = build_agent_websocket_url(
+                request,
+                configured_url=_get_agent_websocket_url(),
+            )
 
     return render_template(
         'device_detail.html',
@@ -503,6 +511,8 @@ def device_detail(system_id):
         android_device_policy=android_device_policy,
         agent_online=AgentConnectionManager.is_online(system_id),
         fcm_available=bool((device.fcm_token or '').strip()),
+        parental_access_code=parental_access_code,
+        android_recovery_ws_url=android_recovery_ws_url,
     )
 
 

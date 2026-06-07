@@ -13,7 +13,6 @@ import android.os.UserManager
 import android.provider.Settings
 import android.util.Log
 import com.timekpr.agent.TimeKprApplication
-import com.timekpr.agent.admin.CrossUserStoreSync
 import com.timekpr.agent.admin.DeviceOwnerProvisioner
 import com.timekpr.agent.admin.SecondaryUserProvisioner
 import com.timekpr.agent.admin.TimeKprDeviceAdminReceiver
@@ -24,6 +23,7 @@ import com.timekpr.agent.policy.DeviceRestrictionPolicy
 import com.timekpr.agent.policy.PolicyStorePayloadPush
 import com.timekpr.agent.policy.ProfileProvisioningStore
 import com.timekpr.agent.ui.TimeExhaustedOverlay
+import com.timekpr.agent.util.AgentLog
 import com.timekpr.agent.util.AndroidUsers
 import com.timekpr.agent.vpn.DomainBlockVpnService
 import android.os.Process
@@ -40,6 +40,8 @@ class EnforcementController(
     private val enforcementPrefs =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     private val lastTimeExhaustionSuspendedByUser = mutableMapOf<String, Set<String>>()
+    private var lastOwnerLockdownSuspended = emptySet<String>()
+    private var ownerLockdownActive = false
 
     init {
         restoreTimeExhaustionSuspended()
@@ -54,6 +56,9 @@ class EnforcementController(
         val allUsers = TimeKprApplication.from(context).timeLimitStore.allUsernames()
         allUsers.forEach { username ->
             val uid = getUidForUsername(username)
+            if (uid < 0) {
+                return@forEach
+            }
             if (uid != callingUserId) {
                 if (callingUserId == 0 && uid > 0) {
                     delegateEnforcementToUser(uid)
@@ -65,7 +70,30 @@ class EnforcementController(
             applyDeviceRestrictionsForUser(username, uid)
         }
         DomainBlockVpnService.reconcile(context)
-        UsageMonitorService.start(context)
+        if (Process.myUid() / 100_000 == 0) {
+            UsageMonitorService.start(context)
+        }
+        applyOwnerProfileLockdownIfNeeded()
+    }
+
+    fun applyOwnerProfileLockdownIfNeeded() {
+        if (Process.myUid() / 100_000 != 0) return
+        val dpm = context.getSystemService(DevicePolicyManager::class.java) ?: return
+        if (!dpm.isAdminActive(adminComponent)) return
+
+        val ownerEval = OwnerProfileLockdown.evaluate(context)
+
+        if (!ownerEval.shouldLock) {
+            OwnerProfilePinRotator.clearAppliedSlot(context)
+            clearOwnerProfileLockdown(dpm)
+            return
+        }
+        enforceOwnerProfileLockdown(dpm)
+    }
+
+    fun onOwnerProfileUnlocked() {
+        OwnerProfileLockdown.markUnlockedForCurrentOtpWindow(context)
+        applyOwnerProfileLockdownIfNeeded()
     }
 
     fun applyTimePolicies(username: String) {
@@ -101,6 +129,7 @@ class EnforcementController(
             }
             return
         }
+        if (uid < 0) return
 
         val userContext = AndroidUsers.getUserContext(context, uid) ?: context
         val dpm = userContext.getSystemService(DevicePolicyManager::class.java) ?: return
@@ -110,10 +139,13 @@ class EnforcementController(
         val previouslyEnforced = appPolicyStore.lastEnforcedBlockedPackages(username)
         val releasedBySync = appPolicyStore.consumePackagesReleasedBySync(username)
         var toUnsuspend = (previouslyEnforced + releasedBySync - blocked).toMutableSet()
-        if (blocked.isEmpty() && toUnsuspend.isEmpty()) {
+        if (blocked.isEmpty() && toUnsuspend.isEmpty() && !ownerLockdownActive) {
             toUnsuspend.addAll(findSuspendedThirdPartyPackagesForUser(uid))
         }
-        val toSuspend = blocked.toTypedArray()
+        if (toUnsuspend.isEmpty() && blocked == previouslyEnforced) {
+            return
+        }
+        val toSuspend = (blocked - previouslyEnforced).toTypedArray()
         val toUnsuspendArray = toUnsuspend.toTypedArray()
         setPackagesSuspended(dpm, toUnsuspendArray, false)
         setPackagesSuspended(dpm, toSuspend, true)
@@ -134,7 +166,7 @@ class EnforcementController(
     }
 
     private fun clearTimeExhaustionForUser(username: String, uid: Int, dpm: DevicePolicyManager) {
-        if (uid == AndroidUsers.activeUserUid(context)) {
+        if (uid == AndroidUsers.activeUserUid(context) && !ownerLockdownActive) {
             TimeExhaustedOverlay.dismiss(context)
         }
 
@@ -146,17 +178,16 @@ class EnforcementController(
             setPackagesSuspended(dpm, toUnsuspend, false)
         }
         persistTimeExhaustionSuspended()
-        applyAppPoliciesForUser(username, uid)
     }
 
     private fun getUidForUsername(username: String): Int {
+        timeLimitStore.persistedLinuxUid(username)?.let { return it }
         val hintedUid = ProfileProvisioningStore(context).userIdFor(username)
         val resolvedUid = AndroidUsers.resolveUidForUsername(context, username, hintedUid)
         return timeLimitStore.ensureUser(username, resolvedUid).linuxUid
     }
 
     private fun delegateEnforcementToUser(targetUserId: Int) {
-        CrossUserStoreSync.replicateFromPrimaryToUser(context, targetUserId)
         PolicyStorePayloadPush.pushToUser(context, targetUserId)
         SecondaryUserInitService.startOnUser(context, targetUserId)
     }
@@ -206,6 +237,45 @@ class EnforcementController(
         }
 
         applyDeviceRestrictionPolicy(dpm, policy)
+        if (uid == 0) {
+            applyOwnerProfileLockdownIfNeeded()
+        }
+    }
+
+    private fun enforceOwnerProfileLockdown(dpm: DevicePolicyManager) {
+        val ownerUid = 0
+        if (ownerUid == AndroidUsers.activeUserUid(context)) {
+            TimeExhaustedOverlay.show(context, showCallButton = false, mode = TimeExhaustedOverlay.Mode.OWNER_LOCKDOWN)
+        }
+
+        val exempt = setOf(context.packageName)
+        val toSuspend = launcherPackagesForUser(ownerUid) - exempt
+        if (toSuspend != lastOwnerLockdownSuspended) {
+            val released = lastOwnerLockdownSuspended - toSuspend
+            if (released.isNotEmpty()) {
+                setPackagesSuspended(dpm, released.toTypedArray(), false)
+            }
+            val added = toSuspend - lastOwnerLockdownSuspended
+            if (added.isNotEmpty()) {
+                setPackagesSuspended(dpm, added.toTypedArray(), true)
+            }
+            lastOwnerLockdownSuspended = toSuspend
+        }
+        ownerLockdownActive = true
+    }
+
+    private fun clearOwnerProfileLockdown(dpm: DevicePolicyManager) {
+        if (!ownerLockdownActive && lastOwnerLockdownSuspended.isEmpty()) {
+            return
+        }
+        if (lastOwnerLockdownSuspended.isNotEmpty()) {
+            setPackagesSuspended(dpm, lastOwnerLockdownSuspended.toTypedArray(), false)
+        }
+        lastOwnerLockdownSuspended = emptySet()
+        ownerLockdownActive = false
+        if (AndroidUsers.activeUserUid(context) == 0) {
+            TimeExhaustedOverlay.dismiss(context)
+        }
     }
 
     private fun provisionProfiles(dpm: DevicePolicyManager, policy: DeviceRestrictionPolicy) {
@@ -213,8 +283,11 @@ class EnforcementController(
         SecondaryUserProvisioner.ensurePrimaryAffiliation(context)
 
         val provisioningStore = ProfileProvisioningStore(context)
-        val existingUsers = AndroidUsers.linuxUsersPayload(context)
-        val activeUserIds = existingUsers.mapNotNull { (it["uid"] as? Number)?.toInt() }.toSet()
+        val activeUserIds = provisioningStore.allProvisionedUserIds().ifEmpty {
+            AndroidUsers.linuxUsersPayload(context)
+                .mapNotNull { (it["uid"] as? Number)?.toInt() }
+                .toSet()
+        }
         provisioningStore.prune(activeUserIds)
 
         val adminExtras = PersistableBundle().apply {
@@ -223,7 +296,7 @@ class EnforcementController(
 
         for (profile in policy.profiles) {
             val existsByRegistry = provisioningStore.isProvisioned(profile.username, activeUserIds)
-            val existsByReportedName = existingUsers.any {
+            val existsByReportedName = AndroidUsers.linuxUsersPayload(context).any {
                 (it["username"] as? String)?.equals(profile.username, ignoreCase = true) == true
             }
             if (existsByRegistry || existsByReportedName) {
@@ -330,65 +403,64 @@ class EnforcementController(
     }
 
     private fun applyDeviceRestrictionPolicy(dpm: DevicePolicyManager, policy: DeviceRestrictionPolicy) {
-        try {
-            dpm.setShortSupportMessage(adminComponent, policy.shortSupportMessage)
-            dpm.setLongSupportMessage(adminComponent, policy.longSupportMessage)
-            dpm.setScreenCaptureDisabled(adminComponent, policy.screenCaptureDisabled)
-            dpm.setCameraDisabled(adminComponent, policy.cameraDisabled)
+        dpm.setShortSupportMessage(adminComponent, policy.shortSupportMessage)
+        dpm.setLongSupportMessage(adminComponent, policy.longSupportMessage)
+        dpm.setScreenCaptureDisabled(adminComponent, policy.screenCaptureDisabled)
+        dpm.setCameraDisabled(adminComponent, policy.cameraDisabled)
 
-            setUserRestriction(dpm, UserManager.DISALLOW_INSTALL_APPS, policy.installAppsDisabled)
-            setUserRestriction(dpm, UserManager.DISALLOW_UNINSTALL_APPS, policy.uninstallAppsDisabled)
-            setUserRestriction(dpm, UserManager.DISALLOW_FACTORY_RESET, policy.factoryResetDisabled)
-            setUserRestriction(dpm, UserManager.DISALLOW_ADJUST_VOLUME, policy.adjustVolumeDisabled)
-            setUserRestriction(dpm, UserManager.DISALLOW_MODIFY_ACCOUNTS, policy.modifyAccountsDisabled)
+        setUserRestriction(dpm, UserManager.DISALLOW_INSTALL_APPS, policy.installAppsDisabled)
+        setUserRestriction(dpm, UserManager.DISALLOW_UNINSTALL_APPS, policy.uninstallAppsDisabled)
+        setUserRestriction(dpm, UserManager.DISALLOW_FACTORY_RESET, policy.factoryResetDisabled)
+        setUserRestriction(dpm, UserManager.DISALLOW_ADJUST_VOLUME, policy.adjustVolumeDisabled)
+        setUserRestriction(dpm, UserManager.DISALLOW_MODIFY_ACCOUNTS, policy.modifyAccountsDisabled)
+        setUserRestriction(
+            dpm,
+            UserManager.DISALLOW_MOUNT_PHYSICAL_MEDIA,
+            policy.mountPhysicalMediaDisabled,
+        )
+        setUserRestriction(dpm, UserManager.DISALLOW_BLUETOOTH, policy.bluetoothDisabled)
+        setUserRestriction(dpm, UserManager.DISALLOW_OUTGOING_CALLS, policy.outgoingCallsDisabled)
+        setUserRestriction(dpm, UserManager.DISALLOW_SMS, policy.smsDisabled)
+        setUserRestriction(dpm, UserManager.DISALLOW_UNMUTE_MICROPHONE, policy.microphoneDisabled)
+        setUserRestriction(dpm, UserManager.DISALLOW_USB_FILE_TRANSFER, policy.blockUsbFileTransfer)
+        setUserRestriction(dpm, UserManager.DISALLOW_WIFI_TETHERING, policy.blockWifiTethering)
+        setUserRestriction(dpm, UserManager.DISALLOW_CONFIG_TETHERING, policy.blockWifiTethering)
+        setUserRestriction(dpm, UserManager.DISALLOW_NEAR_FIELD_COMMUNICATION_RADIO, policy.blockNfc)
+
+        when {
+            policy.developerSettingsDisabled -> {
+                setUserRestriction(dpm, UserManager.DISALLOW_DEBUGGING_FEATURES, true)
+                setUserRestriction(dpm, UserManager.DISALLOW_SAFE_BOOT, true)
+            }
+            policy.developerSettingsAllowed -> {
+                setUserRestriction(dpm, UserManager.DISALLOW_DEBUGGING_FEATURES, false)
+                setUserRestriction(dpm, UserManager.DISALLOW_SAFE_BOOT, false)
+            }
+            else -> {
+                setUserRestriction(dpm, UserManager.DISALLOW_DEBUGGING_FEATURES, false)
+                setUserRestriction(dpm, UserManager.DISALLOW_SAFE_BOOT, false)
+            }
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            setUserRestriction(dpm, UserManager.DISALLOW_CAMERA_TOGGLE, policy.enforceCameraToggle)
             setUserRestriction(
                 dpm,
-                UserManager.DISALLOW_MOUNT_PHYSICAL_MEDIA,
-                policy.mountPhysicalMediaDisabled,
+                UserManager.DISALLOW_MICROPHONE_TOGGLE,
+                policy.enforceMicrophoneToggle,
             )
-            setUserRestriction(dpm, UserManager.DISALLOW_BLUETOOTH, policy.bluetoothDisabled)
-            setUserRestriction(dpm, UserManager.DISALLOW_OUTGOING_CALLS, policy.outgoingCallsDisabled)
-            setUserRestriction(dpm, UserManager.DISALLOW_SMS, policy.smsDisabled)
-            setUserRestriction(dpm, UserManager.DISALLOW_UNMUTE_MICROPHONE, policy.microphoneDisabled)
-            setUserRestriction(dpm, UserManager.DISALLOW_USB_FILE_TRANSFER, policy.blockUsbFileTransfer)
-            setUserRestriction(dpm, UserManager.DISALLOW_WIFI_TETHERING, policy.blockWifiTethering)
-            setUserRestriction(dpm, UserManager.DISALLOW_CONFIG_TETHERING, policy.blockWifiTethering)
-            setUserRestriction(dpm, UserManager.DISALLOW_NEAR_FIELD_COMMUNICATION_RADIO, policy.blockNfc)
+        }
 
-            when {
-                policy.developerSettingsDisabled -> {
-                    setUserRestriction(dpm, UserManager.DISALLOW_DEBUGGING_FEATURES, true)
-                    setUserRestriction(dpm, UserManager.DISALLOW_SAFE_BOOT, true)
-                }
-                policy.developerSettingsAllowed -> {
-                    setUserRestriction(dpm, UserManager.DISALLOW_DEBUGGING_FEATURES, false)
-                    setUserRestriction(dpm, UserManager.DISALLOW_SAFE_BOOT, false)
-                }
-                else -> {
-                    setUserRestriction(dpm, UserManager.DISALLOW_DEBUGGING_FEATURES, false)
-                    setUserRestriction(dpm, UserManager.DISALLOW_SAFE_BOOT, false)
-                }
-            }
-
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                setUserRestriction(dpm, UserManager.DISALLOW_CAMERA_TOGGLE, policy.enforceCameraToggle)
-                setUserRestriction(
-                    dpm,
-                    UserManager.DISALLOW_MICROPHONE_TOGGLE,
-                    policy.enforceMicrophoneToggle,
-                )
-            }
-
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && dpm.canUsbDataSignalingBeDisabled()) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && dpm.canUsbDataSignalingBeDisabled()) {
+            try {
                 when {
                     policy.blockAllUsbData -> dpm.setUsbDataSignalingEnabled(false)
                     policy.usbDataAccess == DeviceRestrictionPolicy.USB_DATA_ACCESS_ALLOW ||
                         policy.usbDataAccess == DeviceRestrictionPolicy.USB_DATA_ACCESS_UNSPECIFIED ->
                         dpm.setUsbDataSignalingEnabled(true)
                 }
+            } catch (_: SecurityException) {
             }
-        } catch (e: SecurityException) {
-            Log.w(TAG, "Failed to apply some device restrictions (requires Device Owner)", e)
         }
     }
 
@@ -399,21 +471,24 @@ class EnforcementController(
     ) {
         if (packages.isEmpty()) return
         if (!DeviceOwnerProvisioner.isDeviceOrProfileOwner(context)) {
-            Log.w(TAG, "Cannot suspend/unsuspend packages: App is not Device Owner or Profile Owner")
+            AgentLog.d(TAG, "Cannot suspend/unsuspend packages: not device/profile owner")
             return
         }
         try {
             dpm.setPackagesSuspended(adminComponent, packages, suspended)
         } catch (e: SecurityException) {
-            Log.e(TAG, "Failed to set packages suspended (suspended=$suspended) for: ${packages.joinToString()}", e)
+            AgentLog.d(TAG, "Failed to set packages suspended (suspended=$suspended): ${e.message}")
         }
     }
 
     private fun setUserRestriction(dpm: DevicePolicyManager, restriction: String, enabled: Boolean) {
-        if (enabled) {
-            dpm.addUserRestriction(adminComponent, restriction)
-        } else {
-            dpm.clearUserRestriction(adminComponent, restriction)
+        try {
+            if (enabled) {
+                dpm.addUserRestriction(adminComponent, restriction)
+            } else {
+                dpm.clearUserRestriction(adminComponent, restriction)
+            }
+        } catch (_: SecurityException) {
         }
     }
 

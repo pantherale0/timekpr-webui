@@ -3,6 +3,8 @@ package com.timekpr.agent.policy
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.os.Handler
+import android.os.Looper
 import com.timekpr.agent.TimeKprApplication
 import com.timekpr.agent.enforcement.EnforcementController
 import java.io.File
@@ -12,12 +14,9 @@ class PolicyStoreReloadReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent?) {
         if (intent?.action != ACTION_RELOAD_STORES) return
         applyPayloadFiles(context, intent)
-        val app = TimeKprApplication.from(context)
-        app.timeLimitStore.reloadFromPrefs()
-        app.appPolicyStore.restore()
-        app.domainPolicyStore.restore()
-        app.deviceRestrictionStore.restore()
-        EnforcementController(context, app.appPolicyStore).reconcileAllUsers()
+        pendingContext = context.applicationContext
+        handler.removeCallbacks(reconcileRunnable)
+        handler.postDelayed(reconcileRunnable, DEBOUNCE_MS)
     }
 
     private fun applyPayloadFiles(context: Context, intent: Intent) {
@@ -35,5 +34,19 @@ class PolicyStoreReloadReceiver : BroadcastReceiver() {
     companion object {
         const val ACTION_RELOAD_STORES = "com.timekpr.agent.policy.ACTION_RELOAD_STORES"
         private const val PAYLOAD_PREFIX = "prefs_xml_"
+        private const val DEBOUNCE_MS = 400L
+
+        private val handler = Handler(Looper.getMainLooper())
+        private var pendingContext: Context? = null
+
+        private val reconcileRunnable = Runnable {
+            val ctx = pendingContext ?: return@Runnable
+            val app = TimeKprApplication.from(ctx)
+            app.timeLimitStore.reloadFromPrefs()
+            app.appPolicyStore.restore()
+            app.domainPolicyStore.restore()
+            app.deviceRestrictionStore.restore()
+            EnforcementController(ctx, app.appPolicyStore).reconcileAllUsers()
+        }
     }
 }

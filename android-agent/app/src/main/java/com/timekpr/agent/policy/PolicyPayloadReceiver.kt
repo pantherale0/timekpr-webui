@@ -3,7 +3,7 @@ package com.timekpr.agent.policy
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.util.Log
+import com.timekpr.agent.util.AgentLog
 import com.timekpr.agent.TimeKprApplication
 import com.timekpr.agent.vpn.DomainBlockVpnService
 import org.json.JSONArray
@@ -31,10 +31,10 @@ class PolicyPayloadReceiver : BroadcastReceiver() {
             )
             store.persist()
             store.restore()
-            Log.i(TAG, "Applied pushed policy uid=$policyUid blocked=${blocked.size}")
+            AgentLog.d(TAG, "Applied pushed policy uid=$policyUid blocked=${blocked.size}")
             DomainBlockVpnService.reconcile(context)
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to apply pushed policy payload", e)
+            AgentLog.wOnce(TAG, "apply_payload", "Failed to apply pushed policy payload: ${e.message}")
         }
     }
 

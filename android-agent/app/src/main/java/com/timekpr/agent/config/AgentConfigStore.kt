@@ -1,7 +1,10 @@
 package com.timekpr.agent.config
 
 import android.content.Context
+import android.content.SharedPreferences
+import android.os.Build
 import com.timekpr.agent.BuildConfig
+import com.timekpr.agent.util.DirectBootHelper
 import java.util.UUID
 
 data class AgentConfig(
@@ -14,9 +17,25 @@ data class AgentConfig(
 )
 
 class AgentConfigStore(context: Context) {
-    private val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    private val appContext = context.applicationContext
+    private val storageContext = DirectBootHelper.deviceProtectedContext(appContext)
+    private val prefs = storageContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+
+    fun migrateToDeviceProtectedStorageIfNeeded() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) return
+        if (prefs.contains(KEY_SERVER_URL)) return
+        if (!DirectBootHelper.isCredentialStorageUnlocked(appContext)) return
+        val credentialPrefs = try {
+            appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        } catch (_: IllegalStateException) {
+            return
+        }
+        if (credentialPrefs.all.isEmpty()) return
+        copySharedPreferences(credentialPrefs, prefs)
+    }
 
     fun load(): AgentConfig {
+        migrateToDeviceProtectedStorageIfNeeded()
         val systemId = prefs.getString(KEY_SYSTEM_ID, null)?.takeIf { it.isNotBlank() }
             ?: UUID.randomUUID().toString().also { saveSystemId(it) }
         return AgentConfig(
@@ -31,27 +50,29 @@ class AgentConfigStore(context: Context) {
     }
 
     fun saveServerUrl(url: String) {
-        prefs.edit().putString(KEY_SERVER_URL, url.trim()).apply()
+        writeBoth { putString(KEY_SERVER_URL, url.trim()) }
     }
 
     fun saveRegistrationToken(token: String?) {
-        if (token.isNullOrBlank()) {
-            prefs.edit().remove(KEY_REGISTRATION_TOKEN).apply()
-        } else {
-            prefs.edit().putString(KEY_REGISTRATION_TOKEN, token.trim()).apply()
+        writeBoth {
+            if (token.isNullOrBlank()) {
+                remove(KEY_REGISTRATION_TOKEN)
+            } else {
+                putString(KEY_REGISTRATION_TOKEN, token.trim())
+            }
         }
     }
 
     fun saveAgentToken(token: String) {
-        prefs.edit().putString(KEY_AGENT_TOKEN, token).apply()
+        writeBoth { putString(KEY_AGENT_TOKEN, token) }
     }
 
     fun savePairingComplete(complete: Boolean) {
-        prefs.edit().putBoolean(KEY_PAIRING_COMPLETE, complete).apply()
+        writeBoth { putBoolean(KEY_PAIRING_COMPLETE, complete) }
     }
 
     fun saveFcmToken(token: String) {
-        prefs.edit().putString(KEY_FCM_TOKEN, token.trim()).apply()
+        writeBoth { putString(KEY_FCM_TOKEN, token.trim()) }
     }
 
     fun cachedFcmToken(): String? {
@@ -59,28 +80,57 @@ class AgentConfigStore(context: Context) {
     }
 
     fun applyPairingPayload(serverUrl: String, registrationToken: String?) {
-        prefs.edit()
-            .putString(KEY_SERVER_URL, serverUrl.trim())
-            .apply {
-                if (registrationToken.isNullOrBlank()) {
-                    remove(KEY_REGISTRATION_TOKEN)
-                } else {
-                    putString(KEY_REGISTRATION_TOKEN, registrationToken.trim())
-                }
+        writeBoth {
+            putString(KEY_SERVER_URL, serverUrl.trim())
+            if (registrationToken.isNullOrBlank()) {
+                remove(KEY_REGISTRATION_TOKEN)
+            } else {
+                putString(KEY_REGISTRATION_TOKEN, registrationToken.trim())
             }
-            .apply()
+        }
     }
 
     fun clearEnrollmentState() {
-        prefs.edit()
-            .remove(KEY_AGENT_TOKEN)
-            .putBoolean(KEY_PAIRING_COMPLETE, false)
-            .remove(KEY_FCM_TOKEN)
-            .apply()
+        writeBoth {
+            remove(KEY_AGENT_TOKEN)
+            putBoolean(KEY_PAIRING_COMPLETE, false)
+            remove(KEY_FCM_TOKEN)
+        }
     }
 
     private fun saveSystemId(systemId: String) {
-        prefs.edit().putString(KEY_SYSTEM_ID, systemId).apply()
+        writeBoth { putString(KEY_SYSTEM_ID, systemId) }
+    }
+
+    private fun writeBoth(block: SharedPreferences.Editor.() -> Unit) {
+        prefs.edit().apply(block).apply()
+        if (DirectBootHelper.isCredentialStorageUnlocked(appContext)) {
+            try {
+                appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                    .edit()
+                    .apply(block)
+                    .apply()
+            } catch (_: IllegalStateException) {
+            }
+        }
+    }
+
+    private fun copySharedPreferences(from: SharedPreferences, to: SharedPreferences) {
+        val editor = to.edit().clear()
+        for ((key, value) in from.all) {
+            when (value) {
+                is String -> editor.putString(key, value)
+                is Boolean -> editor.putBoolean(key, value)
+                is Int -> editor.putInt(key, value)
+                is Long -> editor.putLong(key, value)
+                is Float -> editor.putFloat(key, value)
+                is Set<*> -> {
+                    @Suppress("UNCHECKED_CAST")
+                    editor.putStringSet(key, value as Set<String>)
+                }
+            }
+        }
+        editor.apply()
     }
 
     companion object {

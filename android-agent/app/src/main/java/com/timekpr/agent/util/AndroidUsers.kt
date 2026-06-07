@@ -9,11 +9,18 @@ import android.os.UserHandle
 import android.os.UserManager
 import android.provider.Settings
 import android.util.Log
+import com.timekpr.agent.admin.DeviceOwnerProvisioner
 import com.timekpr.agent.admin.TimeKprDeviceAdminReceiver
 import com.timekpr.agent.policy.ProfileProvisioningStore
 
 object AndroidUsers {
     private const val TAG = "AndroidUsers"
+    private const val CACHE_TTL_MS = 30_000L
+
+    private var cachedUsersPayload: List<Map<String, Any>>? = null
+    private var cacheUserId = -1
+    private var cacheTimeMs = 0L
+    private var loggedReflectionFallback = false
 
     fun displayNameForUser(context: Context, userId: Int): String? {
         ProfileProvisioningStore(context).displayNameForUserId(userId)?.let { return it }
@@ -44,6 +51,8 @@ object AndroidUsers {
 
     fun currentLinuxUid(context: Context): Int = Process.myUid() / 100_000
 
+    fun isPrimaryUser(context: Context): Boolean = currentLinuxUid(context) == 0
+
     /**
      * Resolve the Android multi-user ID for [username] using provisioning registry,
      * hello inventory, or an optional server hint. Avoids defaulting to user 0 when
@@ -63,6 +72,13 @@ object AndroidUsers {
             if (userId >= 0) return userId
         }
 
+        if (!isPrimaryUser(context)) {
+            if (normalized.equals(currentLinuxUsername(context), ignoreCase = true)) {
+                return currentLinuxUid(context)
+            }
+            return hintedUid?.takeIf { it >= 0 } ?: -1
+        }
+
         for (entry in linuxUsersPayload(context)) {
             val reported = entry["username"] as? String ?: continue
             if (reported.equals(normalized, ignoreCase = true)) {
@@ -77,7 +93,7 @@ object AndroidUsers {
             return currentLinuxUid(context)
         }
 
-        return hintedUid ?: currentLinuxUid(context)
+        return hintedUid?.takeIf { it >= 0 } ?: -1
     }
 
     fun deviceHostname(context: Context): String {
@@ -87,10 +103,52 @@ object AndroidUsers {
     }
 
     fun linuxUsersPayload(context: Context): List<Map<String, Any>> {
+        val callingUserId = currentLinuxUid(context)
+        val now = System.currentTimeMillis()
+        if (
+            cachedUsersPayload != null &&
+            cacheUserId == callingUserId &&
+            now - cacheTimeMs < CACHE_TTL_MS
+        ) {
+            return cachedUsersPayload!!
+        }
+
+        val result = buildLinuxUsersPayload(context)
+        cachedUsersPayload = result
+        cacheUserId = callingUserId
+        cacheTimeMs = now
+        return result
+    }
+
+    /** Provisioned secondary profile IDs (excludes user 0). Primary user only. */
+    fun managedSecondaryUserIds(context: Context): Set<Int> {
+        if (!isPrimaryUser(context)) return emptySet()
+        val fromProvisioning = ProfileProvisioningStore(context).allProvisionedUserIds().filter { it > 0 }
+        if (fromProvisioning.isNotEmpty()) return fromProvisioning.toSet()
+        return linuxUsersPayload(context)
+            .mapNotNull { (it["uid"] as? Number)?.toInt() }
+            .filter { it > 0 }
+            .toSet()
+    }
+
+    private fun buildLinuxUsersPayload(context: Context): List<Map<String, Any>> {
+        val callingUserId = currentLinuxUid(context)
+        if (callingUserId != 0) {
+            return applyProvisionedDisplayNames(
+                context,
+                listOf(
+                    mapOf(
+                        "username" to currentLinuxUsername(context),
+                        "uid" to callingUserId,
+                        "platform" to "android",
+                    ),
+                ),
+            )
+        }
+
         val userManager = context.getSystemService(UserManager::class.java) ?: return emptyList()
         val users = mutableListOf<Map<String, Any>>()
 
-        // 1. Try reflection on UserManager.getUsers()
         try {
             val getUsersMethod = UserManager::class.java.getMethod("getUsers")
             val rawUsers = getUsersMethod.invoke(userManager) as? List<*>
@@ -99,70 +157,64 @@ object AndroidUsers {
                     if (userInfo != null) {
                         val id = userInfo.javaClass.getField("id").get(userInfo) as? Int ?: continue
                         val name = userInfo.javaClass.getField("name").get(userInfo) as? String ?: "User $id"
-                        
                         users.add(
                             mapOf(
                                 "username" to name,
                                 "uid" to id,
-                                "platform" to "android"
-                            )
+                                "platform" to "android",
+                            ),
                         )
                     }
                 }
             }
-        } catch (e: Exception) {
-            Log.w(TAG, "Reflection to list users failed, falling back to public APIs", e)
+        } catch (_: Exception) {
+            if (!loggedReflectionFallback) {
+                loggedReflectionFallback = true
+                Log.d(TAG, "UserManager.getUsers unavailable; using public user APIs")
+            }
         }
 
-        // 2. If reflection failed or returned empty, use public APIs as fallback
         if (users.isEmpty()) {
             val userHandles = mutableSetOf<UserHandle>()
-            
-            // Add user profiles of the calling user
             try {
                 userHandles.addAll(userManager.userProfiles)
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to get user profiles", e)
+            } catch (_: Exception) {
             }
 
-            // If API 28+ and app is device owner/admin, we can get secondary users
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && DeviceOwnerProvisioner.isDeviceOwner(context)) {
                 val dpm = context.getSystemService(DevicePolicyManager::class.java)
                 val admin = ComponentName(context, TimeKprDeviceAdminReceiver::class.java)
                 if (dpm != null && dpm.isAdminActive(admin)) {
                     try {
-                        val secondary = dpm.getSecondaryUsers(admin)
-                        if (secondary != null) {
-                            userHandles.addAll(secondary)
-                        }
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Failed to get secondary users", e)
+                        dpm.getSecondaryUsers(admin)?.let { userHandles.addAll(it) }
+                    } catch (_: SecurityException) {
                     }
                 }
             }
 
             for (handle in userHandles) {
-                val id = handle.hashCode() // Fallback key, but getIdentifier() is cleaner
                 val actualId = try {
                     val getIdentifierMethod = UserHandle::class.java.getMethod("getIdentifier")
-                    getIdentifierMethod.invoke(handle) as? Int ?: id
-                } catch (e: Exception) {
-                    id
+                    getIdentifierMethod.invoke(handle) as? Int ?: handle.hashCode()
+                } catch (_: Exception) {
+                    handle.hashCode()
                 }
-                
+
                 val name = if (actualId == 0) {
                     "System User"
                 } else {
-                    // Try to get username via reflection if possible
                     try {
-                        val getUserInfoMethod = UserManager::class.java.getMethod("getUserInfo", Int::class.javaPrimitiveType)
+                        val getUserInfoMethod = UserManager::class.java.getMethod(
+                            "getUserInfo",
+                            Int::class.javaPrimitiveType,
+                        )
                         val userInfo = getUserInfoMethod.invoke(userManager, actualId)
                         if (userInfo != null) {
                             userInfo.javaClass.getField("name").get(userInfo) as? String
                         } else {
                             null
                         }
-                    } catch (e: Exception) {
+                    } catch (_: Exception) {
                         null
                     } ?: "User $actualId"
                 }
@@ -171,22 +223,19 @@ object AndroidUsers {
                     mapOf(
                         "username" to name,
                         "uid" to actualId,
-                        "platform" to "android"
-                    )
+                        "platform" to "android",
+                    ),
                 )
             }
         }
 
-        // If all fallback attempts failed, report the current user
         if (users.isEmpty()) {
-            val currentUsername = currentLinuxUsername(context)
-            val currentUid = currentLinuxUid(context)
             users.add(
                 mapOf(
-                    "username" to currentUsername,
-                    "uid" to currentUid,
-                    "platform" to "android"
-                )
+                    "username" to currentLinuxUsername(context),
+                    "uid" to callingUserId,
+                    "platform" to "android",
+                ),
             )
         }
 
@@ -233,8 +282,49 @@ object AndroidUsers {
             )
             method.invoke(context, context.packageName, 0, userHandle) as? Context
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to create context for user $userId", e)
+            Log.d(TAG, "Failed to create context for user $userId: ${e.message}")
             null
         }
+    }
+
+    fun usernameForUid(context: Context, uid: Int, timeLimitStore: com.timekpr.agent.policy.TimeLimitStore? = null): String {
+        timeLimitStore?.getUsernameForUid(uid)?.let { return it }
+        ProfileProvisioningStore(context).displayNameForUserId(uid)?.let { return it }
+        displayNameForUser(context, uid)?.let { return it }
+        for (entry in linuxUsersPayload(context)) {
+            val entryUid = (entry["uid"] as? Number)?.toInt()
+            if (entryUid == uid) {
+                (entry["username"] as? String)?.trim()?.takeIf { it.isNotEmpty() }?.let { return it }
+            }
+        }
+        if (uid == currentLinuxUid(context)) {
+            return currentLinuxUsername(context)
+        }
+        return "User $uid"
+    }
+
+    /**
+     * Device owner (user 0) reports every managed profile; secondary processes report only themselves.
+     */
+    fun inventoryTargets(context: Context): List<Pair<String, Context>> {
+        if (!isPrimaryUser(context)) {
+            return listOf(currentLinuxUsername(context) to context)
+        }
+
+        val results = mutableListOf<Pair<String, Context>>()
+        for (entry in linuxUsersPayload(context)) {
+            val uid = (entry["uid"] as? Number)?.toInt() ?: continue
+            val username = (entry["username"] as? String)?.trim()?.takeIf { it.isNotEmpty() } ?: continue
+            val userContext = if (uid == currentLinuxUid(context)) {
+                context
+            } else {
+                getUserContext(context, uid) ?: continue
+            }
+            results.add(username to userContext)
+        }
+        if (results.isEmpty()) {
+            results.add(currentLinuxUsername(context) to context)
+        }
+        return results
     }
 }

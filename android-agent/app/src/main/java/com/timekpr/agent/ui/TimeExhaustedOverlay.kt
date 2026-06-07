@@ -17,13 +17,19 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.WindowManager
 import android.widget.Button
+import android.widget.TextView
 import androidx.core.app.NotificationCompat
 import com.timekpr.agent.R
 
 /**
- * Persistent top banner shown when screen time is exhausted or access is otherwise denied.
+ * Persistent top banner shown when screen time is exhausted or owner profile lockdown is active.
  */
 object TimeExhaustedOverlay {
+    enum class Mode {
+        TIME_EXHAUSTED,
+        OWNER_LOCKDOWN,
+    }
+
     private const val TAG = "TimeExhaustedOverlay"
     private const val CHANNEL_ID = "timekpr_time_exhausted"
     private const val NOTIFICATION_ID = 1006
@@ -32,15 +38,16 @@ object TimeExhaustedOverlay {
     private var currentView: View? = null
     private var windowManager: WindowManager? = null
     private var fallbackActive = false
+    private var currentMode: Mode? = null
 
-    fun show(context: Context, showCallButton: Boolean) {
+    fun show(context: Context, showCallButton: Boolean, mode: Mode = Mode.TIME_EXHAUSTED) {
         handler.post {
             if (!Settings.canDrawOverlays(context)) {
-                showNotificationFallback(context.applicationContext)
+                showNotificationFallback(context.applicationContext, mode)
                 return@post
             }
             dismissNotificationFallback(context.applicationContext)
-            showOverlay(context.applicationContext, showCallButton)
+            showOverlay(context.applicationContext, showCallButton, mode)
         }
     }
 
@@ -48,19 +55,21 @@ object TimeExhaustedOverlay {
         handler.post {
             dismissOverlayImmediate()
             dismissNotificationFallback(context.applicationContext)
+            currentMode = null
         }
     }
 
-    private fun showOverlay(context: Context, showCallButton: Boolean) {
+    private fun showOverlay(context: Context, showCallButton: Boolean, mode: Mode) {
+        currentMode = mode
         if (currentView != null) {
-            updateCallButton(currentView!!, showCallButton, context)
+            updateOverlayContent(currentView!!, showCallButton, context, mode)
             return
         }
         try {
             val themedContext = ContextThemeWrapper(context, R.style.Theme_TimeKprAgent)
             val overlayView = LayoutInflater.from(themedContext)
                 .inflate(R.layout.overlay_time_exhausted, null)
-            updateCallButton(overlayView, showCallButton, context)
+            updateOverlayContent(overlayView, showCallButton, context, mode)
 
             val params = WindowManager.LayoutParams(
                 WindowManager.LayoutParams.MATCH_PARENT,
@@ -79,8 +88,30 @@ object TimeExhaustedOverlay {
             windowManager = wm
         } catch (e: Exception) {
             Log.w(TAG, "Failed to show time exhausted overlay", e)
-            showNotificationFallback(context)
+            showNotificationFallback(context, mode)
         }
+    }
+
+    private fun updateOverlayContent(
+        overlayView: View,
+        showCallButton: Boolean,
+        context: Context,
+        mode: Mode,
+    ) {
+        val titleView = overlayView.findViewById<TextView>(R.id.time_exhausted_title)
+        val bodyView = overlayView.findViewById<TextView>(R.id.time_exhausted_body)
+        when (mode) {
+            Mode.TIME_EXHAUSTED -> {
+                titleView.setText(R.string.time_exhausted_title)
+                bodyView.setText(R.string.time_exhausted_body)
+            }
+            Mode.OWNER_LOCKDOWN -> {
+                titleView.setText(R.string.owner_lockdown_title)
+                bodyView.setText(R.string.owner_lockdown_body)
+            }
+        }
+        updateCallButton(overlayView, showCallButton, context)
+        setupParentAccessButton(overlayView, context, mode)
     }
 
     private fun updateCallButton(overlayView: View, showCallButton: Boolean, context: Context) {
@@ -96,6 +127,16 @@ object TimeExhaustedOverlay {
         }
     }
 
+    private fun setupParentAccessButton(overlayView: View, context: Context, mode: Mode) {
+        val parentButton = overlayView.findViewById<Button>(R.id.time_exhausted_parent_access)
+        parentButton.setOnClickListener {
+            val intent = Intent(context, ParentalAccessActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            }
+            context.startActivity(intent)
+        }
+    }
+
     private fun launchDialer(context: Context) {
         val intent = Intent(Intent.ACTION_DIAL).apply {
             data = Uri.parse("tel:")
@@ -108,22 +149,47 @@ object TimeExhaustedOverlay {
         }
     }
 
-    private fun showNotificationFallback(context: Context) {
+    private fun showNotificationFallback(context: Context, mode: Mode) {
         if (fallbackActive) {
             return
         }
         val manager = ensureChannel(context)
+        val intent = Intent(context, ParentalAccessActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+        val pendingIntent = android.app.PendingIntent.getActivity(
+            context,
+            0,
+            intent,
+            android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val titleRes = when (mode) {
+            Mode.TIME_EXHAUSTED -> R.string.time_exhausted_title
+            Mode.OWNER_LOCKDOWN -> R.string.owner_lockdown_title
+        }
+        val bodyRes = when (mode) {
+            Mode.TIME_EXHAUSTED -> R.string.time_exhausted_body
+            Mode.OWNER_LOCKDOWN -> R.string.owner_lockdown_body
+        }
+
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_launcher_foreground)
-            .setContentTitle(context.getString(R.string.time_exhausted_title))
-            .setContentText(context.getString(R.string.time_exhausted_body))
+            .setContentTitle(context.getString(titleRes))
+            .setContentText(context.getString(bodyRes))
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_STATUS)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
+            .addAction(
+                0,
+                context.getString(R.string.parental_access_notification_action),
+                pendingIntent
+            )
             .build()
         manager.notify(NOTIFICATION_ID, notification)
         fallbackActive = true
+        currentMode = mode
     }
 
     private fun dismissNotificationFallback(context: Context) {

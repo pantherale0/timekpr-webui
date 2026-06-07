@@ -29,6 +29,8 @@ data class DeviceRestrictionPolicy(
     val shortSupportMessage: String = DEFAULT_SHORT_SUPPORT_MESSAGE,
     val longSupportMessage: String = DEFAULT_LONG_SUPPORT_MESSAGE,
     val profiles: List<ProfileToProvision> = emptyList(),
+    val lockOwnerProfile: Boolean = false,
+    val managedProfileUids: List<Int> = emptyList(),
 ) {
     val cameraDisabled: Boolean
         get() = when (cameraAccess) {
@@ -117,6 +119,14 @@ data class DeviceRestrictionPolicy(
                 }
             }
 
+            val managedUids = mutableListOf<Int>()
+            val managedArray = json.optJSONArray("managedProfileUids")
+            if (managedArray != null) {
+                for (i in 0 until managedArray.length()) {
+                    managedArray.optInt(i).takeIf { it >= 0 }?.let { managedUids.add(it) }
+                }
+            }
+
             return DeviceRestrictionPolicy(
                 screenCaptureDisabled = json.optBoolean("screenCaptureDisabled", false),
                 cameraAccess = json.optString("cameraAccess", CAMERA_ACCESS_UNSPECIFIED),
@@ -173,6 +183,11 @@ data class DeviceRestrictionPolicy(
             .put("blockWifiTethering", blockWifiTethering)
             .put("blockNfc", blockNfc)
             .put("profiles", profilesArray)
+            .put("lockOwnerProfile", lockOwnerProfile)
+            .put(
+                "managedProfileUids",
+                JSONArray().apply { managedProfileUids.forEach { put(it) } },
+            )
             .put(
                 "advancedSecurityOverrides",
                 JSONObject().put("developerSettings", developerSettings),

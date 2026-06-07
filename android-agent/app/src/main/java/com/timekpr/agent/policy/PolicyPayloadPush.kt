@@ -4,7 +4,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.os.UserHandle
-import android.util.Log
+import com.timekpr.agent.util.AgentLog
 import com.timekpr.agent.TimeKprApplication
 import org.json.JSONArray
 
@@ -34,9 +34,9 @@ object PolicyPayloadPush {
             )
         try {
             primaryContext.sendBroadcastAsUser(intent, userHandle)
-            Log.i(TAG, "Pushed policy payload to user $targetUserId (${policy.blockedDomains.size} domains)")
+            AgentLog.d(TAG, "Pushed policy payload to user $targetUserId (${policy.blockedDomains.size} domains)")
         } catch (e: Exception) {
-            Log.w(TAG, "Failed to push policy payload to user $targetUserId", e)
+            AgentLog.wOnce(TAG, "push_$targetUserId", "Failed to push policy payload to user $targetUserId")
         }
     }
 

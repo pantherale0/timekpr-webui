@@ -88,6 +88,10 @@ class TimeLimitStore(context: Context) {
         var uacc: Int = 0,
     )
 
+    fun persistedLinuxUid(username: String): Int? {
+        return loadPersisted(username)?.linuxUid
+    }
+
     fun ensureUser(username: String, defaultUid: Int, defaultSeconds: Int = 2 * 3600): UserTimeState {
         val loaded = loadPersisted(username)
         val state = users.getOrPut(username) {
@@ -102,9 +106,9 @@ class TimeLimitStore(context: Context) {
                 allowedHours = defaultAllowedHours(),
             )
         }
-        if (loaded != null && loaded.linuxUid > 0) {
+        if (loaded != null) {
             state.linuxUid = loaded.linuxUid
-        } else if (defaultUid > 0 && state.linuxUid <= 0) {
+        } else if (defaultUid >= 0) {
             state.linuxUid = defaultUid
             persist(username, state)
         }

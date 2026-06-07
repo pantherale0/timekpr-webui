@@ -36,4 +36,14 @@
         android:text="@string/time_exhausted_call"
         android:textColor="@color/timekpr_primary"
         android:visibility="gone" />
+
+    <Button
+        android:id="@+id/time_exhausted_parent_access"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:minHeight="44dp"
+        android:text="@string/time_exhausted_parent_access"
+        android:textColor="@color/timekpr_primary"
+        android:visibility="visible" />
 </LinearLayout>

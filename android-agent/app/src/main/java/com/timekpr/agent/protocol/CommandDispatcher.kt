@@ -207,8 +207,17 @@ class CommandDispatcher(
     }
 
     private fun handleRefreshInstalledApps(username: String): DispatchResult {
-        timeLimitStore.ensureUser(username, AndroidUsers.currentLinuxUid(context))
-        val apps = InstalledAppsDiscovery.discover(context)
+        val uid = AndroidUsers.resolveUidForUsername(context, username)
+        val discoveryContext = if (uid >= 0) {
+            AndroidUsers.getUserContext(context, uid) ?: context
+        } else {
+            context
+        }
+        timeLimitStore.ensureUser(
+            username,
+            if (uid >= 0) uid else AndroidUsers.currentLinuxUid(context),
+        )
+        val apps = InstalledAppsDiscovery.discover(discoveryContext)
         return DispatchResult(
             success = true,
             message = "Installed apps refresh queued",

@@ -40,6 +40,18 @@ class ProfileProvisioningStore(context: Context) {
         return null
     }
 
+    fun allProvisionedUserIds(): Set<Int> {
+        val root = loadRoot()
+        val ids = mutableSetOf<Int>()
+        val keys = root.keys()
+        while (keys.hasNext()) {
+            val key = keys.next()
+            if (key.startsWith(DISPLAY_PREFIX)) continue
+            root.optInt(key, -1).takeIf { it >= 0 }?.let { ids.add(it) }
+        }
+        return ids
+    }
+
     fun isProvisioned(username: String, activeUserIds: Set<Int>): Boolean {
         val userId = userIdFor(username) ?: return false
         return userId in activeUserIds

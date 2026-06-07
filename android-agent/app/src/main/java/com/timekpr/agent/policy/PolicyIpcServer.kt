@@ -59,6 +59,17 @@ class PolicyIpcServer(private val context: Context) {
                     .put("allowed_domains", JSONArray(policy.allowedDomains.toList()))
                 
                 writer.println(response.toString())
+            } else if (line.startsWith("POST_ALERT ")) {
+                val payload = JSONObject(line.substring("POST_ALERT ".length))
+                val eventType = payload.optString("event_type")
+                val linuxUsername = payload.optString("linux_username")
+                val details = payload.optJSONObject("details") ?: JSONObject()
+                if (eventType.isNotBlank() && linuxUsername.isNotBlank()) {
+                    com.timekpr.agent.monitor.AlertEventBus.emit(eventType, linuxUsername, details)
+                    writer.println(JSONObject().put("ok", true).toString())
+                } else {
+                    writer.println(JSONObject().put("ok", false).put("error", "invalid payload").toString())
+                }
             } else {
                 writer.println(JSONObject().put("error", "Unknown command").toString())
             }

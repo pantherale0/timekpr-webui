@@ -1,6 +1,7 @@
 package com.timekpr.agent.policy
 
 import android.content.Context
+import android.os.Process
 import com.timekpr.agent.discovery.InstalledAppsDiscovery
 import com.timekpr.agent.monitor.ApprovalRequestDeduper
 import com.timekpr.agent.util.PrefXmlReader
@@ -195,6 +196,11 @@ class AppPolicyStore(context: Context) {
     }
 
     fun restore() {
+        val preserveLastEnforced = if (Process.myUid() / 100_000 != 0) {
+            lastEnforcedBlockedByUser.toMap()
+        } else {
+            emptyMap()
+        }
         policiesByUser.clear()
         packagesReleasedBySync.clear()
         val raw = readPrefJson(KEY_RULES)
@@ -210,7 +216,12 @@ class AppPolicyStore(context: Context) {
             }
         }
         restoreApprovalPolicies(readPrefJson(KEY_APPROVAL_POLICIES))
-        restoreLastEnforcedBlocked(readPrefJson(KEY_LAST_ENFORCED_BLOCKED))
+        lastEnforcedBlockedByUser.clear()
+        if (Process.myUid() / 100_000 == 0) {
+            restoreLastEnforcedBlocked(readPrefJson(KEY_LAST_ENFORCED_BLOCKED))
+        } else if (preserveLastEnforced.isNotEmpty()) {
+            lastEnforcedBlockedByUser.putAll(preserveLastEnforced)
+        }
     }
 
     private fun readPrefJson(key: String): String? {

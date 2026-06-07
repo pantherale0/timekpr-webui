@@ -8,40 +8,33 @@ import com.timekpr.agent.policy.DeviceRestrictionStore
 import com.timekpr.agent.policy.DomainPolicyStore
 import com.timekpr.agent.policy.TimeLimitStore
 import com.timekpr.agent.policy.PolicyIpcServer
+import com.timekpr.agent.util.DirectBootHelper
 
 class TimeKprApplication : Application() {
     lateinit var configStore: AgentConfigStore
         private set
-    lateinit var timeLimitStore: TimeLimitStore
-        private set
-    lateinit var domainPolicyStore: DomainPolicyStore
-        private set
-    lateinit var appPolicyStore: AppPolicyStore
-        private set
-    lateinit var deviceRestrictionStore: DeviceRestrictionStore
-        private set
-    lateinit var policyIpcServer: PolicyIpcServer
-        private set
+
+    val timeLimitStore: TimeLimitStore by lazy { TimeLimitStore(this) }
+    val domainPolicyStore: DomainPolicyStore by lazy { DomainPolicyStore(this).also { it.restore() } }
+    val appPolicyStore: AppPolicyStore by lazy { AppPolicyStore(this).also { it.restore() } }
+    val deviceRestrictionStore: DeviceRestrictionStore by lazy { DeviceRestrictionStore(this).also { it.restore() } }
+    val policyIpcServer: PolicyIpcServer by lazy { PolicyIpcServer(this) }
 
     override fun onCreate() {
         super.onCreate()
         configStore = AgentConfigStore(this)
-        timeLimitStore = TimeLimitStore(this)
-        domainPolicyStore = DomainPolicyStore(this).also { it.restore() }
-        appPolicyStore = AppPolicyStore(this).also { it.restore() }
-        deviceRestrictionStore = DeviceRestrictionStore(this).also { it.restore() }
-        policyIpcServer = PolicyIpcServer(this)
-        
-        val myUid = android.os.Process.myUid()
-        val isUserZero = (myUid / 100000) == 0
-        if (isUserZero) {
+
+        if (DirectBootHelper.isCredentialStorageUnlocked(this)) {
+            configStore.migrateToDeviceProtectedStorageIfNeeded()
+            if ((android.os.Process.myUid() / 100_000) == 0) {
+                policyIpcServer.start()
+                com.timekpr.agent.admin.SecondaryUserProvisioner.ensurePrimaryUiVisible(this)
+            }
+            DeviceOwnerProvisioner.applyIfDeviceOwner(this)
+        } else if ((android.os.Process.myUid() / 100_000) == 0) {
             policyIpcServer.start()
-            com.timekpr.agent.admin.SecondaryUserProvisioner.ensurePrimaryUiVisible(this)
+            DeviceOwnerProvisioner.applyIfDeviceOwner(this)
         }
-        // Managed secondary profiles are initialized by SecondaryUserInitService
-        // after the device owner replicates policy stores from user 0.
-        
-        DeviceOwnerProvisioner.applyIfDeviceOwner(this)
     }
 
     companion object {

@@ -33,4 +33,8 @@
     <string name="agent_version_label">Agent version: %1$s</string>
     <string name="managed_secondary_profile_status">This profile is managed by TimeKpr</string>
     <string name="managed_secondary_profile_waiting">Waiting for the main profile to finish setup. Open TimeKpr on the primary account first.</string>
+    <string name="time_exhausted_parent_access">Parental Access</string>
+    <string name="parental_access_notification_action">Enter Access Code</string>
+    <string name="owner_lockdown_title">Parent access required</string>
+    <string name="owner_lockdown_body">This owner profile is locked. Enter the parental access code from the dashboard to unlock it.</string>
 </resources>

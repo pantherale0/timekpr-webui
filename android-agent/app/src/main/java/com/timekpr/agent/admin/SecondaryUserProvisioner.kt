@@ -3,18 +3,25 @@ package com.timekpr.agent.admin
 import android.app.admin.DevicePolicyManager
 import android.content.ComponentName
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.os.Process
 import android.util.Log
 import com.timekpr.agent.TimeKprApplication
 import com.timekpr.agent.enforcement.EnforcementController
 import com.timekpr.agent.boot.SecondaryUserInitService
+import com.timekpr.agent.monitor.UsageAlertForwarder
+import com.timekpr.agent.monitor.UsageAlertRelayActivity
 import com.timekpr.agent.monitor.UsageMonitorService
 import com.timekpr.agent.vpn.DomainBlockVpnService
+import com.timekpr.agent.policy.PolicyStorePayloadPush
+import com.timekpr.agent.policy.ProfileProvisioningStore
 import com.timekpr.agent.ui.MainActivity
 import com.timekpr.agent.ui.PairingSetupActivity
 import com.timekpr.agent.ui.QrScanActivity
 import com.timekpr.agent.util.AndroidUsers
+import java.io.File
 
 /**
  * Coordinates Device Owner affiliation between the primary user (User 0) and
@@ -38,6 +45,7 @@ object SecondaryUserProvisioner {
             if (dpm.getAffiliationIds(admin).isEmpty()) {
                 dpm.setAffiliationIds(admin, setOf(AFFILIATION_ID))
             }
+            DeviceOwnerProvisioner.configureCrossProfileCommunication(context)
         } catch (e: Exception) {
             Log.w(TAG, "Failed to set primary affiliation ids", e)
         }
@@ -50,8 +58,8 @@ object SecondaryUserProvisioner {
         if (!dpm.isAdminActive(admin)) return
         try {
             dpm.setAffiliationIds(admin, setOf(AFFILIATION_ID))
-            CrossUserStoreSync.replicateFromPrimaryToCurrentUser(context)
             DeviceOwnerProvisioner.applyManagedCapabilities(context)
+            registerCrossProfileRelayIntentFilter(context)
             hideManagementUi(context)
             Log.i(TAG, "Secondary user admin enabled for user ${currentUserId(context)}")
         } catch (e: Exception) {
@@ -62,18 +70,37 @@ object SecondaryUserProvisioner {
     /** Push enrollment/policies to a newly created user and grant capabilities there. */
     fun setupProvisionedUser(primaryContext: Context, userId: Int) {
         if (userId == 0) return
-        CrossUserStoreSync.replicateFromPrimaryToUser(primaryContext, userId)
+        DeviceOwnerProvisioner.configureCrossProfileCommunication(primaryContext)
+        PolicyStorePayloadPush.pushToUser(primaryContext, userId)
         val userContext = AndroidUsers.getUserContext(primaryContext, userId) ?: return
-        DeviceOwnerProvisioner.applyManagedCapabilities(userContext)
+        if (File(userContext.applicationInfo.dataDir).exists()) {
+            DeviceOwnerProvisioner.applyManagedCapabilities(userContext)
+        }
         DomainBlockVpnService.reconcile(userContext)
         bootstrapSecondaryUser(primaryContext, userId)
         SecondaryUserInitService.startOnUser(primaryContext, userId)
         hideManagementUi(userContext)
     }
 
+    /** Start init/monitor services on every managed secondary profile from user 0. */
+    fun bootstrapAllSecondaryUsers(primaryContext: Context) {
+        if (currentUserId(primaryContext) != 0) return
+        if (!DeviceOwnerProvisioner.isDeviceOwner(primaryContext)) return
+        val userIds = ProfileProvisioningStore(primaryContext).allProvisionedUserIds().filter { it > 0 }
+        if (userIds.isEmpty()) {
+            AndroidUsers.linuxUsersPayload(primaryContext)
+                .mapNotNull { (it["uid"] as? Number)?.toInt() }
+                .filter { it > 0 }
+                .forEach { bootstrapSecondaryUser(primaryContext, it) }
+            return
+        }
+        userIds.forEach { bootstrapSecondaryUser(primaryContext, it) }
+    }
+
     private fun bootstrapSecondaryUser(primaryContext: Context, userId: Int) {
         if (userId == 0) return
         if (!DeviceOwnerProvisioner.isDeviceOwner(primaryContext)) return
+        UsageMonitorService.start(primaryContext)
         try {
             val constructor = android.os.UserHandle::class.java.getConstructor(Int::class.javaPrimitiveType)
             val userHandle = constructor.newInstance(userId) as android.os.UserHandle
@@ -85,7 +112,42 @@ object SecondaryUserProvisioner {
             )
             startMethod.invoke(primaryContext, monitorIntent, userHandle)
         } catch (e: Exception) {
-            Log.w(TAG, "Failed to bootstrap services for user $userId", e)
+            Log.w(TAG, "Failed to start usage monitor on user $userId", e)
+        }
+    }
+
+    fun configureRelayActivityForUser(context: Context) {
+        val pm = context.packageManager
+        val component = ComponentName(context, UsageAlertRelayActivity::class.java)
+        try {
+            pm.setComponentEnabledSetting(
+                component,
+                PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
+                PackageManager.DONT_KILL_APP,
+            )
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to configure relay activity for user ${currentUserId(context)}", e)
+        }
+    }
+
+    fun registerCrossProfileRelayIntentFilter(context: Context) {
+        if (currentUserId(context) == 0) return
+        val dpm = context.getSystemService(DevicePolicyManager::class.java) ?: return
+        val admin = ComponentName(context, TimeKprDeviceAdminReceiver::class.java)
+        if (!dpm.isAdminActive(admin)) return
+        try {
+            val filter = IntentFilter().apply {
+                addAction(UsageAlertForwarder.RELAY_ACTION)
+                addCategory(Intent.CATEGORY_DEFAULT)
+            }
+            dpm.addCrossProfileIntentFilter(
+                admin,
+                filter,
+                DevicePolicyManager.FLAG_MANAGED_CAN_ACCESS_PARENT,
+            )
+            Log.i(TAG, "Registered cross-profile relay intent filter on user ${currentUserId(context)}")
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to register cross-profile relay intent filter", e)
         }
     }
 
@@ -133,6 +195,8 @@ object SecondaryUserProvisioner {
         if (!isManagedSecondaryUser(appContext)) return
 
         DeviceOwnerProvisioner.applyManagedCapabilities(appContext)
+        registerCrossProfileRelayIntentFilter(appContext)
+        configureRelayActivityForUser(appContext)
 
         val app = TimeKprApplication.from(appContext)
         app.timeLimitStore.reloadFromPrefs()
@@ -141,6 +205,8 @@ object SecondaryUserProvisioner {
         app.deviceRestrictionStore.restore()
 
         UsageMonitorService.start(appContext)
+        registerCrossProfileRelayIntentFilter(appContext)
+        configureRelayActivityForUser(appContext)
         EnforcementController(appContext, app.appPolicyStore).reconcileAllUsers()
         hideManagementUi(appContext)
         Log.i(TAG, "Prepared managed secondary user ${currentUserId(appContext)} at launch")

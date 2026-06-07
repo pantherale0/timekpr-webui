@@ -35,7 +35,7 @@ Copy `android-agent/app/google-services.json.example` → `google-services.json`
 | iptables + local DNS (`firewall.rs`, `local_dns.rs`) | `DomainBlockVpnService` (VPN tunnel with DNS filtering) |
 | Netlink process monitor (`netlink.rs`) | `UsageStatsManager` event stream |
 | `/etc/timekpr-agent/config.json` | `AgentConfigStore` (EncryptedSharedPreferences-ready SharedPreferences) |
-| logind session alerts | `user_signed_in` / `app_usage` alerts via usage events |
+| logind session alerts | `user_signed_in` / `app_usage` alerts via usage events (secondary profiles forward alerts to user 0) |
 | Persistent WebSocket loop | FCM wake + ephemeral `AgentWebSocketClient` sessions |
 
 ## Screen time lockout
@@ -360,9 +360,9 @@ Presets:
 
 ## Installed application inventory
 
-After each authenticated sync session the agent scans launcher-visible packages and sends chunked `installed_apps_report` messages to the server, plus optional `app_icon_report` PNG uploads (64×64, content-addressed). The server uses this inventory in the application policies UI.
+After each authenticated sync session the agent scans launcher-visible packages **for every managed Android user** (device owner on user 0 reports owner + secondary profiles via cross-user `PackageManager` contexts) and sends chunked `installed_apps_report` messages per `linux_username`, plus optional `app_icon_report` PNG uploads (64×64, content-addressed). The server uses this inventory in the application policies UI.
 
-The agent also handles `refresh_installed_apps` RPC for on-demand rescans while connected.
+The agent also handles `refresh_installed_apps` RPC for on-demand rescans of a specific mapped profile while connected.
 
 See [app-discovery.md](app-discovery.md) for the full protocol reference.
 

@@ -2,7 +2,9 @@ package com.timekpr.agent.admin
 
 import android.content.Context
 import android.os.Process
-import android.util.Log
+import com.timekpr.agent.util.AgentLog
+import com.timekpr.agent.policy.PolicyStorePayloadPush
+import com.timekpr.agent.policy.ProfileProvisioningStore
 import com.timekpr.agent.util.AndroidUsers
 import java.io.File
 
@@ -30,13 +32,24 @@ object CrossUserStoreSync {
         "domain_policy",
     )
 
-    fun replicateToAllSecondaryUsers(primaryContext: Context) {
+    fun pushPolicyToAllSecondaryUsers(primaryContext: Context) {
         if (currentUserId(primaryContext) != 0) return
-        for (entry in AndroidUsers.linuxUsersPayload(primaryContext)) {
-            val uid = (entry["uid"] as? Number)?.toInt() ?: continue
-            if (uid == 0) continue
-            replicateFromPrimaryToUser(primaryContext, uid)
+        secondaryTargetUserIds(primaryContext).forEach { userId ->
+            PolicyStorePayloadPush.pushToUser(primaryContext, userId)
         }
+    }
+
+    /** @deprecated Prefer [pushPolicyToAllSecondaryUsers]; direct file copy requires the target data dir. */
+    fun replicateToAllSecondaryUsers(primaryContext: Context) {
+        pushPolicyToAllSecondaryUsers(primaryContext)
+    }
+
+    private fun secondaryTargetUserIds(context: Context): List<Int> {
+        val fromProvisioning = ProfileProvisioningStore(context).allProvisionedUserIds().filter { it > 0 }
+        if (fromProvisioning.isNotEmpty()) return fromProvisioning
+        return AndroidUsers.linuxUsersPayload(context)
+            .mapNotNull { (it["uid"] as? Number)?.toInt() }
+            .filter { it > 0 }
     }
 
     fun replicateFromPrimaryToCurrentUser(secondaryContext: Context): Boolean {
@@ -50,7 +63,10 @@ object CrossUserStoreSync {
         if (targetUserId == 0) return true
         val targetContext = AndroidUsers.getUserContext(primaryContext, targetUserId)
         if (targetContext == null) {
-            Log.w(TAG, "Could not open context for user $targetUserId")
+            AgentLog.d(TAG, "Could not open context for user $targetUserId")
+            return false
+        }
+        if (!File(targetContext.applicationInfo.dataDir).exists()) {
             return false
         }
         try {
@@ -61,18 +77,23 @@ object CrossUserStoreSync {
                 try {
                     copyFilesDirectory(primaryContext, targetContext, dirName)
                 } catch (e: Exception) {
-                    Log.w(TAG, "Failed to copy files dir $dirName to user $targetUserId", e)
+                    AgentLog.d(TAG, "Failed to copy files dir $dirName to user $targetUserId: ${e.message}")
                 }
             }
-            Log.i(TAG, "Replicated stores from user 0 to user $targetUserId")
+            AgentLog.d(TAG, "Replicated stores from user 0 to user $targetUserId")
             return true
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to replicate stores to user $targetUserId", e)
+            AgentLog.wOnce(TAG, "replicate_$targetUserId", "Failed to replicate stores to user $targetUserId: ${e.message}")
             return false
         }
     }
 
     private fun copySharedPreferences(from: Context, to: Context, name: String) {
+        if (from.applicationInfo.dataDir != to.applicationInfo.dataDir) {
+            copySharedPreferencesCrossUser(from, to, name)
+            return
+        }
+
         val sourceFile = File(from.applicationInfo.dataDir, "shared_prefs/$name.xml")
         if (!sourceFile.exists()) {
             val source = from.getSharedPreferences(name, Context.MODE_PRIVATE)
@@ -84,23 +105,29 @@ object CrossUserStoreSync {
         if (sourceFile.exists()) {
             sourceFile.copyTo(targetFile, overwrite = true)
         } else {
-            val source = from.getSharedPreferences(name, Context.MODE_PRIVATE)
-            val editor = to.getSharedPreferences(name, Context.MODE_PRIVATE).edit().clear()
-            for ((key, value) in source.all) {
-                when (value) {
-                    is String -> editor.putString(key, value)
-                    is Boolean -> editor.putBoolean(key, value)
-                    is Int -> editor.putInt(key, value)
-                    is Long -> editor.putLong(key, value)
-                    is Float -> editor.putFloat(key, value)
-                    is Set<*> -> {
-                        @Suppress("UNCHECKED_CAST")
-                        editor.putStringSet(key, value as Set<String>)
-                    }
+            copySharedPreferencesCrossUser(from, to, name)
+        }
+    }
+
+    private fun copySharedPreferencesCrossUser(from: Context, to: Context, name: String) {
+        to.getSharedPreferences("_timekpr_sync_bootstrap", Context.MODE_PRIVATE)
+        val source = from.getSharedPreferences(name, Context.MODE_PRIVATE)
+        if (source.all.isEmpty()) return
+        val editor = to.getSharedPreferences(name, Context.MODE_PRIVATE).edit().clear()
+        for ((key, value) in source.all) {
+            when (value) {
+                is String -> editor.putString(key, value)
+                is Boolean -> editor.putBoolean(key, value)
+                is Int -> editor.putInt(key, value)
+                is Long -> editor.putLong(key, value)
+                is Float -> editor.putFloat(key, value)
+                is Set<*> -> {
+                    @Suppress("UNCHECKED_CAST")
+                    editor.putStringSet(key, value as Set<String>)
                 }
             }
-            editor.commit()
         }
+        editor.commit()
     }
 
     private fun copyFilesDirectory(from: Context, to: Context, relativePath: String) {

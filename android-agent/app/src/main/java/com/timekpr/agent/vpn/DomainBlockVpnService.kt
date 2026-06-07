@@ -17,19 +17,21 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.timekpr.agent.R
 import com.timekpr.agent.TimeKprApplication
-import com.timekpr.agent.admin.CrossUserStoreSync
 import com.timekpr.agent.admin.DeviceOwnerProvisioner
 import com.timekpr.agent.admin.TimeKprDeviceAdminReceiver
 import com.timekpr.agent.policy.BlockedDomainMatcher
 import com.timekpr.agent.boot.SecondaryUserInitService
 import com.timekpr.agent.policy.DomainPolicyResolver
 import com.timekpr.agent.policy.PolicyIpcServer
-import com.timekpr.agent.util.AndroidUsers
+import com.timekpr.agent.policy.ProfileProvisioningStore
+import com.timekpr.agent.util.AgentLog
 import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
+import android.os.Handler
+import android.os.Looper
 
 /**
  * DNS-only VPN tunnel that blocks queries for filtered domains (TimeKpr web policies).
@@ -50,7 +52,6 @@ class DomainBlockVpnService : VpnService() {
     private val policyReloadReceiver = object : android.content.BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent?) {
             if (intent?.action == ACTION_RELOAD_POLICY) {
-                Log.i(TAG, "Reload policy broadcast received; querying IPC server")
                 Executors.newSingleThreadExecutor().execute {
                     TimeKprApplication.from(context).domainPolicyStore.restore()
                     fetchPolicyAndReconcile()
@@ -76,6 +77,10 @@ class DomainBlockVpnService : VpnService() {
             return START_NOT_STICKY
         }
         upstreamNetwork = readUpstreamNetwork(intent)
+        if (intent?.action == ACTION_RELOAD_POLICY && running.get()) {
+            fetchPolicyAndReconcile()
+            return START_STICKY
+        }
         startTunnel()
         return START_STICKY
     }
@@ -94,7 +99,7 @@ class DomainBlockVpnService : VpnService() {
         vpnBlockedDomains = policy.blockedDomains
         vpnAllowedDomains = policy.allowedDomains
         vpnBlockedMatcher = BlockedDomainMatcher.from(vpnBlockedDomains)
-        Log.i(
+        AgentLog.d(
             TAG,
             "Loaded policy for user $userId (key=${policy.policyUid}): " +
                 "blocked=${vpnBlockedDomains.size}, allowed=${vpnAllowedDomains.size}",
@@ -106,7 +111,7 @@ class DomainBlockVpnService : VpnService() {
 
         fetchPolicyAndReconcile()
         if (vpnBlockedMatcher.isEmpty()) {
-            Log.i(TAG, "No blocked domains configured; skipping VPN tunnel")
+            AgentLog.d(TAG, "No blocked domains configured; skipping VPN tunnel")
             running.set(false)
             stopSelf()
             return
@@ -122,7 +127,7 @@ class DomainBlockVpnService : VpnService() {
         val resolver = upstreamResolver ?: return
         val dnsServers = resolver.servers
         if (dnsServers.isEmpty()) {
-            Log.w(TAG, "No upstream DNS servers available; skipping VPN tunnel")
+            AgentLog.wOnce(TAG, "no_dns", "No upstream DNS servers available; skipping VPN tunnel")
             running.set(false)
             stopSelf()
             return
@@ -148,13 +153,13 @@ class DomainBlockVpnService : VpnService() {
 
         tunInterface = builder.establish()
         if (tunInterface == null) {
-            Log.w(TAG, "Failed to establish VPN tunnel")
+            AgentLog.wOnce(TAG, "tun_failed", "Failed to establish VPN tunnel")
             running.set(false)
             stopSelf()
             return
         }
 
-        Log.i(
+        AgentLog.d(
             TAG,
             "VPN started with ${vpnBlockedDomains.size} blocked domain(s); " +
                 "upstreamNetwork=$network routedDns=${dnsServers.joinToString { it.hostAddress ?: "?" }}",
@@ -202,12 +207,12 @@ class DomainBlockVpnService : VpnService() {
                         DnsAnswerBuilder.buildNxDomain(parsed)
                     } else if (!isBlocked) {
                         resolver.resolve(parsed) ?: run {
-                            Log.w(TAG, "Failed to resolve TUN DNS query for ${parsed.queryName}")
+                            AgentLog.d(TAG, "Failed to resolve TUN DNS query for ${parsed.queryName}")
                             DnsAnswerBuilder.buildServFail(parsed)
                         }
                     } else {
                         resolver.resolve(parsed) ?: run {
-                            Log.w(TAG, "Failed to resolve granted TUN DNS query for ${parsed.queryName}")
+                            AgentLog.d(TAG, "Failed to resolve granted TUN DNS query for ${parsed.queryName}")
                             DnsAnswerBuilder.buildServFail(parsed)
                         }
                     }
@@ -217,7 +222,7 @@ class DomainBlockVpnService : VpnService() {
                     }
                     Log.d(TAG, "Answered TUN DNS query for ${parsed.queryName} (${parsed.ipVersion})")
                 } catch (e: Exception) {
-                    Log.w(TAG, "Failed to handle TUN DNS query for ${parsed.queryName}", e)
+                    AgentLog.wOnce(TAG, "tun_dns_${parsed.queryName}", "Failed to handle TUN DNS query for ${parsed.queryName}")
                 }
             }
         }
@@ -280,45 +285,58 @@ class DomainBlockVpnService : VpnService() {
         private const val EXTRA_UPSTREAM_NETWORK = "com.timekpr.agent.vpn.EXTRA_UPSTREAM_NETWORK"
         private const val VPN_ADDRESS = "10.111.0.1"
         private const val VPN_PREFIX = 32
-        fun reconcile(context: Context) {
-            val appContext = context.applicationContext
-            val callingUserId = Process.myUid() / 100_000
-            reconcileForUser(appContext, callingUserId)
+        private const val RECONCILE_DEBOUNCE_MS = 400L
 
-            if (callingUserId == 0 && DeviceOwnerProvisioner.isDeviceOwner(appContext)) {
-                CrossUserStoreSync.replicateToAllSecondaryUsers(appContext)
-                fanOutSecondaryUsers(appContext)
+        private val reconcileHandler = Handler(Looper.getMainLooper())
+        private var pendingReconcileContext: Context? = null
+        private val lastPolicySignatureByUser = mutableMapOf<Int, String>()
+
+        fun reconcile(context: Context) {
+            pendingReconcileContext = context.applicationContext
+            reconcileHandler.removeCallbacks(reconcileRunnable)
+            reconcileHandler.postDelayed(reconcileRunnable, RECONCILE_DEBOUNCE_MS)
+        }
+
+        private val reconcileRunnable = Runnable {
+            val ctx = pendingReconcileContext ?: return@Runnable
+            reconcileImmediate(ctx)
+        }
+
+        private fun reconcileImmediate(context: Context) {
+            val callingUserId = Process.myUid() / 100_000
+            reconcileForUser(context, callingUserId)
+
+            if (callingUserId == 0 && DeviceOwnerProvisioner.isDeviceOwner(context)) {
+                fanOutSecondaryUsers(context)
             }
         }
 
         private fun fanOutSecondaryUsers(context: Context) {
-            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) return
-            val dpm = context.getSystemService(DevicePolicyManager::class.java) ?: return
-            val admin = ComponentName(context, TimeKprDeviceAdminReceiver::class.java)
-            if (!dpm.isAdminActive(admin)) return
-            try {
-                dpm.getSecondaryUsers(admin)?.forEach { userHandle ->
-                    val userId = userHandleIdentifier(userHandle)
-                    SecondaryUserInitService.startOnUser(context, userId)
-                    val reloadIntent = Intent(ACTION_RELOAD_POLICY)
-                    userHandleForId(userId)?.let { context.sendBroadcastAsUser(reloadIntent, it) }
+            val targets = ProfileProvisioningStore(context).allProvisionedUserIds().filter { it > 0 }
+            if (targets.isEmpty()) return
+            for (userId in targets) {
+                SecondaryUserInitService.startOnUser(context, userId)
+                val reloadIntent = Intent(ACTION_RELOAD_POLICY).setPackage(context.packageName)
+                userHandleForId(userId)?.let { handle ->
+                    context.sendBroadcastAsUser(reloadIntent, handle)
                 }
-            } catch (e: Exception) {
-                Log.w(TAG, "Failed to reconcile VPN for secondary users", e)
             }
         }
 
-        private fun reconcileForUser(context: Context, userId: Int) {
-            val reloadIntent = Intent(ACTION_RELOAD_POLICY)
-            val userHandle = userHandleForId(userId)
-            if (userHandle != null) {
-                context.sendBroadcastAsUser(reloadIntent, userHandle)
-            } else {
-                context.sendBroadcast(reloadIntent)
-            }
+        private fun policySignature(policy: DomainPolicyResolver.VpnDomainPolicy): String {
+            return "${policy.policyUid}:${policy.blockedDomains.size}:${policy.blockedDomains.hashCode()}"
+        }
 
+        private fun reconcileForUser(context: Context, userId: Int) {
             val policy = loadPolicyForUser(context, userId)
+            val signature = policySignature(policy)
+            if (signature == lastPolicySignatureByUser[userId]) {
+                return
+            }
+            lastPolicySignatureByUser[userId] = signature
+
             if (policy.blockedDomains.isEmpty()) {
+                lastPolicySignatureByUser.remove(userId)
                 clearAlwaysOnVpnIfDeviceOwner(context)
                 context.stopService(
                     Intent(context, DomainBlockVpnService::class.java).setAction(ACTION_STOP),
@@ -326,7 +344,9 @@ class DomainBlockVpnService : VpnService() {
                 return
             }
 
-            DeviceOwnerProvisioner.applyManagedCapabilities(context)
+            if (!DeviceOwnerProvisioner.hasUsageAccess(context)) {
+                DeviceOwnerProvisioner.applyManagedCapabilities(context)
+            }
             setAlwaysOnVpnIfDeviceOwner(context)
 
             val prepare = VpnService.prepare(context)
@@ -338,6 +358,7 @@ class DomainBlockVpnService : VpnService() {
 
             val upstreamNetwork = VpnNetworkCapture.findUnderlyingNetwork(context)
             val serviceIntent = Intent(context, DomainBlockVpnService::class.java)
+                .setAction(ACTION_RELOAD_POLICY)
                 .putExtra(EXTRA_UPSTREAM_NETWORK, upstreamNetwork)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 context.startForegroundService(serviceIntent)
@@ -352,15 +373,6 @@ class DomainBlockVpnService : VpnService() {
                 constructor.newInstance(userId) as UserHandle
             } catch (_: Exception) {
                 null
-            }
-        }
-
-        private fun userHandleIdentifier(userHandle: UserHandle): Int {
-            return try {
-                val method = UserHandle::class.java.getMethod("getIdentifier")
-                method.invoke(userHandle) as? Int ?: userHandle.hashCode()
-            } catch (_: Exception) {
-                userHandle.hashCode()
             }
         }
 
@@ -402,7 +414,7 @@ class DomainBlockVpnService : VpnService() {
                     allowedDomains = allowed,
                 )
             } catch (e: Exception) {
-                Log.w(TAG, "IPC policy fetch failed for user $androidUserId", e)
+                AgentLog.wOnce(TAG, "ipc_$androidUserId", "IPC policy fetch failed for user $androidUserId")
                 null
             } finally {
                 try {
@@ -417,8 +429,7 @@ class DomainBlockVpnService : VpnService() {
             val admin = ComponentName(context, TimeKprDeviceAdminReceiver::class.java)
             try {
                 dpm.setAlwaysOnVpnPackage(admin, context.packageName, false)
-            } catch (e: Exception) {
-                Log.w(TAG, "Failed to set always-on VPN", e)
+            } catch (_: Exception) {
             }
         }
 
@@ -428,8 +439,7 @@ class DomainBlockVpnService : VpnService() {
             val admin = ComponentName(context, TimeKprDeviceAdminReceiver::class.java)
             try {
                 dpm.setAlwaysOnVpnPackage(admin, null, false)
-            } catch (e: Exception) {
-                Log.w(TAG, "Failed to clear always-on VPN", e)
+            } catch (_: Exception) {
             }
         }
     }

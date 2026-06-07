@@ -114,3 +114,22 @@ def _device_display_label(system_id, label_map=None):
 
 def _mapping_display_label(mapping, label_map=None):
     return f"{mapping.linux_username}@{_device_display_label(mapping.system_id, label_map)}"
+
+
+def generate_parental_access_code(secure_token: str, time_step_seconds: int = 1800) -> str:
+    """Generate a 6-digit TOTP code using hmac-sha256 and a time step (default 30 mins)."""
+    if not secure_token:
+        return "000000"
+    import hmac
+    import hashlib
+    import struct
+    import time
+    key_bytes = secure_token.encode('utf-8')
+    time_slot = int(time.time()) // time_step_seconds
+    msg = struct.pack(">Q", time_slot)
+    hm_val = hmac.new(key_bytes, msg, hashlib.sha256).digest()
+    offset = hm_val[-1] & 0x0f
+    binary = struct.unpack(">I", hm_val[offset:offset+4])[0] & 0x7fffffff
+    otp = binary % 1000000
+    return f"{otp:06d}"
+

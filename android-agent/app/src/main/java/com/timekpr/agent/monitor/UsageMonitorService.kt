@@ -16,7 +16,6 @@ import androidx.core.app.NotificationCompat
 import com.timekpr.agent.R
 import com.timekpr.agent.TimeKprApplication
 import com.timekpr.agent.discovery.PackageChangeMonitor
-import com.timekpr.agent.admin.CrossUserStoreSync
 import com.timekpr.agent.admin.DeviceOwnerProvisioner
 import com.timekpr.agent.admin.SecondaryUserProvisioner
 import com.timekpr.agent.boot.SecondaryUserInitService
@@ -60,6 +59,11 @@ class UsageMonitorService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        ensureManagedUserEntries()
+        if (!AndroidUsers.isPrimaryUser(this)) {
+            SecondaryUserProvisioner.registerCrossProfileRelayIntentFilter(this)
+            SecondaryUserProvisioner.configureRelayActivityForUser(this)
+        }
         startForeground(NOTIFICATION_ID, buildNotification())
         packageChangeMonitor.register()
         monitorJob?.cancel()
@@ -80,10 +84,13 @@ class UsageMonitorService : Service() {
         val timeStore = TimeKprApplication.from(this).timeLimitStore
 
         while (scope.isActive) {
+            val callingUserId = Process.myUid() / 100_000
+            if (callingUserId == 0) {
+                drainPendingAlertsFromSecondaryUsers()
+            }
             val activeUid = AndroidUsers.activeUserUid(this)
-            if (Process.myUid() / 100_000 == 0 && activeUid != 0 && activeUid != lastBootstrappedForegroundUser) {
+            if (callingUserId == 0 && activeUid != 0 && activeUid != lastBootstrappedForegroundUser) {
                 lastBootstrappedForegroundUser = activeUid
-                CrossUserStoreSync.replicateFromPrimaryToUser(this, activeUid)
                 PolicyStorePayloadPush.pushToUser(this, activeUid)
                 PolicyPayloadPush.pushToUser(this, activeUid, activeUid)
                 SecondaryUserInitService.startOnUser(this, activeUid)
@@ -91,26 +98,34 @@ class UsageMonitorService : Service() {
                     sendBroadcastAsUser(Intent(DomainBlockVpnService.ACTION_RELOAD_POLICY), handle)
                 }
             }
-            val username = timeStore.getUsernameForUid(activeUid) ?: AndroidUsers.currentLinuxUsername(this)
-            
+            val username = AndroidUsers.usernameForUid(this, activeUid, timeStore)
+
             val userContext = AndroidUsers.getUserContext(this, activeUid) ?: this
+            if (callingUserId == 0 && activeUid == 0) {
+                enforcement.applyOwnerProfileLockdownIfNeeded()
+            }
             if (++capabilityCheckCounter % 15 == 0) {
                 enforceManagedCapabilities(userContext)
             }
-            val usageStatsManager = userContext.getSystemService(UsageStatsManager::class.java)
 
-            if (usageStatsManager != null) {
+            if (callingUserId == 0 && activeUid != callingUserId) {
+                delay(2_000)
+                continue
+            }
+
+            val end = System.currentTimeMillis()
+            val start = end - 5_000
+            val usageEvents = queryUsageEvents(callingUserId, activeUid, userContext, start, end)
+
+            if (usageEvents != null) {
                 val accessAllowed = timeStore.isAccessAllowed(username)
                 if (!accessAllowed) {
                     enforcement.applyTimePoliciesForUser(username, activeUid)
                 }
 
-                val end = System.currentTimeMillis()
-                val start = end - 5_000
-                val events = usageStatsManager.queryEvents(start, end)
                 val event = UsageEvents.Event()
-                while (events.hasNextEvent()) {
-                    events.getNextEvent(event)
+                while (usageEvents.hasNextEvent()) {
+                    usageEvents.getNextEvent(event)
                     when (event.eventType) {
                         UsageEvents.Event.ACTIVITY_RESUMED -> {
                             val packageName = event.packageName ?: continue
@@ -124,7 +139,7 @@ class UsageMonitorService : Service() {
                                 processedResumeKeys.remove(oldest)
                             }
                             if (enforcement.suspendBlockedLaunch(packageName, username)) {
-                                emitBlockedLaunchAlerts(packageName, username, accessAllowed)
+                                emitBlockedLaunchAlerts(userContext, packageName, username, accessAllowed)
                                 continue
                             }
                             if (accessAllowed) {
@@ -168,12 +183,66 @@ class UsageMonitorService : Service() {
         }
     }
 
+    private fun drainPendingAlertsFromSecondaryUsers() {
+        val userIds = AndroidUsers.managedSecondaryUserIds(this)
+        for (userId in userIds) {
+            val userContext = AndroidUsers.getUserContext(this, userId)
+            if (userContext != null) {
+                for (pending in ApplicationRestrictionsAlertQueue.drain(userContext)) {
+                    AlertEventBus.emit(pending.eventType, pending.linuxUsername, pending.details)
+                }
+            }
+            val pendingFile = userContext?.let { java.io.File(it.filesDir, PendingAlertStore.FILE_NAME) }
+            val directFile = java.io.File("/data/user/$userId/$packageName/files/${PendingAlertStore.FILE_NAME}")
+            val drainContext = when {
+                pendingFile?.exists() == true && pendingFile.length() > 0L -> userContext
+                directFile.exists() && directFile.length() > 0L -> this
+                else -> continue
+            }
+            val alerts = if (drainContext === this && directFile.exists()) {
+                PendingAlertStore.drainFile(directFile)
+            } else if (userContext != null) {
+                PendingAlertStore.drain(userContext)
+            } else {
+                emptyList()
+            }
+            for (pending in alerts) {
+                AlertEventBus.emit(pending.eventType, pending.linuxUsername, pending.details)
+            }
+        }
+    }
+
+    private fun queryUsageEvents(
+        callingUserId: Int,
+        activeUid: Int,
+        userContext: Context,
+        start: Long,
+        end: Long,
+    ): UsageEvents? {
+        val primaryUsm = getSystemService(UsageStatsManager::class.java) ?: return null
+        if (activeUid != callingUserId) {
+            try {
+                val method = UsageStatsManager::class.java.getMethod(
+                    "queryEventsForUser",
+                    Int::class.javaPrimitiveType,
+                    Long::class.javaPrimitiveType,
+                    Long::class.javaPrimitiveType,
+                )
+                return method.invoke(primaryUsm, activeUid, start, end) as? UsageEvents
+            } catch (_: Exception) {
+                // fall through
+            }
+        }
+        return userContext.getSystemService(UsageStatsManager::class.java)?.queryEvents(start, end)
+    }
+
     private fun emitBlockedLaunchAlerts(
+        userContext: Context,
         packageName: String,
         username: String,
         accessAllowed: Boolean,
     ) {
-        val displayLabel = applicationLabel(packageName) ?: packageName
+        val displayLabel = applicationLabel(userContext, packageName) ?: packageName
         if (!accessAllowed) {
             emitLocalAlert(
                 "app_blocked",
@@ -216,9 +285,9 @@ class UsageMonitorService : Service() {
         )
     }
 
-    private fun applicationLabel(packageName: String): String? {
+    private fun applicationLabel(userContext: Context, packageName: String): String? {
         return try {
-            val pm = packageManager
+            val pm = userContext.packageManager
             val appInfo = pm.getApplicationInfo(packageName, 0)
             pm.getApplicationLabel(appInfo)?.toString()
         } catch (_: PackageManager.NameNotFoundException) {
@@ -233,7 +302,6 @@ class UsageMonitorService : Service() {
             return
         }
         if (SecondaryUserProvisioner.isManagedSecondaryUser(userContext)) {
-            CrossUserStoreSync.replicateFromPrimaryToCurrentUser(userContext)
             TimeKprApplication.from(userContext).domainPolicyStore.restore()
         }
         if (!DeviceOwnerProvisioner.hasUsageAccess(userContext)) {
@@ -251,12 +319,28 @@ class UsageMonitorService : Service() {
         }
     }
 
+    private fun ensureManagedUserEntries() {
+        val timeStore = TimeKprApplication.from(this).timeLimitStore
+        for ((username, _) in AndroidUsers.inventoryTargets(this)) {
+            val uid = AndroidUsers.resolveUidForUsername(this, username)
+            if (uid >= 0) {
+                timeStore.ensureUser(username, uid)
+            }
+        }
+    }
+
     private fun emitLocalAlert(eventType: String, details: JSONObject, username: String) {
-        AlertEventBus.emit(
-            eventType = eventType,
-            linuxUsername = username,
-            details = details,
-        )
+        if (AndroidUsers.isPrimaryUser(this)) {
+            AlertEventBus.emit(
+                eventType = eventType,
+                linuxUsername = username,
+                details = details,
+            )
+        } else {
+            PendingAlertStore.append(this, eventType, username, details)
+            ApplicationRestrictionsAlertQueue.append(this, eventType, username, details)
+            UsageAlertForwarder.sendToPrimary(this, eventType, username, details)
+        }
     }
 
     private fun buildNotification(): Notification {
