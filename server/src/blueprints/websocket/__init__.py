@@ -80,6 +80,7 @@ def ws_agent_handler(ws):
             if isinstance(system_hostname, str):
                 system_hostname = system_hostname.strip() or None
             reg_token = hello_msg.get("registration_token")
+            paired = hello_msg.get("paired", True)
             
             if not system_id:
                 _LOGGER.warning("Initial hello missing system_id")
@@ -181,6 +182,25 @@ def ws_agent_handler(ws):
                     ws.send(json.dumps({"type": "auth_result", "success": False, "message": "Device rejected/banned"}))
                     return
     
+                if device.status == 'approved' and not paired:
+                    if expected_reg_token and reg_token != expected_reg_token:
+                        _LOGGER.warning(
+                            "Token delivery rejected: Invalid registration token from %s",
+                            system_id,
+                        )
+                        ws.send(json.dumps({"type": "auth_result", "success": False, "message": "Invalid registration token"}))
+                        return
+                    
+                    _LOGGER.info(
+                        "Device %s is approved but client reports it is unpaired. Delivering token.",
+                        system_id,
+                    )
+                    ws.send(json.dumps({
+                        "type": "pairing_approved",
+                        "token": device.secure_token
+                    }))
+                    return
+
                 if device.status == 'approved' or allow_pending_reset_auth:
                     challenge = secrets.token_hex(32)
                     ws.send(json.dumps({

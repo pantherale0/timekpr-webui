@@ -31,7 +31,10 @@ class PairingPollWorker(
             applicationContext,
             AgentWebSocketClient.SessionMode.PAIRING_ONLY,
         )
-        return if (result.success) Result.success() else Result.success()
+        if (result.reason == "pairing_approved") {
+            AgentSessionCoordinator.scheduleSync(applicationContext, reason = "pairing_approved")
+        }
+        return Result.success()
     }
 
     companion object {

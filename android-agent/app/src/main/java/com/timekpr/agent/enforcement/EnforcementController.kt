@@ -37,32 +37,49 @@ class EnforcementController(
     }
 
     fun startAll() {
-        val username = AndroidUsers.currentLinuxUsername(context)
-        applyTimePolicies(username)
-        applyAppPolicies(username)
-        applyDeviceRestrictions(username)
+        reconcileAllUsers()
+    }
+
+    fun reconcileAllUsers() {
+        val allUsers = TimeKprApplication.from(context).timeLimitStore.allUsernames()
+        allUsers.forEach { username ->
+            val uid = getUidForUsername(username)
+            applyTimePoliciesForUser(username, uid)
+            applyAppPoliciesForUser(username, uid)
+            applyDeviceRestrictionsForUser(username, uid)
+        }
         DomainBlockVpnService.reconcile(context)
         UsageMonitorService.start(context)
     }
 
     fun applyTimePolicies(username: String) {
-        val dpm = context.getSystemService(DevicePolicyManager::class.java) ?: return
+        applyTimePoliciesForUser(username, getUidForUsername(username))
+    }
+
+    fun applyTimePoliciesForUser(username: String, uid: Int) {
+        val userContext = AndroidUsers.getUserContext(context, uid) ?: context
+        val dpm = userContext.getSystemService(DevicePolicyManager::class.java) ?: return
         if (!dpm.isAdminActive(adminComponent)) return
 
         if (!timeLimitStore.isAccessAllowed(username)) {
-            enforceTimeExhaustion(username, dpm)
+            enforceTimeExhaustionForUser(username, uid, dpm)
             return
         }
-        clearTimeExhaustion(username, dpm)
+        clearTimeExhaustionForUser(username, uid, dpm)
     }
 
     fun applyAppPolicies(username: String) {
+        applyAppPoliciesForUser(username, getUidForUsername(username))
+    }
+
+    fun applyAppPoliciesForUser(username: String, uid: Int) {
         if (!timeLimitStore.isAccessAllowed(username)) {
-            applyTimePolicies(username)
+            applyTimePoliciesForUser(username, uid)
             return
         }
 
-        val dpm = context.getSystemService(DevicePolicyManager::class.java) ?: return
+        val userContext = AndroidUsers.getUserContext(context, uid) ?: context
+        val dpm = userContext.getSystemService(DevicePolicyManager::class.java) ?: return
         if (!dpm.isAdminActive(adminComponent)) return
 
         val blocked = appPolicyStore.effectiveBlockedPackages(username)
@@ -70,7 +87,7 @@ class EnforcementController(
         val releasedBySync = appPolicyStore.consumePackagesReleasedBySync(username)
         var toUnsuspend = (previouslyEnforced + releasedBySync - blocked).toMutableSet()
         if (blocked.isEmpty() && toUnsuspend.isEmpty()) {
-            toUnsuspend.addAll(findSuspendedThirdPartyPackages())
+            toUnsuspend.addAll(findSuspendedThirdPartyPackagesForUser(uid))
         }
         val toSuspend = blocked.toTypedArray()
         val toUnsuspendArray = toUnsuspend.toTypedArray()
@@ -79,19 +96,23 @@ class EnforcementController(
         appPolicyStore.setLastEnforcedBlockedPackages(username, blocked)
     }
 
-    private fun enforceTimeExhaustion(username: String, dpm: DevicePolicyManager) {
+    private fun enforceTimeExhaustionForUser(username: String, uid: Int, dpm: DevicePolicyManager) {
         val showCallButton = PhoneCallExemption.canMakeCalls(context)
-        TimeExhaustedOverlay.show(context, showCallButton)
+        if (uid == AndroidUsers.activeUserUid(context)) {
+            TimeExhaustedOverlay.show(context, showCallButton)
+        }
 
         val exempt = timeExemptionResolver.exemptPackages(username)
-        val toSuspend = launcherPackages() - exempt
+        val toSuspend = launcherPackagesForUser(uid) - exempt
         setPackagesSuspended(dpm, toSuspend.toTypedArray(), true)
         lastTimeExhaustionSuspendedByUser[username] = toSuspend
         persistTimeExhaustionSuspended()
     }
 
-    private fun clearTimeExhaustion(username: String, dpm: DevicePolicyManager) {
-        TimeExhaustedOverlay.dismiss(context)
+    private fun clearTimeExhaustionForUser(username: String, uid: Int, dpm: DevicePolicyManager) {
+        if (uid == AndroidUsers.activeUserUid(context)) {
+            TimeExhaustedOverlay.dismiss(context)
+        }
 
         val previouslySuspended = lastTimeExhaustionSuspendedByUser.remove(username) ?: emptySet()
         if (previouslySuspended.isNotEmpty()) {
@@ -100,30 +121,49 @@ class EnforcementController(
             setPackagesSuspended(dpm, toUnsuspend, false)
         }
         persistTimeExhaustionSuspended()
-        applyAppPolicies(username)
+        applyAppPoliciesForUser(username, uid)
     }
 
-    private fun launcherPackages(): Set<String> {
-        val packageManager = context.packageManager
-        return packageManager.queryIntentActivities(
-            Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER),
-            PackageManager.MATCH_ALL,
-        ).map { it.activityInfo.packageName }.toSet()
+    private fun getUidForUsername(username: String): Int {
+        return TimeKprApplication.from(context).timeLimitStore.ensureUser(username, AndroidUsers.currentLinuxUid(context)).linuxUid
     }
 
-    private fun findSuspendedThirdPartyPackages(): Set<String> {
-        val pm = context.packageManager
-        return pm.getInstalledApplications(PackageManager.MATCH_UNINSTALLED_PACKAGES)
-            .asSequence()
-            .filter { (it.flags and ApplicationInfo.FLAG_SUSPENDED) != 0 }
-            .map { it.packageName }
-            .filter { it != context.packageName }
-            .toSet()
+    private fun launcherPackagesForUser(uid: Int): Set<String> {
+        val userContext = AndroidUsers.getUserContext(context, uid) ?: context
+        val packageManager = userContext.packageManager
+        return try {
+            packageManager.queryIntentActivities(
+                Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER),
+                PackageManager.MATCH_ALL,
+            ).map { it.activityInfo.packageName }.toSet()
+        } catch (_: Exception) {
+            emptySet()
+        }
+    }
+
+    private fun findSuspendedThirdPartyPackagesForUser(uid: Int): Set<String> {
+        val userContext = AndroidUsers.getUserContext(context, uid) ?: context
+        val pm = userContext.packageManager
+        return try {
+            pm.getInstalledApplications(PackageManager.MATCH_UNINSTALLED_PACKAGES)
+                .asSequence()
+                .filter { (it.flags and ApplicationInfo.FLAG_SUSPENDED) != 0 }
+                .map { it.packageName }
+                .filter { it != context.packageName }
+                .toSet()
+        } catch (_: Exception) {
+            emptySet()
+        }
     }
 
     fun applyDeviceRestrictions(username: String) {
+        applyDeviceRestrictionsForUser(username, getUidForUsername(username))
+    }
+
+    fun applyDeviceRestrictionsForUser(username: String, uid: Int) {
         if (!DeviceOwnerProvisioner.isDeviceOrProfileOwner(context)) return
-        val dpm = context.getSystemService(DevicePolicyManager::class.java) ?: return
+        val userContext = AndroidUsers.getUserContext(context, uid) ?: context
+        val dpm = userContext.getSystemService(DevicePolicyManager::class.java) ?: return
         if (!dpm.isAdminActive(adminComponent)) return
 
         val policy = TimeKprApplication.from(context).deviceRestrictionStore.policyForUser(username)

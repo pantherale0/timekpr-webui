@@ -28,7 +28,7 @@ class CommandDispatcher(
 
     fun handle(action: String, username: String, args: JSONObject): DispatchResult {
         return when (action) {
-            "validate_user" -> handleValidateUser(username)
+            "validate_user" -> handleValidateUser(username, args)
             "modify_time_left" -> handleModifyTimeLeft(username, args)
             "set_weekly_time_limits" -> handleWeeklyLimits(username, args)
             "set_allowed_hours" -> handleAllowedHours(username, args)
@@ -49,11 +49,9 @@ class CommandDispatcher(
         }
     }
 
-    private fun handleValidateUser(username: String): DispatchResult {
-        val state = timeLimitStore.ensureUser(
-            username,
-            AndroidUsers.currentLinuxUid(context),
-        )
+    private fun handleValidateUser(username: String, args: JSONObject): DispatchResult {
+        val uid = if (args.has("linux_uid")) args.getInt("linux_uid") else AndroidUsers.currentLinuxUid(context)
+        val state = timeLimitStore.ensureUser(username, uid)
         val config = timeLimitStore.configPayload(username, state)
         config.put("DOMAIN_POLICY_SOURCE_IDS", JSONArray())
         config.put("APPARMOR_POLICY_COUNT", appPolicyStore.rulesForUser(username).size)

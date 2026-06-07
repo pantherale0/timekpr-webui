@@ -18,6 +18,8 @@ import com.timekpr.agent.TimeKprApplication
 import com.timekpr.agent.admin.DeviceOwnerProvisioner
 import com.timekpr.agent.admin.TimeKprDeviceAdminReceiver
 import com.timekpr.agent.policy.DomainPolicyStore
+import com.timekpr.agent.policy.BlockedDomainMatcher
+import com.timekpr.agent.policy.PolicyIpcServer
 import com.timekpr.agent.util.AndroidUsers
 import java.io.FileInputStream
 import java.io.FileOutputStream
@@ -37,6 +39,31 @@ class DomainBlockVpnService : VpnService() {
     private var tunDrainThread: Thread? = null
     private var upstreamNetwork: Network? = null
 
+    private var vpnBlockedDomains = emptySet<String>()
+    private var vpnAllowedDomains = emptySet<String>()
+    private var vpnBlockedMatcher: BlockedDomainMatcher = BlockedDomainMatcher.EMPTY
+
+    private val policyReloadReceiver = object : android.content.BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent?) {
+            if (intent?.action == ACTION_RELOAD_POLICY) {
+                Log.i(TAG, "Reload policy broadcast received; querying IPC server")
+                Executors.newSingleThreadExecutor().execute {
+                    fetchPolicyAndReconcile()
+                }
+            }
+        }
+    }
+
+    override fun onCreate() {
+        super.onCreate()
+        val filter = android.content.IntentFilter(ACTION_RELOAD_POLICY)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(policyReloadReceiver, filter, RECEIVER_EXPORTED)
+        } else {
+            registerReceiver(policyReloadReceiver, filter)
+        }
+    }
+
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_STOP) {
             stopTunnel()
@@ -50,14 +77,68 @@ class DomainBlockVpnService : VpnService() {
 
     override fun onDestroy() {
         stopTunnel()
+        try {
+            unregisterReceiver(policyReloadReceiver)
+        } catch (_: Exception) {}
         super.onDestroy()
+    }
+
+    private fun fetchPolicyAndReconcile() {
+        val myUid = android.os.Process.myUid()
+        val userId = myUid / 100000
+        
+        if (userId == 0) {
+            val domainStore = TimeKprApplication.from(this).domainPolicyStore
+            val uidStr = "0"
+            vpnBlockedDomains = domainStore.blockedDomainsForUid(uidStr)
+            vpnAllowedDomains = domainStore.policyForUid(uidStr)?.allowedDomains ?: emptySet()
+            vpnBlockedMatcher = BlockedDomainMatcher.from(vpnBlockedDomains)
+            Log.i(TAG, "Loaded policy locally for User 0: blocked=${vpnBlockedDomains.size}, allowed=${vpnAllowedDomains.size}")
+        } else {
+            val socket = android.net.LocalSocket()
+            try {
+                socket.connect(android.net.LocalSocketAddress(PolicyIpcServer.SOCKET_NAME))
+                val writer = java.io.PrintWriter(socket.outputStream, true)
+                val reader = java.io.BufferedReader(java.io.InputStreamReader(socket.inputStream))
+                
+                writer.println("GET_POLICY $userId")
+                val responseLine = reader.readLine()
+                if (responseLine != null) {
+                    val json = org.json.JSONObject(responseLine)
+                    val blockedArray = json.optJSONArray("blocked_domains")
+                    val allowedArray = json.optJSONArray("allowed_domains")
+                    
+                    val blocked = mutableSetOf<String>()
+                    if (blockedArray != null) {
+                        for (i in 0 until blockedArray.length()) {
+                            blocked.add(blockedArray.getString(i))
+                        }
+                    }
+                    val allowed = mutableSetOf<String>()
+                    if (allowedArray != null) {
+                        for (i in 0 until allowedArray.length()) {
+                            allowed.add(allowedArray.getString(i))
+                        }
+                    }
+                    
+                    vpnBlockedDomains = blocked
+                    vpnAllowedDomains = allowed
+                    vpnBlockedMatcher = BlockedDomainMatcher.from(blocked)
+                    Log.i(TAG, "Loaded policy via IPC for User $userId: blocked=${vpnBlockedDomains.size}, allowed=${vpnAllowedDomains.size}")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to fetch policy from IPC server for User $userId", e)
+            } finally {
+                try { socket.close() } catch (_: Exception) {}
+            }
+        }
     }
 
     private fun startTunnel() {
         if (running.getAndSet(true)) return
 
-        val domainStore = TimeKprApplication.from(this).domainPolicyStore
-        if (domainStore.blockedMatcher().isEmpty()) {
+        fetchPolicyAndReconcile()
+        if (vpnBlockedMatcher.isEmpty()) {
             Log.i(TAG, "No blocked domains configured; skipping VPN tunnel")
             running.set(false)
             stopSelf()
@@ -108,18 +189,17 @@ class DomainBlockVpnService : VpnService() {
 
         Log.i(
             TAG,
-            "VPN started with ${domainStore.blockedDomainCount()} blocked domain(s); " +
+            "VPN started with ${vpnBlockedDomains.size} blocked domain(s); " +
                 "upstreamNetwork=$network routedDns=${dnsServers.joinToString { it.hostAddress ?: "?" }}",
         )
 
         val executor = packetExecutor ?: return
-        tunDrainThread = Thread({ processTunPackets(domainStore, resolver, executor) }, "timekpr-vpn").also {
+        tunDrainThread = Thread({ processTunPackets(resolver, executor) }, "timekpr-vpn").also {
             it.start()
         }
     }
 
     private fun processTunPackets(
-        domainStore: DomainPolicyStore,
         resolver: UpstreamDnsResolver,
         executor: ExecutorService,
     ) {
@@ -129,8 +209,7 @@ class DomainBlockVpnService : VpnService() {
         val packet = ByteArray(32767)
 
         while (running.get()) {
-            val matcher = domainStore.blockedMatcher()
-            if (matcher.isEmpty()) {
+            if (vpnBlockedMatcher.isEmpty()) {
                 stopTunnel()
                 stopSelf()
                 break
@@ -147,11 +226,9 @@ class DomainBlockVpnService : VpnService() {
             executor.execute {
                 if (!running.get()) return@execute
                 try {
-                    val uid = AndroidUsers.currentLinuxUid(this@DomainBlockVpnService).toString()
-                    val uidPolicy = domainStore.policyForUid(uid)
-                    val isBlocked = matcher.isBlocked(parsed.queryName)
-                    val isGranted = uidPolicy != null &&
-                        domainStore.isDomainAllowed(parsed.queryName, uidPolicy.allowedDomains)
+                    val isBlocked = vpnBlockedMatcher.isBlocked(parsed.queryName)
+                    val isGranted = vpnAllowedDomains.isNotEmpty() &&
+                        isDomainAllowed(parsed.queryName, vpnAllowedDomains)
                     val dnsPayload = if (isBlocked && !isGranted) {
                         Log.d(TAG, "Blocked TUN DNS query for ${parsed.queryName}")
                         BlockNotificationCoordinator.onDomainBlocked(this@DomainBlockVpnService, parsed.queryName)
@@ -177,6 +254,11 @@ class DomainBlockVpnService : VpnService() {
                 }
             }
         }
+    }
+
+    private fun isDomainAllowed(queryDomain: String, allowedDomains: Set<String>): Boolean {
+        if (allowedDomains.isEmpty()) return false
+        return BlockedDomainMatcher.from(allowedDomains).isBlocked(queryDomain)
     }
 
     private fun stopTunnel() {
@@ -226,12 +308,18 @@ class DomainBlockVpnService : VpnService() {
         private const val TAG = "DomainBlockVpn"
         private const val CHANNEL_ID = "timekpr_vpn"
         private const val NOTIFICATION_ID = 1002
+        const val ACTION_RELOAD_POLICY = "com.timekpr.agent.vpn.ACTION_RELOAD_POLICY"
         private const val ACTION_STOP = "com.timekpr.agent.vpn.STOP"
         private const val EXTRA_UPSTREAM_NETWORK = "com.timekpr.agent.vpn.EXTRA_UPSTREAM_NETWORK"
         private const val VPN_ADDRESS = "10.111.0.1"
         private const val VPN_PREFIX = 32
         fun reconcile(context: Context) {
             val app = TimeKprApplication.from(context)
+            
+            // Broadcast reload event to secondary users' VPN instances
+            val reloadIntent = Intent(ACTION_RELOAD_POLICY)
+            context.sendBroadcast(reloadIntent)
+
             if (app.domainPolicyStore.blockedMatcher().isEmpty()) {
                 clearAlwaysOnVpnIfDeviceOwner(context)
                 context.stopService(Intent(context, DomainBlockVpnService::class.java).setAction(ACTION_STOP))

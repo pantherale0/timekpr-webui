@@ -22,6 +22,34 @@ class TimeLimitStore(context: Context) {
         restoreScreentimeExemptPackages()
     }
 
+    fun getUsernameForUid(uid: Int): String? {
+        val found = users.entries.find { it.value.linuxUid == uid }?.key
+        if (found != null) return found
+
+        prefs.all.forEach { (key, value) ->
+            if (key.startsWith("user_") && value is String) {
+                try {
+                    val json = JSONObject(value)
+                    if (json.optInt("linux_uid") == uid) {
+                        return key.substring(5)
+                    }
+                } catch (_: Exception) {}
+            }
+        }
+        return null
+    }
+
+    fun allUsernames(): Set<String> {
+        val names = mutableSetOf<String>()
+        names.addAll(users.keys)
+        prefs.all.keys.forEach { key ->
+            if (key.startsWith("user_")) {
+                names.add(key.substring(5))
+            }
+        }
+        return names
+    }
+
     data class UserTimeState(
         var linuxUid: Int,
         var timeSpentDay: Int,

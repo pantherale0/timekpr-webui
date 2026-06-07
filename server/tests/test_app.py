@@ -680,6 +680,34 @@ def test_websocket_handshake_saves_linux_users(app, db_session):
     assert device.linux_users[1]['uid'] == 1002
 
 
+def test_websocket_handshake_unpaired_approved_device(app, db_session):
+    from app import ws_agent_handler
+    
+    system_id = "approved-but-unpaired"
+    token = "approved-token-value"
+    device = AgentDevice(system_id=system_id, status="approved", secure_token=token)
+    db_session.add(device)
+    db_session.commit()
+
+    # Client connects with paired: False
+    hello_msg = json.dumps({
+        "type": "hello",
+        "system_id": system_id,
+        "agent_version": "v0.10",
+        "paired": False
+    })
+
+    ws = MockWS([hello_msg])
+    with app.test_request_context('/ws', environ_base={'REMOTE_ADDR': '127.0.0.1'}):
+        ws_agent_handler(ws)
+
+    # Check that pairing_approved with token was sent to the client
+    assert len(ws.sent_messages) == 1
+    resp = json.loads(ws.sent_messages[0])
+    assert resp['type'] == "pairing_approved"
+    assert resp['token'] == token
+
+
     # 6. Approved Device authentication flow (HMAC challenge-response)
     system_id = "approved-system-id"
     token = "approved-token"

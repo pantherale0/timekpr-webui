@@ -60,14 +60,15 @@ class AgentWebSocketClient(
         AgentConnectionState.update(AgentConnectionStatus.CONNECTING)
         return suspendCancellableCoroutine { continuation ->
             var completed = false
+            val socketRef = arrayOf<WebSocket?>(null)
             fun finish(result: SessionResult) {
                 if (completed) return
                 completed = true
+                socketRef[0]?.close(1000, "session completed")
                 if (continuation.isActive) continuation.resume(result)
             }
 
             val request = Request.Builder().url(config.serverUrl).build()
-            val socketRef = arrayOf<WebSocket?>(null)
 
             socketRef[0] = client.newWebSocket(
                 request,
@@ -112,6 +113,7 @@ class AgentWebSocketClient(
             registrationToken = config.registrationToken,
             agentVersion = normalizedVersion,
             linuxUsers = AndroidUsers.linuxUsersPayload(context),
+            paired = !config.agentToken.isNullOrBlank(),
             fcmToken = fcmToken,
         )
     }

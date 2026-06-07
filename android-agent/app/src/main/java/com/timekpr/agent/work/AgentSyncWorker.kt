@@ -23,6 +23,9 @@ class AgentSyncWorker(
             AgentWebSocketClient.SessionMode.SYNC
         }
         val result = AgentSessionCoordinator.runSyncSession(applicationContext, mode)
+        if (result.reason == "pairing_approved") {
+            AgentSessionCoordinator.scheduleSync(applicationContext, reason = "pairing_approved")
+        }
         return when {
             result.success -> Result.success()
             result.reason == "update_scheduled" -> Result.success()

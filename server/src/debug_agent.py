@@ -762,6 +762,7 @@ class DebugAgentProtocol:
             "system_hostname": self.config.get("system_hostname"),
             "registration_token": self.config.get("registration_token"),
             "agent_version": self.config["agent_version"],
+            "paired": bool(self.config.get("agent_token")),
         }
 
     def build_alert_event(self, event_type, linux_username=None, details=None, occurred_at=None):

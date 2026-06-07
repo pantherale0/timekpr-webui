@@ -134,6 +134,8 @@ enum ClientMessage {
         registration_token: Option<String>,
         agent_version: String,
         linux_users: Option<Vec<LinuxUser>>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        paired: Option<bool>,
     },
     #[serde(rename = "register")]
     Register {
@@ -1272,6 +1274,7 @@ async fn main() {
                         format!("v{}", AGENT_VERSION)
                     },
                     linux_users: Some(users_vec),
+                    paired: Some(agent_token.is_some()),
                 };
                 let hello_json = serde_json::to_string(&hello_msg).unwrap();
                 if let Err(e) = ws_stream.send(Message::Text(hello_json.into())).await {

@@ -473,7 +473,7 @@ class BackgroundTaskManager:
                                     message,
                                 )
 
-                        is_valid, result_message, config_dict = agent_client.validate_user(mapping.linux_username)
+                        is_valid, result_message, config_dict = agent_client.validate_user(mapping.linux_username, linux_uid=mapping.linux_uid)
                         if is_valid and config_dict:
                             any_valid_mapping = True
                             previous_linux_uid = mapping.linux_uid

@@ -67,70 +67,77 @@ class UsageMonitorService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     private suspend fun monitorLoop() {
-        val usageStatsManager = getSystemService(UsageStatsManager::class.java) ?: return
-        val username = AndroidUsers.currentLinuxUsername(this)
         val timeStore = TimeKprApplication.from(this).timeLimitStore
 
         while (scope.isActive) {
-            val accessAllowed = timeStore.isAccessAllowed(username)
-            if (!accessAllowed) {
-                enforcement.applyTimePolicies(username)
-            }
+            val activeUid = AndroidUsers.activeUserUid(this)
+            val username = timeStore.getUsernameForUid(activeUid) ?: AndroidUsers.currentLinuxUsername(this)
+            
+            val userContext = AndroidUsers.getUserContext(this, activeUid) ?: this
+            val usageStatsManager = userContext.getSystemService(UsageStatsManager::class.java)
 
-            val end = System.currentTimeMillis()
-            val start = end - 5_000
-            val events = usageStatsManager.queryEvents(start, end)
-            val event = UsageEvents.Event()
-            while (events.hasNextEvent()) {
-                events.getNextEvent(event)
-                when (event.eventType) {
-                    UsageEvents.Event.ACTIVITY_RESUMED -> {
-                        val packageName = event.packageName ?: continue
-                        val resumeKey = "$packageName:${event.timeStamp}"
-                        if (resumeKey in processedResumeKeys) {
-                            continue
+            if (usageStatsManager != null) {
+                val accessAllowed = timeStore.isAccessAllowed(username)
+                if (!accessAllowed) {
+                    enforcement.applyTimePoliciesForUser(username, activeUid)
+                }
+
+                val end = System.currentTimeMillis()
+                val start = end - 5_000
+                val events = usageStatsManager.queryEvents(start, end)
+                val event = UsageEvents.Event()
+                while (events.hasNextEvent()) {
+                    events.getNextEvent(event)
+                    when (event.eventType) {
+                        UsageEvents.Event.ACTIVITY_RESUMED -> {
+                            val packageName = event.packageName ?: continue
+                            val resumeKey = "$activeUid:$packageName:${event.timeStamp}"
+                            if (resumeKey in processedResumeKeys) {
+                                continue
+                            }
+                            processedResumeKeys.add(resumeKey)
+                            while (processedResumeKeys.size > 200) {
+                                val oldest = processedResumeKeys.first()
+                                processedResumeKeys.remove(oldest)
+                            }
+                            if (enforcement.suspendBlockedLaunch(packageName, username)) {
+                                emitBlockedLaunchAlerts(packageName, username, accessAllowed)
+                                continue
+                            }
+                            if (accessAllowed) {
+                                activeSessions["$activeUid:$packageName"] = event.timeStamp
+                            }
                         }
-                        processedResumeKeys.add(resumeKey)
-                        while (processedResumeKeys.size > 200) {
-                            val oldest = processedResumeKeys.first()
-                            processedResumeKeys.remove(oldest)
-                        }
-                        if (enforcement.suspendBlockedLaunch(packageName, username)) {
-                            emitBlockedLaunchAlerts(packageName, username, accessAllowed)
-                            continue
-                        }
-                        if (accessAllowed) {
-                            activeSessions[packageName] = event.timeStamp
-                        }
-                    }
-                    UsageEvents.Event.ACTIVITY_PAUSED,
-                    UsageEvents.Event.ACTIVITY_STOPPED -> {
-                        if (!accessAllowed) {
-                            continue
-                        }
-                        val packageName = event.packageName ?: continue
-                        val startedAt = activeSessions.remove(packageName) ?: continue
-                        val durationSeconds = ((event.timeStamp - startedAt) / 1000).coerceAtLeast(1)
-                        timeStore.recordUsage(username, durationSeconds.toInt())
-                        emitLocalAlert(
-                            "app_usage",
-                            JSONObject()
-                                .put("application_name", packageName)
-                                .put("executable_path", "/android/package/$packageName")
-                                .put("duration_seconds", durationSeconds)
-                                .put(
-                                    "start_time",
-                                    DateTimeFormatter.ISO_INSTANT.format(
-                                        Instant.ofEpochMilli(startedAt),
+                        UsageEvents.Event.ACTIVITY_PAUSED,
+                        UsageEvents.Event.ACTIVITY_STOPPED -> {
+                            if (!accessAllowed) {
+                                continue
+                            }
+                            val packageName = event.packageName ?: continue
+                            val startedAt = activeSessions.remove("$activeUid:$packageName") ?: continue
+                            val durationSeconds = ((event.timeStamp - startedAt) / 1000).coerceAtLeast(1)
+                            timeStore.recordUsage(username, durationSeconds.toInt())
+                            emitLocalAlert(
+                                "app_usage",
+                                JSONObject()
+                                    .put("application_name", packageName)
+                                    .put("executable_path", "/android/package/$packageName")
+                                    .put("duration_seconds", durationSeconds)
+                                    .put(
+                                        "start_time",
+                                        DateTimeFormatter.ISO_INSTANT.format(
+                                            Instant.ofEpochMilli(startedAt),
+                                        ),
+                                    )
+                                    .put(
+                                        "end_time",
+                                        DateTimeFormatter.ISO_INSTANT.format(
+                                            Instant.ofEpochMilli(event.timeStamp),
+                                        ),
                                     ),
-                                )
-                                .put(
-                                    "end_time",
-                                    DateTimeFormatter.ISO_INSTANT.format(
-                                        Instant.ofEpochMilli(event.timeStamp),
-                                    ),
-                                ),
-                        )
+                                username
+                            )
+                        }
                     }
                 }
             }
@@ -151,6 +158,7 @@ class UsageMonitorService : Service() {
                     .put("application_name", displayLabel)
                     .put("executable_path", "/android/package/$packageName")
                     .put("reason", "screen_time_exhausted"),
+                username
             )
             return
         }
@@ -163,6 +171,7 @@ class UsageMonitorService : Service() {
                     .put("target_kind", "package")
                     .put("target_value", packageName)
                     .put("display_label", displayLabel),
+                username
             )
             emitLocalAlert(
                 "app_blocked",
@@ -170,6 +179,7 @@ class UsageMonitorService : Service() {
                     .put("application_name", displayLabel)
                     .put("executable_path", "/android/package/$packageName")
                     .put("reason", "not_approved"),
+                username
             )
             return
         }
@@ -179,6 +189,7 @@ class UsageMonitorService : Service() {
                 .put("application_name", displayLabel)
                 .put("executable_path", "/android/package/$packageName")
                 .put("reason", "policy_block"),
+            username
         )
     }
 
@@ -192,10 +203,10 @@ class UsageMonitorService : Service() {
         }
     }
 
-    private fun emitLocalAlert(eventType: String, details: JSONObject) {
+    private fun emitLocalAlert(eventType: String, details: JSONObject, username: String) {
         AlertEventBus.emit(
             eventType = eventType,
-            linuxUsername = AndroidUsers.currentLinuxUsername(this),
+            linuxUsername = username,
             details = details,
         )
     }

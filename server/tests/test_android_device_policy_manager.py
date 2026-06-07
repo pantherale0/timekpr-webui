@@ -66,6 +66,8 @@ def test_build_device_policy_payload_defaults(android_mapping):
         'bluetoothDisabled': False,
         'outgoingCallsDisabled': False,
         'smsDisabled': False,
+        'blockNfc': False,
+        'blockWifiTethering': False,
         'advancedSecurityOverrides': {
             'developerSettings': MappingAndroidDevicePolicy.DEVELOPER_SETTINGS_UNSPECIFIED,
         },

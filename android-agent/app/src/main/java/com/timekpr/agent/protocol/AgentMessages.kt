@@ -10,6 +10,7 @@ object AgentMessages {
         registrationToken: String?,
         agentVersion: String,
         linuxUsers: List<Map<String, Any>>,
+        paired: Boolean,
         platform: String = "android",
         fcmToken: String? = null,
     ): String {
@@ -20,6 +21,7 @@ object AgentMessages {
             .put("agent_version", agentVersion)
             .put("platform", platform)
             .put("linux_users", JSONArray(linuxUsers.map { JSONObject(it) }))
+            .put("paired", paired)
         if (!registrationToken.isNullOrBlank()) {
             payload.put("registration_token", registrationToken)
         }

@@ -486,26 +486,22 @@
                         </div>
                     </div>
 
-                    <!-- STEP 5: Linux User Mapping -->
+                    <!-- STEP 5: Account Mapping -->
                     <div class="wizard-step-panel d-none" id="step-panel-5">
                         <div style="max-width: 500px; margin: 0 auto;">
                             <!-- Mappings Info -->
-                            <div id="wizard-mapping-linux" class="d-none">
-                                <p class="mb-3 text-center">Guardian found the following local OS users on the PC. Select which local user accounts should be locked under this profile:</p>
+                            <div id="wizard-mapping-section">
+                                <p class="mb-3 text-center" id="wizard-mapping-instructions">Guardian found the following local accounts on the device. Select which local user account should be locked under this profile:</p>
                                 <div class="form-group mb-3">
-                                    <label for="wizard-linux-user-select" class="form-label fw-bold small text-muted">LOCAL OS USERNAME</label>
+                                    <label for="wizard-linux-user-select" class="form-label fw-bold small text-muted" id="wizard-user-select-label">LOCAL OS USERNAME</label>
                                     <select id="wizard-linux-user-select" class="form-select">
                                         <!-- Will populate dynamically -->
                                     </select>
                                 </div>
                                 <div class="form-group mb-3">
-                                    <label for="wizard-linux-uid" class="form-label fw-bold small text-muted">LINUX UID (OPTIONAL)</label>
+                                    <label for="wizard-linux-uid" class="form-label fw-bold small text-muted" id="wizard-uid-label">LINUX UID (OPTIONAL)</label>
                                     <input type="text" id="wizard-linux-uid" class="form-control" placeholder="e.g. 1000">
                                 </div>
-                            </div>
-                            
-                            <div id="wizard-mapping-android" class="d-none text-center">
-                                <p>On Android, the agent automatically locks the primary user workspace. No additional account mapping is required.</p>
                             </div>
 
                             <div class="text-center mt-4">
@@ -852,45 +848,55 @@
 
             setWizardStep(5);
             
-            document.getElementById('wizard-mapping-linux').classList.add('d-none');
-            document.getElementById('wizard-mapping-android').classList.add('d-none');
+            const instructions = document.getElementById('wizard-mapping-instructions');
+            const selectLabel = document.getElementById('wizard-user-select-label');
+            const uidLabel = document.getElementById('wizard-uid-label');
+            const usersSelect = document.getElementById('wizard-linux-user-select');
+            const uidInput = document.getElementById('wizard-linux-uid');
+            
+            usersSelect.innerHTML = '';
+            const detectedUsers = wizardState.detectedDevice.linux_users || [];
             
             if (wizardState.platform === 'linux') {
-                document.getElementById('wizard-mapping-linux').classList.remove('d-none');
-                
-                // Populate Linux Users dropdown from detected device metadata
-                const usersSelect = document.getElementById('wizard-linux-user-select');
-                usersSelect.innerHTML = '';
-                const linuxUsers = wizardState.detectedDevice.linux_users || [];
-                
-                if (linuxUsers.length === 0) {
-                    const opt = document.createElement('option');
-                    opt.value = '';
-                    opt.textContent = 'No local accounts reported. Type username manually below';
-                    usersSelect.appendChild(opt);
-                } else {
-                    linuxUsers.forEach(u => {
-                        const opt = document.createElement('option');
-                        opt.value = u.username;
-                        opt.textContent = `${u.username} (UID: ${u.uid})`;
-                        opt.dataset.uid = u.uid;
-                        usersSelect.appendChild(opt);
-                    });
-                }
-                
-                // Auto fill UID on change
-                usersSelect.addEventListener('change', () => {
-                    const opt = usersSelect.options[usersSelect.selectedIndex];
-                    const uidInput = document.getElementById('wizard-linux-uid');
-                    uidInput.value = opt.dataset.uid || '';
-                });
-                
-                // Set initial UID if user exists
-                if (linuxUsers.length > 0) {
-                    document.getElementById('wizard-linux-uid').value = linuxUsers[0].uid;
-                }
+                instructions.textContent = 'Guardian found the following local accounts on the device. Select which local user account should be locked under this profile:';
+                selectLabel.textContent = 'LOCAL OS USERNAME';
+                uidLabel.textContent = 'LINUX UID (OPTIONAL)';
+                uidInput.placeholder = 'e.g. 1000';
             } else {
-                document.getElementById('wizard-mapping-android').classList.remove('d-none');
+                instructions.textContent = 'Guardian found the following Android profiles on the device. Select which Android profile should be locked under this child account:';
+                selectLabel.textContent = 'ANDROID PROFILE';
+                uidLabel.textContent = 'ANDROID USER ID (UID)';
+                uidInput.placeholder = 'e.g. 0';
+            }
+            
+            if (detectedUsers.length === 0) {
+                const opt = document.createElement('option');
+                opt.value = '';
+                opt.textContent = wizardState.platform === 'linux' 
+                    ? 'No local accounts reported. Type username manually below' 
+                    : 'No Android profiles reported.';
+                usersSelect.appendChild(opt);
+            } else {
+                detectedUsers.forEach(u => {
+                    const opt = document.createElement('option');
+                    opt.value = u.username;
+                    opt.textContent = `${u.username} (UID: ${u.uid})`;
+                    opt.dataset.uid = u.uid;
+                    usersSelect.appendChild(opt);
+                });
+            }
+            
+            // Auto fill UID on change
+            usersSelect.onchange = () => {
+                const opt = usersSelect.options[usersSelect.selectedIndex];
+                uidInput.value = opt ? (opt.dataset.uid || '') : '';
+            };
+            
+            // Set initial UID if user exists
+            if (detectedUsers.length > 0) {
+                uidInput.value = detectedUsers[0].uid;
+            } else {
+                uidInput.value = '';
             }
         }
 
@@ -932,14 +938,12 @@
                     const mappingData = new FormData();
                     mappingData.append('system_id', wizardState.detectedDevice.system_id);
                     
-                    if (wizardState.platform === 'linux') {
-                        const linuxUser = document.getElementById('wizard-linux-user-select').value;
-                        const linuxUid = document.getElementById('wizard-linux-uid').value.trim();
-                        mappingData.append('linux_username', linuxUser);
-                        if (linuxUid) mappingData.append('linux_uid', linuxUid);
-                    } else {
-                        // For Android, default username to child profile name or 'default'
-                        mappingData.append('linux_username', 'android-agent');
+                    const mappedUser = document.getElementById('wizard-linux-user-select').value;
+                    const mappedUid = document.getElementById('wizard-linux-uid').value.trim();
+                    
+                    mappingData.append('linux_username', mappedUser || (wizardState.platform === 'android' ? 'android-agent' : ''));
+                    if (mappedUid) {
+                        mappingData.append('linux_uid', mappedUid);
                     }
 
                     return fetch(`/managed-users/${userId}/mappings/add`, {

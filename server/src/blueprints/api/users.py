@@ -163,7 +163,7 @@ def validate_user(user_id):
     for mapping in mappings:
         previous_linux_uid = mapping.linux_uid
         agent_client = AgentClient(system_id=mapping.system_id)
-        is_valid, message, config_dict = agent_client.validate_user(mapping.linux_username)
+        is_valid, message, config_dict = agent_client.validate_user(mapping.linux_username, linux_uid=mapping.linux_uid)
         mapping.last_checked = datetime.now(timezone.utc)
         mapping.is_valid = is_valid
         if is_valid and config_dict:
@@ -205,7 +205,7 @@ def validate_mapping(user_id, mapping_id):
     user = ManagedUser.query.get_or_404(user_id)
     mapping = ManagedUserDeviceMap.query.filter_by(id=mapping_id, managed_user_id=user.id).first_or_404()
     agent_client = AgentClient(system_id=mapping.system_id)
-    is_valid, message, config_dict = agent_client.validate_user(mapping.linux_username)
+    is_valid, message, config_dict = agent_client.validate_user(mapping.linux_username, linux_uid=mapping.linux_uid)
 
     previous_linux_uid = mapping.linux_uid
     mapping.last_checked = datetime.now(timezone.utc)

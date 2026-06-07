@@ -456,13 +456,16 @@ class AgentClient:
 
         return day_hours
 
-    def validate_user(self, username):
+    def validate_user(self, username, linux_uid=None):
         """
         Check if a user exists by querying the agent for normalized user config
         Returns: (is_valid, message, config_dict)
         """
+        args = {}
+        if linux_uid is not None:
+            args["linux_uid"] = linux_uid
         success, message, data = AgentConnectionManager.send_command_sync(
-            self.system_id, "validate_user", username
+            self.system_id, "validate_user", username, args
         )
         if not success:
             return False, message, None

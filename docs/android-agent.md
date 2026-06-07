@@ -173,6 +173,51 @@ The agent implements Android 12+ provisioning handlers (`GET_PROVISIONING_MODE`,
 
 When device owner, the app auto-grants itself Usage Access, overlay (`SYSTEM_ALERT_WINDOW`), and notification permission (Android 13+) via `DevicePolicyManager` — no manual Settings taps required. Always-on VPN is enabled only when domain block policies are active. Device Admin alone still needs the user to approve Usage Access and VPN in system settings.
 
+## Multi-user support
+
+Android allows multiple user profiles (e.g. secondary users, guests, restricted profiles) to run on a single device. TimeKpr Android Agent supports managing these secondary profiles from a single installation running under the primary user account (User 0).
+
+### The Device Owner (DO) Requirement
+
+Due to Android security restrictions, standard **Device Admin (DA)** applications are sandboxed and cannot view or manage other profiles on the system. Attempting to query secondary users on a standard Device Admin install causes Android to throw a `SecurityException`, falling back to returning only the current user profile (User 0).
+
+> [!IMPORTANT]
+> To discover, monitor, and enforce rules on secondary user profiles (e.g., child profiles on a shared tablet), the agent app **MUST** be provisioned as the **Device Owner (DO)**.
+
+### Provisioning Device Owner
+
+#### Method A: MDM/Android Enterprise QR (Recommended)
+This is the cleanest method, performed during initial device setup.
+1. Perform a factory reset on the target device.
+2. At the welcome screen, tap anywhere on the screen 6 times to launch the QR code reader.
+3. Scan the MDM provisioning QR code from the WebUI (**Settings → Agent pairing → Android MDM provisioning QR**).
+4. The system automatically installs the agent and configures it as Device Owner.
+
+#### Method B: ADB (Android Debug Bridge)
+If the device is already set up and you do not want to perform a factory reset, you can set the Device Owner via ADB:
+
+1. Enable **Developer Options** and **USB Debugging** on the target device.
+2. Connect the device to your computer and run the following command:
+   ```bash
+   adb shell dpm set-device-owner com.timekpr.agent/.admin.TimeKprDeviceAdminReceiver
+   ```
+
+> [!WARNING]
+> Android forbids setting a Device Owner via ADB if there are any active accounts (e.g., Google account, Samsung account, email accounts) configured on the device. If you see an error like `Run-time exception: java.lang.IllegalStateException: Not allowed to set the device owner because there are already some accounts`, you must:
+> 1. Go to **Settings → Passwords & Accounts** (or **Accounts & Backup**) on the device.
+> 2. Temporarily **remove all accounts** listed.
+> 3. Run the `adb shell dpm set-device-owner ...` command again.
+> 4. Once successful, you can re-add the Google and other accounts.
+
+### Multi-User Management Workflow
+
+Once the agent has Device Owner status and is running:
+1. **User Setup**: Create the secondary user profiles on the Android device (e.g., through **Settings → System → Multiple users**).
+2. **Pairing**: Initiate the pairing flow on the agent app under User 0.
+3. **Discovery**: The agent queries the list of secondary users via `DevicePolicyManager.getSecondaryUsers()` and packages them in the connection handshake.
+4. **Approval**: Go to the server WebUI (**Admin → Devices**) to approve the pending device.
+5. **Mapping**: On the server, the discovered Android user profiles will appear under the device configuration. You can map each Android profile to a corresponding TimeKpr user/child account to enforce distinct daily time limits and restrictions.
+
 ## Domain block notifications
 
 When the DNS VPN blocks a domain, the agent shows deduplicated user feedback:

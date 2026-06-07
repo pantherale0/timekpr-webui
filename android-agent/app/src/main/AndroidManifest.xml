@@ -92,6 +92,14 @@
         </receiver>
 
         <receiver
+            android:name=".boot.UserSwitchedReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.USER_SWITCHED" />
+            </intent-filter>
+        </receiver>
+
+        <receiver
             android:name=".discovery.PackageChangeReceiver"
             android:exported="false">
             <intent-filter>
