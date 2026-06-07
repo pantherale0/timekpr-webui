@@ -94,7 +94,10 @@
                                             <select name="system_id" class="form-select target-device-select" required>
                                                 <option value="" disabled selected>Select hardware</option>
                                                 {% for device in approved_devices %}
-                                                    <option value="{{ device.system_id }}" data-linux-users="{{ device.linux_users|tojson|forceescape }}">
+                                                    <option value="{{ device.system_id }}" 
+                                                            data-linux-users="{{ device.linux_users|tojson|forceescape }}"
+                                                            data-platform="{{ device.platform }}"
+                                                            data-is-device-owner="{{ 'true' if device.is_device_owner else 'false' }}">
                                                         {{ device_labels.get(device.system_id, device.display_name) }} ({{ device.system_ip }})
                                                     </option>
                                                 {% endfor %}
@@ -105,11 +108,19 @@
                                             <input type="text" name="linux_username" class="form-control linux-username-input" placeholder="e.g. jordan" required list="linux-users-list-{{ user.id }}" autocomplete="off">
                                             <datalist id="linux-users-list-{{ user.id }}"></datalist>
                                         </div>
-                                        <div class="col-12 col-md-3">
+                                        <div class="col-12 col-md-2">
                                             <label class="form-label fw-bold text-muted" style="font-size: 0.7rem;">Linux UID (Optional)</label>
                                             <input type="text" name="linux_uid" class="form-control linux-uid-input" placeholder="e.g. 1000">
                                         </div>
-                                        <div class="col-12 col-md-3">
+                                        <div class="col-12 col-md-2 profile-provision-container" style="display: none;">
+                                            <label class="form-label fw-bold text-muted" style="font-size: 0.7rem;">Profile Provisioning</label>
+                                            <select name="android_profile_type" class="form-select form-select-sm profile-provision-select">
+                                                <option value="">Map to Existing</option>
+                                                <option value="restricted">Create Restricted Profile</option>
+                                                <option value="standard">Create Standard User</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-12 col-md-2 ms-auto">
                                             <button type="submit" class="btn btn-sm btn-primary w-100 fw-bold py-2"><i class="fas fa-link me-1"></i> Link Mapping</button>
                                         </div>
                                     </form>
@@ -132,9 +143,14 @@
                                             <tbody>
                                                 {% for mapping in user.device_mappings %}
                                                     <tr>
-                                                        <td class="ps-3 fw-bold">
-                                                            <code class="bg-body-secondary border px-2 py-1 rounded small" style="color: var(--bs-body-color);">{{ mapping.linux_username }}</code>
-                                                        </td>
+                                                         <td class="ps-3 fw-bold">
+                                                             <code class="bg-body-secondary border px-2 py-1 rounded small" style="color: var(--bs-body-color);">{{ mapping.linux_username }}</code>
+                                                             {% if mapping.android_profile_type %}
+                                                                 <div class="text-secondary small mt-1" style="font-size: 0.7rem;">
+                                                                     <i class="fab fa-android text-success"></i> Programmatic: {{ mapping.android_profile_type|title }}
+                                                                 </div>
+                                                             {% endif %}
+                                                         </td>
                                                         <td>
                                                             <a href="{{ url_for('device_detail', system_id=mapping.system_id) }}" class="fw-bold text-decoration-none d-inline-flex align-items-center gap-1">
                                                                 <i class="fas fa-laptop text-secondary small"></i>
@@ -230,10 +246,26 @@
             select.addEventListener('change', (e) => {
                 const selectedOption = e.target.options[e.target.selectedIndex];
                 const usersJson = selectedOption.getAttribute('data-linux-users');
+                const platform = selectedOption.getAttribute('data-platform') || '';
+                const isDeviceOwner = selectedOption.getAttribute('data-is-device-owner') === 'true';
                 const form = e.target.closest('form');
                 const datalist = form.querySelector('datalist');
                 const usernameInput = form.querySelector('.linux-username-input');
                 const uidInput = form.querySelector('.linux-uid-input');
+                
+                // Toggle Profile Provisioning Dropdown
+                const provisionContainer = form.querySelector('.profile-provision-container');
+                const provisionSelect = form.querySelector('.profile-provision-select');
+                if (provisionContainer) {
+                    if (platform === 'android' && isDeviceOwner) {
+                        provisionContainer.style.display = 'block';
+                    } else {
+                        provisionContainer.style.display = 'none';
+                        if (provisionSelect) {
+                            provisionSelect.value = '';
+                        }
+                    }
+                }
 
                 // Clear existing options
                 datalist.innerHTML = '';
@@ -252,10 +284,25 @@
                         usernameInput.addEventListener('input', () => {
                             const val = usernameInput.value;
                             const matchedUser = users.find(u => u.username === val);
-                            if (matchedUser) {
+                            const provisionSelect = form.querySelector('.profile-provision-select');
+                            const provisioningNewProfile = provisionSelect && provisionSelect.value;
+                            if (matchedUser && !provisioningNewProfile) {
                                 uidInput.value = matchedUser.uid;
+                            } else if (provisioningNewProfile) {
+                                uidInput.value = '';
                             }
                         });
+
+                        if (provisionSelect) {
+                            provisionSelect.addEventListener('change', () => {
+                                if (provisionSelect.value) {
+                                    uidInput.value = '';
+                                    uidInput.placeholder = 'Assigned after profile is created';
+                                } else {
+                                    uidInput.placeholder = 'e.g. 1000';
+                                }
+                            });
+                        }
                     } catch (err) {
                         console.error('Failed to parse linux users data', err);
                     }

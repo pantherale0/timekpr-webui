@@ -163,6 +163,7 @@ class AgentDevice(db.Model):
     installed_apps_count = db.Column(db.Integer, nullable=True)
     pending_factory_reset = db.Column(db.Boolean, default=False, nullable=False)
     unenrolled_at = db.Column(db.DateTime(timezone=True), nullable=True)
+    is_device_owner = db.Column(db.Boolean, default=False, nullable=False)
 
     # Relationship to per-user Linux account mappings on this device
     user_mappings = db.relationship(
@@ -531,6 +532,7 @@ class ManagedUserDeviceMap(db.Model):
     blocklist_last_attempted = db.Column(db.DateTime(timezone=True), nullable=True)
     blocklist_last_attempt_hash = db.Column(db.String(64), nullable=True)
     blocklist_last_error = db.Column(db.Text, nullable=True)
+    android_profile_type = db.Column(db.String(20), nullable=True)
 
     __table_args__ = (
         db.UniqueConstraint('managed_user_id', 'system_id', name='managed_user_system_uc'),
@@ -1303,10 +1305,10 @@ class MappingAndroidDevicePolicy(db.Model):
     MAX_SHORT_SUPPORT_MESSAGE_LENGTH = 200
     MAX_LONG_SUPPORT_MESSAGE_LENGTH = 4096
 
-    id = db.Column(db.Integer, primary_key=True)
-    device_map_id = db.Column(
-        db.Integer,
-        db.ForeignKey('managed_user_device_map.id'),
+    system_id = db.Column(
+        db.String(50),
+        db.ForeignKey('agent_device.system_id'),
+        primary_key=True,
         nullable=False,
         unique=True,
     )
@@ -1366,8 +1368,8 @@ class MappingAndroidDevicePolicy(db.Model):
         nullable=False,
     )
 
-    device_map = db.relationship(
-        'ManagedUserDeviceMap',
+    device = db.relationship(
+        'AgentDevice',
         backref=db.backref('android_device_policy', uselist=False, cascade='all, delete-orphan'),
     )
 
@@ -1375,7 +1377,7 @@ class MappingAndroidDevicePolicy(db.Model):
     block_nfc = db.Column(db.Boolean, nullable=False, default=False)
 
     def __repr__(self):
-        return f'<MappingAndroidDevicePolicy map={self.device_map_id} revision={self.revision}>'
+        return f'<MappingAndroidDevicePolicy device={self.system_id} revision={self.revision}>'
 
 
 class MappingLinuxDevicePolicy(db.Model):

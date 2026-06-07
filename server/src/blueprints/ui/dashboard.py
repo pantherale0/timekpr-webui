@@ -104,14 +104,12 @@ def edit_user_profile(user_id):
         else:
             user_platforms.add(AppPolicy.PLATFORM_LINUX)
 
-    from src.android_device_policy_manager import get_or_create_policy as get_or_create_android_policy
     from src.linux_device_policy_manager import get_or_create_policy as get_or_create_linux_policy
-    from src.database import MappingAndroidDevicePolicy, MappingLinuxDevicePolicy
+    from src.database import MappingLinuxDevicePolicy
     from src.approvals_manager import get_or_create_settings, grant_status_for_apps
     from src.installed_apps_manager import list_installed_apps_for_device
 
     approval_settings_by_mapping = {}
-    android_device_policy_by_mapping = {}
     linux_device_policy_by_mapping = {}
     installed_apps_enriched = []
     seen_apps = set()
@@ -123,39 +121,7 @@ def edit_user_profile(user_id):
             'device_label': device_labels.get(mapping.system_id, mapping.system_id),
         }
         mapping_platform = (mapping.device.platform if mapping.device else None) or AppPolicy.PLATFORM_LINUX
-        if mapping_platform == AppPolicy.PLATFORM_ANDROID:
-            try:
-                device_policy = get_or_create_android_policy(mapping)
-                android_device_policy_by_mapping[mapping.id] = {
-                    'device_label': device_labels.get(mapping.system_id, mapping.system_id),
-                    'screen_capture_disabled': device_policy.screen_capture_disabled,
-                    'camera_access': device_policy.camera_access,
-                    'microphone_access': device_policy.microphone_access,
-                    'install_apps_disabled': device_policy.install_apps_disabled,
-                    'uninstall_apps_disabled': device_policy.uninstall_apps_disabled,
-                    'factory_reset_disabled': device_policy.factory_reset_disabled,
-                    'adjust_volume_disabled': device_policy.adjust_volume_disabled,
-                    'modify_accounts_disabled': device_policy.modify_accounts_disabled,
-                    'mount_physical_media_disabled': device_policy.mount_physical_media_disabled,
-                    'bluetooth_disabled': device_policy.bluetooth_disabled,
-                    'outgoing_calls_disabled': device_policy.outgoing_calls_disabled,
-                    'sms_disabled': device_policy.sms_disabled,
-                    'usb_data_access': device_policy.usb_data_access,
-                    'developer_settings': device_policy.developer_settings,
-                    'short_support_message': (
-                        device_policy.short_support_message
-                        or MappingAndroidDevicePolicy.DEFAULT_SHORT_SUPPORT_MESSAGE
-                    ),
-                    'long_support_message': (
-                        device_policy.long_support_message
-                        or MappingAndroidDevicePolicy.DEFAULT_LONG_SUPPORT_MESSAGE
-                    ),
-                    'is_synced': device_policy.is_synced,
-                    'last_sync_error': device_policy.last_sync_error,
-                }
-            except ValueError:
-                pass
-        else:
+        if mapping_platform != AppPolicy.PLATFORM_ANDROID:
             try:
                 linux_policy = get_or_create_linux_policy(mapping)
                 linux_device_policy_by_mapping[mapping.id] = {
@@ -213,7 +179,6 @@ def edit_user_profile(user_id):
         installed_apps=installed_apps_enriched or installed_apps,
         user_platforms=user_platforms,
         approval_settings_by_mapping=approval_settings_by_mapping,
-        android_device_policy_by_mapping=android_device_policy_by_mapping,
         linux_device_policy_by_mapping=linux_device_policy_by_mapping,
         device_labels=device_labels,
     )
@@ -516,6 +481,14 @@ def device_detail(system_id):
             linux_username=mapping.linux_username,
         )
 
+    android_device_policy = None
+    if (device.platform or '').strip().lower() == 'android':
+        from src.android_device_policy_manager import get_or_create_policy as get_or_create_android_policy
+        try:
+            android_device_policy = get_or_create_android_policy(device)
+        except ValueError:
+            pass
+
     return render_template(
         'device_detail.html',
         device=device,
@@ -527,6 +500,7 @@ def device_detail(system_id):
         alert_summary=alert_summary,
         usage_summaries=usage_summaries,
         installed_apps_by_mapping=installed_apps_by_mapping,
+        android_device_policy=android_device_policy,
         agent_online=AgentConnectionManager.is_online(system_id),
         fcm_available=bool((device.fcm_token or '').strip()),
     )

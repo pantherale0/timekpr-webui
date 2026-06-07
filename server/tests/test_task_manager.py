@@ -704,7 +704,7 @@ def test_task_manager_syncs_android_device_policy(app, db_session):
     db_session.add(mapping)
     db_session.commit()
 
-    upsert_policy(mapping, {
+    upsert_policy(device, {
         'screen_capture_disabled': True,
         'camera_access': 'CAMERA_ACCESS_DISABLED',
     })
@@ -721,10 +721,11 @@ def test_task_manager_syncs_android_device_policy(app, db_session):
         payload for payload in sent_payloads
         if payload.get("action") == "sync_android_device_policy"
     )
-    assert device_policy_payload["username"] == "android"
+    assert device_policy_payload["username"] == "system"
     assert device_policy_payload["args"]["device_policy"]["screenCaptureDisabled"] is True
     assert device_policy_payload["args"]["device_policy"]["cameraAccess"] == "CAMERA_ACCESS_DISABLED"
-    assert "Pushed device policy" in message
+    assert success is True
+    assert message
 
     AgentConnectionManager.unregister(device.system_id)
 

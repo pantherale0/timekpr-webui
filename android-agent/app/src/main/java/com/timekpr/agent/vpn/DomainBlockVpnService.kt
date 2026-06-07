@@ -11,14 +11,18 @@ import android.net.Network
 import android.net.VpnService
 import android.os.Build
 import android.os.ParcelFileDescriptor
+import android.os.Process
+import android.os.UserHandle
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.timekpr.agent.R
 import com.timekpr.agent.TimeKprApplication
+import com.timekpr.agent.admin.CrossUserStoreSync
 import com.timekpr.agent.admin.DeviceOwnerProvisioner
 import com.timekpr.agent.admin.TimeKprDeviceAdminReceiver
-import com.timekpr.agent.policy.DomainPolicyStore
 import com.timekpr.agent.policy.BlockedDomainMatcher
+import com.timekpr.agent.boot.SecondaryUserInitService
+import com.timekpr.agent.policy.DomainPolicyResolver
 import com.timekpr.agent.policy.PolicyIpcServer
 import com.timekpr.agent.util.AndroidUsers
 import java.io.FileInputStream
@@ -48,6 +52,7 @@ class DomainBlockVpnService : VpnService() {
             if (intent?.action == ACTION_RELOAD_POLICY) {
                 Log.i(TAG, "Reload policy broadcast received; querying IPC server")
                 Executors.newSingleThreadExecutor().execute {
+                    TimeKprApplication.from(context).domainPolicyStore.restore()
                     fetchPolicyAndReconcile()
                 }
             }
@@ -84,54 +89,16 @@ class DomainBlockVpnService : VpnService() {
     }
 
     private fun fetchPolicyAndReconcile() {
-        val myUid = android.os.Process.myUid()
-        val userId = myUid / 100000
-        
-        if (userId == 0) {
-            val domainStore = TimeKprApplication.from(this).domainPolicyStore
-            val uidStr = "0"
-            vpnBlockedDomains = domainStore.blockedDomainsForUid(uidStr)
-            vpnAllowedDomains = domainStore.policyForUid(uidStr)?.allowedDomains ?: emptySet()
-            vpnBlockedMatcher = BlockedDomainMatcher.from(vpnBlockedDomains)
-            Log.i(TAG, "Loaded policy locally for User 0: blocked=${vpnBlockedDomains.size}, allowed=${vpnAllowedDomains.size}")
-        } else {
-            val socket = android.net.LocalSocket()
-            try {
-                socket.connect(android.net.LocalSocketAddress(PolicyIpcServer.SOCKET_NAME))
-                val writer = java.io.PrintWriter(socket.outputStream, true)
-                val reader = java.io.BufferedReader(java.io.InputStreamReader(socket.inputStream))
-                
-                writer.println("GET_POLICY $userId")
-                val responseLine = reader.readLine()
-                if (responseLine != null) {
-                    val json = org.json.JSONObject(responseLine)
-                    val blockedArray = json.optJSONArray("blocked_domains")
-                    val allowedArray = json.optJSONArray("allowed_domains")
-                    
-                    val blocked = mutableSetOf<String>()
-                    if (blockedArray != null) {
-                        for (i in 0 until blockedArray.length()) {
-                            blocked.add(blockedArray.getString(i))
-                        }
-                    }
-                    val allowed = mutableSetOf<String>()
-                    if (allowedArray != null) {
-                        for (i in 0 until allowedArray.length()) {
-                            allowed.add(allowedArray.getString(i))
-                        }
-                    }
-                    
-                    vpnBlockedDomains = blocked
-                    vpnAllowedDomains = allowed
-                    vpnBlockedMatcher = BlockedDomainMatcher.from(blocked)
-                    Log.i(TAG, "Loaded policy via IPC for User $userId: blocked=${vpnBlockedDomains.size}, allowed=${vpnAllowedDomains.size}")
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to fetch policy from IPC server for User $userId", e)
-            } finally {
-                try { socket.close() } catch (_: Exception) {}
-            }
-        }
+        val userId = Process.myUid() / 100_000
+        val policy = Companion.loadPolicyForUser(this, userId)
+        vpnBlockedDomains = policy.blockedDomains
+        vpnAllowedDomains = policy.allowedDomains
+        vpnBlockedMatcher = BlockedDomainMatcher.from(vpnBlockedDomains)
+        Log.i(
+            TAG,
+            "Loaded policy for user $userId (key=${policy.policyUid}): " +
+                "blocked=${vpnBlockedDomains.size}, allowed=${vpnAllowedDomains.size}",
+        )
     }
 
     private fun startTunnel() {
@@ -314,19 +281,52 @@ class DomainBlockVpnService : VpnService() {
         private const val VPN_ADDRESS = "10.111.0.1"
         private const val VPN_PREFIX = 32
         fun reconcile(context: Context) {
-            val app = TimeKprApplication.from(context)
-            
-            // Broadcast reload event to secondary users' VPN instances
-            val reloadIntent = Intent(ACTION_RELOAD_POLICY)
-            context.sendBroadcast(reloadIntent)
+            val appContext = context.applicationContext
+            val callingUserId = Process.myUid() / 100_000
+            reconcileForUser(appContext, callingUserId)
 
-            if (app.domainPolicyStore.blockedMatcher().isEmpty()) {
+            if (callingUserId == 0 && DeviceOwnerProvisioner.isDeviceOwner(appContext)) {
+                CrossUserStoreSync.replicateToAllSecondaryUsers(appContext)
+                fanOutSecondaryUsers(appContext)
+            }
+        }
+
+        private fun fanOutSecondaryUsers(context: Context) {
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) return
+            val dpm = context.getSystemService(DevicePolicyManager::class.java) ?: return
+            val admin = ComponentName(context, TimeKprDeviceAdminReceiver::class.java)
+            if (!dpm.isAdminActive(admin)) return
+            try {
+                dpm.getSecondaryUsers(admin)?.forEach { userHandle ->
+                    val userId = userHandleIdentifier(userHandle)
+                    SecondaryUserInitService.startOnUser(context, userId)
+                    val reloadIntent = Intent(ACTION_RELOAD_POLICY)
+                    userHandleForId(userId)?.let { context.sendBroadcastAsUser(reloadIntent, it) }
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to reconcile VPN for secondary users", e)
+            }
+        }
+
+        private fun reconcileForUser(context: Context, userId: Int) {
+            val reloadIntent = Intent(ACTION_RELOAD_POLICY)
+            val userHandle = userHandleForId(userId)
+            if (userHandle != null) {
+                context.sendBroadcastAsUser(reloadIntent, userHandle)
+            } else {
+                context.sendBroadcast(reloadIntent)
+            }
+
+            val policy = loadPolicyForUser(context, userId)
+            if (policy.blockedDomains.isEmpty()) {
                 clearAlwaysOnVpnIfDeviceOwner(context)
-                context.stopService(Intent(context, DomainBlockVpnService::class.java).setAction(ACTION_STOP))
+                context.stopService(
+                    Intent(context, DomainBlockVpnService::class.java).setAction(ACTION_STOP),
+                )
                 return
             }
 
-            DeviceOwnerProvisioner.applyIfDeviceOwner(context)
+            DeviceOwnerProvisioner.applyManagedCapabilities(context)
             setAlwaysOnVpnIfDeviceOwner(context)
 
             val prepare = VpnService.prepare(context)
@@ -343,6 +343,71 @@ class DomainBlockVpnService : VpnService() {
                 context.startForegroundService(serviceIntent)
             } else {
                 context.startService(serviceIntent)
+            }
+        }
+
+        private fun userHandleForId(userId: Int): UserHandle? {
+            return try {
+                val constructor = UserHandle::class.java.getConstructor(Int::class.javaPrimitiveType)
+                constructor.newInstance(userId) as UserHandle
+            } catch (_: Exception) {
+                null
+            }
+        }
+
+        private fun userHandleIdentifier(userHandle: UserHandle): Int {
+            return try {
+                val method = UserHandle::class.java.getMethod("getIdentifier")
+                method.invoke(userHandle) as? Int ?: userHandle.hashCode()
+            } catch (_: Exception) {
+                userHandle.hashCode()
+            }
+        }
+
+        private fun loadPolicyForUser(context: Context, userId: Int): DomainPolicyResolver.VpnDomainPolicy {
+            TimeKprApplication.from(context).domainPolicyStore.restore()
+            var policy = DomainPolicyResolver.loadVpnPolicyForUser(context, userId)
+            if (policy.blockedDomains.isEmpty() && userId != 0) {
+                fetchPolicyFromPrimaryUserIpc(userId)?.let { ipcPolicy ->
+                    policy = ipcPolicy
+                }
+            }
+            return policy
+        }
+
+        private fun fetchPolicyFromPrimaryUserIpc(androidUserId: Int): DomainPolicyResolver.VpnDomainPolicy? {
+            val socket = android.net.LocalSocket()
+            return try {
+                socket.connect(android.net.LocalSocketAddress(PolicyIpcServer.SOCKET_NAME))
+                val writer = java.io.PrintWriter(socket.outputStream, true)
+                val reader = java.io.BufferedReader(java.io.InputStreamReader(socket.inputStream))
+                writer.println("GET_POLICY $androidUserId")
+                val responseLine = reader.readLine() ?: return null
+                val json = org.json.JSONObject(responseLine)
+                val blocked = mutableSetOf<String>()
+                json.optJSONArray("blocked_domains")?.let { array ->
+                    for (i in 0 until array.length()) {
+                        blocked.add(array.getString(i))
+                    }
+                }
+                val allowed = mutableSetOf<String>()
+                json.optJSONArray("allowed_domains")?.let { array ->
+                    for (i in 0 until array.length()) {
+                        allowed.add(array.getString(i))
+                    }
+                }
+                DomainPolicyResolver.VpnDomainPolicy(
+                    policyUid = androidUserId.toString(),
+                    blockedDomains = blocked,
+                    allowedDomains = allowed,
+                )
+            } catch (e: Exception) {
+                Log.w(TAG, "IPC policy fetch failed for user $androidUserId", e)
+                null
+            } finally {
+                try {
+                    socket.close()
+                } catch (_: Exception) {}
             }
         }
 

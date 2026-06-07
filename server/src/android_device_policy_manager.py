@@ -20,14 +20,14 @@ from src.database import (
 _LOGGER = logging.getLogger(__name__)
 
 
-def _is_android_mapping(mapping: ManagedUserDeviceMap) -> bool:
-    platform = (mapping.device.platform if mapping.device else None) or AppPolicy.PLATFORM_LINUX
+def _is_android_device(device: AgentDevice) -> bool:
+    platform = (device.platform if device else None) or AppPolicy.PLATFORM_LINUX
     return platform == AppPolicy.PLATFORM_ANDROID
 
 
-def _require_android_mapping(mapping: ManagedUserDeviceMap) -> None:
-    if not _is_android_mapping(mapping):
-        raise ValueError('Android device policy is only supported for Android device mappings')
+def _require_android_device(device: AgentDevice) -> None:
+    if not _is_android_device(device):
+        raise ValueError('Android device policy is only supported for Android devices')
 
 
 def _normalize_camera_access(value: str | None) -> str:
@@ -93,6 +93,20 @@ def build_device_policy_payload(policy: MappingAndroidDevicePolicy) -> dict:
         policy.long_support_message
         or MappingAndroidDevicePolicy.DEFAULT_LONG_SUPPORT_MESSAGE
     )
+    
+    # Query profiles to provision (skip once linked to a device UID)
+    mappings = ManagedUserDeviceMap.query.filter_by(system_id=policy.system_id).all()
+    profiles = []
+    for m in mappings:
+        if m.android_profile_type not in ('restricted', 'standard'):
+            continue
+        if m.linux_uid is not None:
+            continue
+        profiles.append({
+            'username': m.linux_username,
+            'profile_type': m.android_profile_type,
+        })
+
     payload = {
         'screenCaptureDisabled': bool(policy.screen_capture_disabled),
         'cameraAccess': policy.camera_access,
@@ -116,6 +130,7 @@ def build_device_policy_payload(policy: MappingAndroidDevicePolicy) -> dict:
         },
         'shortSupportMessage': _user_facing_message(short_message),
         'longSupportMessage': _user_facing_message(long_message),
+        'profiles': profiles,
     }
     return payload
 
@@ -125,19 +140,19 @@ def compute_revision(payload: dict) -> str:
     return hashlib.sha256(canonical.encode('utf-8')).hexdigest()
 
 
-def _get_policy_row(mapping: ManagedUserDeviceMap) -> MappingAndroidDevicePolicy | None:
-    return MappingAndroidDevicePolicy.query.filter_by(device_map_id=mapping.id).first()
+def _get_policy_row(device: AgentDevice) -> MappingAndroidDevicePolicy | None:
+    return MappingAndroidDevicePolicy.query.filter_by(system_id=device.system_id).first()
 
 
-def get_or_create_policy(mapping: ManagedUserDeviceMap) -> MappingAndroidDevicePolicy:
-    _require_android_mapping(mapping)
-    policy = _get_policy_row(mapping)
+def get_or_create_policy(device: AgentDevice) -> MappingAndroidDevicePolicy:
+    _require_android_device(device)
+    policy = _get_policy_row(device)
     if policy is None:
         payload = build_device_policy_payload(
-            MappingAndroidDevicePolicy(device_map_id=mapping.id),
+            MappingAndroidDevicePolicy(system_id=device.system_id),
         )
         policy = MappingAndroidDevicePolicy(
-            device_map_id=mapping.id,
+            system_id=device.system_id,
             revision=compute_revision(payload),
         )
         db.session.add(policy)
@@ -145,14 +160,11 @@ def get_or_create_policy(mapping: ManagedUserDeviceMap) -> MappingAndroidDeviceP
     return policy
 
 
-def build_policy_summary(policy: MappingAndroidDevicePolicy, mapping: ManagedUserDeviceMap) -> dict:
-    device = mapping.device
+def build_policy_summary(policy: MappingAndroidDevicePolicy, device: AgentDevice) -> dict:
     return {
-        'device_map_id': mapping.id,
-        'system_id': mapping.system_id,
-        'linux_username': mapping.linux_username,
-        'device_label': (device.system_hostname if device else None) or mapping.system_id,
-        'platform': (device.platform if device else None) or AppPolicy.PLATFORM_LINUX,
+        'system_id': device.system_id,
+        'device_label': (device.system_hostname if device else None) or device.system_id,
+        'platform': (device.platform if device else None) or AppPolicy.PLATFORM_ANDROID,
         'screen_capture_disabled': policy.screen_capture_disabled,
         'camera_access': policy.camera_access,
         'microphone_access': policy.microphone_access,
@@ -185,12 +197,12 @@ def build_policy_summary(policy: MappingAndroidDevicePolicy, mapping: ManagedUse
     }
 
 
-def upsert_policy(mapping: ManagedUserDeviceMap, body: dict) -> MappingAndroidDevicePolicy:
-    _require_android_mapping(mapping)
+def upsert_policy(device: AgentDevice, body: dict) -> MappingAndroidDevicePolicy:
+    _require_android_device(device)
     if not isinstance(body, dict):
         raise ValueError('Request body must be a JSON object')
 
-    policy = get_or_create_policy(mapping)
+    policy = get_or_create_policy(device)
 
     if 'screen_capture_disabled' in body:
         policy.screen_capture_disabled = _coerce_bool(
@@ -260,7 +272,7 @@ def upsert_policy(mapping: ManagedUserDeviceMap, body: dict) -> MappingAndroidDe
     policy.updated_at = datetime.now(timezone.utc)
     db.session.commit()
 
-    push_success, push_message = push_mapping_device_policy(mapping)
+    push_success, push_message = push_device_policy(device)
     if push_success:
         policy.is_synced = True
         policy.last_synced_at = datetime.now(timezone.utc)
@@ -272,65 +284,54 @@ def upsert_policy(mapping: ManagedUserDeviceMap, body: dict) -> MappingAndroidDe
     return policy
 
 
-def push_mapping_device_policy(mapping: ManagedUserDeviceMap) -> tuple[bool, str]:
+def push_device_policy(device: AgentDevice) -> tuple[bool, str]:
     """Push device restriction policy to the agent when online."""
     from src.agent_helper import AgentClient, AgentConnectionManager
 
-    if not _is_android_mapping(mapping):
-        return False, 'Not an Android mapping'
+    if not _is_android_device(device):
+        return False, 'Not an Android device'
 
-    policy = _get_policy_row(mapping)
+    policy = _get_policy_row(device)
     if policy is None:
-        policy = get_or_create_policy(mapping)
+        policy = get_or_create_policy(device)
         db.session.commit()
 
-    if not AgentConnectionManager.is_online(mapping.system_id):
+    if not AgentConnectionManager.is_online(device.system_id):
         return False, 'Agent offline'
 
     payload = build_device_policy_payload(policy)
-    agent = AgentClient(system_id=mapping.system_id)
-    return agent.sync_android_device_policy(mapping.linux_username, payload)
+    agent = AgentClient(system_id=device.system_id)
+    return agent.sync_android_device_policy('system', payload)
+
+
+def push_mapping_device_policy(mapping: ManagedUserDeviceMap) -> tuple[bool, str]:
+    """Backward compatibility wrapper."""
+    if not mapping or not mapping.device:
+        return False, 'Invalid mapping'
+    return push_device_policy(mapping.device)
 
 
 def sync_android_device_policies_for_system(system_id: str) -> tuple[bool, str]:
-    """Push device policies for all Android mappings on a connected device."""
+    """Push device policies for Android device."""
     device = AgentDevice.query.get(system_id)
     if device is None or (device.platform or '') != AppPolicy.PLATFORM_ANDROID:
         return True, 'No Android device policy sync required'
 
-    mappings = ManagedUserDeviceMap.query.filter_by(system_id=system_id).all()
-    if not mappings:
-        return True, 'No mappings for device'
+    try:
+        success, message = push_device_policy(device)
+    except (OSError, RuntimeError, SQLAlchemyError, ValueError) as exc:
+        success = False
+        message = str(exc)
 
-    pushed = 0
-    errors = []
-    for mapping in mappings:
-        if not _is_android_mapping(mapping):
-            continue
-        try:
-            success, message = push_mapping_device_policy(mapping)
-        except (OSError, RuntimeError, SQLAlchemyError, ValueError) as exc:
-            success = False
-            message = str(exc)
-        policy = _get_policy_row(mapping)
-        if policy is not None:
-            if success:
-                policy.is_synced = True
-                policy.last_synced_at = datetime.now(timezone.utc)
-                policy.last_sync_error = None
-            else:
-                policy.is_synced = False
-                policy.last_sync_error = message
+    policy = _get_policy_row(device)
+    if policy is not None:
         if success:
-            pushed += 1
+            policy.is_synced = True
+            policy.last_synced_at = datetime.now(timezone.utc)
+            policy.last_sync_error = None
         else:
-            errors.append(f'{mapping.linux_username}: {message}')
+            policy.is_synced = False
+            policy.last_sync_error = message
+        db.session.commit()
 
-    db.session.commit()
-    if errors and pushed == 0:
-        return False, '; '.join(errors)
-    if errors:
-        return True, f'Pushed {pushed} mapping(s); partial failures: {"; ".join(errors)}'
-    if pushed == 0:
-        return True, 'No Android mappings required device policy sync'
-    return True, f'Pushed device policy for {pushed} mapping(s)'
+    return success, message

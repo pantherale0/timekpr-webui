@@ -50,7 +50,8 @@ class CommandDispatcher(
     }
 
     private fun handleValidateUser(username: String, args: JSONObject): DispatchResult {
-        val uid = if (args.has("linux_uid")) args.getInt("linux_uid") else AndroidUsers.currentLinuxUid(context)
+        val hintedUid = if (args.has("linux_uid")) args.optInt("linux_uid") else null
+        val uid = AndroidUsers.resolveUidForUsername(context, username, hintedUid)
         val state = timeLimitStore.ensureUser(username, uid)
         val config = timeLimitStore.configPayload(username, state)
         config.put("DOMAIN_POLICY_SOURCE_IDS", JSONArray())

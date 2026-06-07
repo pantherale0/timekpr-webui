@@ -12,21 +12,29 @@ from src.database import AgentDevice, ManagedUser, ManagedUserDeviceMap, Mapping
 
 
 @pytest.fixture
-def android_mapping(db_session):
+def android_device(db_session):
     device = AgentDevice(
         system_id='sys-android-policy',
         status='approved',
         secure_token='token',
         platform='android',
     )
+    db_session.add(device)
+    db_session.commit()
+    return device
+
+
+@pytest.fixture
+def android_mapping(db_session, android_device):
     user = ManagedUser(username='android-child', system_ip='Unassigned', is_valid=True)
-    db_session.add_all([device, user])
+    db_session.add(user)
     db_session.flush()
     mapping = ManagedUserDeviceMap(
         managed_user_id=user.id,
         system_id='sys-android-policy',
         linux_username='android',
         is_valid=True,
+        android_profile_type='restricted',
     )
     db_session.add(mapping)
     db_session.commit()
@@ -34,24 +42,20 @@ def android_mapping(db_session):
 
 
 @pytest.fixture
-def linux_mapping(db_session):
-    device = AgentDevice(system_id='sys-linux-policy', status='approved', secure_token='token')
-    user = ManagedUser(username='linux-child', system_ip='Unassigned', is_valid=True)
-    db_session.add_all([device, user])
-    db_session.flush()
-    mapping = ManagedUserDeviceMap(
-        managed_user_id=user.id,
-        system_id='sys-linux-policy',
-        linux_username='linux-child',
-        is_valid=True,
+def linux_device(db_session):
+    device = AgentDevice(
+        system_id='sys-linux-policy', 
+        status='approved', 
+        secure_token='token',
+        platform='linux',
     )
-    db_session.add(mapping)
+    db_session.add(device)
     db_session.commit()
-    return mapping
+    return device
 
 
-def test_build_device_policy_payload_defaults(android_mapping):
-    policy = get_or_create_policy(android_mapping)
+def test_build_device_policy_payload_defaults(android_device):
+    policy = get_or_create_policy(android_device)
     payload = build_device_policy_payload(policy)
     assert payload == {
         'screenCaptureDisabled': False,
@@ -80,11 +84,31 @@ def test_build_device_policy_payload_defaults(android_mapping):
         'longSupportMessage': {
             'defaultMessage': MappingAndroidDevicePolicy.DEFAULT_LONG_SUPPORT_MESSAGE,
         },
+        'profiles': [],
     }
 
 
-def test_compute_revision_is_stable(android_mapping):
-    policy = get_or_create_policy(android_mapping)
+def test_build_device_policy_payload_with_profiles(android_device, android_mapping):
+    policy = get_or_create_policy(android_device)
+    payload = build_device_policy_payload(policy)
+    assert payload['profiles'] == [
+        {
+            'username': 'android',
+            'profile_type': 'restricted'
+        }
+    ]
+
+
+def test_build_device_policy_payload_skips_linked_profiles(android_device, android_mapping, db_session):
+    android_mapping.linux_uid = 11
+    db_session.commit()
+    policy = get_or_create_policy(android_device)
+    payload = build_device_policy_payload(policy)
+    assert payload['profiles'] == []
+
+
+def test_compute_revision_is_stable(android_device):
+    policy = get_or_create_policy(android_device)
     payload = build_device_policy_payload(policy)
     first = compute_revision(payload)
     second = compute_revision(payload)
@@ -92,12 +116,12 @@ def test_compute_revision_is_stable(android_mapping):
     assert len(first) == 64
 
 
-def test_upsert_policy_updates_fields(android_mapping, monkeypatch):
+def test_upsert_policy_updates_fields(android_device, monkeypatch):
     monkeypatch.setattr(
-        'src.android_device_policy_manager.push_mapping_device_policy',
-        lambda mapping: (False, 'Agent offline'),
+        'src.android_device_policy_manager.push_device_policy',
+        lambda device: (False, 'Agent offline'),
     )
-    policy = upsert_policy(android_mapping, {
+    policy = upsert_policy(android_device, {
         'screen_capture_disabled': True,
         'camera_access': 'CAMERA_ACCESS_DISABLED',
         'microphone_access': 'MICROPHONE_ACCESS_DISABLED',
@@ -120,17 +144,17 @@ def test_upsert_policy_updates_fields(android_mapping, monkeypatch):
     assert policy.last_sync_error == 'Agent offline'
 
 
-def test_upsert_rejects_linux_mapping(linux_mapping):
+def test_upsert_rejects_linux_mapping(linux_device):
     with pytest.raises(ValueError, match='Android device policy'):
-        upsert_policy(linux_mapping, {'screen_capture_disabled': True})
+        upsert_policy(linux_device, {'screen_capture_disabled': True})
 
 
-def test_upsert_support_messages_use_parental_controls_wording(android_mapping, monkeypatch):
+def test_upsert_support_messages_use_parental_controls_wording(android_device, monkeypatch):
     monkeypatch.setattr(
-        'src.android_device_policy_manager.push_mapping_device_policy',
-        lambda mapping: (True, 'ok'),
+        'src.android_device_policy_manager.push_device_policy',
+        lambda device: (True, 'ok'),
     )
-    policy = upsert_policy(android_mapping, {
+    policy = upsert_policy(android_device, {
         'short_support_message': 'Ask your parent to change this in TimeKpr.',
         'long_support_message': 'TimeKpr parental controls protect this device.',
     })
@@ -141,28 +165,28 @@ def test_upsert_support_messages_use_parental_controls_wording(android_mapping, 
     assert payload['longSupportMessage']['defaultMessage'] == policy.long_support_message
 
 
-def test_upsert_rejects_empty_support_message(android_mapping, monkeypatch):
+def test_upsert_rejects_empty_support_message(android_device, monkeypatch):
     monkeypatch.setattr(
-        'src.android_device_policy_manager.push_mapping_device_policy',
-        lambda mapping: (True, 'ok'),
+        'src.android_device_policy_manager.push_device_policy',
+        lambda device: (True, 'ok'),
     )
     with pytest.raises(ValueError, match='short_support_message'):
-        upsert_policy(android_mapping, {'short_support_message': '   '})
+        upsert_policy(android_device, {'short_support_message': '   '})
 
 
-def test_upsert_rejects_invalid_camera_access(android_mapping, monkeypatch):
+def test_upsert_rejects_invalid_camera_access(android_device, monkeypatch):
     monkeypatch.setattr(
-        'src.android_device_policy_manager.push_mapping_device_policy',
-        lambda mapping: (True, 'ok'),
+        'src.android_device_policy_manager.push_device_policy',
+        lambda device: (True, 'ok'),
     )
     with pytest.raises(ValueError, match='camera_access'):
-        upsert_policy(android_mapping, {'camera_access': 'INVALID'})
+        upsert_policy(android_device, {'camera_access': 'INVALID'})
 
 
-def test_upsert_rejects_invalid_usb_data_access(android_mapping, monkeypatch):
+def test_upsert_rejects_invalid_usb_data_access(android_device, monkeypatch):
     monkeypatch.setattr(
-        'src.android_device_policy_manager.push_mapping_device_policy',
-        lambda mapping: (True, 'ok'),
+        'src.android_device_policy_manager.push_device_policy',
+        lambda device: (True, 'ok'),
     )
     with pytest.raises(ValueError, match='usb_data_access'):
-        upsert_policy(android_mapping, {'usb_data_access': 'INVALID'})
+        upsert_policy(android_device, {'usb_data_access': 'INVALID'})

@@ -5,6 +5,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from src.agent_push import (
+    android_push_wake_available,
+    android_should_use_persistent_websocket,
     device_prefers_push,
     notify_device_message,
     update_device_push_metadata,
@@ -62,6 +64,42 @@ def test_device_prefers_push(db_session):
 
     linux_device = AgentDevice(system_id='linux-1', status='approved', platform='linux')
     assert device_prefers_push(linux_device) is False
+
+
+def test_android_push_wake_available(monkeypatch, db_session):
+    monkeypatch.delenv('FCM_SERVER_KEY', raising=False)
+    monkeypatch.delenv('FIREBASE_CREDENTIALS_JSON', raising=False)
+    device = AgentDevice(
+        system_id='android-push',
+        status='approved',
+        platform='android',
+        fcm_token='token',
+    )
+    assert android_push_wake_available(device) is False
+
+    monkeypatch.setenv('FCM_SERVER_KEY', 'test-key')
+    assert android_push_wake_available(device) is True
+
+    device.fcm_token = None
+    assert android_push_wake_available(device) is False
+
+
+def test_android_should_use_persistent_websocket(monkeypatch, db_session):
+    monkeypatch.delenv('FCM_SERVER_KEY', raising=False)
+    monkeypatch.delenv('FIREBASE_CREDENTIALS_JSON', raising=False)
+    android = AgentDevice(
+        system_id='android-persist',
+        status='approved',
+        platform='android',
+        fcm_token='token',
+    )
+    linux = AgentDevice(system_id='linux-persist', status='approved', platform='linux')
+
+    assert android_should_use_persistent_websocket(android) is True
+    assert android_should_use_persistent_websocket(linux) is False
+
+    monkeypatch.setenv('FCM_SERVER_KEY', 'test-key')
+    assert android_should_use_persistent_websocket(android) is False
 
 
 @patch('src.agent_push.notify_android_agent', return_value=(True, 'sent'))

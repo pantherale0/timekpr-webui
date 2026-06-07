@@ -68,8 +68,9 @@ class TimeLimitStore(context: Context) {
     )
 
     fun ensureUser(username: String, defaultUid: Int, defaultSeconds: Int = 2 * 3600): UserTimeState {
-        return users.getOrPut(username) {
-            loadPersisted(username) ?: UserTimeState(
+        val loaded = loadPersisted(username)
+        val state = users.getOrPut(username) {
+            loaded ?: UserTimeState(
                 linuxUid = defaultUid,
                 timeSpentDay = 0,
                 timeLeftDay = defaultSeconds,
@@ -80,6 +81,11 @@ class TimeLimitStore(context: Context) {
                 allowedHours = defaultAllowedHours(),
             )
         }
+        if (defaultUid > 0 && state.linuxUid != defaultUid) {
+            state.linuxUid = defaultUid
+            persist(username, state)
+        }
+        return state
     }
 
     fun modifyTimeLeft(username: String, operation: String, seconds: Int): Boolean {

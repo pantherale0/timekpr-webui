@@ -13,6 +13,7 @@ object AgentMessages {
         paired: Boolean,
         platform: String = "android",
         fcmToken: String? = null,
+        isDeviceOwner: Boolean = false,
     ): String {
         val payload = JSONObject()
             .put("type", "hello")
@@ -22,6 +23,7 @@ object AgentMessages {
             .put("platform", platform)
             .put("linux_users", JSONArray(linuxUsers.map { JSONObject(it) }))
             .put("paired", paired)
+            .put("is_device_owner", isDeviceOwner)
         if (!registrationToken.isNullOrBlank()) {
             payload.put("registration_token", registrationToken)
         }

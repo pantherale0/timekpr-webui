@@ -10,7 +10,7 @@ from src.agent_helper import (
     agent_versions_compatible,
     normalize_agent_alert_payload,
 )
-from src.agent_push import update_device_push_metadata
+from src.agent_push import android_should_use_persistent_websocket, update_device_push_metadata
 from src.alerts_manager import _store_agent_alert
 from src.apparmor_manager import _store_app_usage_from_alert
 from src.installed_apps_manager import handle_app_icon_report, handle_installed_apps_report
@@ -144,12 +144,29 @@ def ws_agent_handler(ws):
 
                 # Update synced linux users list for all connections
                 linux_users = hello_msg.get("linux_users")
+                policy_hint_system_ids = set()
                 if linux_users is not None:
                     device.linux_users_json = json.dumps(linux_users)
+                    from src.users_manager import sync_mapping_linux_uids_from_device
+                    policy_hint_system_ids = sync_mapping_linux_uids_from_device(device)
 
                 update_device_push_metadata(device, hello_msg)
                 
                 db.session.commit()
+
+                if policy_hint_system_ids:
+                    try:
+                        from app import task_manager
+                        task_manager.notify_domain_policy_hint(
+                            system_ids=policy_hint_system_ids,
+                            reason='mapping_uid_updated',
+                        )
+                    except Exception:
+                        _LOGGER.debug(
+                            "Could not notify domain policy after uid sync for %s",
+                            system_id,
+                            exc_info=True,
+                        )
     
                 if device.status == 'pending':
                     _LOGGER.info("Device %s is PENDING approval. Waiting...", system_id)
@@ -236,7 +253,14 @@ def ws_agent_handler(ws):
                         return
                         
                     AgentConnectionManager.register(system_id, ws, remote_ip)
-                    ws.send(json.dumps({"type": "auth_result", "success": True, "message": "Authenticated successfully"}))
+                    auth_result = {
+                        "type": "auth_result",
+                        "success": True,
+                        "message": "Authenticated successfully",
+                    }
+                    if android_should_use_persistent_websocket(device):
+                        auth_result["persistent_connection"] = True
+                    ws.send(json.dumps(auth_result))
                     
                     device.last_seen = datetime.now(timezone.utc)
                     db.session.commit()

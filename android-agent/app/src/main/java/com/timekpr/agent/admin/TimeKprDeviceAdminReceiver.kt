@@ -7,6 +7,7 @@ import android.content.Intent
 class TimeKprDeviceAdminReceiver : DeviceAdminReceiver() {
     override fun onEnabled(context: Context, intent: Intent) {
         super.onEnabled(context, intent)
+        SecondaryUserProvisioner.onSecondaryAdminEnabled(context)
     }
 
     override fun onDisabled(context: Context, intent: Intent) {

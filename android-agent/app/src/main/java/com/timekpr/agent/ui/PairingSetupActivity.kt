@@ -8,6 +8,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import com.timekpr.agent.R
 import com.timekpr.agent.TimeKprApplication
+import com.timekpr.agent.admin.SecondaryUserProvisioner
 import com.timekpr.agent.service.AgentSessionCoordinator
 
 class PairingSetupActivity : AppCompatActivity() {
@@ -23,6 +24,10 @@ class PairingSetupActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (SecondaryUserProvisioner.blockManagementActivity(this)) {
+            finish()
+            return
+        }
         setContentView(R.layout.activity_pairing_setup)
 
         val serverInput = findViewById<EditText>(R.id.serverUrlInput)

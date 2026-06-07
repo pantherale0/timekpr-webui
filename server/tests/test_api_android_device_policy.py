@@ -41,8 +41,8 @@ def test_get_android_device_policy_requires_auth(client, android_policy_fixture)
 
 
 def test_get_android_device_policy_defaults(auth_client, android_policy_fixture):
-    mapping_id = android_policy_fixture['mapping'].id
-    response = auth_client.get(f'/api/mappings/{mapping_id}/android-device-policy')
+    system_id = android_policy_fixture['mapping'].system_id
+    response = auth_client.get(f'/api/devices/{system_id}/android-device-policy')
     assert response.status_code == 200
     payload = response.get_json()
     assert payload['success'] is True
@@ -51,13 +51,13 @@ def test_get_android_device_policy_defaults(auth_client, android_policy_fixture)
 
 
 def test_put_android_device_policy(auth_client, android_policy_fixture, monkeypatch):
-    mapping_id = android_policy_fixture['mapping'].id
+    system_id = android_policy_fixture['mapping'].system_id
     monkeypatch.setattr(
-        'src.android_device_policy_manager.push_mapping_device_policy',
-        lambda mapping: (False, 'Agent offline'),
+        'src.android_device_policy_manager.push_device_policy',
+        lambda device: (False, 'Agent offline'),
     )
     response = auth_client.put(
-        f'/api/mappings/{mapping_id}/android-device-policy',
+        f'/api/devices/{system_id}/android-device-policy',
         json={
             'screen_capture_disabled': True,
             'camera_access': 'CAMERA_ACCESS_DISABLED',

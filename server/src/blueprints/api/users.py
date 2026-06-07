@@ -76,12 +76,17 @@ def add_user_mapping(user_id):
             flash('Linux UID must be numeric', 'danger')
             return redirect(url_for('ui_dashboard.admin'))
 
+    android_profile_type = request.form.get('android_profile_type')
+    if android_profile_type not in ('restricted', 'standard'):
+        android_profile_type = None
+
     mapping = ManagedUserDeviceMap(
         managed_user_id=user.id,
         system_id=system_id,
         linux_username=linux_username,
         linux_uid=linux_uid,
         is_valid=False,
+        android_profile_type=android_profile_type,
     )
     db.session.add(mapping)
     db.session.commit()
@@ -105,6 +110,9 @@ def add_user():
 
     username = (request.form.get('username') or '').strip()
     system_id = (request.form.get('system_id') or '').strip()
+    android_profile_type = request.form.get('android_profile_type')
+    if android_profile_type not in ('restricted', 'standard'):
+        android_profile_type = None
 
     if not username or not system_id:
         flash('Both username and device are required', 'danger')
@@ -135,6 +143,7 @@ def add_user():
         managed_user_id=user.id,
         system_id=system_id,
         linux_username=username,
+        android_profile_type=android_profile_type,
     )
     db.session.add(mapping)
     db.session.commit()

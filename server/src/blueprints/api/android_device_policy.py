@@ -9,7 +9,7 @@ from src.android_device_policy_manager import (
     get_or_create_policy,
     upsert_policy,
 )
-from src.database import ManagedUserDeviceMap
+from src.database import AgentDevice
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -22,41 +22,41 @@ def _require_auth():
     return None
 
 
-def _get_mapping_or_404(mapping_id):
-    mapping = ManagedUserDeviceMap.query.get(mapping_id)
-    if mapping is None:
-        return None, (jsonify({'success': False, 'message': 'Mapping not found'}), 404)
-    return mapping, None
+def _get_device_or_404(system_id):
+    device = AgentDevice.query.get(system_id)
+    if device is None:
+        return None, (jsonify({'success': False, 'message': 'Device not found'}), 404)
+    return device, None
 
 
-@api_android_device_policy_bp.route('/api/mappings/<int:mapping_id>/android-device-policy', methods=['GET'])
-def get_android_device_policy(mapping_id):
+@api_android_device_policy_bp.route('/api/devices/<system_id>/android-device-policy', methods=['GET'])
+def get_android_device_policy(system_id):
     auth_response = _require_auth()
     if auth_response is not None:
         return auth_response
 
-    mapping, error_response = _get_mapping_or_404(mapping_id)
+    device, error_response = _get_device_or_404(system_id)
     if error_response is not None:
         return error_response
 
     try:
-        policy = get_or_create_policy(mapping)
+        policy = get_or_create_policy(device)
     except ValueError as exc:
         return jsonify({'success': False, 'message': str(exc)}), 400
 
     return jsonify({
         'success': True,
-        'policy': build_policy_summary(policy, mapping),
+        'policy': build_policy_summary(policy, device),
     })
 
 
-@api_android_device_policy_bp.route('/api/mappings/<int:mapping_id>/android-device-policy', methods=['PUT'])
-def update_android_device_policy(mapping_id):
+@api_android_device_policy_bp.route('/api/devices/<system_id>/android-device-policy', methods=['PUT'])
+def update_android_device_policy(system_id):
     auth_response = _require_auth()
     if auth_response is not None:
         return auth_response
 
-    mapping, error_response = _get_mapping_or_404(mapping_id)
+    device, error_response = _get_device_or_404(system_id)
     if error_response is not None:
         return error_response
 
@@ -65,11 +65,11 @@ def update_android_device_policy(mapping_id):
         return jsonify({'success': False, 'message': 'Request body must be a JSON object'}), 400
 
     try:
-        policy = upsert_policy(mapping, body)
+        policy = upsert_policy(device, body)
     except ValueError as exc:
         return jsonify({'success': False, 'message': str(exc)}), 400
 
-    summary = build_policy_summary(policy, mapping)
+    summary = build_policy_summary(policy, device)
     message = 'Device policy saved'
     if not policy.is_synced:
         message = f'Device policy saved; sync pending ({policy.last_sync_error or "agent offline"})'
@@ -79,3 +79,27 @@ def update_android_device_policy(mapping_id):
         'message': message,
         'policy': summary,
     })
+
+
+@api_android_device_policy_bp.route('/api/mappings/<int:mapping_id>/android-device-policy', methods=['GET'])
+def get_android_device_policy_legacy(mapping_id):
+    from src.database import ManagedUserDeviceMap
+    auth_response = _require_auth()
+    if auth_response is not None:
+        return auth_response
+    mapping = ManagedUserDeviceMap.query.get(mapping_id)
+    if mapping is None or not mapping.device:
+        return jsonify({'success': False, 'message': 'Mapping or device not found'}), 404
+    return get_android_device_policy(mapping.system_id)
+
+
+@api_android_device_policy_bp.route('/api/mappings/<int:mapping_id>/android-device-policy', methods=['PUT'])
+def update_android_device_policy_legacy(mapping_id):
+    from src.database import ManagedUserDeviceMap
+    auth_response = _require_auth()
+    if auth_response is not None:
+        return auth_response
+    mapping = ManagedUserDeviceMap.query.get(mapping_id)
+    if mapping is None or not mapping.device:
+        return jsonify({'success': False, 'message': 'Mapping or device not found'}), 404
+    return update_android_device_policy(mapping.system_id)

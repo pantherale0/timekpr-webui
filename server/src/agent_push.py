@@ -33,6 +33,20 @@ def device_prefers_push(device: AgentDevice | None) -> bool:
     return _is_android_device(device) and bool((device.fcm_token or '').strip())
 
 
+def android_push_wake_available(device: AgentDevice | None) -> bool:
+    """True when the server can wake this Android device via FCM while offline."""
+    if not _is_android_device(device):
+        return False
+    if not is_fcm_configured():
+        return False
+    return bool((device.fcm_token or '').strip())
+
+
+def android_should_use_persistent_websocket(device: AgentDevice | None) -> bool:
+    """Android agents should stay connected when FCM wake is unavailable."""
+    return _is_android_device(device) and not android_push_wake_available(device)
+
+
 def update_device_push_metadata(device: AgentDevice, hello_msg: dict) -> None:
     platform = hello_msg.get('platform')
     if isinstance(platform, str) and platform.strip():
@@ -44,6 +58,10 @@ def update_device_push_metadata(device: AgentDevice, hello_msg: dict) -> None:
         from datetime import datetime, timezone
 
         device.fcm_token_updated_at = datetime.now(timezone.utc)
+
+    is_device_owner = hello_msg.get('is_device_owner')
+    if is_device_owner is not None:
+        device.is_device_owner = bool(is_device_owner)
 
 
 def notify_device_message(system_id: str, payload: dict) -> tuple[bool, str]:

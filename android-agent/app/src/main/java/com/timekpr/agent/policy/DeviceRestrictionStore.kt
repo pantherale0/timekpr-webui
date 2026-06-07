@@ -1,7 +1,13 @@
 package com.timekpr.agent.policy
 
 import android.content.Context
+import org.json.JSONArray
 import org.json.JSONObject
+
+data class ProfileToProvision(
+    val username: String,
+    val profileType: String
+)
 
 data class DeviceRestrictionPolicy(
     val screenCaptureDisabled: Boolean = false,
@@ -22,6 +28,7 @@ data class DeviceRestrictionPolicy(
     val developerSettings: String = DEVELOPER_SETTINGS_UNSPECIFIED,
     val shortSupportMessage: String = DEFAULT_SHORT_SUPPORT_MESSAGE,
     val longSupportMessage: String = DEFAULT_LONG_SUPPORT_MESSAGE,
+    val profiles: List<ProfileToProvision> = emptyList(),
 ) {
     val cameraDisabled: Boolean
         get() = when (cameraAccess) {
@@ -94,6 +101,22 @@ data class DeviceRestrictionPolicy(
                 "usbDataAccess",
                 USB_DATA_ACCESS_UNSPECIFIED,
             ) ?: USB_DATA_ACCESS_UNSPECIFIED
+
+            val profilesList = mutableListOf<ProfileToProvision>()
+            val profilesArray = json.optJSONArray("profiles")
+            if (profilesArray != null) {
+                for (i in 0 until profilesArray.length()) {
+                    val p = profilesArray.optJSONObject(i)
+                    if (p != null) {
+                        val name = p.optString("username", "").trim()
+                        val type = p.optString("profile_type", "").trim()
+                        if (name.isNotEmpty() && type.isNotEmpty()) {
+                            profilesList.add(ProfileToProvision(name, type))
+                        }
+                    }
+                }
+            }
+
             return DeviceRestrictionPolicy(
                 screenCaptureDisabled = json.optBoolean("screenCaptureDisabled", false),
                 cameraAccess = json.optString("cameraAccess", CAMERA_ACCESS_UNSPECIFIED),
@@ -119,11 +142,21 @@ data class DeviceRestrictionPolicy(
                     json.optJSONObject("longSupportMessage"),
                     DEFAULT_LONG_SUPPORT_MESSAGE,
                 ),
+                profiles = profilesList,
             )
         }
     }
 
     fun toJson(): JSONObject {
+        val profilesArray = JSONArray()
+        profiles.forEach { p ->
+            profilesArray.put(
+                JSONObject()
+                    .put("username", p.username)
+                    .put("profile_type", p.profileType)
+            )
+        }
+
         return JSONObject()
             .put("screenCaptureDisabled", screenCaptureDisabled)
             .put("cameraAccess", cameraAccess)
@@ -139,6 +172,7 @@ data class DeviceRestrictionPolicy(
             .put("smsDisabled", smsDisabled)
             .put("blockWifiTethering", blockWifiTethering)
             .put("blockNfc", blockNfc)
+            .put("profiles", profilesArray)
             .put(
                 "advancedSecurityOverrides",
                 JSONObject().put("developerSettings", developerSettings),
@@ -161,42 +195,36 @@ data class DeviceRestrictionPolicy(
 class DeviceRestrictionStore(context: Context) {
     private val appContext = context.applicationContext
     private val prefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-    private val policyByUser = mutableMapOf<String, DeviceRestrictionPolicy>()
+    private var globalPolicy = DeviceRestrictionPolicy()
 
     fun policyForUser(username: String): DeviceRestrictionPolicy {
-        return policyByUser[username] ?: DeviceRestrictionPolicy()
+        return globalPolicy
     }
 
     fun syncPolicy(username: String, policyJson: JSONObject?) {
-        val policy = DeviceRestrictionPolicy.parse(policyJson)
-        policyByUser[username] = policy
+        globalPolicy = DeviceRestrictionPolicy.parse(policyJson)
         persist()
     }
 
     fun restore() {
-        policyByUser.clear()
-        val raw = prefs.getString(KEY_POLICIES, null) ?: return
-        try {
-            val root = JSONObject(raw)
-            root.keys().forEach { username ->
-                val entry = root.optJSONObject(username) ?: return@forEach
-                policyByUser[username] = DeviceRestrictionPolicy.parse(entry)
+        val raw = prefs.getString(KEY_POLICY, null)
+        globalPolicy = if (raw != null) {
+            try {
+                DeviceRestrictionPolicy.parse(JSONObject(raw))
+            } catch (_: Exception) {
+                DeviceRestrictionPolicy()
             }
-        } catch (_: Exception) {
-            policyByUser.clear()
+        } else {
+            DeviceRestrictionPolicy()
         }
     }
 
     private fun persist() {
-        val root = JSONObject()
-        policyByUser.forEach { (username, policy) ->
-            root.put(username, policy.toJson())
-        }
-        prefs.edit().putString(KEY_POLICIES, root.toString()).apply()
+        prefs.edit().putString(KEY_POLICY, globalPolicy.toJson().toString()).apply()
     }
 
     companion object {
         private const val PREFS_NAME = "timekpr_device_restrictions"
-        private const val KEY_POLICIES = "policies_by_user"
+        private const val KEY_POLICY = "global_device_policy"
     }
 }

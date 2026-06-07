@@ -8,6 +8,7 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import com.timekpr.agent.TimeKprApplication
 import com.timekpr.agent.admin.DeviceOwnerProvisioner
+import com.timekpr.agent.admin.SecondaryUserProvisioner
 import com.timekpr.agent.enforcement.EnforcementController
 import com.timekpr.agent.monitor.UsageMonitorService
 import com.timekpr.agent.protocol.AgentWebSocketClient
@@ -27,6 +28,11 @@ object AgentSessionCoordinator {
 
     fun startMobileAgent(context: Context) {
         val appContext = context.applicationContext
+        if (SecondaryUserProvisioner.isManagedSecondaryUser(appContext)) {
+            SecondaryUserProvisioner.prepareAtLaunch(appContext)
+            return
+        }
+
         DeviceOwnerProvisioner.applyIfDeviceOwner(appContext)
         val app = TimeKprApplication.from(appContext)
         app.appPolicyStore.restore()
@@ -38,6 +44,9 @@ object AgentSessionCoordinator {
     }
 
     fun scheduleSync(context: Context, reason: String = "manual") {
+        if (AgentPersistentConnectionService.isRunning()) {
+            return
+        }
         val constraints = Constraints.Builder()
             .setRequiredNetworkType(NetworkType.CONNECTED)
             .build()

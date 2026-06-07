@@ -4,7 +4,7 @@ import android.content.Context
 import android.net.LocalServerSocket
 import android.net.LocalSocket
 import android.util.Log
-import com.timekpr.agent.TimeKprApplication
+import com.timekpr.agent.policy.DomainPolicyResolver
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.BufferedReader
@@ -51,14 +51,12 @@ class PolicyIpcServer(private val context: Context) {
             
             if (line.startsWith("GET_POLICY ")) {
                 val uid = line.substring("GET_POLICY ".length).trim()
-                val domainStore = TimeKprApplication.from(context).domainPolicyStore
-                
-                val blocked = domainStore.blockedDomainsForUid(uid)
-                val allowed = domainStore.policyForUid(uid)?.allowedDomains ?: emptySet()
+                val androidUserId = uid.toIntOrNull() ?: 0
+                val policy = DomainPolicyResolver.loadVpnPolicyForUser(context, androidUserId)
                 
                 val response = JSONObject()
-                    .put("blocked_domains", JSONArray(blocked.toList()))
-                    .put("allowed_domains", JSONArray(allowed.toList()))
+                    .put("blocked_domains", JSONArray(policy.blockedDomains.toList()))
+                    .put("allowed_domains", JSONArray(policy.allowedDomains.toList()))
                 
                 writer.println(response.toString())
             } else {

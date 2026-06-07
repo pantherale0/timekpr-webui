@@ -36,6 +36,9 @@ class TimeKprApplication : Application() {
         val isUserZero = (myUid / 100000) == 0
         if (isUserZero) {
             policyIpcServer.start()
+            com.timekpr.agent.admin.SecondaryUserProvisioner.ensurePrimaryUiVisible(this)
+        } else {
+            com.timekpr.agent.admin.SecondaryUserProvisioner.prepareAtLaunch(this)
         }
         
         DeviceOwnerProvisioner.applyIfDeviceOwner(this)

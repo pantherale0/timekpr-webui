@@ -102,6 +102,232 @@
                 </div>
             </div>
 
+            {% if device.platform == 'android' %}
+                {% if device.is_device_owner %}
+                    <!-- Android Device Policy Form Card -->
+                    <div class="card shadow-sm border mb-4">
+                        <div class="card-header bg-body-secondary py-3 d-flex align-items-center justify-content-between flex-wrap gap-2">
+                            <div class="d-flex align-items-center gap-2">
+                                <div class="bg-success-subtle text-success p-2 rounded d-flex align-items-center justify-content-center" style="width: 38px; height: 38px;">
+                                    <i class="fab fa-android fs-5"></i>
+                                </div>
+                                <div>
+                                    <h5 class="mb-0 fw-bold">Android Device Policy</h5>
+                                    <span class="text-secondary small fw-medium">Manage hardware access, system settings, and restrictions.</span>
+                                </div>
+                            </div>
+                            <div>
+                                <span id="policy-sync-badge" class="badge {% if android_device_policy and android_device_policy.is_synced %}bg-success-subtle text-success border border-success-subtle{% else %}bg-warning-subtle text-warning border border-warning-subtle{% endif %} px-2.5 py-1.5 fw-bold" style="font-size: 0.75rem;">
+                                    {% if android_device_policy and android_device_policy.is_synced %}
+                                        <i class="fas fa-check-circle me-1"></i> Synced to Device
+                                    {% else %}
+                                        <i class="fas fa-sync me-1"></i> Sync Pending
+                                    {% endif %}
+                                </span>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <form id="android-policy-form" class="needs-validation" novalidate>
+                                <!-- Success/Error Alert -->
+                                <div id="policy-alert" class="alert d-none mb-3" role="alert"></div>
+
+                                <!-- Category: Hardware & Connectivity -->
+                                <h6 class="fw-bold text-secondary text-uppercase mb-3 pb-1 border-bottom" style="font-size: 0.75rem; letter-spacing: 0.05em;">
+                                    <i class="fas fa-microchip me-1 text-primary"></i> Hardware & Connectivity
+                                </h6>
+                                <div class="row g-3 mb-4">
+                                    <div class="col-12 col-md-6">
+                                        <label class="form-label fw-bold text-body small" for="camera_access">Camera Access</label>
+                                        <select id="camera_access" name="camera_access" class="form-select form-select-sm">
+                                            <option value="CAMERA_ACCESS_UNSPECIFIED" {% if android_device_policy and android_device_policy.camera_access == 'CAMERA_ACCESS_UNSPECIFIED' %}selected{% endif %}>Unspecified (Default)</option>
+                                            <option value="CAMERA_ACCESS_DISABLED" {% if android_device_policy and android_device_policy.camera_access == 'CAMERA_ACCESS_DISABLED' %}selected{% endif %}>Disabled</option>
+                                            <option value="CAMERA_ACCESS_USER_CHOICE" {% if android_device_policy and android_device_policy.camera_access == 'CAMERA_ACCESS_USER_CHOICE' %}selected{% endif %}>User Choice</option>
+                                            <option value="CAMERA_ACCESS_ENFORCED" {% if android_device_policy and android_device_policy.camera_access == 'CAMERA_ACCESS_ENFORCED' %}selected{% endif %}>Enforced</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-12 col-md-6">
+                                        <label class="form-label fw-bold text-body small" for="microphone_access">Microphone Access</label>
+                                        <select id="microphone_access" name="microphone_access" class="form-select form-select-sm">
+                                            <option value="MICROPHONE_ACCESS_UNSPECIFIED" {% if android_device_policy and android_device_policy.microphone_access == 'MICROPHONE_ACCESS_UNSPECIFIED' %}selected{% endif %}>Unspecified (Default)</option>
+                                            <option value="MICROPHONE_ACCESS_DISABLED" {% if android_device_policy and android_device_policy.microphone_access == 'MICROPHONE_ACCESS_DISABLED' %}selected{% endif %}>Disabled</option>
+                                            <option value="MICROPHONE_ACCESS_USER_CHOICE" {% if android_device_policy and android_device_policy.microphone_access == 'MICROPHONE_ACCESS_USER_CHOICE' %}selected{% endif %}>User Choice</option>
+                                            <option value="MICROPHONE_ACCESS_ENFORCED" {% if android_device_policy and android_device_policy.microphone_access == 'MICROPHONE_ACCESS_ENFORCED' %}selected{% endif %}>Enforced</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-12 col-md-6">
+                                        <label class="form-label fw-bold text-body small" for="usb_data_access">USB Data Access</label>
+                                        <select id="usb_data_access" name="usb_data_access" class="form-select form-select-sm">
+                                            <option value="USB_DATA_ACCESS_UNSPECIFIED" {% if android_device_policy and android_device_policy.usb_data_access == 'USB_DATA_ACCESS_UNSPECIFIED' %}selected{% endif %}>Unspecified (Default)</option>
+                                            <option value="ALLOW_USB_DATA_TRANSFER" {% if android_device_policy and android_device_policy.usb_data_access == 'ALLOW_USB_DATA_TRANSFER' %}selected{% endif %}>Allow USB Data Transfer</option>
+                                            <option value="DISALLOW_USB_FILE_TRANSFER" {% if android_device_policy and android_device_policy.usb_data_access == 'DISALLOW_USB_FILE_TRANSFER' %}selected{% endif %}>Disallow USB File Transfer (Charge Only)</option>
+                                            <option value="DISALLOW_USB_DATA_TRANSFER" {% if android_device_policy and android_device_policy.usb_data_access == 'DISALLOW_USB_DATA_TRANSFER' %}selected{% endif %}>Disallow USB Data Transfer Completely</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-12 col-md-6 col-lg-4 d-flex align-items-center mt-auto pb-1">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="bluetooth_disabled" name="bluetooth_disabled" {% if android_device_policy and android_device_policy.bluetooth_disabled %}checked{% endif %}>
+                                            <label class="form-check-label fw-bold text-body small" for="bluetooth_disabled">Disable Bluetooth</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-12 col-md-6 col-lg-4 d-flex align-items-center mt-auto pb-1">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="block_nfc" name="block_nfc" {% if android_device_policy and android_device_policy.block_nfc %}checked{% endif %}>
+                                            <label class="form-check-label fw-bold text-body small" for="block_nfc">Block NFC</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-12 col-md-6 col-lg-4 d-flex align-items-center mt-auto pb-1">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="mount_physical_media_disabled" name="mount_physical_media_disabled" {% if android_device_policy and android_device_policy.mount_physical_media_disabled %}checked{% endif %}>
+                                            <label class="form-check-label fw-bold text-body small" for="mount_physical_media_disabled">Disable SD Card/External Drive</label>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Category: System Security -->
+                                <h6 class="fw-bold text-secondary text-uppercase mb-3 pb-1 border-bottom" style="font-size: 0.75rem; letter-spacing: 0.05em;">
+                                    <i class="fas fa-shield-alt me-1 text-primary"></i> System Security
+                                </h6>
+                                <div class="row g-3 mb-4">
+                                    <div class="col-12 col-md-6">
+                                        <label class="form-label fw-bold text-body small" for="developer_settings">Developer Options</label>
+                                        <select id="developer_settings" name="developer_settings" class="form-select form-select-sm">
+                                            <option value="DEVELOPER_SETTINGS_UNSPECIFIED" {% if android_device_policy and android_device_policy.developer_settings == 'DEVELOPER_SETTINGS_UNSPECIFIED' %}selected{% endif %}>Unspecified (Default)</option>
+                                            <option value="DEVELOPER_SETTINGS_DISABLED" {% if android_device_policy and android_device_policy.developer_settings == 'DEVELOPER_SETTINGS_DISABLED' %}selected{% endif %}>Disabled</option>
+                                            <option value="DEVELOPER_SETTINGS_ALLOWED" {% if android_device_policy and android_device_policy.developer_settings == 'DEVELOPER_SETTINGS_ALLOWED' %}selected{% endif %}>Allowed</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-12 col-md-6 col-lg-4 d-flex align-items-center mt-auto pb-1">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="factory_reset_disabled" name="factory_reset_disabled" {% if android_device_policy and android_device_policy.factory_reset_disabled %}checked{% endif %}>
+                                            <label class="form-check-label fw-bold text-body small" for="factory_reset_disabled">Disable Factory Reset</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-12 col-md-6 col-lg-4 d-flex align-items-center mt-auto pb-1">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="modify_accounts_disabled" name="modify_accounts_disabled" {% if android_device_policy and android_device_policy.modify_accounts_disabled %}checked{% endif %}>
+                                            <label class="form-check-label fw-bold text-body small" for="modify_accounts_disabled">Disable Accounts Mod</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-12 col-md-6 col-lg-4 d-flex align-items-center mt-auto pb-1">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="screen_capture_disabled" name="screen_capture_disabled" {% if android_device_policy and android_device_policy.screen_capture_disabled %}checked{% endif %}>
+                                            <label class="form-check-label fw-bold text-body small" for="screen_capture_disabled">Disable Screenshots</label>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Category: Applications & Control -->
+                                <h6 class="fw-bold text-secondary text-uppercase mb-3 pb-1 border-bottom" style="font-size: 0.75rem; letter-spacing: 0.05em;">
+                                    <i class="fas fa-mobile-alt me-1 text-primary"></i> Applications & Control
+                                </h6>
+                                <div class="row g-3 mb-4">
+                                    <div class="col-12 col-md-6 col-lg-4">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="install_apps_disabled" name="install_apps_disabled" {% if android_device_policy and android_device_policy.install_apps_disabled %}checked{% endif %}>
+                                            <label class="form-check-label fw-bold text-body small" for="install_apps_disabled">Disable App Installation</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-12 col-md-6 col-lg-4">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="uninstall_apps_disabled" name="uninstall_apps_disabled" {% if android_device_policy and android_device_policy.uninstall_apps_disabled %}checked{% endif %}>
+                                            <label class="form-check-label fw-bold text-body small" for="uninstall_apps_disabled">Disable App Uninstallation</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-12 col-md-6 col-lg-4">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="adjust_volume_disabled" name="adjust_volume_disabled" {% if android_device_policy and android_device_policy.adjust_volume_disabled %}checked{% endif %}>
+                                            <label class="form-check-label fw-bold text-body small" for="adjust_volume_disabled">Disable Volume Adjustment</label>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Category: Call & Network Controls -->
+                                <h6 class="fw-bold text-secondary text-uppercase mb-3 pb-1 border-bottom" style="font-size: 0.75rem; letter-spacing: 0.05em;">
+                                    <i class="fas fa-phone me-1 text-primary"></i> Call & Network Controls
+                                </h6>
+                                <div class="row g-3 mb-4">
+                                    <div class="col-12 col-md-6 col-lg-4">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="outgoing_calls_disabled" name="outgoing_calls_disabled" {% if android_device_policy and android_device_policy.outgoing_calls_disabled %}checked{% endif %}>
+                                            <label class="form-check-label fw-bold text-body small" for="outgoing_calls_disabled">Disable Outgoing Phone Calls</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-12 col-md-6 col-lg-4">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="sms_disabled" name="sms_disabled" {% if android_device_policy and android_device_policy.sms_disabled %}checked{% endif %}>
+                                            <label class="form-check-label fw-bold text-body small" for="sms_disabled">Disable SMS (Text Messages)</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-12 col-md-6 col-lg-4">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="block_wifi_tethering" name="block_wifi_tethering" {% if android_device_policy and android_device_policy.block_wifi_tethering %}checked{% endif %}>
+                                            <label class="form-check-label fw-bold text-body small" for="block_wifi_tethering">Disable Wi-Fi Hotspot</label>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Category: Support Message -->
+                                <h6 class="fw-bold text-secondary text-uppercase mb-3 pb-1 border-bottom" style="font-size: 0.75rem; letter-spacing: 0.05em;">
+                                    <i class="fas fa-comment-dots me-1 text-primary"></i> Support Message
+                                </h6>
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold text-body small" for="short_support_message">Short Support Message</label>
+                                    <input type="text" class="form-control form-control-sm" id="short_support_message" name="short_support_message" 
+                                           maxlength="200" required
+                                           value="{{ android_device_policy.short_support_message if android_device_policy else 'This setting is managed by your parent through TimeKpr.' }}">
+                                    <div class="form-text small text-secondary" style="font-size: 0.75rem;">Shown when a restricted setting is blocked (e.g., in Settings). Max 200 chars.</div>
+                                </div>
+                                <div class="mb-4">
+                                    <label class="form-label fw-bold text-body small" for="long_support_message">Long Support Message</label>
+                                    <textarea class="form-control form-control-sm" id="long_support_message" name="long_support_message" 
+                                              rows="3" maxlength="4096" required>{{ android_device_policy.long_support_message if android_device_policy else 'This device is protected by TimeKpr parental controls. Your parent manages screen time, apps, and websites. Ask them if you need something changed.' }}</textarea>
+                                    <div class="form-text small text-secondary" style="font-size: 0.75rem;">Shown in the Device Administrator details screen. Max 4096 chars.</div>
+                                </div>
+
+                                <!-- Save Action -->
+                                <div class="d-flex justify-content-end">
+                                    <button type="submit" id="save-policy-btn" class="btn btn-primary fw-bold">
+                                        <i class="fas fa-save me-1"></i> Save Restrictions
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                {% else %}
+                    <!-- Android Device Owner Enrollment Instructions Card -->
+                    <div class="card shadow-sm border border-warning mb-4">
+                        <div class="card-header bg-warning-subtle py-3 d-flex align-items-center gap-2">
+                            <div class="bg-warning text-dark p-2 rounded d-flex align-items-center justify-content-center" style="width: 38px; height: 38px;">
+                                <i class="fas fa-shield-alt fs-5"></i>
+                            </div>
+                            <div>
+                                <h5 class="mb-0 fw-bold text-warning-emphasis">Unlocking Advanced Restrictions</h5>
+                                <span class="text-secondary small fw-medium">TimeKpr needs Device Owner (DO) permission for these controls.</span>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <p class="small text-secondary mb-3">
+                                Enforcing hardware limitations, preventing uninstall, and automatically provisioning child user accounts requires the TimeKpr agent to be set as <strong>Device Owner</strong>.
+                            </p>
+                            
+                            <h6 class="fw-bold small text-body mb-2">To provision via ADB:</h6>
+                            <ol class="small text-secondary mb-3 ps-3">
+                                <li>Enable <strong>Developer Options</strong> and <strong>USB Debugging</strong> on the child's device.</li>
+                                <li>Remove all existing user accounts from the device under <em>Settings &rarr; Passwords &amp; Accounts</em>.</li>
+                                <li>Connect the device to a computer and execute the following terminal command:</li>
+                            </ol>
+                            <div class="p-3 border rounded bg-body-secondary mb-3">
+                                <code class="d-block text-break font-monospace small" style="user-select: all;">adb shell dpm set-device-owner com.timekpr.agent/.admin.TimeKprDeviceAdminReceiver</code>
+                            </div>
+                            
+                            <p class="small text-secondary mb-0">
+                                <i class="fas fa-info-circle me-1 text-primary"></i> Once successfully executed, restart the TimeKpr agent. The Device Owner status will refresh and unlock these restrictions.
+                            </p>
+                        </div>
+                    </div>
+                {% endif %}
+            {% endif %}
+
             <!-- Installed Applications -->
             <div class="card shadow-sm border mb-4">
                 <div class="card-header bg-body-secondary py-3 d-flex justify-content-between align-items-center flex-wrap gap-3">
@@ -703,6 +929,83 @@
     // Initial load
     fetchAlerts();
 
+})();
+</script>
+<script>
+(function() {
+    const systemId = "{{ device.system_id }}";
+    const form = document.getElementById('android-policy-form');
+    if (!form) return;
+
+    const saveBtn = document.getElementById('save-policy-btn');
+    const policyAlert = document.getElementById('policy-alert');
+    const syncBadge = document.getElementById('policy-sync-badge');
+
+    function showAlert(message, isSuccess) {
+        policyAlert.textContent = message;
+        policyAlert.className = `alert mb-3 alert-${isSuccess ? 'success' : 'danger'}`;
+        policyAlert.classList.remove('d-none');
+    }
+
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        saveBtn.disabled = true;
+        const originalText = saveBtn.innerHTML;
+        saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span> Saving...';
+        policyAlert.classList.add('d-none');
+
+        const payload = {
+            screen_capture_disabled: document.getElementById('screen_capture_disabled').checked,
+            camera_access: document.getElementById('camera_access').value,
+            microphone_access: document.getElementById('microphone_access').value,
+            usb_data_access: document.getElementById('usb_data_access').value,
+            developer_settings: document.getElementById('developer_settings').value,
+            install_apps_disabled: document.getElementById('install_apps_disabled').checked,
+            uninstall_apps_disabled: document.getElementById('uninstall_apps_disabled').checked,
+            factory_reset_disabled: document.getElementById('factory_reset_disabled').checked,
+            adjust_volume_disabled: document.getElementById('adjust_volume_disabled').checked,
+            modify_accounts_disabled: document.getElementById('modify_accounts_disabled').checked,
+            mount_physical_media_disabled: document.getElementById('mount_physical_media_disabled').checked,
+            bluetooth_disabled: document.getElementById('bluetooth_disabled').checked,
+            outgoing_calls_disabled: document.getElementById('outgoing_calls_disabled').checked,
+            sms_disabled: document.getElementById('sms_disabled').checked,
+            block_wifi_tethering: document.getElementById('block_wifi_tethering').checked,
+            block_nfc: document.getElementById('block_nfc').checked,
+            short_support_message: document.getElementById('short_support_message').value,
+            long_support_message: document.getElementById('long_support_message').value
+        };
+
+        try {
+            const response = await fetch(`/api/devices/${encodeURIComponent(systemId)}/android-device-policy`, {
+                method: 'PUT',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('meta[name="csrf-token"]')?.content || ''
+                },
+                body: JSON.stringify(payload)
+            });
+            const data = await response.json();
+            
+            if (response.ok && data.success) {
+                showAlert(data.message || 'Restrictions saved successfully', true);
+                if (data.policy && data.policy.is_synced) {
+                    syncBadge.className = 'badge bg-success-subtle text-success border border-success-subtle px-2.5 py-1.5 fw-bold';
+                    syncBadge.innerHTML = '<i class="fas fa-check-circle me-1"></i> Synced to Device';
+                } else {
+                    syncBadge.className = 'badge bg-warning-subtle text-warning border border-warning-subtle px-2.5 py-1.5 fw-bold';
+                    syncBadge.innerHTML = '<i class="fas fa-sync me-1"></i> Sync Pending';
+                }
+            } else {
+                showAlert(data.message || 'Failed to save restrictions', false);
+            }
+        } catch (err) {
+            showAlert(err.message || 'An error occurred while saving the policy', false);
+        } finally {
+            saveBtn.disabled = false;
+            saveBtn.innerHTML = originalText;
+        }
+    });
 })();
 </script>
 {% endblock %}

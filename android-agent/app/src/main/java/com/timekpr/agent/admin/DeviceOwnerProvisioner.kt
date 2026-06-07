@@ -7,6 +7,8 @@ import android.content.ComponentName
 import android.content.Context
 import android.net.VpnService
 import android.os.Build
+import android.os.Process
+import android.os.UserManager
 import android.util.Log
 
 /**
@@ -29,20 +31,87 @@ object DeviceOwnerProvisioner {
         return isDeviceOwner(context) || isProfileOwner(context)
     }
 
-    /** @return true when this app is device owner (grants may still partially fail). */
+    /** @return true when admin/owner grants were attempted for this user profile. */
     fun applyIfDeviceOwner(context: Context): Boolean {
-        if (!isDeviceOrProfileOwner(context)) return false
-        val dpm = context.getSystemService(DevicePolicyManager::class.java) ?: return true
+        if (!shouldAttemptManagedGrants(context)) return false
+        return applyManagedCapabilities(context)
+    }
+
+    fun applyManagedCapabilities(context: Context): Boolean {
+        val dpm = context.getSystemService(DevicePolicyManager::class.java) ?: return false
         val admin = ComponentName(context, TimeKprDeviceAdminReceiver::class.java)
+        if (!dpm.isAdminActive(admin)) return false
         val packageName = context.packageName
 
         grantPermission(dpm, admin, packageName, Manifest.permission.PACKAGE_USAGE_STATS)
+        grantUsageStatsAppOp(context)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            grantPermission(dpm, admin, packageName, Manifest.permission.REQUEST_INSTALL_PACKAGES)
+        }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             grantPermission(dpm, admin, packageName, Manifest.permission.POST_NOTIFICATIONS)
         }
         grantOverlayPermission(context)
+        grantCrossUserPermissionsIfDeviceOwner(context)
+        lockManagedProfileSettings(context, dpm, admin)
 
         return true
+    }
+
+    private fun lockManagedProfileSettings(
+        context: Context,
+        dpm: DevicePolicyManager,
+        admin: ComponentName,
+    ) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            try {
+                dpm.setPermissionPolicy(admin, DevicePolicyManager.PERMISSION_POLICY_AUTO_GRANT)
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to set permission auto-grant policy", e)
+            }
+        }
+
+        val userId = Process.myUid() / 100_000
+        if (userId == 0) return
+
+        try {
+            dpm.addUserRestriction(admin, UserManager.DISALLOW_APPS_CONTROL)
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to lock app settings on managed profile", e)
+        }
+    }
+
+    fun grantCrossUserPermissionsIfDeviceOwner(context: Context) {
+        if (!isDeviceOwner(context)) return
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return
+        val dpm = context.getSystemService(DevicePolicyManager::class.java) ?: return
+        val admin = ComponentName(context, TimeKprDeviceAdminReceiver::class.java)
+        val packageName = context.packageName
+        for (permission in CROSS_USER_PERMISSIONS) {
+            try {
+                if (dpm.getPermissionGrantState(admin, packageName, permission)
+                    != DevicePolicyManager.PERMISSION_GRANT_STATE_GRANTED
+                ) {
+                    dpm.setPermissionGrantState(
+                        admin,
+                        packageName,
+                        permission,
+                        DevicePolicyManager.PERMISSION_GRANT_STATE_GRANTED,
+                    )
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to grant cross-user permission $permission", e)
+            }
+        }
+    }
+
+    private val CROSS_USER_PERMISSIONS = listOf(
+        "android.permission.INTERACT_ACROSS_USERS",
+    )
+
+    private fun shouldAttemptManagedGrants(context: Context): Boolean {
+        return isDeviceOrProfileOwner(context) ||
+            DeviceAdminActivationActivity.isActive(context)
     }
 
     fun hasOverlayPermission(context: Context): Boolean {
@@ -65,6 +134,28 @@ object DeviceOwnerProvisioner {
         return DeviceAdminActivationActivity.isActive(context)
             && hasUsageAccess(context)
             && hasVpnConsent(context)
+    }
+
+    private fun grantUsageStatsAppOp(context: Context) {
+        val appOps = context.getSystemService(AppOpsManager::class.java) ?: return
+        try {
+            val method = AppOpsManager::class.java.getMethod(
+                "setMode",
+                String::class.java,
+                Int::class.javaPrimitiveType,
+                String::class.java,
+                Int::class.javaPrimitiveType,
+            )
+            method.invoke(
+                appOps,
+                AppOpsManager.OPSTR_GET_USAGE_STATS,
+                android.os.Process.myUid(),
+                context.packageName,
+                AppOpsManager.MODE_ALLOWED,
+            )
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to grant GET_USAGE_STATS app op", e)
+        }
     }
 
     private fun grantOverlayPermission(context: Context) {

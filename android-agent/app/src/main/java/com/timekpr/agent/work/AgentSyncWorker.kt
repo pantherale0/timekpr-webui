@@ -29,6 +29,7 @@ class AgentSyncWorker(
         return when {
             result.success -> Result.success()
             result.reason == "update_scheduled" -> Result.success()
+            result.reason == "persistent_handoff" -> Result.success()
             else -> Result.retry()
         }
     }

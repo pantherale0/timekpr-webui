@@ -15,6 +15,7 @@ import com.timekpr.agent.R
 import com.timekpr.agent.TimeKprApplication
 import com.timekpr.agent.admin.DeviceAdminActivationActivity
 import com.timekpr.agent.admin.DeviceOwnerProvisioner
+import com.timekpr.agent.admin.SecondaryUserProvisioner
 import com.timekpr.agent.service.AgentConnectionState
 import com.timekpr.agent.service.AgentConnectionStatus
 import com.timekpr.agent.service.AgentSessionCoordinator
@@ -35,6 +36,11 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (SecondaryUserProvisioner.blockManagementActivity(this)) {
+            finish()
+            return
+        }
+
         val config = TimeKprApplication.from(this).configStore.load()
         if (config.serverUrl.isBlank()) {
             startActivity(Intent(this, PairingSetupActivity::class.java))
@@ -84,7 +90,12 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        if (SecondaryUserProvisioner.isManagedSecondaryUser(this)) {
+            finish()
+            return
+        }
         DeviceOwnerProvisioner.applyIfDeviceOwner(this)
+        SecondaryUserProvisioner.ensurePrimaryUiVisible(this)
         refreshCapabilityButtons()
     }
 

@@ -3,6 +3,8 @@ package com.timekpr.agent.protocol
 import android.content.Context
 import com.timekpr.agent.BuildConfig
 import com.timekpr.agent.TimeKprApplication
+import com.timekpr.agent.admin.CrossUserStoreSync
+import com.timekpr.agent.admin.DeviceOwnerProvisioner
 import com.timekpr.agent.config.AgentConfig
 import com.timekpr.agent.discovery.InstalledAppsDiscovery
 import com.timekpr.agent.discovery.InstalledAppsReporter
@@ -12,6 +14,7 @@ import com.timekpr.agent.policy.AppPolicyStore
 import com.timekpr.agent.push.PushTokenProvider
 import com.timekpr.agent.service.AgentConnectionState
 import com.timekpr.agent.service.AgentConnectionStatus
+import com.timekpr.agent.service.AgentPersistentConnectionService
 import com.timekpr.agent.update.AgentUpdateRequest
 import com.timekpr.agent.update.AgentUpdateWorker
 import com.timekpr.agent.util.AndroidUsers
@@ -58,6 +61,13 @@ class AgentWebSocketClient(
         }
 
         AgentConnectionState.update(AgentConnectionStatus.CONNECTING)
+        val sessionClient = if (mode == SessionMode.PERSISTENT) {
+            client.newBuilder()
+                .readTimeout(0, TimeUnit.MILLISECONDS)
+                .build()
+        } else {
+            client
+        }
         return suspendCancellableCoroutine { continuation ->
             var completed = false
             val socketRef = arrayOf<WebSocket?>(null)
@@ -70,7 +80,7 @@ class AgentWebSocketClient(
 
             val request = Request.Builder().url(config.serverUrl).build()
 
-            socketRef[0] = client.newWebSocket(
+            socketRef[0] = sessionClient.newWebSocket(
                 request,
                 object : WebSocketListener() {
                     override fun onOpen(webSocket: WebSocket, response: Response) {
@@ -115,6 +125,7 @@ class AgentWebSocketClient(
             linuxUsers = AndroidUsers.linuxUsersPayload(context),
             paired = !config.agentToken.isNullOrBlank(),
             fcmToken = fcmToken,
+            isDeviceOwner = DeviceOwnerProvisioner.isDeviceOrProfileOwner(context),
         )
     }
 
@@ -189,6 +200,7 @@ class AgentWebSocketClient(
                 sendAlert(webSocket, "system_startup", JSONObject().put("platform", "android"))
                 sendPolicySyncCheck(webSocket)
                 enforcement.startAll()
+                CrossUserStoreSync.replicateToAllSecondaryUsers(context)
                 DomainBlockVpnService.reconcile(context)
 
                 AlertEventBus.drain().forEach { pending ->
@@ -199,6 +211,16 @@ class AgentWebSocketClient(
                 val discoveredApps = InstalledAppsDiscovery.discover(context)
                 InstalledAppsReporter.sendInventory(webSocket, linuxUsername, discoveredApps)
                 enforcement.applyAppPolicies(linuxUsername)
+
+                if (mode == SessionMode.PERSISTENT || message.optBoolean("persistent_connection", false)) {
+                    if (mode != SessionMode.PERSISTENT) {
+                        AgentPersistentConnectionService.start(context)
+                        clearAlertListener()
+                        onComplete(SessionResult(success = true, reason = "persistent_handoff"))
+                        return
+                    }
+                    return
+                }
 
                 clearAlertListener()
                 onComplete(SessionResult(success = true, reason = "sync_complete"))
@@ -258,6 +280,7 @@ class AgentWebSocketClient(
     enum class SessionMode {
         PAIRING_ONLY,
         SYNC,
+        PERSISTENT,
     }
 
     data class SessionResult(val success: Boolean, val reason: String)
@@ -271,7 +294,10 @@ class AgentWebSocketClient(
             val dispatcher = CommandDispatcher(
                 context = context,
                 appPolicyStore = appPolicyStore,
-                onDomainPolicyChanged = { DomainBlockVpnService.reconcile(context) },
+                onDomainPolicyChanged = {
+                    CrossUserStoreSync.replicateToAllSecondaryUsers(context)
+                    DomainBlockVpnService.reconcile(context)
+                },
                 onAppPolicyChanged = { username -> enforcement.applyAppPolicies(username) },
                 onTimePolicyChanged = { username -> enforcement.applyTimePolicies(username) },
                 onDeviceRestrictionChanged = { username -> enforcement.applyDeviceRestrictions(username) },

@@ -4,6 +4,7 @@
     <string name="agent_notification_channel">TimeKpr Agent</string>
     <string name="agent_notification_title">TimeKpr protection active</string>
     <string name="agent_notification_body">Policies active — server sync via push</string>
+    <string name="agent_notification_body_persistent">Connected to TimeKpr server</string>
     <string name="vpn_notification_title">Web policy filter</string>
     <string name="vpn_notification_body">Blocking restricted domains</string>
     <string name="domain_block_notification_channel">Domain blocks</string>
@@ -30,4 +31,6 @@
     <string name="status_pending">Awaiting admin approval</string>
     <string name="status_disconnected">Disconnected</string>
     <string name="agent_version_label">Agent version: %1$s</string>
+    <string name="managed_secondary_profile_status">This profile is managed by TimeKpr</string>
+    <string name="managed_secondary_profile_waiting">Waiting for the main profile to finish setup. Open TimeKpr on the primary account first.</string>
 </resources>

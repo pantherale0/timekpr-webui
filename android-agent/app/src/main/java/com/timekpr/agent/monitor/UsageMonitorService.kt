@@ -11,11 +11,18 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.IBinder
+import android.os.Process
 import androidx.core.app.NotificationCompat
 import com.timekpr.agent.R
 import com.timekpr.agent.TimeKprApplication
 import com.timekpr.agent.discovery.PackageChangeMonitor
+import com.timekpr.agent.admin.CrossUserStoreSync
+import com.timekpr.agent.admin.DeviceOwnerProvisioner
+import com.timekpr.agent.admin.SecondaryUserProvisioner
+import com.timekpr.agent.boot.SecondaryUserInitService
 import com.timekpr.agent.enforcement.EnforcementController
+import com.timekpr.agent.policy.PolicyPayloadPush
+import com.timekpr.agent.vpn.DomainBlockVpnService
 import com.timekpr.agent.policy.AppPolicyStore
 import com.timekpr.agent.util.AndroidUsers
 import kotlinx.coroutines.CoroutineScope
@@ -40,6 +47,8 @@ class UsageMonitorService : Service() {
     private lateinit var packageChangeMonitor: PackageChangeMonitor
     private val activeSessions = mutableMapOf<String, Long>()
     private val processedResumeKeys = LinkedHashSet<String>()
+    private var capabilityCheckCounter = 0
+    private var lastBootstrappedForegroundUser = -1
 
     override fun onCreate() {
         super.onCreate()
@@ -71,9 +80,21 @@ class UsageMonitorService : Service() {
 
         while (scope.isActive) {
             val activeUid = AndroidUsers.activeUserUid(this)
+            if (Process.myUid() / 100_000 == 0 && activeUid != 0 && activeUid != lastBootstrappedForegroundUser) {
+                lastBootstrappedForegroundUser = activeUid
+                CrossUserStoreSync.replicateFromPrimaryToUser(this, activeUid)
+                PolicyPayloadPush.pushToUser(this, activeUid, activeUid)
+                SecondaryUserInitService.startOnUser(this, activeUid)
+                userHandleForId(activeUid)?.let { handle ->
+                    sendBroadcastAsUser(Intent(DomainBlockVpnService.ACTION_RELOAD_POLICY), handle)
+                }
+            }
             val username = timeStore.getUsernameForUid(activeUid) ?: AndroidUsers.currentLinuxUsername(this)
             
             val userContext = AndroidUsers.getUserContext(this, activeUid) ?: this
+            if (++capabilityCheckCounter % 15 == 0) {
+                enforceManagedCapabilities(userContext)
+            }
             val usageStatsManager = userContext.getSystemService(UsageStatsManager::class.java)
 
             if (usageStatsManager != null) {
@@ -199,6 +220,31 @@ class UsageMonitorService : Service() {
             val appInfo = pm.getApplicationInfo(packageName, 0)
             pm.getApplicationLabel(appInfo)?.toString()
         } catch (_: PackageManager.NameNotFoundException) {
+            null
+        }
+    }
+
+    private fun enforceManagedCapabilities(userContext: Context) {
+        if (!SecondaryUserProvisioner.isManagedSecondaryUser(userContext) &&
+            !DeviceOwnerProvisioner.isDeviceOrProfileOwner(userContext)
+        ) {
+            return
+        }
+        if (SecondaryUserProvisioner.isManagedSecondaryUser(userContext)) {
+            CrossUserStoreSync.replicateFromPrimaryToCurrentUser(userContext)
+            TimeKprApplication.from(userContext).domainPolicyStore.restore()
+        }
+        if (!DeviceOwnerProvisioner.hasUsageAccess(userContext)) {
+            DeviceOwnerProvisioner.applyManagedCapabilities(userContext)
+        }
+        DomainBlockVpnService.reconcile(userContext)
+    }
+
+    private fun userHandleForId(userId: Int): android.os.UserHandle? {
+        return try {
+            val constructor = android.os.UserHandle::class.java.getConstructor(Int::class.javaPrimitiveType)
+            constructor.newInstance(userId) as android.os.UserHandle
+        } catch (_: Exception) {
             null
         }
     }

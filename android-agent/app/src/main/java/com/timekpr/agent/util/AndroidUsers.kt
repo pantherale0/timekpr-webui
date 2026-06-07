@@ -4,30 +4,80 @@ import android.app.admin.DevicePolicyManager
 import android.content.ComponentName
 import android.content.Context
 import android.os.Build
+import android.os.Process
 import android.os.UserHandle
 import android.os.UserManager
 import android.provider.Settings
 import android.util.Log
 import com.timekpr.agent.admin.TimeKprDeviceAdminReceiver
+import com.timekpr.agent.policy.ProfileProvisioningStore
 
 object AndroidUsers {
     private const val TAG = "AndroidUsers"
 
-    fun currentLinuxUsername(context: Context): String {
+    fun displayNameForUser(context: Context, userId: Int): String? {
+        ProfileProvisioningStore(context).displayNameForUserId(userId)?.let { return it }
         return try {
-            val userManager = context.getSystemService(UserManager::class.java)
-            userManager?.userName?.takeIf { it.isNotBlank() } ?: "android"
+            val userManager = context.getSystemService(UserManager::class.java) ?: return null
+            val getUserInfoMethod = UserManager::class.java.getMethod(
+                "getUserInfo",
+                Int::class.javaPrimitiveType,
+            )
+            val userInfo = getUserInfoMethod.invoke(userManager, userId) ?: return null
+            userInfo.javaClass.getField("name").get(userInfo) as? String
         } catch (_: Exception) {
-            "android"
+            null
         }
     }
 
-    fun currentLinuxUid(context: Context): Int {
+    fun currentLinuxUsername(context: Context): String {
+        val userId = Process.myUid() / 100_000
+        displayNameForUser(context, userId)?.let { return it }
         return try {
-            UserHandle.getUserHandleForUid(android.os.Process.myUid()).hashCode()
+            val userManager = context.getSystemService(UserManager::class.java)
+            userManager?.userName?.takeIf { it.isNotBlank() && !it.equals("android", ignoreCase = true) }
+                ?: "User $userId"
         } catch (_: Exception) {
-            android.os.Process.myUid()
+            "User $userId"
         }
+    }
+
+    fun currentLinuxUid(context: Context): Int = Process.myUid() / 100_000
+
+    /**
+     * Resolve the Android multi-user ID for [username] using provisioning registry,
+     * hello inventory, or an optional server hint. Avoids defaulting to user 0 when
+     * validating managed secondary profiles from the primary user's WebSocket session.
+     */
+    fun resolveUidForUsername(
+        context: Context,
+        username: String,
+        hintedUid: Int? = null,
+    ): Int {
+        val normalized = username.trim()
+        if (normalized.isEmpty()) {
+            return hintedUid?.takeIf { it >= 0 } ?: currentLinuxUid(context)
+        }
+
+        ProfileProvisioningStore(context).userIdFor(normalized)?.let { userId ->
+            if (userId >= 0) return userId
+        }
+
+        for (entry in linuxUsersPayload(context)) {
+            val reported = entry["username"] as? String ?: continue
+            if (reported.equals(normalized, ignoreCase = true)) {
+                val uid = (entry["uid"] as? Number)?.toInt()
+                if (uid != null && uid >= 0) return uid
+            }
+        }
+
+        if (hintedUid != null && hintedUid > 0) return hintedUid
+
+        if (normalized.equals(currentLinuxUsername(context), ignoreCase = true)) {
+            return currentLinuxUid(context)
+        }
+
+        return hintedUid ?: currentLinuxUid(context)
     }
 
     fun deviceHostname(context: Context): String {
@@ -140,21 +190,38 @@ object AndroidUsers {
             )
         }
 
-        return users
+        return applyProvisionedDisplayNames(context, users)
     }
 
-    fun activeUserUid(context: Context): Int {
-        return try {
-            val activityManager = context.getSystemService(android.app.ActivityManager::class.java)
-            val getCurrentUserMethod = android.app.ActivityManager::class.java.getMethod("getCurrentUser")
-            getCurrentUserMethod.invoke(activityManager) as? Int ?: 0
-        } catch (_: Exception) {
-            0
+    private fun applyProvisionedDisplayNames(
+        context: Context,
+        users: List<Map<String, Any>>,
+    ): List<Map<String, Any>> {
+        val store = ProfileProvisioningStore(context)
+        return users.map { user ->
+            val uid = (user["uid"] as? Number)?.toInt() ?: return@map user
+            val displayName = store.displayNameForUserId(uid) ?: return@map user
+            user.toMutableMap().apply { put("username", displayName) }
         }
     }
 
+    fun activeUserUid(context: Context): Int {
+        val callingUserId = Process.myUid() / 100_000
+        if (callingUserId == 0) {
+            return try {
+                val activityManager = context.getSystemService(android.app.ActivityManager::class.java)
+                val getCurrentUserMethod = android.app.ActivityManager::class.java.getMethod("getCurrentUser")
+                getCurrentUserMethod.invoke(activityManager) as? Int ?: callingUserId
+            } catch (_: Exception) {
+                callingUserId
+            }
+        }
+        return callingUserId
+    }
+
     fun getUserContext(context: Context, userId: Int): Context? {
-        if (userId == 0) return context
+        val currentUserId = Process.myUid() / 100_000
+        if (userId == currentUserId) return context
         return try {
             val constructor = UserHandle::class.java.getConstructor(Int::class.javaPrimitiveType)
             val userHandle = constructor.newInstance(userId)
@@ -162,11 +229,11 @@ object AndroidUsers {
                 "createPackageContextAsUser",
                 String::class.java,
                 Int::class.javaPrimitiveType,
-                UserHandle::class.java
+                UserHandle::class.java,
             )
             method.invoke(context, context.packageName, 0, userHandle) as? Context
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to create context for user $userId via reflection", e)
+            Log.e(TAG, "Failed to create context for user $userId", e)
             null
         }
     }

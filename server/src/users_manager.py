@@ -55,3 +55,40 @@ def _refresh_managed_user_summary(user):
         usage.time_spent = shared_spent
     else:
         db.session.add(UserTimeUsage(user_id=user.id, date=today, time_spent=shared_spent))
+
+
+def sync_mapping_linux_uids_from_device(device):
+    """
+    Match device-reported linux_users to mappings by username and update linux_uid.
+
+    Returns system_ids whose mappings had linux_uid changes.
+    """
+    if device is None or not device.linux_users:
+        return set()
+
+    uid_by_username = {}
+    for entry in device.linux_users:
+        if not isinstance(entry, dict):
+            continue
+        username = (entry.get('username') or '').strip()
+        uid = entry.get('uid')
+        if not username or uid is None:
+            continue
+        try:
+            uid_by_username[username.casefold()] = int(uid)
+        except (TypeError, ValueError):
+            continue
+
+    if not uid_by_username:
+        return set()
+
+    updated_system_ids = set()
+    for mapping in device.user_mappings:
+        key = (mapping.linux_username or '').casefold()
+        reported_uid = uid_by_username.get(key)
+        if reported_uid is None:
+            continue
+        if mapping.linux_uid != reported_uid:
+            mapping.linux_uid = reported_uid
+            updated_system_ids.add(mapping.system_id)
+    return updated_system_ids

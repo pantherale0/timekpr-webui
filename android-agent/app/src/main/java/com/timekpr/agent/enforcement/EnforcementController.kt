@@ -7,14 +7,19 @@ import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.os.Build
+import android.os.PersistableBundle
+import android.os.UserHandle
 import android.os.UserManager
+import android.provider.Settings
 import android.util.Log
 import com.timekpr.agent.TimeKprApplication
 import com.timekpr.agent.admin.DeviceOwnerProvisioner
+import com.timekpr.agent.admin.SecondaryUserProvisioner
 import com.timekpr.agent.admin.TimeKprDeviceAdminReceiver
 import com.timekpr.agent.monitor.UsageMonitorService
 import com.timekpr.agent.policy.AppPolicyStore
 import com.timekpr.agent.policy.DeviceRestrictionPolicy
+import com.timekpr.agent.policy.ProfileProvisioningStore
 import com.timekpr.agent.ui.TimeExhaustedOverlay
 import com.timekpr.agent.util.AndroidUsers
 import com.timekpr.agent.vpn.DomainBlockVpnService
@@ -167,7 +172,133 @@ class EnforcementController(
         if (!dpm.isAdminActive(adminComponent)) return
 
         val policy = TimeKprApplication.from(context).deviceRestrictionStore.policyForUser(username)
+
+        if (uid == 0) {
+            provisionProfiles(dpm, policy)
+        }
+
         applyDeviceRestrictionPolicy(dpm, policy)
+    }
+
+    private fun provisionProfiles(dpm: DevicePolicyManager, policy: DeviceRestrictionPolicy) {
+        if (!DeviceOwnerProvisioner.isDeviceOrProfileOwner(context)) return
+        SecondaryUserProvisioner.ensurePrimaryAffiliation(context)
+
+        val provisioningStore = ProfileProvisioningStore(context)
+        val existingUsers = AndroidUsers.linuxUsersPayload(context)
+        val activeUserIds = existingUsers.mapNotNull { (it["uid"] as? Number)?.toInt() }.toSet()
+        provisioningStore.prune(activeUserIds)
+
+        val adminExtras = PersistableBundle().apply {
+            putString(SecondaryUserProvisioner.AFFILIATION_ID, SecondaryUserProvisioner.AFFILIATION_ID)
+        }
+
+        for (profile in policy.profiles) {
+            val existsByRegistry = provisioningStore.isProvisioned(profile.username, activeUserIds)
+            val existsByReportedName = existingUsers.any {
+                (it["username"] as? String)?.equals(profile.username, ignoreCase = true) == true
+            }
+            if (existsByRegistry || existsByReportedName) {
+                continue
+            }
+            try {
+                Log.i(TAG, "Provisioning profile on device: username=${profile.username}, type=${profile.profileType}")
+                val flags = buildCreateUserFlags(profile.profileType)
+                val userHandle = dpm.createAndManageUser(
+                    adminComponent,
+                    profile.username,
+                    adminComponent,
+                    adminExtras,
+                    flags,
+                )
+                if (userHandle != null) {
+                    val userId = userHandleIdentifier(userHandle)
+                    provisioningStore.record(profile.username, userId)
+                    Log.i(TAG, "Successfully created user $userHandle (id=$userId)")
+                    startProvisionedUserInBackground(dpm, userHandle, userId, profile.profileType)
+                    SecondaryUserProvisioner.setupProvisionedUser(context, userId)
+                    if (profile.profileType == "restricted") {
+                        applyRestrictedProfileDefaults(userHandle)
+                    }
+                } else {
+                    Log.e(TAG, "Failed to create user (returned null)")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error provisioning profile: ${profile.username}", e)
+            }
+        }
+    }
+
+    private fun buildCreateUserFlags(profileType: String): Int {
+        var flags = 0
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            flags = flags or DevicePolicyManager.LEAVE_ALL_SYSTEM_APPS_ENABLED
+        }
+        // Standard users must run the system setup wizard on first switch; skipping it
+        // leaves SystemUI/navigation in a broken state on many OEM builds.
+        if (profileType == "restricted" && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            flags = flags or DevicePolicyManager.SKIP_SETUP_WIZARD
+        }
+        return flags
+    }
+
+    private fun startProvisionedUserInBackground(
+        dpm: DevicePolicyManager,
+        userHandle: UserHandle,
+        userId: Int,
+        profileType: String,
+    ) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) return
+        try {
+            val result = dpm.startUserInBackground(adminComponent, userHandle)
+            Log.i(TAG, "startUserInBackground(user=$userId) result=$result")
+            if (profileType == "restricted") {
+                finalizeUserSetup(userId)
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to start provisioned user $userId in background", e)
+        }
+    }
+
+    private fun finalizeUserSetup(userId: Int) {
+        val userContext = AndroidUsers.getUserContext(context, userId) ?: return
+        try {
+            Settings.Secure.putInt(
+                userContext.contentResolver,
+                USER_SETUP_COMPLETE,
+                1,
+            )
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to mark user setup complete for user $userId", e)
+        }
+    }
+
+    private fun applyRestrictedProfileDefaults(userHandle: UserHandle) {
+        val userId = userHandleIdentifier(userHandle)
+        val userContext = AndroidUsers.getUserContext(context, userId) ?: return
+        val dpm = userContext.getSystemService(DevicePolicyManager::class.java) ?: return
+        if (!dpm.isAdminActive(adminComponent)) return
+
+        val restrictedDefaults = listOf(
+            UserManager.DISALLOW_INSTALL_APPS,
+            UserManager.DISALLOW_UNINSTALL_APPS,
+            UserManager.DISALLOW_APPS_CONTROL,
+            UserManager.DISALLOW_MODIFY_ACCOUNTS,
+            UserManager.DISALLOW_FACTORY_RESET,
+            UserManager.DISALLOW_USB_FILE_TRANSFER,
+        )
+        restrictedDefaults.forEach { restriction ->
+            setUserRestriction(dpm, restriction, true)
+        }
+    }
+
+    private fun userHandleIdentifier(userHandle: UserHandle): Int {
+        return try {
+            val method = UserHandle::class.java.getMethod("getIdentifier")
+            method.invoke(userHandle) as? Int ?: userHandle.hashCode()
+        } catch (_: Exception) {
+            userHandle.hashCode()
+        }
     }
 
     private fun applyDeviceRestrictionPolicy(dpm: DevicePolicyManager, policy: DeviceRestrictionPolicy) {
@@ -302,5 +433,6 @@ class EnforcementController(
         private const val TAG = "EnforcementController"
         private const val PREFS_NAME = "timekpr_enforcement"
         private const val KEY_TIME_EXHAUSTION_SUSPENDED = "time_exhaustion_suspended"
+        private const val USER_SETUP_COMPLETE = "user_setup_complete"
     }
 }

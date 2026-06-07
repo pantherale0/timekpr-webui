@@ -752,6 +752,49 @@ def test_websocket_handshake_unpaired_approved_device(app, db_session):
     assert json.loads(ws_flow.sent_messages[1])['type'] == "auth_result"
     assert json.loads(ws_flow.sent_messages[1])['success'] is True
 
+    android_system_id = "android-persistent-ws"
+    android_token = "android-persistent-token"
+    android_device = AgentDevice(
+        system_id=android_system_id,
+        status="approved",
+        secure_token=android_token,
+        platform='android',
+        fcm_token='device-fcm-token',
+    )
+    db_session.add(android_device)
+    db_session.commit()
+
+    android_hello = json.dumps({
+        "type": "hello",
+        "system_id": android_system_id,
+        "agent_version": "v0.10",
+        "platform": "android",
+        "fcm_token": "device-fcm-token",
+    })
+
+    class AndroidFlowWS(MockWS):
+        def send(self, data):
+            super().send(data)
+            payload = json.loads(data)
+            if payload.get("type") == "challenge":
+                challenge = payload.get("challenge")
+                token_bytes = android_token.encode('utf-8')
+                msg = (challenge + android_system_id).encode('utf-8')
+                signature = hmac.new(token_bytes, msg, hashlib.sha256).hexdigest()
+                self.messages.append(json.dumps({
+                    "type": "register",
+                    "signature": signature,
+                }))
+
+    android_ws = AndroidFlowWS([android_hello])
+    with app.test_request_context('/ws', environ_base={'REMOTE_ADDR': '127.0.0.1'}):
+        ws_agent_handler(android_ws)
+
+    android_auth = json.loads(android_ws.sent_messages[1])
+    assert android_auth['type'] == "auth_result"
+    assert android_auth['success'] is True
+    assert android_auth.get('persistent_connection') is True
+
     stored_alert = AgentAlert.query.filter_by(system_id=system_id, event_type='system_startup').first()
     assert stored_alert is not None
     assert stored_alert.delivery_status == AgentAlert.DELIVERY_DISABLED
