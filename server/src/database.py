@@ -186,6 +186,14 @@ class AgentDevice(db.Model):
     )
 
     @property
+    def has_managed_profiles(self):
+        """Check if this device has at least one user mapping with a managed profile type."""
+        return any(
+            m.android_profile_type in ('restricted', 'standard')
+            for m in self.user_mappings
+        )
+
+    @property
     def linux_users(self):
         """Parse stored JSON user list into a list of dictionaries."""
         if not self.linux_users_json:

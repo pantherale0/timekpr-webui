@@ -540,6 +540,7 @@ def device_detail(system_id):
         fcm_available=bool((device.fcm_token or '').strip()),
         parental_access_code=parental_access_code,
         android_recovery_ws_url=android_recovery_ws_url,
+        has_managed_profiles=device.has_managed_profiles,
     )
 
 

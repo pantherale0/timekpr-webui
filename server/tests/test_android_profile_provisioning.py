@@ -3,7 +3,7 @@
 import pytest
 
 from src.agent_push import update_device_push_metadata
-from src.database import AgentDevice, ManagedUser, ManagedUserDeviceMap
+from src.database import AgentDevice, ManagedUser, ManagedUserDeviceMap, Settings
 from src.users_manager import sync_mapping_linux_uids_from_device
 
 
@@ -131,3 +131,66 @@ def test_sync_mapping_linux_uids_leaves_unmatched_mappings(db_session, android_d
     updated = sync_mapping_linux_uids_from_device(android_device)
     assert updated == set()
     assert mapping.linux_uid is None
+
+
+def test_agent_device_has_managed_profiles_property(db_session, android_device):
+    # Initially no mappings, so has_managed_profiles should be False
+    assert android_device.has_managed_profiles is False
+
+    # Add a standard mapping without profile type
+    user = ManagedUser(username='child-standard', system_ip='Unassigned', is_valid=True)
+    db_session.add(user)
+    db_session.flush()
+    mapping_standard = ManagedUserDeviceMap(
+        managed_user_id=user.id,
+        system_id=android_device.system_id,
+        linux_username='child_std',
+        is_valid=True,
+    )
+    db_session.add(mapping_standard)
+    db_session.commit()
+    assert android_device.has_managed_profiles is False
+
+    # Add a mapping with android_profile_type = 'restricted'
+    user_restricted = ManagedUser(username='child-restricted', system_ip='Unassigned', is_valid=True)
+    db_session.add(user_restricted)
+    db_session.flush()
+    mapping_restricted = ManagedUserDeviceMap(
+        managed_user_id=user_restricted.id,
+        system_id=android_device.system_id,
+        linux_username='child_res',
+        is_valid=True,
+        android_profile_type='restricted',
+    )
+    db_session.add(mapping_restricted)
+    db_session.commit()
+    assert android_device.has_managed_profiles is True
+
+
+def test_device_detail_locked_device_recovery_conditional_rendering(auth_client, android_device, db_session):
+    # Log in first
+    Settings.set_admin_password("admin")
+    auth_client.post('/', data={'username': 'admin', 'password': 'admin'})
+
+    # Case 1: No managed profiles. The recovery card should not be in the rendered HTML.
+    res = auth_client.get(f'/devices/{android_device.system_id}')
+    assert res.status_code == 200
+    assert b"Locked Device Recovery" not in res.data
+
+    # Case 2: Using managed profiles. The recovery card should be present.
+    user = ManagedUser(username='child-res-ui', system_ip='Unassigned', is_valid=True)
+    db_session.add(user)
+    db_session.flush()
+    mapping = ManagedUserDeviceMap(
+        managed_user_id=user.id,
+        system_id=android_device.system_id,
+        linux_username='child_res_ui',
+        is_valid=True,
+        android_profile_type='restricted',
+    )
+    db_session.add(mapping)
+    db_session.commit()
+
+    res = auth_client.get(f'/devices/{android_device.system_id}')
+    assert res.status_code == 200
+    assert b"Locked Device Recovery" in res.data

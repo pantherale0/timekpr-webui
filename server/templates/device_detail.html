@@ -8,9 +8,9 @@
     <div>
         <h1 class="fw-bold mb-1" style="font-size: 2.25rem; font-weight: 800; letter-spacing: -0.025em;">
             {% if device.platform == 'android' %}
-                <i class="fab fa-android text-success me-1"></i>
+            <i class="fab fa-android text-success me-1"></i>
             {% else %}
-                <i class="fab fa-linux text-secondary me-1"></i>
+            <i class="fab fa-linux text-secondary me-1"></i>
             {% endif %}
             {{ device_label }}
         </h1>
@@ -31,28 +31,34 @@
         <!-- System ID -->
         <div class="col-12 col-sm-6 col-md-3">
             <div class="card border shadow-sm h-100 text-center p-3">
-                <span class="text-secondary small fw-bold text-uppercase d-block mb-1" style="font-size: 0.7rem; letter-spacing: 0.05em;">System ID</span>
-                <strong class="small text-body font-monospace text-truncate d-block" title="{{ device.system_id }}">{{ device.system_id }}</strong>
+                <span class="text-secondary small fw-bold text-uppercase d-block mb-1"
+                    style="font-size: 0.7rem; letter-spacing: 0.05em;">System ID</span>
+                <strong class="small text-body font-monospace text-truncate d-block" title="{{ device.system_id }}">{{
+                    device.system_id }}</strong>
             </div>
         </div>
         <!-- Trust Status -->
         <div class="col-12 col-sm-6 col-md-3">
             <div class="card border shadow-sm h-100 text-center p-3">
-                <span class="text-secondary small fw-bold text-uppercase d-block mb-1" style="font-size: 0.7rem; letter-spacing: 0.05em;">Trust Status</span>
+                <span class="text-secondary small fw-bold text-uppercase d-block mb-1"
+                    style="font-size: 0.7rem; letter-spacing: 0.05em;">Trust Status</span>
                 <strong class="fs-4 text-success d-block lh-1 fw-bold">{{ device.status|title }}</strong>
             </div>
         </div>
         <!-- IP Address -->
         <div class="col-12 col-sm-6 col-md-3">
             <div class="card border shadow-sm h-100 text-center p-3">
-                <span class="text-secondary small fw-bold text-uppercase d-block mb-1" style="font-size: 0.7rem; letter-spacing: 0.05em;">Last IP Address</span>
-                <code class="fs-4 text-body d-block lh-1 fw-bold" style="font-family: monospace;">{{ device.system_ip or 'Offline' }}</code>
+                <span class="text-secondary small fw-bold text-uppercase d-block mb-1"
+                    style="font-size: 0.7rem; letter-spacing: 0.05em;">Last IP Address</span>
+                <code class="fs-4 text-body d-block lh-1 fw-bold"
+                    style="font-family: monospace;">{{ device.system_ip or 'Offline' }}</code>
             </div>
         </div>
         <!-- Host Logs Alert count -->
         <div class="col-12 col-sm-6 col-md-3">
             <div class="card border shadow-sm h-100 text-center p-3">
-                <span class="text-secondary small fw-bold text-uppercase d-block mb-1" style="font-size: 0.7rem; letter-spacing: 0.05em;">Host Logs</span>
+                <span class="text-secondary small fw-bold text-uppercase d-block mb-1"
+                    style="font-size: 0.7rem; letter-spacing: 0.05em;">Host Logs</span>
                 <strong class="fs-4 text-warning d-block lh-1 fw-bold">{{ alert_summary.total }} alerts</strong>
             </div>
         </div>
@@ -64,341 +70,459 @@
             <!-- Linked Accounts -->
             <div class="card shadow-sm border mb-4">
                 <div class="card-header bg-body-secondary py-3 d-flex align-items-center gap-2">
-                    <div class="bg-primary-subtle text-primary p-2 rounded d-flex align-items-center justify-content-center" style="width: 38px; height: 38px;">
+                    <div class="bg-primary-subtle text-primary p-2 rounded d-flex align-items-center justify-content-center"
+                        style="width: 38px; height: 38px;">
                         <i class="fas fa-users-cog fs-5"></i>
                     </div>
                     <h5 class="mb-0 fw-bold">Linked Managed Accounts</h5>
                 </div>
                 <div class="card-body">
                     {% if mapped_accounts %}
-                        <div class="d-flex flex-column gap-2">
-                            {% for mapping in mapped_accounts %}
-                                <div class="border rounded p-3 bg-body-secondary d-flex justify-content-between align-items-center flex-wrap gap-3">
-                                    <div>
-                                        <div class="fw-bold fs-5 text-body">
-                                            {{ mapping.managed_user.username }} &rarr; {{ mapping.linux_username }}
-                                        </div>
-                                        <div class="text-secondary small fw-semibold mt-1">
-                                            Linux UID: {{ mapping.linux_uid if mapping.linux_uid is not none else 'Unassigned' }}
-                                            <span class="badge {% if mapping.is_valid %}bg-success-subtle text-success border border-success-subtle{% else %}bg-warning-subtle text-warning border border-warning-subtle{% endif %} ms-2 px-2 py-0.5" style="font-size: 0.7rem;">
-                                                {{ 'Verified' if mapping.is_valid else 'Pending Check' }}
-                                            </span>
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <a href="{{ url_for('ui_dashboard.edit_user_profile', user_id=mapping.managed_user.id) }}" class="btn btn-sm btn-outline-primary fw-bold">
-                                            <i class="fas fa-shield-alt me-1"></i> Application Policies
-                                        </a>
-                                    </div>
+                    <div class="d-flex flex-column gap-2">
+                        {% for mapping in mapped_accounts %}
+                        <div
+                            class="border rounded p-3 bg-body-secondary d-flex justify-content-between align-items-center flex-wrap gap-3">
+                            <div>
+                                <div class="fw-bold fs-5 text-body">
+                                    {{ mapping.managed_user.username }} &rarr; {{ mapping.linux_username }}
                                 </div>
-                            {% endfor %}
+                                <div class="text-secondary small fw-semibold mt-1">
+                                    Linux UID: {{ mapping.linux_uid if mapping.linux_uid is not none else 'Unassigned'
+                                    }}
+                                    <span
+                                        class="badge {% if mapping.is_valid %}bg-success-subtle text-success border border-success-subtle{% else %}bg-warning-subtle text-warning border border-warning-subtle{% endif %} ms-2 px-2 py-0.5"
+                                        style="font-size: 0.7rem;">
+                                        {{ 'Verified' if mapping.is_valid else 'Pending Check' }}
+                                    </span>
+                                </div>
+                            </div>
+                            <div>
+                                <a href="{{ url_for('ui_dashboard.edit_user_profile', user_id=mapping.managed_user.id) }}"
+                                    class="btn btn-sm btn-outline-primary fw-bold">
+                                    <i class="fas fa-shield-alt me-1"></i> Application Policies
+                                </a>
+                            </div>
                         </div>
+                        {% endfor %}
+                    </div>
                     {% else %}
-                        <div class="text-center text-secondary py-3">
-                            <i class="fas fa-user-slash fs-4 mb-2"></i>
-                            <p class="mb-0 small fw-semibold">No accounts mapped to this device yet.</p>
-                        </div>
+                    <div class="text-center text-secondary py-3">
+                        <i class="fas fa-user-slash fs-4 mb-2"></i>
+                        <p class="mb-0 small fw-semibold">No accounts mapped to this device yet.</p>
+                    </div>
                     {% endif %}
                 </div>
             </div>
 
             {% if device.platform == 'android' %}
-                {% if device.is_device_owner %}
-                    <!-- Android Device Policy Form Card -->
-                    <div class="card shadow-sm border mb-4">
-                        <div class="card-header bg-body-secondary py-3 d-flex align-items-center justify-content-between flex-wrap gap-2">
-                            <div class="d-flex align-items-center gap-2">
-                                <div class="bg-success-subtle text-success p-2 rounded d-flex align-items-center justify-content-center" style="width: 38px; height: 38px;">
-                                    <i class="fab fa-android fs-5"></i>
-                                </div>
-                                <div>
-                                    <h5 class="mb-0 fw-bold">Android Device Policy</h5>
-                                    <span class="text-secondary small fw-medium">Manage hardware access, system settings, and restrictions.</span>
-                                </div>
-                            </div>
-                            <div>
-                                <span id="policy-sync-badge" class="badge {% if android_device_policy and android_device_policy.is_synced %}bg-success-subtle text-success border border-success-subtle{% else %}bg-warning-subtle text-warning border border-warning-subtle{% endif %} px-2.5 py-1.5 fw-bold" style="font-size: 0.75rem;">
-                                    {% if android_device_policy and android_device_policy.is_synced %}
-                                        <i class="fas fa-check-circle me-1"></i> Synced to Device
-                                    {% else %}
-                                        <i class="fas fa-sync me-1"></i> Sync Pending
-                                    {% endif %}
-                                </span>
-                            </div>
+            {% if device.is_device_owner %}
+            <!-- Android Device Policy Form Card -->
+            <div class="card shadow-sm border mb-4">
+                <div
+                    class="card-header bg-body-secondary py-3 d-flex align-items-center justify-content-between flex-wrap gap-2">
+                    <div class="d-flex align-items-center gap-2">
+                        <div class="bg-success-subtle text-success p-2 rounded d-flex align-items-center justify-content-center"
+                            style="width: 38px; height: 38px;">
+                            <i class="fab fa-android fs-5"></i>
                         </div>
-                        <div class="card-body">
-                            <form id="android-policy-form" class="needs-validation" novalidate>
-                                <!-- Success/Error Alert -->
-                                <div id="policy-alert" class="alert d-none mb-3" role="alert"></div>
-
-                                <!-- Category: Hardware & Connectivity -->
-                                <h6 class="fw-bold text-secondary text-uppercase mb-3 pb-1 border-bottom" style="font-size: 0.75rem; letter-spacing: 0.05em;">
-                                    <i class="fas fa-microchip me-1 text-primary"></i> Hardware & Connectivity
-                                </h6>
-                                <div class="row g-3 mb-4">
-                                    <div class="col-12 col-md-6">
-                                        <label class="form-label fw-bold text-body small" for="camera_access">Camera Access</label>
-                                        <select id="camera_access" name="camera_access" class="form-select form-select-sm">
-                                            <option value="CAMERA_ACCESS_UNSPECIFIED" {% if android_device_policy and android_device_policy.camera_access == 'CAMERA_ACCESS_UNSPECIFIED' %}selected{% endif %}>Unspecified (Default)</option>
-                                            <option value="CAMERA_ACCESS_DISABLED" {% if android_device_policy and android_device_policy.camera_access == 'CAMERA_ACCESS_DISABLED' %}selected{% endif %}>Disabled</option>
-                                            <option value="CAMERA_ACCESS_USER_CHOICE" {% if android_device_policy and android_device_policy.camera_access == 'CAMERA_ACCESS_USER_CHOICE' %}selected{% endif %}>User Choice</option>
-                                            <option value="CAMERA_ACCESS_ENFORCED" {% if android_device_policy and android_device_policy.camera_access == 'CAMERA_ACCESS_ENFORCED' %}selected{% endif %}>Enforced</option>
-                                        </select>
-                                    </div>
-                                    <div class="col-12 col-md-6">
-                                        <label class="form-label fw-bold text-body small" for="microphone_access">Microphone Access</label>
-                                        <select id="microphone_access" name="microphone_access" class="form-select form-select-sm">
-                                            <option value="MICROPHONE_ACCESS_UNSPECIFIED" {% if android_device_policy and android_device_policy.microphone_access == 'MICROPHONE_ACCESS_UNSPECIFIED' %}selected{% endif %}>Unspecified (Default)</option>
-                                            <option value="MICROPHONE_ACCESS_DISABLED" {% if android_device_policy and android_device_policy.microphone_access == 'MICROPHONE_ACCESS_DISABLED' %}selected{% endif %}>Disabled</option>
-                                            <option value="MICROPHONE_ACCESS_USER_CHOICE" {% if android_device_policy and android_device_policy.microphone_access == 'MICROPHONE_ACCESS_USER_CHOICE' %}selected{% endif %}>User Choice</option>
-                                            <option value="MICROPHONE_ACCESS_ENFORCED" {% if android_device_policy and android_device_policy.microphone_access == 'MICROPHONE_ACCESS_ENFORCED' %}selected{% endif %}>Enforced</option>
-                                        </select>
-                                    </div>
-                                    <div class="col-12 col-md-6">
-                                        <label class="form-label fw-bold text-body small" for="usb_data_access">USB Data Access</label>
-                                        <select id="usb_data_access" name="usb_data_access" class="form-select form-select-sm">
-                                            <option value="USB_DATA_ACCESS_UNSPECIFIED" {% if android_device_policy and android_device_policy.usb_data_access == 'USB_DATA_ACCESS_UNSPECIFIED' %}selected{% endif %}>Unspecified (Default)</option>
-                                            <option value="ALLOW_USB_DATA_TRANSFER" {% if android_device_policy and android_device_policy.usb_data_access == 'ALLOW_USB_DATA_TRANSFER' %}selected{% endif %}>Allow USB Data Transfer</option>
-                                            <option value="DISALLOW_USB_FILE_TRANSFER" {% if android_device_policy and android_device_policy.usb_data_access == 'DISALLOW_USB_FILE_TRANSFER' %}selected{% endif %}>Disallow USB File Transfer (Charge Only)</option>
-                                            <option value="DISALLOW_USB_DATA_TRANSFER" {% if android_device_policy and android_device_policy.usb_data_access == 'DISALLOW_USB_DATA_TRANSFER' %}selected{% endif %}>Disallow USB Data Transfer Completely</option>
-                                        </select>
-                                    </div>
-                                    <div class="col-12 col-md-6 col-lg-4 d-flex align-items-center mt-auto pb-1">
-                                        <div class="form-check form-switch">
-                                            <input class="form-check-input" type="checkbox" id="bluetooth_disabled" name="bluetooth_disabled" {% if android_device_policy and android_device_policy.bluetooth_disabled %}checked{% endif %}>
-                                            <label class="form-check-label fw-bold text-body small" for="bluetooth_disabled">Disable Bluetooth</label>
-                                        </div>
-                                    </div>
-                                    <div class="col-12 col-md-6 col-lg-4 d-flex align-items-center mt-auto pb-1">
-                                        <div class="form-check form-switch">
-                                            <input class="form-check-input" type="checkbox" id="block_nfc" name="block_nfc" {% if android_device_policy and android_device_policy.block_nfc %}checked{% endif %}>
-                                            <label class="form-check-label fw-bold text-body small" for="block_nfc">Block NFC</label>
-                                        </div>
-                                    </div>
-                                    <div class="col-12 col-md-6 col-lg-4 d-flex align-items-center mt-auto pb-1">
-                                        <div class="form-check form-switch">
-                                            <input class="form-check-input" type="checkbox" id="mount_physical_media_disabled" name="mount_physical_media_disabled" {% if android_device_policy and android_device_policy.mount_physical_media_disabled %}checked{% endif %}>
-                                            <label class="form-check-label fw-bold text-body small" for="mount_physical_media_disabled">Disable SD Card/External Drive</label>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <!-- Category: System Security -->
-                                <h6 class="fw-bold text-secondary text-uppercase mb-3 pb-1 border-bottom" style="font-size: 0.75rem; letter-spacing: 0.05em;">
-                                    <i class="fas fa-shield-alt me-1 text-primary"></i> System Security
-                                </h6>
-                                <div class="row g-3 mb-4">
-                                    <div class="col-12 col-md-6">
-                                        <label class="form-label fw-bold text-body small" for="developer_settings">Developer Options</label>
-                                        <select id="developer_settings" name="developer_settings" class="form-select form-select-sm">
-                                            <option value="DEVELOPER_SETTINGS_UNSPECIFIED" {% if android_device_policy and android_device_policy.developer_settings == 'DEVELOPER_SETTINGS_UNSPECIFIED' %}selected{% endif %}>Unspecified (Default)</option>
-                                            <option value="DEVELOPER_SETTINGS_DISABLED" {% if android_device_policy and android_device_policy.developer_settings == 'DEVELOPER_SETTINGS_DISABLED' %}selected{% endif %}>Disabled</option>
-                                            <option value="DEVELOPER_SETTINGS_ALLOWED" {% if android_device_policy and android_device_policy.developer_settings == 'DEVELOPER_SETTINGS_ALLOWED' %}selected{% endif %}>Allowed</option>
-                                        </select>
-                                    </div>
-                                    <div class="col-12 col-md-6 col-lg-4 d-flex align-items-center mt-auto pb-1">
-                                        <div class="form-check form-switch">
-                                            <input class="form-check-input" type="checkbox" id="factory_reset_disabled" name="factory_reset_disabled" {% if android_device_policy and android_device_policy.factory_reset_disabled %}checked{% endif %}>
-                                            <label class="form-check-label fw-bold text-body small" for="factory_reset_disabled">Disable Factory Reset</label>
-                                        </div>
-                                    </div>
-                                    <div class="col-12 col-md-6 col-lg-4 d-flex align-items-center mt-auto pb-1">
-                                        <div class="form-check form-switch">
-                                            <input class="form-check-input" type="checkbox" id="modify_accounts_disabled" name="modify_accounts_disabled" {% if android_device_policy and android_device_policy.modify_accounts_disabled %}checked{% endif %}>
-                                            <label class="form-check-label fw-bold text-body small" for="modify_accounts_disabled">Disable Accounts Mod</label>
-                                        </div>
-                                    </div>
-                                    <div class="col-12 col-md-6 col-lg-4 d-flex align-items-center mt-auto pb-1">
-                                        <div class="form-check form-switch">
-                                            <input class="form-check-input" type="checkbox" id="screen_capture_disabled" name="screen_capture_disabled" {% if android_device_policy and android_device_policy.screen_capture_disabled %}checked{% endif %}>
-                                            <label class="form-check-label fw-bold text-body small" for="screen_capture_disabled">Disable Screenshots</label>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <!-- Category: Applications & Control -->
-                                <h6 class="fw-bold text-secondary text-uppercase mb-3 pb-1 border-bottom" style="font-size: 0.75rem; letter-spacing: 0.05em;">
-                                    <i class="fas fa-mobile-alt me-1 text-primary"></i> Applications & Control
-                                </h6>
-                                <div class="row g-3 mb-4">
-                                    <div class="col-12 col-md-6 col-lg-4">
-                                        <div class="form-check form-switch">
-                                            <input class="form-check-input" type="checkbox" id="install_apps_disabled" name="install_apps_disabled" {% if android_device_policy and android_device_policy.install_apps_disabled %}checked{% endif %}>
-                                            <label class="form-check-label fw-bold text-body small" for="install_apps_disabled">Disable App Installation</label>
-                                        </div>
-                                    </div>
-                                    <div class="col-12 col-md-6 col-lg-4">
-                                        <div class="form-check form-switch">
-                                            <input class="form-check-input" type="checkbox" id="uninstall_apps_disabled" name="uninstall_apps_disabled" {% if android_device_policy and android_device_policy.uninstall_apps_disabled %}checked{% endif %}>
-                                            <label class="form-check-label fw-bold text-body small" for="uninstall_apps_disabled">Disable App Uninstallation</label>
-                                        </div>
-                                    </div>
-                                    <div class="col-12 col-md-6 col-lg-4">
-                                        <div class="form-check form-switch">
-                                            <input class="form-check-input" type="checkbox" id="adjust_volume_disabled" name="adjust_volume_disabled" {% if android_device_policy and android_device_policy.adjust_volume_disabled %}checked{% endif %}>
-                                            <label class="form-check-label fw-bold text-body small" for="adjust_volume_disabled">Disable Volume Adjustment</label>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <!-- Category: Call & Network Controls -->
-                                <h6 class="fw-bold text-secondary text-uppercase mb-3 pb-1 border-bottom" style="font-size: 0.75rem; letter-spacing: 0.05em;">
-                                    <i class="fas fa-phone me-1 text-primary"></i> Call & Network Controls
-                                </h6>
-                                <div class="row g-3 mb-4">
-                                    <div class="col-12 col-md-6 col-lg-4">
-                                        <div class="form-check form-switch">
-                                            <input class="form-check-input" type="checkbox" id="outgoing_calls_disabled" name="outgoing_calls_disabled" {% if android_device_policy and android_device_policy.outgoing_calls_disabled %}checked{% endif %}>
-                                            <label class="form-check-label fw-bold text-body small" for="outgoing_calls_disabled">Disable Outgoing Phone Calls</label>
-                                        </div>
-                                    </div>
-                                    <div class="col-12 col-md-6 col-lg-4">
-                                        <div class="form-check form-switch">
-                                            <input class="form-check-input" type="checkbox" id="sms_disabled" name="sms_disabled" {% if android_device_policy and android_device_policy.sms_disabled %}checked{% endif %}>
-                                            <label class="form-check-label fw-bold text-body small" for="sms_disabled">Disable SMS (Text Messages)</label>
-                                        </div>
-                                    </div>
-                                    <div class="col-12 col-md-6 col-lg-4">
-                                        <div class="form-check form-switch">
-                                            <input class="form-check-input" type="checkbox" id="block_wifi_tethering" name="block_wifi_tethering" {% if android_device_policy and android_device_policy.block_wifi_tethering %}checked{% endif %}>
-                                            <label class="form-check-label fw-bold text-body small" for="block_wifi_tethering">Disable Wi-Fi Hotspot</label>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <!-- Category: Support Message -->
-                                <h6 class="fw-bold text-secondary text-uppercase mb-3 pb-1 border-bottom" style="font-size: 0.75rem; letter-spacing: 0.05em;">
-                                    <i class="fas fa-comment-dots me-1 text-primary"></i> Support Message
-                                </h6>
-                                <div class="mb-3">
-                                    <label class="form-label fw-bold text-body small" for="short_support_message">Short Support Message</label>
-                                    <input type="text" class="form-control form-control-sm" id="short_support_message" name="short_support_message" 
-                                           maxlength="200" required
-                                           value="{{ android_device_policy.short_support_message if android_device_policy else 'This setting is managed by your parent through TimeKpr.' }}">
-                                    <div class="form-text small text-secondary" style="font-size: 0.75rem;">Shown when a restricted setting is blocked (e.g., in Settings). Max 200 chars.</div>
-                                </div>
-                                <div class="mb-4">
-                                    <label class="form-label fw-bold text-body small" for="long_support_message">Long Support Message</label>
-                                    <textarea class="form-control form-control-sm" id="long_support_message" name="long_support_message" 
-                                              rows="3" maxlength="4096" required>{{ android_device_policy.long_support_message if android_device_policy else 'This device is protected by TimeKpr parental controls. Your parent manages screen time, apps, and websites. Ask them if you need something changed.' }}</textarea>
-                                    <div class="form-text small text-secondary" style="font-size: 0.75rem;">Shown in the Device Administrator details screen. Max 4096 chars.</div>
-                                </div>
-
-                                <!-- Save Action -->
-                                <div class="d-flex justify-content-end">
-                                    <button type="submit" id="save-policy-btn" class="btn btn-primary fw-bold">
-                                        <i class="fas fa-save me-1"></i> Save Restrictions
-                                    </button>
-                                </div>
-                            </form>
+                        <div>
+                            <h5 class="mb-0 fw-bold">Android Device Policy</h5>
+                            <span class="text-secondary small fw-medium">Manage hardware access, system settings, and
+                                restrictions.</span>
                         </div>
                     </div>
-                {% else %}
-                    <!-- Android Device Owner Enrollment Instructions Card -->
-                    <div class="card shadow-sm border border-warning mb-4">
-                        <div class="card-header bg-warning-subtle py-3 d-flex align-items-center gap-2">
-                            <div class="bg-warning text-dark p-2 rounded d-flex align-items-center justify-content-center" style="width: 38px; height: 38px;">
-                                <i class="fas fa-shield-alt fs-5"></i>
-                            </div>
-                            <div>
-                                <h5 class="mb-0 fw-bold text-warning-emphasis">Unlocking Advanced Restrictions</h5>
-                                <span class="text-secondary small fw-medium">TimeKpr needs Device Owner (DO) permission for these controls.</span>
-                            </div>
-                        </div>
-                        <div class="card-body">
-                            <p class="small text-secondary mb-3">
-                                Enforcing hardware limitations, preventing uninstall, and automatically provisioning child user accounts requires the TimeKpr agent to be set as <strong>Device Owner</strong>.
-                            </p>
-                            
-                            <h6 class="fw-bold small text-body mb-2">To provision via ADB:</h6>
-                            <ol class="small text-secondary mb-3 ps-3">
-                                <li>Enable <strong>Developer Options</strong> and <strong>USB Debugging</strong> on the child's device.</li>
-                                <li>Remove all existing user accounts from the device under <em>Settings &rarr; Passwords &amp; Accounts</em>.</li>
-                                <li>Connect the device to a computer and execute the following terminal command:</li>
-                            </ol>
-                            <div class="p-3 border rounded bg-body-secondary mb-3">
-                                <code class="d-block text-break font-monospace small" style="user-select: all;">adb shell dpm set-device-owner com.timekpr.agent/.admin.TimeKprDeviceAdminReceiver</code>
-                            </div>
-                            
-                            <p class="small text-secondary mb-0">
-                                <i class="fas fa-info-circle me-1 text-primary"></i> Once successfully executed, restart the TimeKpr agent. The Device Owner status will refresh and unlock these restrictions.
-                            </p>
-                        </div>
+                    <div>
+                        <span id="policy-sync-badge"
+                            class="badge {% if android_device_policy and android_device_policy.is_synced %}bg-success-subtle text-success border border-success-subtle{% else %}bg-warning-subtle text-warning border border-warning-subtle{% endif %} px-2.5 py-1.5 fw-bold"
+                            style="font-size: 0.75rem;">
+                            {% if android_device_policy and android_device_policy.is_synced %}
+                            <i class="fas fa-check-circle me-1"></i> Synced to Device
+                            {% else %}
+                            <i class="fas fa-sync me-1"></i> Sync Pending
+                            {% endif %}
+                        </span>
                     </div>
-                {% endif %}
+                </div>
+                <div class="card-body">
+                    <form id="android-policy-form" class="needs-validation" novalidate>
+                        <!-- Success/Error Alert -->
+                        <div id="policy-alert" class="alert d-none mb-3" role="alert"></div>
+
+                        <!-- Category: Hardware & Connectivity -->
+                        <h6 class="fw-bold text-secondary text-uppercase mb-3 pb-1 border-bottom"
+                            style="font-size: 0.75rem; letter-spacing: 0.05em;">
+                            <i class="fas fa-microchip me-1 text-primary"></i> Hardware & Connectivity
+                        </h6>
+                        <div class="row g-3 mb-4">
+                            <div class="col-12 col-md-6">
+                                <label class="form-label fw-bold text-body small" for="camera_access">Camera
+                                    Access</label>
+                                <select id="camera_access" name="camera_access" class="form-select form-select-sm">
+                                    <option value="CAMERA_ACCESS_UNSPECIFIED" {% if android_device_policy and
+                                        android_device_policy.camera_access=='CAMERA_ACCESS_UNSPECIFIED' %}selected{%
+                                        endif %}>Unspecified (Default)</option>
+                                    <option value="CAMERA_ACCESS_DISABLED" {% if android_device_policy and
+                                        android_device_policy.camera_access=='CAMERA_ACCESS_DISABLED' %}selected{% endif
+                                        %}>Disabled</option>
+                                    <option value="CAMERA_ACCESS_USER_CHOICE" {% if android_device_policy and
+                                        android_device_policy.camera_access=='CAMERA_ACCESS_USER_CHOICE' %}selected{%
+                                        endif %}>User Choice</option>
+                                    <option value="CAMERA_ACCESS_ENFORCED" {% if android_device_policy and
+                                        android_device_policy.camera_access=='CAMERA_ACCESS_ENFORCED' %}selected{% endif
+                                        %}>Enforced</option>
+                                </select>
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label class="form-label fw-bold text-body small" for="microphone_access">Microphone
+                                    Access</label>
+                                <select id="microphone_access" name="microphone_access"
+                                    class="form-select form-select-sm">
+                                    <option value="MICROPHONE_ACCESS_UNSPECIFIED" {% if android_device_policy and
+                                        android_device_policy.microphone_access=='MICROPHONE_ACCESS_UNSPECIFIED'
+                                        %}selected{% endif %}>Unspecified (Default)</option>
+                                    <option value="MICROPHONE_ACCESS_DISABLED" {% if android_device_policy and
+                                        android_device_policy.microphone_access=='MICROPHONE_ACCESS_DISABLED'
+                                        %}selected{% endif %}>Disabled</option>
+                                    <option value="MICROPHONE_ACCESS_USER_CHOICE" {% if android_device_policy and
+                                        android_device_policy.microphone_access=='MICROPHONE_ACCESS_USER_CHOICE'
+                                        %}selected{% endif %}>User Choice</option>
+                                    <option value="MICROPHONE_ACCESS_ENFORCED" {% if android_device_policy and
+                                        android_device_policy.microphone_access=='MICROPHONE_ACCESS_ENFORCED'
+                                        %}selected{% endif %}>Enforced</option>
+                                </select>
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label class="form-label fw-bold text-body small" for="usb_data_access">USB Data
+                                    Access</label>
+                                <select id="usb_data_access" name="usb_data_access" class="form-select form-select-sm">
+                                    <option value="USB_DATA_ACCESS_UNSPECIFIED" {% if android_device_policy and
+                                        android_device_policy.usb_data_access=='USB_DATA_ACCESS_UNSPECIFIED'
+                                        %}selected{% endif %}>Unspecified (Default)</option>
+                                    <option value="ALLOW_USB_DATA_TRANSFER" {% if android_device_policy and
+                                        android_device_policy.usb_data_access=='ALLOW_USB_DATA_TRANSFER' %}selected{%
+                                        endif %}>Allow USB Data Transfer</option>
+                                    <option value="DISALLOW_USB_FILE_TRANSFER" {% if android_device_policy and
+                                        android_device_policy.usb_data_access=='DISALLOW_USB_FILE_TRANSFER' %}selected{%
+                                        endif %}>Disallow USB File Transfer (Charge Only)</option>
+                                    <option value="DISALLOW_USB_DATA_TRANSFER" {% if android_device_policy and
+                                        android_device_policy.usb_data_access=='DISALLOW_USB_DATA_TRANSFER' %}selected{%
+                                        endif %}>Disallow USB Data Transfer Completely</option>
+                                </select>
+                            </div>
+                            <div class="col-12 col-md-6 col-lg-4 d-flex align-items-center mt-auto pb-1">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="bluetooth_disabled"
+                                        name="bluetooth_disabled" {% if android_device_policy and
+                                        android_device_policy.bluetooth_disabled %}checked{% endif %}>
+                                    <label class="form-check-label fw-bold text-body small"
+                                        for="bluetooth_disabled">Disable Bluetooth</label>
+                                </div>
+                            </div>
+                            <div class="col-12 col-md-6 col-lg-4 d-flex align-items-center mt-auto pb-1">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="block_nfc" name="block_nfc" {%
+                                        if android_device_policy and android_device_policy.block_nfc %}checked{% endif
+                                        %}>
+                                    <label class="form-check-label fw-bold text-body small" for="block_nfc">Block
+                                        NFC</label>
+                                </div>
+                            </div>
+                            <div class="col-12 col-md-6 col-lg-4 d-flex align-items-center mt-auto pb-1">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="mount_physical_media_disabled"
+                                        name="mount_physical_media_disabled" {% if android_device_policy and
+                                        android_device_policy.mount_physical_media_disabled %}checked{% endif %}>
+                                    <label class="form-check-label fw-bold text-body small"
+                                        for="mount_physical_media_disabled">Disable SD Card/External Drive</label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Category: System Security -->
+                        <h6 class="fw-bold text-secondary text-uppercase mb-3 pb-1 border-bottom"
+                            style="font-size: 0.75rem; letter-spacing: 0.05em;">
+                            <i class="fas fa-shield-alt me-1 text-primary"></i> System Security
+                        </h6>
+                        <div class="row g-3 mb-4">
+                            <div class="col-12 col-md-6">
+                                <label class="form-label fw-bold text-body small" for="developer_settings">Developer
+                                    Options</label>
+                                <select id="developer_settings" name="developer_settings"
+                                    class="form-select form-select-sm">
+                                    <option value="DEVELOPER_SETTINGS_UNSPECIFIED" {% if android_device_policy and
+                                        android_device_policy.developer_settings=='DEVELOPER_SETTINGS_UNSPECIFIED'
+                                        %}selected{% endif %}>Unspecified (Default)</option>
+                                    <option value="DEVELOPER_SETTINGS_DISABLED" {% if android_device_policy and
+                                        android_device_policy.developer_settings=='DEVELOPER_SETTINGS_DISABLED'
+                                        %}selected{% endif %}>Disabled</option>
+                                    <option value="DEVELOPER_SETTINGS_ALLOWED" {% if android_device_policy and
+                                        android_device_policy.developer_settings=='DEVELOPER_SETTINGS_ALLOWED'
+                                        %}selected{% endif %}>Allowed</option>
+                                </select>
+                            </div>
+                            <div class="col-12 col-md-6 col-lg-4 d-flex align-items-center mt-auto pb-1">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="factory_reset_disabled"
+                                        name="factory_reset_disabled" {% if android_device_policy and
+                                        android_device_policy.factory_reset_disabled %}checked{% endif %}>
+                                    <label class="form-check-label fw-bold text-body small"
+                                        for="factory_reset_disabled">Disable Factory Reset</label>
+                                </div>
+                            </div>
+                            <div class="col-12 col-md-6 col-lg-4 d-flex align-items-center mt-auto pb-1">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="modify_accounts_disabled"
+                                        name="modify_accounts_disabled" {% if android_device_policy and
+                                        android_device_policy.modify_accounts_disabled %}checked{% endif %}>
+                                    <label class="form-check-label fw-bold text-body small"
+                                        for="modify_accounts_disabled">Disable Accounts Mod</label>
+                                </div>
+                            </div>
+                            <div class="col-12 col-md-6 col-lg-4 d-flex align-items-center mt-auto pb-1">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="screen_capture_disabled"
+                                        name="screen_capture_disabled" {% if android_device_policy and
+                                        android_device_policy.screen_capture_disabled %}checked{% endif %}>
+                                    <label class="form-check-label fw-bold text-body small"
+                                        for="screen_capture_disabled">Disable Screenshots</label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Category: Applications & Control -->
+                        <h6 class="fw-bold text-secondary text-uppercase mb-3 pb-1 border-bottom"
+                            style="font-size: 0.75rem; letter-spacing: 0.05em;">
+                            <i class="fas fa-mobile-alt me-1 text-primary"></i> Applications & Control
+                        </h6>
+                        <div class="row g-3 mb-4">
+                            <div class="col-12 col-md-6 col-lg-4">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="install_apps_disabled"
+                                        name="install_apps_disabled" {% if android_device_policy and
+                                        android_device_policy.install_apps_disabled %}checked{% endif %}>
+                                    <label class="form-check-label fw-bold text-body small"
+                                        for="install_apps_disabled">Disable App Installation</label>
+                                </div>
+                            </div>
+                            <div class="col-12 col-md-6 col-lg-4">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="uninstall_apps_disabled"
+                                        name="uninstall_apps_disabled" {% if android_device_policy and
+                                        android_device_policy.uninstall_apps_disabled %}checked{% endif %}>
+                                    <label class="form-check-label fw-bold text-body small"
+                                        for="uninstall_apps_disabled">Disable App Uninstallation</label>
+                                </div>
+                            </div>
+                            <div class="col-12 col-md-6 col-lg-4">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="adjust_volume_disabled"
+                                        name="adjust_volume_disabled" {% if android_device_policy and
+                                        android_device_policy.adjust_volume_disabled %}checked{% endif %}>
+                                    <label class="form-check-label fw-bold text-body small"
+                                        for="adjust_volume_disabled">Disable Volume Adjustment</label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Category: Call & Network Controls -->
+                        <h6 class="fw-bold text-secondary text-uppercase mb-3 pb-1 border-bottom"
+                            style="font-size: 0.75rem; letter-spacing: 0.05em;">
+                            <i class="fas fa-phone me-1 text-primary"></i> Call & Network Controls
+                        </h6>
+                        <div class="row g-3 mb-4">
+                            <div class="col-12 col-md-6 col-lg-4">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="outgoing_calls_disabled"
+                                        name="outgoing_calls_disabled" {% if android_device_policy and
+                                        android_device_policy.outgoing_calls_disabled %}checked{% endif %}>
+                                    <label class="form-check-label fw-bold text-body small"
+                                        for="outgoing_calls_disabled">Disable Outgoing Phone Calls</label>
+                                </div>
+                            </div>
+                            <div class="col-12 col-md-6 col-lg-4">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="sms_disabled"
+                                        name="sms_disabled" {% if android_device_policy and
+                                        android_device_policy.sms_disabled %}checked{% endif %}>
+                                    <label class="form-check-label fw-bold text-body small" for="sms_disabled">Disable
+                                        SMS (Text Messages)</label>
+                                </div>
+                            </div>
+                            <div class="col-12 col-md-6 col-lg-4">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="block_wifi_tethering"
+                                        name="block_wifi_tethering" {% if android_device_policy and
+                                        android_device_policy.block_wifi_tethering %}checked{% endif %}>
+                                    <label class="form-check-label fw-bold text-body small"
+                                        for="block_wifi_tethering">Disable Wi-Fi Hotspot</label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Category: Support Message -->
+                        <h6 class="fw-bold text-secondary text-uppercase mb-3 pb-1 border-bottom"
+                            style="font-size: 0.75rem; letter-spacing: 0.05em;">
+                            <i class="fas fa-comment-dots me-1 text-primary"></i> Support Message
+                        </h6>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold text-body small" for="short_support_message">Short Support
+                                Message</label>
+                            <input type="text" class="form-control form-control-sm" id="short_support_message"
+                                name="short_support_message" maxlength="200" required
+                                value="{{ android_device_policy.short_support_message if android_device_policy else 'This setting is managed by your parent through TimeKpr.' }}">
+                            <div class="form-text small text-secondary" style="font-size: 0.75rem;">Shown when a
+                                restricted setting is blocked (e.g., in Settings). Max 200 chars.</div>
+                        </div>
+                        <div class="mb-4">
+                            <label class="form-label fw-bold text-body small" for="long_support_message">Long Support
+                                Message</label>
+                            <textarea class="form-control form-control-sm" id="long_support_message"
+                                name="long_support_message" rows="3" maxlength="4096"
+                                required>{{ android_device_policy.long_support_message if android_device_policy else 'This device is protected by TimeKpr parental controls. Your parent manages screen time, apps, and websites. Ask them if you need something changed.' }}</textarea>
+                            <div class="form-text small text-secondary" style="font-size: 0.75rem;">Shown in the Device
+                                Administrator details screen. Max 4096 chars.</div>
+                        </div>
+
+                        <!-- Save Action -->
+                        <div class="d-flex justify-content-end">
+                            <button type="submit" id="save-policy-btn" class="btn btn-primary fw-bold">
+                                <i class="fas fa-save me-1"></i> Save Restrictions
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            {% else %}
+            <!-- Android Device Owner Enrollment Instructions Card -->
+            <div class="card shadow-sm border border-warning mb-4">
+                <div class="card-header bg-warning-subtle py-3 d-flex align-items-center gap-2">
+                    <div class="bg-warning text-dark p-2 rounded d-flex align-items-center justify-content-center"
+                        style="width: 38px; height: 38px;">
+                        <i class="fas fa-shield-alt fs-5"></i>
+                    </div>
+                    <div>
+                        <h5 class="mb-0 fw-bold text-warning-emphasis">Unlocking Advanced Restrictions</h5>
+                        <span class="text-secondary small fw-medium">TimeKpr needs Device Owner (DO) permission for
+                            these controls.</span>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <p class="small text-secondary mb-3">
+                        Enforcing hardware limitations, preventing uninstall, and automatically provisioning child user
+                        accounts requires the TimeKpr agent to be set as <strong>Device Owner</strong>.
+                    </p>
+
+                    <h6 class="fw-bold small text-body mb-2">To provision via ADB:</h6>
+                    <ol class="small text-secondary mb-3 ps-3">
+                        <li>Enable <strong>Developer Options</strong> and <strong>USB Debugging</strong> on the child's
+                            device.</li>
+                        <li>Remove all existing user accounts from the device under <em>Settings &rarr; Passwords &amp;
+                                Accounts</em>.</li>
+                        <li>Connect the device to a computer and execute the following terminal command:</li>
+                    </ol>
+                    <div class="p-3 border rounded bg-body-secondary mb-3">
+                        <code class="d-block text-break font-monospace small"
+                            style="user-select: all;">adb shell dpm set-device-owner com.timekpr.agent/.admin.TimeKprDeviceAdminReceiver</code>
+                    </div>
+
+                    <p class="small text-secondary mb-0">
+                        <i class="fas fa-info-circle me-1 text-primary"></i> Once successfully executed, restart the
+                        TimeKpr agent. The Device Owner status will refresh and unlock these restrictions.
+                    </p>
+                </div>
+            </div>
+            {% endif %}
             {% endif %}
 
             <!-- Installed Applications -->
             <div class="card shadow-sm border mb-4">
-                <div class="card-header bg-body-secondary py-3 d-flex justify-content-between align-items-center flex-wrap gap-3">
+                <div
+                    class="card-header bg-body-secondary py-3 d-flex justify-content-between align-items-center flex-wrap gap-3">
                     <div class="d-flex align-items-center gap-2">
-                        <div class="bg-info-subtle text-info p-2 rounded d-flex align-items-center justify-content-center" style="width: 38px; height: 38px;">
+                        <div class="bg-info-subtle text-info p-2 rounded d-flex align-items-center justify-content-center"
+                            style="width: 38px; height: 38px;">
                             <i class="fas fa-th-list fs-5"></i>
                         </div>
                         <div>
                             <h5 class="mb-0 fw-bold">Installed Applications</h5>
                             <span class="text-secondary small fw-semibold">
                                 {% if device.installed_apps_last_reported %}
-                                    Last inventory: {{ device.installed_apps_last_reported|localtime }} ({{ device.installed_apps_count or 0 }} apps)
+                                Last inventory: {{ device.installed_apps_last_reported|localtime }} ({{
+                                device.installed_apps_count or 0 }} apps)
                                 {% else %}
-                                    No inventory reported yet.
+                                No inventory reported yet.
                                 {% endif %}
                             </span>
                         </div>
                     </div>
                     {% if mapped_accounts and agent_online %}
-                        <form action="{{ url_for('ui_dashboard.refresh_device_installed_apps_ui', system_id=device.system_id) }}" method="POST" class="m-0">
+                    <form
+                        action="{{ url_for('ui_dashboard.refresh_device_installed_apps_ui', system_id=device.system_id) }}"
+                        method="POST" class="m-0">
 
-                        {{ csrf_field() }}                            <input type="hidden" name="linux_username" value="{{ mapped_accounts[0].linux_username }}">
-                            <button type="submit" class="btn btn-sm btn-primary fw-bold">
-                                <i class="fas fa-sync-alt me-1"></i> Refresh Inventory
-                            </button>
-                        </form>
+                        {{ csrf_field() }} <input type="hidden" name="linux_username"
+                            value="{{ mapped_accounts[0].linux_username }}">
+                        <button type="submit" class="btn btn-sm btn-primary fw-bold">
+                            <i class="fas fa-sync-alt me-1"></i> Refresh Inventory
+                        </button>
+                    </form>
                     {% elif mapped_accounts %}
-                        <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle px-3 py-1.5 fw-bold">Agent Offline</span>
+                    <span
+                        class="badge bg-secondary-subtle text-secondary border border-secondary-subtle px-3 py-1.5 fw-bold">Agent
+                        Offline</span>
                     {% endif %}
                 </div>
                 <div class="card-body">
                     {% if mapped_accounts %}
-                        {% for mapping in mapped_accounts %}
-                            {% set apps = installed_apps_by_mapping.get(mapping.id, []) %}
-                            <div class="mb-4">
-                                <h6 class="fw-bold text-secondary text-uppercase mb-3 pb-1 border-bottom" style="font-size: 0.75rem; letter-spacing: 0.05em;">
-                                    <i class="fas fa-user me-1 text-primary"></i> {{ mapping.managed_user.username }} &rarr; {{ mapping.linux_username }}
-                                </h6>
-                                {% if apps %}
-                                    <div class="row g-2">
-                                        {% for app in apps %}
-                                            <div class="col-12 col-sm-6">
-                                                <div class="d-flex align-items-center p-2 border rounded bg-body shadow-sm h-100">
-                                                    <div class="flex-shrink-0 d-flex align-items-center justify-content-center bg-white border rounded p-1 me-2" style="width: 38px; height: 38px;">
-                                                        {% if app.icon_hash %}
-                                                            <img src="{{ url_for('api_installed_apps.get_application_icon', content_hash=app.icon_hash) }}" alt="" class="rounded" style="width: 30px; height: 30px; object-fit: contain;">
-                                                        {% else %}
-                                                            <span class="fs-5">{% if app.platform == 'android' %}📱{% else %}🖥️{% endif %}</span>
-                                                        {% endif %}
-                                                    </div>
-                                                    <div class="min-width-0 flex-grow-1" style="min-width: 0;">
-                                                        <strong class="d-block text-body text-truncate small">{{ app.application_name }}</strong>
-                                                        <code class="d-block text-secondary text-truncate" style="font-size: 0.65rem;" title="{{ app.identifier }}">{{ app.identifier }}</code>
-                                                        {% if app.version_name %}
-                                                            <span class="text-secondary d-block" style="font-size: 0.65rem;">Version: v{{ app.version_name }}</span>
-                                                        {% endif %}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        {% endfor %}
+                    {% for mapping in mapped_accounts %}
+                    {% set apps = installed_apps_by_mapping.get(mapping.id, []) %}
+                    <div class="mb-4">
+                        <h6 class="fw-bold text-secondary text-uppercase mb-3 pb-1 border-bottom"
+                            style="font-size: 0.75rem; letter-spacing: 0.05em;">
+                            <i class="fas fa-user me-1 text-primary"></i> {{ mapping.managed_user.username }} &rarr; {{
+                            mapping.linux_username }}
+                        </h6>
+                        {% if apps %}
+                        <div class="row g-2">
+                            {% for app in apps %}
+                            <div class="col-12 col-sm-6">
+                                <div class="d-flex align-items-center p-2 border rounded bg-body shadow-sm h-100">
+                                    <div class="flex-shrink-0 d-flex align-items-center justify-content-center bg-white border rounded p-1 me-2"
+                                        style="width: 38px; height: 38px;">
+                                        {% if app.icon_hash %}
+                                        <img src="{{ url_for('api_installed_apps.get_application_icon', content_hash=app.icon_hash) }}"
+                                            alt="" class="rounded"
+                                            style="width: 30px; height: 30px; object-fit: contain;">
+                                        {% else %}
+                                        <span class="fs-5">{% if app.platform == 'android' %}📱{% else %}🖥️{% endif
+                                            %}</span>
+                                        {% endif %}
                                     </div>
-                                {% else %}
-                                    <p class="small text-secondary fst-italic mb-0 py-2"><i class="fas fa-info-circle me-1"></i>No applications reported for this account yet.</p>
-                                {% endif %}
+                                    <div class="min-width-0 flex-grow-1" style="min-width: 0;">
+                                        <strong class="d-block text-body text-truncate small">{{ app.application_name
+                                            }}</strong>
+                                        <code class="d-block text-secondary text-truncate" style="font-size: 0.65rem;"
+                                            title="{{ app.identifier }}">{{ app.identifier }}</code>
+                                        {% if app.version_name %}
+                                        <span class="text-secondary d-block" style="font-size: 0.65rem;">Version: v{{
+                                            app.version_name }}</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
                             </div>
-                        {% endfor %}
-                    {% else %}
-                        <div class="text-center text-secondary py-3">
-                            <i class="fas fa-link-slash fs-4 mb-2"></i>
-                            <p class="mb-0 small fw-semibold">Link a child profile to collect application inventory.</p>
+                            {% endfor %}
                         </div>
+                        {% else %}
+                        <p class="small text-secondary fst-italic mb-0 py-2"><i class="fas fa-info-circle me-1"></i>No
+                            applications reported for this account yet.</p>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                    {% else %}
+                    <div class="text-center text-secondary py-3">
+                        <i class="fas fa-link-slash fs-4 mb-2"></i>
+                        <p class="mb-0 small fw-semibold">Link a child profile to collect application inventory.</p>
+                    </div>
                     {% endif %}
                 </div>
             </div>
@@ -406,7 +530,8 @@
             <!-- Application Runtime Tracker -->
             <div class="card shadow-sm border mb-4">
                 <div class="card-header bg-body-secondary py-3 d-flex align-items-center gap-2">
-                    <div class="bg-success-subtle text-success p-2 rounded d-flex align-items-center justify-content-center" style="width: 38px; height: 38px;">
+                    <div class="bg-success-subtle text-success p-2 rounded d-flex align-items-center justify-content-center"
+                        style="width: 38px; height: 38px;">
                         <i class="fas fa-chart-line fs-5"></i>
                     </div>
                     <div>
@@ -415,44 +540,51 @@
                 </div>
                 <div class="card-body">
                     {% if mapped_accounts %}
-                        {% set ns = namespace(has_any_usage=false) %}
-                        {% for mapping in mapped_accounts %}
-                            {% set usage = usage_summaries.get(mapping.id) %}
-                            {% if usage %}
-                                {% set ns.has_any_usage = true %}
-                                <div class="mb-4">
-                                    <h6 class="fw-bold text-secondary text-uppercase mb-3 pb-1 border-bottom" style="font-size: 0.75rem; letter-spacing: 0.05em;">
-                                        👤 {{ mapping.managed_user.username }} &rarr; <code>{{ mapping.linux_username }}</code>
-                                    </h6>
-                                    <div class="d-flex flex-column gap-2">
-                                        {% set max_seconds = usage[0].total_seconds if usage else 1 %}
-                                        {% for item in usage %}
-                                            <div class="d-flex align-items-center gap-2 py-2 border-bottom flex-wrap flex-md-nowrap">
-                                                <div class="fw-bold small text-body text-truncate" style="min-width: 140px; max-width: 180px;">{{ item.application_name }}</div>
-                                                <div class="flex-grow-1 mx-2" style="height: 16px; background-color: var(--bs-secondary-bg); border-radius: 0.5rem; overflow: hidden; min-width: 100px;">
-                                                    <div class="bg-primary h-100" style="width: {{ (item.total_seconds / max_seconds * 100)|round(1) }}%; border-radius: 0.5rem; min-width: 2px;"></div>
-                                                </div>
-                                                <div class="d-flex gap-3 ms-auto text-end" style="font-size: 0.85rem;">
-                                                    <span class="fw-bold text-body" style="min-width: 80px;">{{ item.formatted }}</span>
-                                                    <span class="text-secondary small fw-bold" style="min-width: 80px;">{{ item.session_count }} session{{ 's' if item.session_count != 1 }}</span>
-                                                </div>
-                                            </div>
-                                        {% endfor %}
+                    {% set ns = namespace(has_any_usage=false) %}
+                    {% for mapping in mapped_accounts %}
+                    {% set usage = usage_summaries.get(mapping.id) %}
+                    {% if usage %}
+                    {% set ns.has_any_usage = true %}
+                    <div class="mb-4">
+                        <h6 class="fw-bold text-secondary text-uppercase mb-3 pb-1 border-bottom"
+                            style="font-size: 0.75rem; letter-spacing: 0.05em;">
+                            👤 {{ mapping.managed_user.username }} &rarr; <code>{{ mapping.linux_username }}</code>
+                        </h6>
+                        <div class="d-flex flex-column gap-2">
+                            {% set max_seconds = usage[0].total_seconds if usage else 1 %}
+                            {% for item in usage %}
+                            <div class="d-flex align-items-center gap-2 py-2 border-bottom flex-wrap flex-md-nowrap">
+                                <div class="fw-bold small text-body text-truncate"
+                                    style="min-width: 140px; max-width: 180px;">{{ item.application_name }}</div>
+                                <div class="flex-grow-1 mx-2"
+                                    style="height: 16px; background-color: var(--bs-secondary-bg); border-radius: 0.5rem; overflow: hidden; min-width: 100px;">
+                                    <div class="bg-primary h-100"
+                                        style="width: {{ (item.total_seconds / max_seconds * 100)|round(1) }}%; border-radius: 0.5rem; min-width: 2px;">
                                     </div>
                                 </div>
-                            {% endif %}
-                        {% endfor %}
-                        {% if not ns.has_any_usage %}
-                            <div class="text-center text-secondary py-3">
-                                <i class="fas fa-history fs-4 mb-2"></i>
-                                <p class="mb-0 small fw-semibold">No application usage recorded for mapped accounts on this device.</p>
+                                <div class="d-flex gap-3 ms-auto text-end" style="font-size: 0.85rem;">
+                                    <span class="fw-bold text-body" style="min-width: 80px;">{{ item.formatted }}</span>
+                                    <span class="text-secondary small fw-bold" style="min-width: 80px;">{{
+                                        item.session_count }} session{{ 's' if item.session_count != 1 }}</span>
+                                </div>
                             </div>
-                        {% endif %}
-                    {% else %}
-                        <div class="text-center text-secondary py-3">
-                            <i class="fas fa-lock-open fs-4 mb-2"></i>
-                            <p class="mb-0 small fw-semibold">No mapped accounts available to audit.</p>
+                            {% endfor %}
                         </div>
+                    </div>
+                    {% endif %}
+                    {% endfor %}
+                    {% if not ns.has_any_usage %}
+                    <div class="text-center text-secondary py-3">
+                        <i class="fas fa-history fs-4 mb-2"></i>
+                        <p class="mb-0 small fw-semibold">No application usage recorded for mapped accounts on this
+                            device.</p>
+                    </div>
+                    {% endif %}
+                    {% else %}
+                    <div class="text-center text-secondary py-3">
+                        <i class="fas fa-lock-open fs-4 mb-2"></i>
+                        <p class="mb-0 small fw-semibold">No mapped accounts available to audit.</p>
+                    </div>
                     {% endif %}
                 </div>
             </div>
@@ -460,15 +592,17 @@
 
         <!-- Right Column: Device management, filtering profiles -->
         <div class="col-12 col-lg-4">
-            {% if parental_access_code %}
+            {% if parental_access_code and has_managed_profiles %}
             <div class="card shadow-sm border mb-4">
                 <div class="card-header bg-primary text-white py-3 d-flex align-items-center gap-2">
-                    <div class="bg-white text-primary p-2 rounded d-flex align-items-center justify-content-center" style="width: 38px; height: 38px;">
+                    <div class="bg-white text-primary p-2 rounded d-flex align-items-center justify-content-center"
+                        style="width: 38px; height: 38px;">
                         <i class="fas fa-key fs-5"></i>
                     </div>
                     <div>
                         <h5 class="mb-0 fw-bold">Parental Access Code</h5>
-                        <span class="text-white-50 text-wrap small fw-medium">Use offline to reset lock screen PIN</span>
+                        <span class="text-white-50 text-wrap small fw-medium">Use offline to reset lock screen
+                            PIN</span>
                     </div>
                 </div>
                 <div class="card-body text-center">
@@ -481,24 +615,28 @@
                     </p>
                 </div>
             </div>
-            {% if device.secure_token and android_recovery_ws_url %}
+            {% if device.secure_token and android_recovery_ws_url and has_managed_profiles %}
             <div class="card shadow-sm border mb-4">
                 <div class="card-header bg-dark text-white py-3 d-flex align-items-center gap-2">
-                    <div class="bg-white text-dark p-2 rounded d-flex align-items-center justify-content-center" style="width: 38px; height: 38px;">
+                    <div class="bg-white text-dark p-2 rounded d-flex align-items-center justify-content-center"
+                        style="width: 38px; height: 38px;">
                         <i class="fas fa-terminal fs-5"></i>
                     </div>
                     <div>
                         <h5 class="mb-0 fw-bold">Locked Device Recovery</h5>
-                        <span class="text-white-50 text-wrap small fw-medium">Use when the phone cannot unlock after reboot</span>
+                        <span class="text-white-50 text-wrap small fw-medium">Use when the phone cannot unlock after
+                            reboot</span>
                     </div>
                 </div>
                 <div class="card-body">
                     <p class="small text-secondary">
-                        The <strong>device token</strong> below is not the 6-digit code above. It is the secret the agent
+                        The <strong>device token</strong> below is not the 6-digit code above. It is the secret the
+                        agent
                         uses to sync with this server. Run these commands from a computer with ADB access:
                     </p>
                     <label class="form-label small fw-bold text-secondary mb-1">Device token</label>
-                    <div class="font-monospace small bg-light border rounded p-2 mb-3 user-select-all">{{ device.secure_token }}</div>
+                    <div class="font-monospace small bg-light border rounded p-2 mb-3 user-select-all">{{
+                        device.secure_token }}</div>
                     <label class="form-label small fw-bold text-secondary mb-1">Recovery commands</label>
                     <pre class="small bg-light border rounded p-2 mb-0 user-select-all" style="white-space: pre-wrap;">adb install -r app-debug.apk
 adb shell am broadcast --user 0 \
@@ -515,7 +653,8 @@ adb reboot</pre>
             {% if device.status == 'approved' %}
             <div class="card shadow-sm border border-danger mb-4">
                 <div class="card-header bg-danger-subtle py-3 d-flex align-items-center gap-2">
-                    <div class="bg-danger text-white p-2 rounded d-flex align-items-center justify-content-center" style="width: 38px; height: 38px;">
+                    <div class="bg-danger text-white p-2 rounded d-flex align-items-center justify-content-center"
+                        style="width: 38px; height: 38px;">
                         <i class="fas fa-exclamation-triangle fs-5"></i>
                     </div>
                     <div>
@@ -526,19 +665,24 @@ adb reboot</pre>
                 <div class="card-body">
                     <div class="d-flex flex-wrap gap-2 mb-3">
                         {% if agent_online %}
-                            <span class="badge bg-success-subtle text-success border border-success-subtle">Agent online</span>
+                        <span class="badge bg-success-subtle text-success border border-success-subtle">Agent
+                            online</span>
                         {% else %}
-                            <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle">Agent offline</span>
+                        <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle">Agent
+                            offline</span>
                         {% endif %}
                         {% if fcm_available %}
-                            <span class="badge bg-primary-subtle text-primary border border-primary-subtle">FCM available</span>
+                        <span class="badge bg-primary-subtle text-primary border border-primary-subtle">FCM
+                            available</span>
                         {% else %}
-                            <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle">No FCM token</span>
+                        <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle">No FCM
+                            token</span>
                         {% endif %}
                     </div>
 
                     <p class="small text-secondary mb-3">
-                        <strong>Unenroll</strong> revokes server trust and asks the agent to stop enforcement and clear local credentials.
+                        <strong>Unenroll</strong> revokes server trust and asks the agent to stop enforcement and clear
+                        local credentials.
                         You can re-pair the device later.
                     </p>
                     <button type="button" id="unenroll-device-btn" class="btn btn-outline-danger fw-bold w-100 mb-3">
@@ -552,7 +696,8 @@ adb reboot</pre>
                         All personal data on the device will be deleted. This cannot be undone.
                         Requires device-owner provisioning.
                     </p>
-                    <button type="button" id="factory-reset-device-btn" class="btn btn-danger fw-bold w-100" data-device-label="{{ device_label }}">
+                    <button type="button" id="factory-reset-device-btn" class="btn btn-danger fw-bold w-100"
+                        data-device-label="{{ device_label }}">
                         <i class="fas fa-eraser me-1"></i> Factory Reset Device
                     </button>
                     {% endif %}
@@ -565,33 +710,41 @@ adb reboot</pre>
             <!-- Domain Policy Contributors -->
             <div class="card shadow-sm border mb-4">
                 <div class="card-header bg-body-secondary py-3 d-flex align-items-center gap-2">
-                    <div class="bg-warning-subtle text-warning p-2 rounded d-flex align-items-center justify-content-center" style="width: 38px; height: 38px;">
+                    <div class="bg-warning-subtle text-warning p-2 rounded d-flex align-items-center justify-content-center"
+                        style="width: 38px; height: 38px;">
                         <i class="fas fa-globe fs-5"></i>
                     </div>
                     <h5 class="mb-0 fw-bold">Domain Policy Contributors</h5>
                 </div>
                 <div class="card-body">
                     {% if blocklist_contributors %}
-                        <div class="d-flex flex-column gap-2">
-                            {% for contributor in blocklist_contributors %}
-                                <div class="border rounded p-3 bg-body-secondary">
-                                    <div class="fw-bold text-body fs-6">{{ contributor.managed_user }} &rarr; <code>{{ contributor.linux_username }}</code></div>
-                                    <div class="text-secondary small fw-semibold mt-2 d-flex flex-wrap gap-2 align-items-center">
-                                        <span class="badge bg-body border text-body">UID: {{ contributor.linux_uid if contributor.linux_uid is not none else '-' }}</span>
-                                        <span class="badge bg-body border text-body">Lists: {{ contributor.assigned_source_count }}</span>
-                                        <span class="badge bg-body border text-body">Hosts: {{ contributor.effective_domain_count }}</span>
-                                        <span class="badge {% if contributor.sync_status == 'synced' %}bg-success{% else %}bg-warning text-dark{% endif %}">
-                                            Sync: {{ contributor.sync_status|replace('_', ' ')|title }}
-                                        </span>
-                                    </div>
-                                </div>
-                            {% endfor %}
+                    <div class="d-flex flex-column gap-2">
+                        {% for contributor in blocklist_contributors %}
+                        <div class="border rounded p-3 bg-body-secondary">
+                            <div class="fw-bold text-body fs-6">{{ contributor.managed_user }} &rarr;
+                                <code>{{ contributor.linux_username }}</code></div>
+                            <div
+                                class="text-secondary small fw-semibold mt-2 d-flex flex-wrap gap-2 align-items-center">
+                                <span class="badge bg-body border text-body">UID: {{ contributor.linux_uid if
+                                    contributor.linux_uid is not none else '-' }}</span>
+                                <span class="badge bg-body border text-body">Lists: {{ contributor.assigned_source_count
+                                    }}</span>
+                                <span class="badge bg-body border text-body">Hosts: {{
+                                    contributor.effective_domain_count }}</span>
+                                <span
+                                    class="badge {% if contributor.sync_status == 'synced' %}bg-success{% else %}bg-warning text-dark{% endif %}">
+                                    Sync: {{ contributor.sync_status|replace('_', ' ')|title }}
+                                </span>
+                            </div>
                         </div>
+                        {% endfor %}
+                    </div>
                     {% else %}
-                        <div class="text-center text-secondary py-3">
-                            <i class="fas fa-shield-alt fs-4 mb-2"></i>
-                            <p class="mb-0 small fw-semibold">No blocklist filtering profiles are contributing to this device.</p>
-                        </div>
+                    <div class="text-center text-secondary py-3">
+                        <i class="fas fa-shield-alt fs-4 mb-2"></i>
+                        <p class="mb-0 small fw-semibold">No blocklist filtering profiles are contributing to this
+                            device.</p>
+                    </div>
                     {% endif %}
                 </div>
             </div>
@@ -602,14 +755,17 @@ adb reboot</pre>
     <div class="row g-4 mt-1">
         <div class="col-12">
             <div class="card shadow-sm border mb-4">
-                <div class="card-header bg-body-secondary py-3 d-flex justify-content-between align-items-center flex-wrap gap-3">
+                <div
+                    class="card-header bg-body-secondary py-3 d-flex justify-content-between align-items-center flex-wrap gap-3">
                     <div class="d-flex align-items-center gap-2">
-                        <div class="bg-danger-subtle text-danger p-2 rounded d-flex align-items-center justify-content-center" style="width: 38px; height: 38px;">
+                        <div class="bg-danger-subtle text-danger p-2 rounded d-flex align-items-center justify-content-center"
+                            style="width: 38px; height: 38px;">
                             <i class="fas fa-bug fs-5"></i>
                         </div>
                         <div>
                             <h5 class="mb-0 fw-bold">Diagnostic Alert History</h5>
-                            <span class="text-secondary small fw-medium">Outbound connection alerts and system exceptions generated by this client</span>
+                            <span class="text-secondary small fw-medium">Outbound connection alerts and system
+                                exceptions generated by this client</span>
                         </div>
                     </div>
                     <div id="alert-summary-stats">
@@ -620,7 +776,8 @@ adb reboot</pre>
                     <!-- toolbar -->
                     <div class="d-flex gap-2 mb-3 flex-wrap align-items-center justify-content-between">
                         <div class="d-flex gap-2 flex-wrap flex-grow-1">
-                            <input type="text" id="alert-search-input" class="form-control form-control-sm" placeholder="Search events, details..." style="max-width: 250px;">
+                            <input type="text" id="alert-search-input" class="form-control form-control-sm"
+                                placeholder="Search events, details..." style="max-width: 250px;">
                             <select id="alert-type-filter" class="form-select form-select-sm" style="max-width: 180px;">
                                 <option value="">All Event Types</option>
                             </select>
@@ -634,7 +791,8 @@ adb reboot</pre>
                             </select>
                         </div>
                         <div>
-                            <button id="alert-prune-btn" class="btn btn-sm btn-outline-danger fw-bold"><i class="fas fa-trash-alt me-1"></i> Prune Old Alerts</button>
+                            <button id="alert-prune-btn" class="btn btn-sm btn-outline-danger fw-bold"><i
+                                    class="fas fa-trash-alt me-1"></i> Prune Old Alerts</button>
                         </div>
                     </div>
 
@@ -649,11 +807,16 @@ adb reboot</pre>
                         <table class="table table-striped align-middle mb-0" style="font-size: 0.9rem;">
                             <thead>
                                 <tr class="table-light">
-                                    <th class="ps-3 text-secondary fw-bold" style="font-size: 0.75rem; text-transform: uppercase;">Date &amp; Time</th>
-                                    <th class="text-secondary fw-bold" style="font-size: 0.75rem; text-transform: uppercase;">Event Type</th>
-                                    <th class="text-secondary fw-bold" style="font-size: 0.75rem; text-transform: uppercase;">Scope</th>
-                                    <th class="text-secondary fw-bold" style="font-size: 0.75rem; text-transform: uppercase;">Delivery Status</th>
-                                    <th class="pe-3 text-secondary fw-bold" style="font-size: 0.75rem; text-transform: uppercase;">Diagnostic Details</th>
+                                    <th class="ps-3 text-secondary fw-bold"
+                                        style="font-size: 0.75rem; text-transform: uppercase;">Date &amp; Time</th>
+                                    <th class="text-secondary fw-bold"
+                                        style="font-size: 0.75rem; text-transform: uppercase;">Event Type</th>
+                                    <th class="text-secondary fw-bold"
+                                        style="font-size: 0.75rem; text-transform: uppercase;">Scope</th>
+                                    <th class="text-secondary fw-bold"
+                                        style="font-size: 0.75rem; text-transform: uppercase;">Delivery Status</th>
+                                    <th class="pe-3 text-secondary fw-bold"
+                                        style="font-size: 0.75rem; text-transform: uppercase;">Diagnostic Details</th>
                                 </tr>
                             </thead>
                             <tbody id="alerts-tbody">
@@ -667,7 +830,9 @@ adb reboot</pre>
                         <p class="mb-0 fw-semibold">No audit records found matching the current filters.</p>
                     </div>
 
-                    <div id="alerts-pagination" class="d-flex justify-content-between align-items-center mt-3 pt-3 border-top" style="display: none;">
+                    <div id="alerts-pagination"
+                        class="d-flex justify-content-between align-items-center mt-3 pt-3 border-top"
+                        style="display: none;">
                         <div id="pagination-info" class="text-secondary small fw-bold">
                             Showing 0-0 of 0 alerts
                         </div>
@@ -685,9 +850,10 @@ adb reboot</pre>
 
 {% block extra_js %}
 <script>
-(function() {
-    const systemId = "{{ device.system_id }}";
-    const deviceLabel = {{ device_label|tojson }};
+    (function () {
+        const systemId = "{{ device.system_id }}";
+        const deviceLabel = {{ device_label| tojson
+    }};
     const unenrollBtn = document.getElementById('unenroll-device-btn');
     const factoryResetBtn = document.getElementById('factory-reset-device-btn');
     const lifecycleResult = document.getElementById('lifecycle-result');
@@ -765,80 +931,80 @@ adb reboot</pre>
             }
         });
     }
-})();
+}) ();
 </script>
 <script>
-(function() {
-    const alertConfig = {
-        managedUserId: null,
-        systemId: "{{ device.system_id }}",
-        page: 1,
-        perPage: 50,
-        search: '',
-        eventType: '',
-        sortBy: 'date',
-        sortDir: 'desc'
-    };
+    (function () {
+        const alertConfig = {
+            managedUserId: null,
+            systemId: "{{ device.system_id }}",
+            page: 1,
+            perPage: 50,
+            search: '',
+            eventType: '',
+            sortBy: 'date',
+            sortDir: 'desc'
+        };
 
-    const elements = {
-        tbody: document.getElementById('alerts-tbody'),
-        loading: document.getElementById('alerts-loading'),
-        empty: document.getElementById('alerts-empty'),
-        table: document.getElementById('alerts-table-container'),
-        summary: document.getElementById('alert-summary-stats'),
-        paginationInfo: document.getElementById('pagination-info'),
-        prevBtn: document.getElementById('prev-page'),
-        nextBtn: document.getElementById('next-page'),
-        searchInput: document.getElementById('alert-search-input'),
-        typeFilter: document.getElementById('alert-type-filter'),
-        sortBySelect: document.getElementById('alert-sort-by'),
-        sortDirSelect: document.getElementById('alert-sort-dir'),
-        pruneBtn: document.getElementById('alert-prune-btn')
-    };
+        const elements = {
+            tbody: document.getElementById('alerts-tbody'),
+            loading: document.getElementById('alerts-loading'),
+            empty: document.getElementById('alerts-empty'),
+            table: document.getElementById('alerts-table-container'),
+            summary: document.getElementById('alert-summary-stats'),
+            paginationInfo: document.getElementById('pagination-info'),
+            prevBtn: document.getElementById('prev-page'),
+            nextBtn: document.getElementById('next-page'),
+            searchInput: document.getElementById('alert-search-input'),
+            typeFilter: document.getElementById('alert-type-filter'),
+            sortBySelect: document.getElementById('alert-sort-by'),
+            sortDirSelect: document.getElementById('alert-sort-dir'),
+            pruneBtn: document.getElementById('alert-prune-btn')
+        };
 
-    let searchTimeout = null;
+        let searchTimeout = null;
 
-    async function fetchAlerts() {
-        elements.loading.style.display = 'block';
-        elements.table.style.display = 'none';
-        elements.empty.style.display = 'none';
+        async function fetchAlerts() {
+            elements.loading.style.display = 'block';
+            elements.table.style.display = 'none';
+            elements.empty.style.display = 'none';
 
-        const params = new URLSearchParams({
-            page: alertConfig.page,
-            per_page: alertConfig.perPage,
-            search: alertConfig.search,
-            event_type: alertConfig.eventType,
-            sort_by: alertConfig.sortBy,
-            sort_dir: alertConfig.sortDir
-        });
-        if (alertConfig.managedUserId) params.append('managed_user_id', alertConfig.managedUserId);
-        if (alertConfig.systemId) params.append('system_id', alertConfig.systemId);
+            const params = new URLSearchParams({
+                page: alertConfig.page,
+                per_page: alertConfig.perPage,
+                search: alertConfig.search,
+                event_type: alertConfig.eventType,
+                sort_by: alertConfig.sortBy,
+                sort_dir: alertConfig.sortDir
+            });
+            if (alertConfig.managedUserId) params.append('managed_user_id', alertConfig.managedUserId);
+            if (alertConfig.systemId) params.append('system_id', alertConfig.systemId);
 
-        try {
-            const response = await fetch(`/api/alerts?${params.toString()}`);
-            const result = await response.json();
-            
-            if (result.success) {
-                renderAlerts(result.data.alerts);
-                updatePagination(result.data.pagination);
-                updateFilters(result.data.filters);
-                updateSummaryStats(result.data.pagination.total_items);
+            try {
+                const response = await fetch(`/api/alerts?${params.toString()}`);
+                const result = await response.json();
+
+                if (result.success) {
+                    renderAlerts(result.data.alerts);
+                    updatePagination(result.data.pagination);
+                    updateFilters(result.data.filters);
+                    updateSummaryStats(result.data.pagination.total_items);
+                }
+            } catch (error) {
+                console.error('Failed to fetch alerts:', error);
+            } finally {
+                elements.loading.style.display = 'none';
             }
-        } catch (error) {
-            console.error('Failed to fetch alerts:', error);
-        } finally {
-            elements.loading.style.display = 'none';
-        }
-    }
-
-    function renderAlerts(alerts) {
-        if (!alerts || alerts.length === 0) {
-            elements.empty.style.display = 'block';
-            return;
         }
 
-        elements.table.style.display = 'block';
-        elements.tbody.innerHTML = alerts.map(alert => `
+        function renderAlerts(alerts) {
+            if (!alerts || alerts.length === 0) {
+                elements.empty.style.display = 'block';
+                return;
+            }
+
+            elements.table.style.display = 'block';
+            elements.tbody.innerHTML = alerts.map(alert => `
             <tr>
                 <td class="ps-3 small fw-bold text-secondary text-nowrap">
                     ${alert.occurred_at ? formatDate(alert.occurred_at) : 'Unknown'}
@@ -858,206 +1024,206 @@ adb reboot</pre>
                 <td class="pe-3 font-monospace text-secondary small" style="font-size: 0.75rem; max-width: 320px; overflow-wrap: break-word;">${alert.details_text}</td>
             </tr>
         `).join('');
-    }
+        }
 
-    function formatDate(dateStr) {
-        const date = new Date(dateStr);
-        return date.getFullYear() + '-' + 
-               String(date.getMonth() + 1).padStart(2, '0') + '-' + 
-               String(date.getDate()).padStart(2, '0') + ' ' + 
-               String(date.getHours()).padStart(2, '0') + ':' + 
-               String(date.getMinutes()).padStart(2, '0');
-    }
+        function formatDate(dateStr) {
+            const date = new Date(dateStr);
+            return date.getFullYear() + '-' +
+                String(date.getMonth() + 1).padStart(2, '0') + '-' +
+                String(date.getDate()).padStart(2, '0') + ' ' +
+                String(date.getHours()).padStart(2, '0') + ':' +
+                String(date.getMinutes()).padStart(2, '0');
+        }
 
-    function formatStatus(status) {
-        if (!status) return 'Unknown';
-        return status.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
-    }
+        function formatStatus(status) {
+            if (!status) return 'Unknown';
+            return status.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+        }
 
-    function updatePagination(pagination) {
-        const start = (pagination.page - 1) * pagination.per_page + 1;
-        const end = Math.min(pagination.page * pagination.per_page, pagination.total_items);
-        
-        elements.paginationInfo.textContent = pagination.total_items > 0 
-            ? `Showing ${start}-${end} of ${pagination.total_items} alerts`
-            : 'No alerts found';
-            
-        elements.prevBtn.disabled = !pagination.has_prev;
-        elements.nextBtn.disabled = !pagination.has_next;
-    }
+        function updatePagination(pagination) {
+            const start = (pagination.page - 1) * pagination.per_page + 1;
+            const end = Math.min(pagination.page * pagination.per_page, pagination.total_items);
 
-    function updateFilters(filters) {
-        const currentType = elements.typeFilter.value;
-        const options = ['<option value="">All Event Types</option>'];
-        filters.event_types.forEach(et => {
-            options.push(`<option value="${et.value}" ${et.value === currentType ? 'selected' : ''}>${et.label}</option>`);
-        });
-        elements.typeFilter.innerHTML = options.join('');
-    }
+            elements.paginationInfo.textContent = pagination.total_items > 0
+                ? `Showing ${start}-${end} of ${pagination.total_items} alerts`
+                : 'No alerts found';
 
-    function updateSummaryStats(total) {
-        elements.summary.innerHTML = `
+            elements.prevBtn.disabled = !pagination.has_prev;
+            elements.nextBtn.disabled = !pagination.has_next;
+        }
+
+        function updateFilters(filters) {
+            const currentType = elements.typeFilter.value;
+            const options = ['<option value="">All Event Types</option>'];
+            filters.event_types.forEach(et => {
+                options.push(`<option value="${et.value}" ${et.value === currentType ? 'selected' : ''}>${et.label}</option>`);
+            });
+            elements.typeFilter.innerHTML = options.join('');
+        }
+
+        function updateSummaryStats(total) {
+            elements.summary.innerHTML = `
             <div class="text-center px-3 py-1 bg-body border rounded shadow-sm" style="min-width: 100px;">
                 <div class="text-secondary small fw-bold text-uppercase" style="font-size: 0.65rem; letter-spacing: 0.05em;">Filtered Results</div>
                 <div class="fs-5 fw-bold text-body">${total}</div>
             </div>
         `;
-    }
-
-    // Event Listeners
-    elements.prevBtn.addEventListener('click', () => {
-        if (alertConfig.page > 1) {
-            alertConfig.page--;
-            fetchAlerts();
-        }
-    });
-
-    elements.nextBtn.addEventListener('click', () => {
-        alertConfig.page++;
-        fetchAlerts();
-    });
-
-    elements.searchInput.addEventListener('input', (e) => {
-        clearTimeout(searchTimeout);
-        searchTimeout = setTimeout(() => {
-            alertConfig.search = e.target.value;
-            alertConfig.page = 1;
-            fetchAlerts();
-        }, 400);
-    });
-
-    elements.typeFilter.addEventListener('change', (e) => {
-        alertConfig.eventType = e.target.value;
-        alertConfig.page = 1;
-        fetchAlerts();
-    });
-
-    elements.sortBySelect.addEventListener('change', (e) => {
-        alertConfig.sortBy = e.target.value;
-        alertConfig.page = 1;
-        fetchAlerts();
-    });
-
-    elements.sortDirSelect.addEventListener('change', (e) => {
-        alertConfig.sortDir = e.target.value;
-        alertConfig.page = 1;
-        fetchAlerts();
-    });
-
-    elements.pruneBtn.addEventListener('click', async () => {
-        const days = prompt('Prune alerts older than how many days?', '30');
-        if (days === null) return;
-        
-        const daysInt = parseInt(days);
-        if (isNaN(daysInt) || daysInt < 0) {
-            alert('Please enter a valid number of days.');
-            return;
         }
 
-        if (!confirm(`Are you sure you want to permanently delete all alerts older than ${daysInt} days for this device?`)) {
-            return;
-        }
-
-        try {
-            const response = await fetch('/api/alerts/prune', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    older_than_days: daysInt,
-                    system_id: alertConfig.systemId
-                })
-            });
-            const result = await response.json();
-            if (result.success) {
-                alert(result.message);
-                alertConfig.page = 1;
+        // Event Listeners
+        elements.prevBtn.addEventListener('click', () => {
+            if (alertConfig.page > 1) {
+                alertConfig.page--;
                 fetchAlerts();
             }
-        } catch (error) {
-            alert('Failed to prune alerts.');
-        }
-    });
+        });
 
-    // Initial load
-    fetchAlerts();
+        elements.nextBtn.addEventListener('click', () => {
+            alertConfig.page++;
+            fetchAlerts();
+        });
 
-})();
+        elements.searchInput.addEventListener('input', (e) => {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                alertConfig.search = e.target.value;
+                alertConfig.page = 1;
+                fetchAlerts();
+            }, 400);
+        });
+
+        elements.typeFilter.addEventListener('change', (e) => {
+            alertConfig.eventType = e.target.value;
+            alertConfig.page = 1;
+            fetchAlerts();
+        });
+
+        elements.sortBySelect.addEventListener('change', (e) => {
+            alertConfig.sortBy = e.target.value;
+            alertConfig.page = 1;
+            fetchAlerts();
+        });
+
+        elements.sortDirSelect.addEventListener('change', (e) => {
+            alertConfig.sortDir = e.target.value;
+            alertConfig.page = 1;
+            fetchAlerts();
+        });
+
+        elements.pruneBtn.addEventListener('click', async () => {
+            const days = prompt('Prune alerts older than how many days?', '30');
+            if (days === null) return;
+
+            const daysInt = parseInt(days);
+            if (isNaN(daysInt) || daysInt < 0) {
+                alert('Please enter a valid number of days.');
+                return;
+            }
+
+            if (!confirm(`Are you sure you want to permanently delete all alerts older than ${daysInt} days for this device?`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/alerts/prune', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        older_than_days: daysInt,
+                        system_id: alertConfig.systemId
+                    })
+                });
+                const result = await response.json();
+                if (result.success) {
+                    alert(result.message);
+                    alertConfig.page = 1;
+                    fetchAlerts();
+                }
+            } catch (error) {
+                alert('Failed to prune alerts.');
+            }
+        });
+
+        // Initial load
+        fetchAlerts();
+
+    })();
 </script>
 <script>
-(function() {
-    const systemId = "{{ device.system_id }}";
-    const form = document.getElementById('android-policy-form');
-    if (!form) return;
+    (function () {
+        const systemId = "{{ device.system_id }}";
+        const form = document.getElementById('android-policy-form');
+        if (!form) return;
 
-    const saveBtn = document.getElementById('save-policy-btn');
-    const policyAlert = document.getElementById('policy-alert');
-    const syncBadge = document.getElementById('policy-sync-badge');
+        const saveBtn = document.getElementById('save-policy-btn');
+        const policyAlert = document.getElementById('policy-alert');
+        const syncBadge = document.getElementById('policy-sync-badge');
 
-    function showAlert(message, isSuccess) {
-        policyAlert.textContent = message;
-        policyAlert.className = `alert mb-3 alert-${isSuccess ? 'success' : 'danger'}`;
-        policyAlert.classList.remove('d-none');
-    }
-
-    form.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        
-        saveBtn.disabled = true;
-        const originalText = saveBtn.innerHTML;
-        saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span> Saving...';
-        policyAlert.classList.add('d-none');
-
-        const payload = {
-            screen_capture_disabled: document.getElementById('screen_capture_disabled').checked,
-            camera_access: document.getElementById('camera_access').value,
-            microphone_access: document.getElementById('microphone_access').value,
-            usb_data_access: document.getElementById('usb_data_access').value,
-            developer_settings: document.getElementById('developer_settings').value,
-            install_apps_disabled: document.getElementById('install_apps_disabled').checked,
-            uninstall_apps_disabled: document.getElementById('uninstall_apps_disabled').checked,
-            factory_reset_disabled: document.getElementById('factory_reset_disabled').checked,
-            adjust_volume_disabled: document.getElementById('adjust_volume_disabled').checked,
-            modify_accounts_disabled: document.getElementById('modify_accounts_disabled').checked,
-            mount_physical_media_disabled: document.getElementById('mount_physical_media_disabled').checked,
-            bluetooth_disabled: document.getElementById('bluetooth_disabled').checked,
-            outgoing_calls_disabled: document.getElementById('outgoing_calls_disabled').checked,
-            sms_disabled: document.getElementById('sms_disabled').checked,
-            block_wifi_tethering: document.getElementById('block_wifi_tethering').checked,
-            block_nfc: document.getElementById('block_nfc').checked,
-            short_support_message: document.getElementById('short_support_message').value,
-            long_support_message: document.getElementById('long_support_message').value
-        };
-
-        try {
-            const response = await fetch(`/api/devices/${encodeURIComponent(systemId)}/android-device-policy`, {
-                method: 'PUT',
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': document.querySelector('meta[name="csrf-token"]')?.content || ''
-                },
-                body: JSON.stringify(payload)
-            });
-            const data = await response.json();
-            
-            if (response.ok && data.success) {
-                showAlert(data.message || 'Restrictions saved successfully', true);
-                if (data.policy && data.policy.is_synced) {
-                    syncBadge.className = 'badge bg-success-subtle text-success border border-success-subtle px-2.5 py-1.5 fw-bold';
-                    syncBadge.innerHTML = '<i class="fas fa-check-circle me-1"></i> Synced to Device';
-                } else {
-                    syncBadge.className = 'badge bg-warning-subtle text-warning border border-warning-subtle px-2.5 py-1.5 fw-bold';
-                    syncBadge.innerHTML = '<i class="fas fa-sync me-1"></i> Sync Pending';
-                }
-            } else {
-                showAlert(data.message || 'Failed to save restrictions', false);
-            }
-        } catch (err) {
-            showAlert(err.message || 'An error occurred while saving the policy', false);
-        } finally {
-            saveBtn.disabled = false;
-            saveBtn.innerHTML = originalText;
+        function showAlert(message, isSuccess) {
+            policyAlert.textContent = message;
+            policyAlert.className = `alert mb-3 alert-${isSuccess ? 'success' : 'danger'}`;
+            policyAlert.classList.remove('d-none');
         }
-    });
-})();
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            saveBtn.disabled = true;
+            const originalText = saveBtn.innerHTML;
+            saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span> Saving...';
+            policyAlert.classList.add('d-none');
+
+            const payload = {
+                screen_capture_disabled: document.getElementById('screen_capture_disabled').checked,
+                camera_access: document.getElementById('camera_access').value,
+                microphone_access: document.getElementById('microphone_access').value,
+                usb_data_access: document.getElementById('usb_data_access').value,
+                developer_settings: document.getElementById('developer_settings').value,
+                install_apps_disabled: document.getElementById('install_apps_disabled').checked,
+                uninstall_apps_disabled: document.getElementById('uninstall_apps_disabled').checked,
+                factory_reset_disabled: document.getElementById('factory_reset_disabled').checked,
+                adjust_volume_disabled: document.getElementById('adjust_volume_disabled').checked,
+                modify_accounts_disabled: document.getElementById('modify_accounts_disabled').checked,
+                mount_physical_media_disabled: document.getElementById('mount_physical_media_disabled').checked,
+                bluetooth_disabled: document.getElementById('bluetooth_disabled').checked,
+                outgoing_calls_disabled: document.getElementById('outgoing_calls_disabled').checked,
+                sms_disabled: document.getElementById('sms_disabled').checked,
+                block_wifi_tethering: document.getElementById('block_wifi_tethering').checked,
+                block_nfc: document.getElementById('block_nfc').checked,
+                short_support_message: document.getElementById('short_support_message').value,
+                long_support_message: document.getElementById('long_support_message').value
+            };
+
+            try {
+                const response = await fetch(`/api/devices/${encodeURIComponent(systemId)}/android-device-policy`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': document.querySelector('meta[name="csrf-token"]')?.content || ''
+                    },
+                    body: JSON.stringify(payload)
+                });
+                const data = await response.json();
+
+                if (response.ok && data.success) {
+                    showAlert(data.message || 'Restrictions saved successfully', true);
+                    if (data.policy && data.policy.is_synced) {
+                        syncBadge.className = 'badge bg-success-subtle text-success border border-success-subtle px-2.5 py-1.5 fw-bold';
+                        syncBadge.innerHTML = '<i class="fas fa-check-circle me-1"></i> Synced to Device';
+                    } else {
+                        syncBadge.className = 'badge bg-warning-subtle text-warning border border-warning-subtle px-2.5 py-1.5 fw-bold';
+                        syncBadge.innerHTML = '<i class="fas fa-sync me-1"></i> Sync Pending';
+                    }
+                } else {
+                    showAlert(data.message || 'Failed to save restrictions', false);
+                }
+            } catch (err) {
+                showAlert(err.message || 'An error occurred while saving the policy', false);
+            } finally {
+                saveBtn.disabled = false;
+                saveBtn.innerHTML = originalText;
+            }
+        });
+    })();
 </script>
 {% endblock %}
