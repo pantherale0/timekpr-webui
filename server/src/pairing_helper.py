@@ -14,6 +14,14 @@ from urllib.parse import urlparse, urlunparse
 import requests
 from werkzeug.datastructures import FileStorage
 from werkzeug.utils import secure_filename
+from src.settings_manager import (
+    _get_android_provisioning_skip_user_setup,
+    _get_android_provisioning_leave_all_system_apps_enabled,
+    _get_android_provisioning_wifi_ssid,
+    _get_android_provisioning_wifi_security_type,
+    _get_android_provisioning_wifi_password,
+)
+
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -28,7 +36,13 @@ PROVISIONING_KEY_COMPONENT = 'android.app.extra.PROVISIONING_DEVICE_ADMIN_COMPON
 PROVISIONING_KEY_SIGNATURE = 'android.app.extra.PROVISIONING_DEVICE_ADMIN_SIGNATURE_CHECKSUM'
 PROVISIONING_KEY_DOWNLOAD = 'android.app.extra.PROVISIONING_DEVICE_ADMIN_PACKAGE_DOWNLOAD_LOCATION'
 PROVISIONING_KEY_EXTRAS = 'android.app.extra.PROVISIONING_ADMIN_EXTRAS_BUNDLE'
+PROVISIONING_KEY_SKIP_USER_SETUP = 'android.app.extra.PROVISIONING_SKIP_USER_SETUP'
+PROVISIONING_KEY_LEAVE_ALL_SYSTEM_APPS_ENABLED = 'android.app.extra.PROVISIONING_LEAVE_ALL_SYSTEM_APPS_ENABLED'
+PROVISIONING_KEY_WIFI_SSID = 'android.app.extra.PROVISIONING_WIFI_SSID'
+PROVISIONING_KEY_WIFI_SECURITY_TYPE = 'android.app.extra.PROVISIONING_WIFI_SECURITY_TYPE'
+PROVISIONING_KEY_WIFI_PASSWORD = 'android.app.extra.PROVISIONING_WIFI_PASSWORD'
 PROVISIONING_APK_PATH = '/api/pairing/provisioning/apk'
+
 
 _CHECKSUM_CACHE: dict[str, tuple[str, float]] = {}
 _CHECKSUM_CACHE_TTL_SECONDS = 300
@@ -393,6 +407,11 @@ def build_android_provisioning_payload(
     apk_url: str,
     signature_checksum: str,
     registration_token: str | None = None,
+    skip_user_setup: bool = True,
+    leave_all_system_apps_enabled: bool = True,
+    wifi_ssid: str | None = None,
+    wifi_security_type: str | None = None,
+    wifi_password: str | None = None,
 ) -> dict:
     """Build an Android Enterprise 6-tap provisioning QR payload."""
     extras = {
@@ -401,12 +420,22 @@ def build_android_provisioning_payload(
     if registration_token:
         extras[ANDROID_EXTRA_REGISTRATION_TOKEN] = registration_token.strip()
 
-    return {
+    payload = {
         PROVISIONING_KEY_COMPONENT: ANDROID_DPC_COMPONENT,
         PROVISIONING_KEY_SIGNATURE: signature_checksum.strip(),
         PROVISIONING_KEY_DOWNLOAD: apk_url.strip(),
         PROVISIONING_KEY_EXTRAS: extras,
+        PROVISIONING_KEY_SKIP_USER_SETUP: skip_user_setup,
+        PROVISIONING_KEY_LEAVE_ALL_SYSTEM_APPS_ENABLED: leave_all_system_apps_enabled,
     }
+
+    if wifi_ssid and wifi_ssid.strip():
+        payload[PROVISIONING_KEY_WIFI_SSID] = wifi_ssid.strip()
+        payload[PROVISIONING_KEY_WIFI_SECURITY_TYPE] = (wifi_security_type or 'WPA').strip()
+        if wifi_password and wifi_password.strip():
+            payload[PROVISIONING_KEY_WIFI_PASSWORD] = wifi_password
+
+    return payload
 
 
 def provisioning_payload_json(
@@ -414,6 +443,11 @@ def provisioning_payload_json(
     apk_url: str,
     signature_checksum: str,
     registration_token: str | None = None,
+    skip_user_setup: bool = True,
+    leave_all_system_apps_enabled: bool = True,
+    wifi_ssid: str | None = None,
+    wifi_security_type: str | None = None,
+    wifi_password: str | None = None,
 ) -> str:
     return json.dumps(
         build_android_provisioning_payload(
@@ -421,6 +455,11 @@ def provisioning_payload_json(
             apk_url,
             signature_checksum,
             registration_token,
+            skip_user_setup=skip_user_setup,
+            leave_all_system_apps_enabled=leave_all_system_apps_enabled,
+            wifi_ssid=wifi_ssid,
+            wifi_security_type=wifi_security_type,
+            wifi_password=wifi_password,
         ),
         sort_keys=True,
     )
@@ -451,6 +490,13 @@ def resolve_android_provisioning(
     elif apk_url:
         apk_source = 'release'
 
+    # Retrieve current provisioning configuration settings
+    skip_user_setup = _get_android_provisioning_skip_user_setup()
+    leave_all_system_apps_enabled = _get_android_provisioning_leave_all_system_apps_enabled()
+    wifi_ssid = _get_android_provisioning_wifi_ssid()
+    wifi_security_type = _get_android_provisioning_wifi_security_type()
+    wifi_password = _get_android_provisioning_wifi_password()
+
     payload = None
     payload_json = None
     if provisioning_ready:
@@ -459,12 +505,22 @@ def resolve_android_provisioning(
             apk_url,
             signature_checksum,
             registration_token,
+            skip_user_setup=skip_user_setup,
+            leave_all_system_apps_enabled=leave_all_system_apps_enabled,
+            wifi_ssid=wifi_ssid,
+            wifi_security_type=wifi_security_type,
+            wifi_password=wifi_password,
         )
         payload_json = provisioning_payload_json(
             server_url,
             apk_url,
             signature_checksum,
             registration_token,
+            skip_user_setup=skip_user_setup,
+            leave_all_system_apps_enabled=leave_all_system_apps_enabled,
+            wifi_ssid=wifi_ssid,
+            wifi_security_type=wifi_security_type,
+            wifi_password=wifi_password,
         )
 
     return {
@@ -476,7 +532,13 @@ def resolve_android_provisioning(
         'payload': payload,
         'payload_json': payload_json,
         'is_dev_version': is_dev_server_version(version),
+        'skip_user_setup': skip_user_setup,
+        'leave_all_system_apps_enabled': leave_all_system_apps_enabled,
+        'wifi_ssid': wifi_ssid,
+        'wifi_security_type': wifi_security_type,
+        'has_wifi_password': bool(wifi_password),
     }
+
 
 
 def resolve_android_update_info(version: str, server_url: str = '') -> dict:

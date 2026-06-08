@@ -19,6 +19,7 @@ from src.settings_manager import (
     _get_alert_retention_days,
     _get_android_agent_apk_filename,
     _get_android_agent_signature_checksum,
+    encrypt_setting,
 )
 from src.pairing_helper import (
     build_agent_websocket_url,
@@ -282,21 +283,47 @@ def settings():
                 flash('Uploaded Android APK removed', 'success')
                 return redirect(url_for('ui_dashboard.settings'))
 
+            # 1. Save settings toggles
+            skip_user_setup = '1' if request.form.get('android_provisioning_skip_user_setup') == 'on' else '0'
+            leave_all_system_apps_enabled = '1' if request.form.get('android_provisioning_leave_all_system_apps_enabled') == 'on' else '0'
+            wifi_ssid = (request.form.get('android_provisioning_wifi_ssid') or '').strip()
+            wifi_security_type = (request.form.get('android_provisioning_wifi_security_type') or 'WPA').strip()
+
+            Settings.set_value('android_provisioning_skip_user_setup', skip_user_setup)
+            Settings.set_value('android_provisioning_leave_all_system_apps_enabled', leave_all_system_apps_enabled)
+            Settings.set_value('android_provisioning_wifi_ssid', wifi_ssid)
+            Settings.set_value('android_provisioning_wifi_security_type', wifi_security_type)
+
+            # 2. Handle Wi-Fi password encryption
+            if not wifi_ssid:
+                Settings.set_value('android_provisioning_wifi_password', '')
+            else:
+                wifi_password = request.form.get('android_provisioning_wifi_password') or ''
+                if wifi_password:
+                    encrypted_password = encrypt_setting(wifi_password)
+                    Settings.set_value('android_provisioning_wifi_password', encrypted_password)
+
+            # 3. Handle APK Upload
             uploaded_apk = request.files.get('android_agent_apk')
+            apk_updated = False
             if uploaded_apk and (uploaded_apk.filename or '').strip():
                 try:
                     filename, checksum = save_uploaded_android_apk(uploaded_apk)
-                except ValueError as exc:
-                    flash(str(exc), 'danger')
-                except RuntimeError as exc:
-                    flash(f'Failed to process uploaded APK: {exc}', 'danger')
-                else:
                     Settings.set_value('android_agent_apk_filename', filename)
                     Settings.set_value('android_agent_signature_checksum', checksum)
-                    flash('Android APK uploaded successfully', 'success')
+                    apk_updated = True
+                except ValueError as exc:
+                    flash(str(exc), 'danger')
                     return redirect(url_for('ui_dashboard.settings'))
+                except RuntimeError as exc:
+                    flash(f'Failed to process uploaded APK: {exc}', 'danger')
+                    return redirect(url_for('ui_dashboard.settings'))
+
+            if apk_updated:
+                flash('Android APK uploaded successfully', 'success')
             else:
-                flash('Choose an APK file to upload', 'warning')
+                flash('MDM provisioning configuration updated successfully', 'success')
+            return redirect(url_for('ui_dashboard.settings'))
         elif form_name == 'alert_webhook':
             webhook_enabled = request.form.get('alert_webhook_enabled') == 'on'
             webhook_url = (request.form.get('alert_webhook_url') or '').strip()

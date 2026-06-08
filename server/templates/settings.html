@@ -84,23 +84,79 @@
                 </div>
                 {% endif %}
 
-                <form action="{{ url_for('ui_dashboard.settings') }}" method="POST" enctype="multipart/form-data">
+                <form action="{{ url_for('ui_dashboard.settings') }}" method="POST" enctype="multipart/form-data" class="mt-3">
+                    {{ csrf_field() }}
+                    <input type="hidden" name="form_name" value="android_provisioning">
 
-                {{ csrf_field() }}                    <input type="hidden" name="form_name" value="android_provisioning">
-                    <label for="android_agent_apk" class="form-label fw-bold small text-muted">
-                        {% if android_agent_apk_uploaded %}REPLACE ANDROID APK{% else %}UPLOAD ANDROID APK{% endif %}
-                    </label>
-                    <input
-                        type="file"
-                        id="android_agent_apk"
-                        name="android_agent_apk"
-                        class="form-control"
-                        accept=".apk,application/vnd.android.package-archive"
-                    >
-                    <div class="form-text text-secondary small">
-                        Upload a signed release APK for dev/testing, or leave empty to use the GitHub release for server version <code>{{ server_version }}</code> when available. Uploaded APKs are hosted at <code>/api/pairing/provisioning/apk</code> with an automatic signature checksum.
+                    <div class="row g-3 mb-3">
+                        <div class="col-12 col-md-6">
+                            <div class="form-check form-switch mb-1">
+                                <input class="form-check-input" type="checkbox" id="android_provisioning_skip_user_setup" name="android_provisioning_skip_user_setup" {% if provisioning.skip_user_setup %}checked{% endif %}>
+                                <label class="form-check-label fw-bold small text-body" for="android_provisioning_skip_user_setup">
+                                    Skip Setup Wizard (Google Account &amp; SIM Setup)
+                                </label>
+                            </div>
+                            <div class="form-text text-secondary small ms-5">
+                                If checked, skips Google account registration and OEM setup wizard steps to expedite provisioning.
+                            </div>
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <div class="form-check form-switch mb-1">
+                                <input class="form-check-input" type="checkbox" id="android_provisioning_leave_all_system_apps_enabled" name="android_provisioning_leave_all_system_apps_enabled" {% if provisioning.leave_all_system_apps_enabled %}checked{% endif %}>
+                                <label class="form-check-label fw-bold small text-body" for="android_provisioning_leave_all_system_apps_enabled">
+                                    Leave All System Apps Enabled
+                                </label>
+                            </div>
+                            <div class="form-text text-secondary small ms-5">
+                                Recommended. Keeps OEM dialer, settings, and carrier configuration apps enabled so SIM cards function correctly.
+                            </div>
+                        </div>
                     </div>
-                    <button type="submit" class="btn btn-secondary fw-bold mt-3">Upload APK</button>
+
+                    <div class="border rounded p-3 bg-body-secondary mb-3">
+                        <h6 class="text-secondary small fw-bold text-uppercase mb-3" style="font-size: 0.75rem;">
+                            <i class="fas fa-wifi me-1 text-info"></i>Default Wi-Fi Network (Optional)
+                        </h6>
+                        <div class="row g-3">
+                            <div class="col-12 col-md-4">
+                                <label for="android_provisioning_wifi_ssid" class="form-label fw-bold small text-muted" style="font-size: 0.7rem;">WIFI SSID (NETWORK NAME)</label>
+                                <input type="text" id="android_provisioning_wifi_ssid" name="android_provisioning_wifi_ssid" class="form-control" placeholder="e.g. MyHomeWiFi" value="{{ provisioning.wifi_ssid or '' }}">
+                                <div class="form-text text-secondary small">Leave blank to omit Wi-Fi configuration from the QR.</div>
+                            </div>
+                            <div class="col-12 col-md-4">
+                                <label for="android_provisioning_wifi_security_type" class="form-label fw-bold small text-muted" style="font-size: 0.7rem;">SECURITY TYPE</label>
+                                <select id="android_provisioning_wifi_security_type" name="android_provisioning_wifi_security_type" class="form-select">
+                                    <option value="WPA" {% if provisioning.wifi_security_type == 'WPA' %}selected{% endif %}>WPA/WPA2-PSK</option>
+                                    <option value="WEP" {% if provisioning.wifi_security_type == 'WEP' %}selected{% endif %}>WEP</option>
+                                    <option value="NONE" {% if provisioning.wifi_security_type == 'NONE' %}selected{% endif %}>None (Open Network)</option>
+                                </select>
+                            </div>
+                            <div class="col-12 col-md-4">
+                                <label for="android_provisioning_wifi_password" class="form-label fw-bold small text-muted" style="font-size: 0.7rem;">WIFI PASSWORD</label>
+                                <input type="password" id="android_provisioning_wifi_password" name="android_provisioning_wifi_password" class="form-control" placeholder="{% if provisioning.has_wifi_password %}••••••••{% else %}Enter password{% endif %}" autocomplete="new-password">
+                                <div class="form-text text-secondary small">Password is only required when changing security settings.</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="android_agent_apk" class="form-label fw-bold small text-muted" style="font-size: 0.7rem;">
+                            {% if android_agent_apk_uploaded %}REPLACE ANDROID APK{% else %}UPLOAD ANDROID APK{% endif %}
+                        </label>
+                        <input
+                            type="file"
+                            id="android_agent_apk"
+                            name="android_agent_apk"
+                            class="form-control"
+                            accept=".apk,application/vnd.android.package-archive"
+                        >
+                        <div class="form-text text-secondary small mt-1">
+                            Upload a signed release APK for dev/testing, or leave empty to use the GitHub release for server version <code>{{ server_version }}</code> when available. Uploaded APKs are hosted at <code>/api/pairing/provisioning/apk</code> with an automatic signature checksum.
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-secondary fw-bold mt-2">Save MDM Provisioning Config</button>
                 </form>
 
                 {% if not provisioning.provisioning_ready %}
