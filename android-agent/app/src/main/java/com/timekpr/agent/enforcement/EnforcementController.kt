@@ -462,6 +462,27 @@ class EnforcementController(
             } catch (_: SecurityException) {
             }
         }
+
+        policy.forceInstalledApps.forEach { app ->
+            if (!isPackageInstalled(app.packageName)) {
+                Log.i(TAG, "Force-installed app missing, enqueuing installation: ${app.packageName}")
+                com.timekpr.agent.update.AppInstallWorker.enqueue(
+                    context,
+                    app.packageName,
+                    app.apkUrl,
+                    app.sha256Checksum
+                )
+            }
+        }
+    }
+
+    private fun isPackageInstalled(packageName: String): Boolean {
+        return try {
+            context.packageManager.getPackageInfo(packageName, 0)
+            true
+        } catch (e: PackageManager.NameNotFoundException) {
+            false
+        }
     }
 
     private fun setPackagesSuspended(

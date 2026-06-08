@@ -382,6 +382,49 @@
                             <div class="form-text small text-secondary" style="font-size: 0.75rem;">Shown in the Device
                                 Administrator details screen. Max 4096 chars.</div>
                         </div>
+                        <!-- Category: Force Installed Applications -->
+                        <h6 class="fw-bold text-secondary text-uppercase mb-3 pb-1 border-bottom"
+                            style="font-size: 0.75rem; letter-spacing: 0.05em;">
+                            <i class="fas fa-download me-1 text-primary"></i> Force Installed Applications
+                        </h6>
+                        <div class="mb-4">
+                            <span class="text-secondary small fw-medium d-block mb-3">Specify external APK URLs to silently download and install on the child's device in the background.</span>
+                            <div class="table-responsive">
+                                <table class="table table-sm table-bordered align-middle mb-2" id="force-apps-table">
+                                    <thead>
+                                        <tr class="bg-body-secondary text-secondary" style="font-size: 0.75rem;">
+                                            <th style="width: 30%;">Package Name</th>
+                                            <th style="width: 45%;">APK URL (HTTPS)</th>
+                                            <th style="width: 20%;">SHA-256 Checksum (Optional)</th>
+                                            <th style="width: 5%;" class="text-center">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="force-apps-list">
+                                        {% if android_device_policy and android_device_policy.force_installed_apps %}
+                                            {% for app in android_device_policy.force_installed_apps %}
+                                            <tr class="force-app-row">
+                                                <td>
+                                                    <input type="text" class="form-control form-control-sm app-package-name bg-body-secondary" placeholder="com.example.app" required readonly value="{{ app.package_name }}">
+                                                </td>
+                                                <td>
+                                                    <input type="url" class="form-control form-control-sm app-apk-url bg-body-secondary" placeholder="https://example.com/app.apk" required readonly value="{{ app.apk_url }}">
+                                                </td>
+                                                <td>
+                                                    <input type="text" class="form-control form-control-sm app-checksum bg-body-secondary" placeholder="SHA-256 Hash" readonly value="{{ app.sha256_checksum or '' }}">
+                                                </td>
+                                                <td class="text-center">
+                                                    <button type="button" class="btn btn-sm btn-outline-danger border-0 remove-app-btn"><i class="fas fa-trash-alt"></i></button>
+                                                </td>
+                                            </tr>
+                                            {% endfor %}
+                                        {% endif %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            <button type="button" class="btn btn-sm btn-outline-primary fw-bold" id="add-force-app-btn">
+                                <i class="fas fa-plus me-1"></i> Add Application
+                            </button>
+                        </div>
 
                         <!-- Save Action -->
                         <div class="d-flex justify-content-end">
@@ -635,10 +678,10 @@
                         uses to sync with this server. Run these commands from a computer with ADB access:
                     </p>
                     <label class="form-label small fw-bold text-secondary mb-1">Device token</label>
-                    <div class="font-monospace small bg-light border rounded p-2 mb-3 user-select-all">{{
+                    <div class="font-monospace small bg-body-secondary border rounded p-2 mb-3 user-select-all">{{
                         device.secure_token }}</div>
                     <label class="form-label small fw-bold text-secondary mb-1">Recovery commands</label>
-                    <pre class="small bg-light border rounded p-2 mb-0 user-select-all" style="white-space: pre-wrap;">adb install -r app-debug.apk
+                    <pre class="small bg-body-secondary border rounded p-2 mb-0 user-select-all" style="white-space: pre-wrap;">adb install -r app-debug.apk
 adb shell am broadcast --user 0 \
   -a com.timekpr.agent.LOCKED_BOOT_SEED_CONFIG \
   -n com.timekpr.agent/.boot.LockedBootRecoveryReceiver \
@@ -1149,6 +1192,85 @@ adb reboot</pre>
 
     })();
 </script>
+
+<!-- Add Application Wizard Modal -->
+<div class="modal fade" id="add-app-wizard-modal" tabindex="-1" aria-labelledby="addAppWizardLabel" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content shadow-lg border-0">
+            <div class="modal-header bg-dark text-white py-3">
+                <h5 class="modal-title fw-bold" id="addAppWizardLabel">
+                    <i class="fas fa-magic text-primary me-2"></i>Add Application Wizard
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4">
+                <!-- Step 1: URL Input -->
+                <div id="wizard-step-1" class="wizard-step">
+                    <p class="text-secondary small mb-3">Provide the HTTPS URL to the application's APK file. The server will download and inspect the file to verify the package name and calculate its checksum.</p>
+                    <div class="mb-3">
+                        <label for="wizard-apk-url" class="form-label small fw-bold text-uppercase text-secondary">APK URL (HTTPS)</label>
+                        <input type="url" class="form-control" id="wizard-apk-url" placeholder="https://example.com/app.apk" required>
+                        <div class="invalid-feedback" id="wizard-url-feedback">Please enter a valid HTTPS URL.</div>
+                    </div>
+                    <div class="d-flex justify-content-end gap-2">
+                        <button type="button" class="btn btn-secondary btn-sm fw-bold" data-bs-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-primary btn-sm fw-bold" id="wizard-btn-validate">
+                            Validate APK <i class="fas fa-arrow-right ms-1"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Step 2: Loading State -->
+                <div id="wizard-step-2" class="wizard-step d-none text-center py-4">
+                    <div class="spinner-border text-primary mb-3" style="width: 3rem; height: 3rem;" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <h5 class="fw-bold mb-2">Validating Application</h5>
+                    <p class="text-secondary small mb-0 px-3">Downloading APK, verifying structural integrity, and extracting binary metadata. This may take a few seconds...</p>
+                </div>
+
+                <!-- Step 3: Confirmation -->
+                <div id="wizard-step-3" class="wizard-step d-none">
+                    <div class="alert alert-success d-flex align-items-center gap-2 mb-3 py-2 border-0 bg-success-subtle text-success">
+                        <i class="fas fa-check-circle fs-5"></i>
+                        <span class="small fw-semibold">APK successfully validated and verified!</span>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <span class="text-secondary small fw-bold text-uppercase d-block mb-1" style="font-size: 0.7rem;">Package Name</span>
+                        <div class="p-2 border rounded bg-body-secondary font-monospace small text-body" id="wizard-confirm-package">com.example.app</div>
+                    </div>
+                    <div class="mb-3">
+                        <span class="text-secondary small fw-bold text-uppercase d-block mb-1" style="font-size: 0.7rem;">SHA-256 Checksum</span>
+                        <div class="p-2 border rounded bg-body-secondary font-monospace small text-body text-break" id="wizard-confirm-checksum">-</div>
+                    </div>
+                    <div class="mb-4">
+                        <span class="text-secondary small fw-bold text-uppercase d-block mb-1" style="font-size: 0.7rem;">Source URL</span>
+                        <div class="p-2 border rounded bg-body-secondary font-monospace small text-body text-truncate" id="wizard-confirm-url">-</div>
+                    </div>
+
+                    <div class="d-flex justify-content-between gap-2">
+                        <button type="button" class="btn btn-outline-secondary btn-sm fw-bold" id="wizard-btn-back">
+                            <i class="fas fa-arrow-left me-1"></i> Back
+                        </button>
+                        <div class="d-flex gap-2">
+                            <button type="button" class="btn btn-secondary btn-sm fw-bold" data-bs-dismiss="modal">Cancel</button>
+                            <button type="button" class="btn btn-success btn-sm fw-bold" id="wizard-btn-confirm">
+                                Confirm & Add <i class="fas fa-plus ms-1"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Error Toast / Box -->
+                <div id="wizard-error-box" class="alert alert-danger d-none mt-3 mb-0 border-0 bg-danger-subtle text-danger text-start small">
+                    <i class="fas fa-exclamation-circle me-1"></i> <span id="wizard-error-message">An error occurred</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
     (function () {
         const systemId = "{{ device.system_id }}";
@@ -1158,6 +1280,131 @@ adb reboot</pre>
         const saveBtn = document.getElementById('save-policy-btn');
         const policyAlert = document.getElementById('policy-alert');
         const syncBadge = document.getElementById('policy-sync-badge');
+
+        const forceAppsList = document.getElementById('force-apps-list');
+        const addForceAppBtn = document.getElementById('add-force-app-btn');
+
+        if (addForceAppBtn && forceAppsList) {
+            const wizardModalEl = document.getElementById('add-app-wizard-modal');
+            const wizardModal = new bootstrap.Modal(wizardModalEl);
+            const validateBtn = document.getElementById('wizard-btn-validate');
+            const apkUrlInput = document.getElementById('wizard-apk-url');
+            const urlFeedback = document.getElementById('wizard-url-feedback');
+            const confirmBtn = document.getElementById('wizard-btn-confirm');
+            const backBtn = document.getElementById('wizard-btn-back');
+
+            function showStep(stepNum) {
+                document.querySelectorAll('.wizard-step').forEach(step => {
+                    step.classList.add('d-none');
+                });
+                document.getElementById(`wizard-step-${stepNum}`).classList.remove('d-none');
+                document.getElementById('wizard-error-box').classList.add('d-none');
+            }
+
+            function showWizardError(msg) {
+                const errorBox = document.getElementById('wizard-error-box');
+                const errorMsg = document.getElementById('wizard-error-message');
+                errorMsg.textContent = msg;
+                errorBox.classList.remove('d-none');
+            }
+
+            addForceAppBtn.addEventListener('click', () => {
+                showStep(1);
+                apkUrlInput.value = '';
+                apkUrlInput.classList.remove('is-invalid');
+                wizardModal.show();
+            });
+
+            validateBtn.addEventListener('click', async () => {
+                const apkUrl = apkUrlInput.value.trim();
+                if (!apkUrl) {
+                    apkUrlInput.classList.add('is-invalid');
+                    urlFeedback.textContent = 'APK URL is required.';
+                    return;
+                }
+                
+                try {
+                    const parsedUrl = new URL(apkUrl);
+                    if (parsedUrl.protocol !== 'https:') {
+                        apkUrlInput.classList.add('is-invalid');
+                        urlFeedback.textContent = 'URL must use HTTPS protocol.';
+                        return;
+                    }
+                } catch (_) {
+                    apkUrlInput.classList.add('is-invalid');
+                    urlFeedback.textContent = 'Please enter a valid URL.';
+                    return;
+                }
+                
+                apkUrlInput.classList.remove('is-invalid');
+                showStep(2);
+                
+                try {
+                    const response = await fetch(`/api/devices/${encodeURIComponent(systemId)}/validate-apk-url`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': document.querySelector('meta[name="csrf-token"]')?.content || ''
+                        },
+                        body: JSON.stringify({ apk_url: apkUrl })
+                    });
+                    
+                    const data = await response.json();
+                    if (response.ok && data.success) {
+                        document.getElementById('wizard-confirm-package').textContent = data.package_name;
+                        document.getElementById('wizard-confirm-checksum').textContent = data.sha256_checksum;
+                        document.getElementById('wizard-confirm-url').textContent = apkUrl;
+                        showStep(3);
+                    } else {
+                        showStep(1);
+                        showWizardError(data.message || 'Validation failed. Please verify the URL is correct and public.');
+                    }
+                } catch (err) {
+                    showStep(1);
+                    showWizardError(err.message || 'An error occurred during verification.');
+                }
+            });
+
+            backBtn.addEventListener('click', () => {
+                showStep(1);
+            });
+
+            confirmBtn.addEventListener('click', () => {
+                const packageName = document.getElementById('wizard-confirm-package').textContent;
+                const checksum = document.getElementById('wizard-confirm-checksum').textContent;
+                const apkUrl = document.getElementById('wizard-confirm-url').textContent;
+                
+                const tr = document.createElement('tr');
+                tr.className = 'force-app-row';
+                tr.innerHTML = `
+                    <td>
+                        <input type="text" class="form-control form-control-sm app-package-name bg-body-secondary" placeholder="com.example.app" required readonly value="${packageName}">
+                    </td>
+                    <td>
+                        <input type="url" class="form-control form-control-sm app-apk-url bg-body-secondary" placeholder="https://example.com/app.apk" required readonly value="${apkUrl}">
+                    </td>
+                    <td>
+                        <input type="text" class="form-control form-control-sm app-checksum bg-body-secondary" placeholder="SHA-256 Hash" readonly value="${checksum}">
+                    </td>
+                    <td class="text-center">
+                        <button type="button" class="btn btn-sm btn-outline-danger border-0 remove-app-btn"><i class="fas fa-trash-alt"></i></button>
+                    </td>
+                `;
+                forceAppsList.appendChild(tr);
+                
+                tr.querySelector('.remove-app-btn').addEventListener('click', () => {
+                    tr.remove();
+                });
+                
+                wizardModal.hide();
+            });
+
+            forceAppsList.querySelectorAll('.remove-app-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.currentTarget.closest('tr').remove();
+                });
+            });
+        }
 
         function showAlert(message, isSuccess) {
             policyAlert.textContent = message;
@@ -1172,6 +1419,22 @@ adb reboot</pre>
             const originalText = saveBtn.innerHTML;
             saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span> Saving...';
             policyAlert.classList.add('d-none');
+
+            const forceApps = [];
+            if (forceAppsList) {
+                forceAppsList.querySelectorAll('.force-app-row').forEach(row => {
+                    const packageName = row.querySelector('.app-package-name').value.trim();
+                    const apkUrl = row.querySelector('.app-apk-url').value.trim();
+                    const checksum = row.querySelector('.app-checksum').value.trim();
+                    if (packageName && apkUrl) {
+                        forceApps.push({
+                            package_name: packageName,
+                            apk_url: apkUrl,
+                            sha256_checksum: checksum
+                        });
+                    }
+                });
+            }
 
             const payload = {
                 screen_capture_disabled: document.getElementById('screen_capture_disabled').checked,
@@ -1191,7 +1454,8 @@ adb reboot</pre>
                 block_wifi_tethering: document.getElementById('block_wifi_tethering').checked,
                 block_nfc: document.getElementById('block_nfc').checked,
                 short_support_message: document.getElementById('short_support_message').value,
-                long_support_message: document.getElementById('long_support_message').value
+                long_support_message: document.getElementById('long_support_message').value,
+                force_installed_apps: forceApps
             };
 
             try {

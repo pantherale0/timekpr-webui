@@ -15,6 +15,7 @@ from src.database import (
     db,
     ManagedUserDeviceMap,
     MappingAndroidDevicePolicy,
+    AndroidForceInstalledApp,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -128,6 +129,15 @@ def build_device_policy_payload(policy: MappingAndroidDevicePolicy) -> dict:
             'profile_type': m.android_profile_type,
         })
 
+    force_installed_apps = []
+    if policy.force_installed_apps:
+        for app in policy.force_installed_apps:
+            force_installed_apps.append({
+                'packageName': app.package_name,
+                'apkUrl': app.apk_url,
+                'sha256Checksum': app.sha256_checksum,
+            })
+
     payload = {
         'screenCaptureDisabled': bool(policy.screen_capture_disabled),
         'cameraAccess': policy.camera_access,
@@ -154,6 +164,7 @@ def build_device_policy_payload(policy: MappingAndroidDevicePolicy) -> dict:
         'profiles': profiles,
         'lockOwnerProfile': lock_owner_profile,
         'managedProfileUids': managed_child_uids,
+        'forceInstalledApps': force_installed_apps,
     }
     return payload
 
@@ -217,6 +228,14 @@ def build_policy_summary(policy: MappingAndroidDevicePolicy, device: AgentDevice
         'last_synced_at': policy.last_synced_at.isoformat() if policy.last_synced_at else None,
         'last_sync_error': policy.last_sync_error,
         'device_policy': build_device_policy_payload(policy),
+        'force_installed_apps': [
+            {
+                'package_name': app.package_name,
+                'apk_url': app.apk_url,
+                'sha256_checksum': app.sha256_checksum or '',
+            }
+            for app in policy.force_installed_apps
+        ],
     }
 
 
@@ -287,6 +306,35 @@ def upsert_policy(device: AgentDevice, body: dict) -> MappingAndroidDevicePolicy
             body.get('block_nfc'),
             'block_nfc',
         )
+
+    if 'force_installed_apps' in body:
+        app_list = body.get('force_installed_apps')
+        if not isinstance(app_list, list):
+            raise ValueError('force_installed_apps must be a list')
+
+        # Clean existing entries
+        AndroidForceInstalledApp.query.filter_by(system_id=policy.system_id).delete()
+
+        # Insert new entries
+        for app_data in app_list:
+            if not isinstance(app_data, dict):
+                raise ValueError('Each item in force_installed_apps must be an object')
+            package_name = (app_data.get('package_name') or '').strip()
+            apk_url = (app_data.get('apk_url') or '').strip()
+            sha256_checksum = (app_data.get('sha256_checksum') or '').strip() or None
+
+            if not package_name:
+                raise ValueError('package_name is required for each force-installed app')
+            if not apk_url:
+                raise ValueError('apk_url is required for each force-installed app')
+
+            new_app = AndroidForceInstalledApp(
+                system_id=policy.system_id,
+                package_name=package_name,
+                apk_url=apk_url,
+                sha256_checksum=sha256_checksum
+            )
+            db.session.add(new_app)
 
     payload = build_device_policy_payload(policy)
     policy.revision = compute_revision(payload)

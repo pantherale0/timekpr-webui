@@ -87,13 +87,15 @@ object DeviceOwnerProvisioner {
     }
 
     fun configureCrossProfileCommunication(context: Context) {
-        if (!isDeviceOwner(context)) return
+        if (!isProfileOwner(context)) return
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return
         val dpm = context.getSystemService(DevicePolicyManager::class.java) ?: return
         val admin = ComponentName(context, TimeKprDeviceAdminReceiver::class.java)
         try {
             dpm.setCrossProfilePackages(admin, setOf(context.packageName))
             AgentLog.d(TAG, "Configured cross-profile package allowlist")
+        } catch (e: SecurityException) {
+            AgentLog.d(TAG, "setCrossProfilePackages not authorized for this profile: ${e.message}")
         } catch (e: Exception) {
             Log.w(TAG, "Failed to configure cross-profile packages", e)
         }

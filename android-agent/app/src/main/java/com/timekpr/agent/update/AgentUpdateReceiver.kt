@@ -17,11 +17,16 @@ class AgentUpdateReceiver : BroadcastReceiver() {
         val message = intent?.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE).orEmpty()
         val appContext = context.applicationContext
 
+        val packageName = intent?.getStringExtra(PackageInstaller.EXTRA_PACKAGE_NAME)
+        val isSelf = packageName == null || packageName == context.packageName
+
         when (status) {
             PackageInstaller.STATUS_SUCCESS -> {
-                Log.i(TAG, "Agent update installed successfully")
-                AgentConnectionState.update(AgentConnectionStatus.CONNECTING, "Update installed, reconnecting…")
-                AgentSessionCoordinator.scheduleSync(appContext, reason = "agent_updated")
+                Log.i(TAG, "Package installed successfully: $packageName")
+                if (isSelf) {
+                    AgentConnectionState.update(AgentConnectionStatus.CONNECTING, "Update installed, reconnecting…")
+                    AgentSessionCoordinator.scheduleSync(appContext, reason = "agent_updated")
+                }
             }
             PackageInstaller.STATUS_PENDING_USER_ACTION -> {
                 val confirmIntent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -36,11 +41,13 @@ class AgentUpdateReceiver : BroadcastReceiver() {
                 }
             }
             else -> {
-                Log.w(TAG, "Agent update install failed: status=$status message=$message")
-                AgentConnectionState.update(
-                    AgentConnectionStatus.ERROR,
-                    message.ifBlank { "Agent update install failed (status $status)" },
-                )
+                Log.w(TAG, "Install failed for $packageName: status=$status message=$message")
+                if (isSelf) {
+                    AgentConnectionState.update(
+                        AgentConnectionStatus.ERROR,
+                        message.ifBlank { "Agent update install failed (status $status)" },
+                    )
+                }
             }
         }
     }

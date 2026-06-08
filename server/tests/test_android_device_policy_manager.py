@@ -87,6 +87,7 @@ def test_build_device_policy_payload_defaults(android_device):
         'profiles': [],
         'lockOwnerProfile': False,
         'managedProfileUids': [],
+        'forceInstalledApps': [],
     }
 
 
@@ -233,3 +234,34 @@ def test_upsert_rejects_invalid_usb_data_access(android_device, monkeypatch):
     )
     with pytest.raises(ValueError, match='usb_data_access'):
         upsert_policy(android_device, {'usb_data_access': 'INVALID'})
+
+
+def test_upsert_policy_with_force_installed_apps(android_device, monkeypatch, db_session):
+    monkeypatch.setattr(
+        'src.android_device_policy_manager.push_device_policy',
+        lambda device: (True, 'ok'),
+    )
+    policy = upsert_policy(android_device, {
+        'force_installed_apps': [
+            {
+                'package_name': 'com.test.app',
+                'apk_url': 'https://example.com/test.apk',
+                'sha256_checksum': 'checksum123'
+            }
+        ]
+    })
+
+    assert len(policy.force_installed_apps) == 1
+    assert policy.force_installed_apps[0].package_name == 'com.test.app'
+    assert policy.force_installed_apps[0].apk_url == 'https://example.com/test.apk'
+    assert policy.force_installed_apps[0].sha256_checksum == 'checksum123'
+
+    payload = build_device_policy_payload(policy)
+    assert payload['forceInstalledApps'] == [
+        {
+            'packageName': 'com.test.app',
+            'apkUrl': 'https://example.com/test.apk',
+            'sha256Checksum': 'checksum123'
+        }
+    ]
+

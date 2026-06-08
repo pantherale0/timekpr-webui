@@ -1384,8 +1384,52 @@ class MappingAndroidDevicePolicy(db.Model):
     block_wifi_tethering = db.Column(db.Boolean, nullable=False, default=False)
     block_nfc = db.Column(db.Boolean, nullable=False, default=False)
 
+    force_installed_apps = db.relationship(
+        'AndroidForceInstalledApp',
+        backref='policy',
+        cascade='all, delete-orphan',
+        lazy=True,
+    )
+
     def __repr__(self):
         return f'<MappingAndroidDevicePolicy device={self.system_id} revision={self.revision}>'
+
+
+class AndroidForceInstalledApp(db.Model):
+    __tablename__ = 'android_force_installed_app'
+
+    id = db.Column(db.Integer, primary_key=True)
+    system_id = db.Column(
+        db.String(50),
+        db.ForeignKey('mapping_android_device_policy.system_id'),
+        nullable=False,
+    )
+    package_name = db.Column(db.String(255), nullable=False)
+    apk_url = db.Column(db.Text, nullable=False)
+    sha256_checksum = db.Column(db.String(64), nullable=True)
+    created_at = db.Column(
+        db.DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+    updated_at = db.Column(
+        db.DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+    __table_args__ = (
+        db.UniqueConstraint(
+            'system_id',
+            'package_name',
+            name='android_force_installed_app_package_uc',
+        ),
+    )
+
+    def __repr__(self):
+        return f'<AndroidForceInstalledApp {self.package_name} on {self.system_id}>'
+
 
 
 class MappingLinuxDevicePolicy(db.Model):

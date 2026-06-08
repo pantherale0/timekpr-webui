@@ -9,6 +9,12 @@ data class ProfileToProvision(
     val profileType: String
 )
 
+data class ForceInstalledApp(
+    val packageName: String,
+    val apkUrl: String,
+    val sha256Checksum: String?
+)
+
 data class DeviceRestrictionPolicy(
     val screenCaptureDisabled: Boolean = false,
     val cameraAccess: String = CAMERA_ACCESS_UNSPECIFIED,
@@ -31,6 +37,7 @@ data class DeviceRestrictionPolicy(
     val profiles: List<ProfileToProvision> = emptyList(),
     val lockOwnerProfile: Boolean = false,
     val managedProfileUids: List<Int> = emptyList(),
+    val forceInstalledApps: List<ForceInstalledApp> = emptyList(),
 ) {
     val cameraDisabled: Boolean
         get() = when (cameraAccess) {
@@ -127,6 +134,22 @@ data class DeviceRestrictionPolicy(
                 }
             }
 
+            val forceInstalledList = mutableListOf<ForceInstalledApp>()
+            val forceInstalledArray = json.optJSONArray("forceInstalledApps")
+            if (forceInstalledArray != null) {
+                for (i in 0 until forceInstalledArray.length()) {
+                    val appJson = forceInstalledArray.optJSONObject(i)
+                    if (appJson != null) {
+                        val packageName = appJson.optString("packageName", "").trim()
+                        val apkUrl = appJson.optString("apkUrl", "").trim()
+                        val sha256Checksum = appJson.optString("sha256Checksum", "").trim().takeIf { it.isNotEmpty() }
+                        if (packageName.isNotEmpty() && apkUrl.isNotEmpty()) {
+                            forceInstalledList.add(ForceInstalledApp(packageName, apkUrl, sha256Checksum))
+                        }
+                    }
+                }
+            }
+
             return DeviceRestrictionPolicy(
                 screenCaptureDisabled = json.optBoolean("screenCaptureDisabled", false),
                 cameraAccess = json.optString("cameraAccess", CAMERA_ACCESS_UNSPECIFIED),
@@ -153,6 +176,7 @@ data class DeviceRestrictionPolicy(
                     DEFAULT_LONG_SUPPORT_MESSAGE,
                 ),
                 profiles = profilesList,
+                forceInstalledApps = forceInstalledList,
             )
         }
     }
@@ -164,6 +188,16 @@ data class DeviceRestrictionPolicy(
                 JSONObject()
                     .put("username", p.username)
                     .put("profile_type", p.profileType)
+            )
+        }
+
+        val forceInstalledArray = JSONArray()
+        forceInstalledApps.forEach { app ->
+            forceInstalledArray.put(
+                JSONObject()
+                    .put("packageName", app.packageName)
+                    .put("apkUrl", app.apkUrl)
+                    .put("sha256Checksum", app.sha256Checksum ?: "")
             )
         }
 
@@ -183,6 +217,7 @@ data class DeviceRestrictionPolicy(
             .put("blockWifiTethering", blockWifiTethering)
             .put("blockNfc", blockNfc)
             .put("profiles", profilesArray)
+            .put("forceInstalledApps", forceInstalledArray)
             .put("lockOwnerProfile", lockOwnerProfile)
             .put(
                 "managedProfileUids",
