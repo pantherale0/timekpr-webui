@@ -12,6 +12,8 @@ import android.util.Log
 import com.timekpr.agent.admin.DeviceOwnerProvisioner
 import com.timekpr.agent.admin.TimeKprDeviceAdminReceiver
 import com.timekpr.agent.policy.ProfileProvisioningStore
+import com.timekpr.agent.TimeKprApplication
+import com.timekpr.agent.config.AgentConfigStore
 
 object AndroidUsers {
     private const val TAG = "AndroidUsers"
@@ -123,6 +125,10 @@ object AndroidUsers {
     /** Provisioned secondary profile IDs (excludes user 0). Primary user only. */
     fun managedSecondaryUserIds(context: Context): Set<Int> {
         if (!isPrimaryUser(context)) return emptySet()
+        val configStore = TimeKprApplication.from(context).configStore
+        if (configStore.load().managementMode == AgentConfigStore.MANAGEMENT_MODE_EXCLUSIVE_DO) {
+            return emptySet()
+        }
         val fromProvisioning = ProfileProvisioningStore(context).allProvisionedUserIds().filter { it > 0 }
         if (fromProvisioning.isNotEmpty()) return fromProvisioning.toSet()
         return linuxUsersPayload(context)
@@ -308,6 +314,10 @@ object AndroidUsers {
      */
     fun inventoryTargets(context: Context): List<Pair<String, Context>> {
         if (!isPrimaryUser(context)) {
+            return listOf(currentLinuxUsername(context) to context)
+        }
+        val configStore = TimeKprApplication.from(context).configStore
+        if (configStore.load().managementMode == AgentConfigStore.MANAGEMENT_MODE_EXCLUSIVE_DO) {
             return listOf(currentLinuxUsername(context) to context)
         }
 

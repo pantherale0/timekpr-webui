@@ -20,6 +20,7 @@ import android.widget.Button
 import android.widget.TextView
 import androidx.core.app.NotificationCompat
 import com.timekpr.agent.R
+import com.timekpr.agent.boot.OtpLockActivity
 
 /**
  * Persistent top banner shown when screen time is exhausted or owner profile lockdown is active.
@@ -126,12 +127,11 @@ object TimeExhaustedOverlay {
             callButton.setOnClickListener(null)
         }
     }
-
     private fun setupParentAccessButton(overlayView: View, context: Context, mode: Mode) {
         val parentButton = overlayView.findViewById<Button>(R.id.time_exhausted_parent_access)
         parentButton.setOnClickListener {
-            val intent = Intent(context, ParentalAccessActivity::class.java).apply {
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            val intent = Intent(context, OtpLockActivity::class.java).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
             }
             context.startActivity(intent)
         }
@@ -154,8 +154,8 @@ object TimeExhaustedOverlay {
             return
         }
         val manager = ensureChannel(context)
-        val intent = Intent(context, ParentalAccessActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        val intent = Intent(context, OtpLockActivity::class.java).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
         }
         val pendingIntent = android.app.PendingIntent.getActivity(
             context,

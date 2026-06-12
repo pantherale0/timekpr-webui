@@ -21,6 +21,7 @@ import com.timekpr.agent.ui.MainActivity
 import com.timekpr.agent.ui.PairingSetupActivity
 import com.timekpr.agent.ui.QrScanActivity
 import com.timekpr.agent.util.AndroidUsers
+import com.timekpr.agent.config.AgentConfigStore
 import java.io.File
 
 /**
@@ -70,6 +71,10 @@ object SecondaryUserProvisioner {
     /** Push enrollment/policies to a newly created user and grant capabilities there. */
     fun setupProvisionedUser(primaryContext: Context, userId: Int) {
         if (userId == 0) return
+        val configStore = TimeKprApplication.from(primaryContext).configStore
+        if (configStore.load().managementMode == AgentConfigStore.MANAGEMENT_MODE_EXCLUSIVE_DO) {
+            return
+        }
         DeviceOwnerProvisioner.configureCrossProfileCommunication(primaryContext)
         PolicyStorePayloadPush.pushToUser(primaryContext, userId)
         val userContext = AndroidUsers.getUserContext(primaryContext, userId) ?: return
@@ -86,6 +91,10 @@ object SecondaryUserProvisioner {
     fun bootstrapAllSecondaryUsers(primaryContext: Context) {
         if (currentUserId(primaryContext) != 0) return
         if (!DeviceOwnerProvisioner.isDeviceOwner(primaryContext)) return
+        val configStore = TimeKprApplication.from(primaryContext).configStore
+        if (configStore.load().managementMode == AgentConfigStore.MANAGEMENT_MODE_EXCLUSIVE_DO) {
+            return
+        }
         val userIds = ProfileProvisioningStore(primaryContext).allProvisionedUserIds().filter { it > 0 }
         if (userIds.isEmpty()) {
             AndroidUsers.linuxUsersPayload(primaryContext)

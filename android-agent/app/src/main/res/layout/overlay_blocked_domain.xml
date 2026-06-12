@@ -13,7 +13,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="@string/domain_block_overlay_title"
-        android:textColor="#1A1A1A"
+        android:textColor="?attr/colorOnSurface"
         android:textSize="18sp"
         android:textStyle="bold" />
 
@@ -22,7 +22,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="8dp"
-        android:textColor="#333333"
+        android:textColor="?attr/colorOnSurfaceVariant"
         android:textSize="14sp" />
 
     <LinearLayout
@@ -32,23 +32,22 @@
         android:gravity="end"
         android:orientation="horizontal">
 
-        <Button
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/blocked_domain_request_access"
+            style="@style/Widget.Material3.Button.TonalButton"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginEnd="8dp"
-            android:minHeight="44dp"
+            android:minHeight="48dp"
             android:text="@string/domain_block_request_access"
-            android:textColor="@color/timekpr_primary"
             android:visibility="gone" />
 
-        <Button
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/blocked_domain_dismiss"
+            style="@style/Widget.Material3.Button.TextButton"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:background="@android:color/transparent"
-            android:minHeight="44dp"
-            android:text="@string/domain_block_dismiss"
-            android:textColor="@color/timekpr_primary" />
+            android:minHeight="48dp"
+            android:text="@string/domain_block_dismiss" />
     </LinearLayout>
 </LinearLayout>

@@ -25,6 +25,7 @@ import com.timekpr.agent.policy.DomainPolicyResolver
 import com.timekpr.agent.policy.PolicyIpcServer
 import com.timekpr.agent.policy.ProfileProvisioningStore
 import com.timekpr.agent.util.AgentLog
+import com.timekpr.agent.config.AgentConfigStore
 import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.util.concurrent.ExecutorService
@@ -312,13 +313,21 @@ class DomainBlockVpnService : VpnService() {
         }
 
         private fun fanOutSecondaryUsers(context: Context) {
+            val configStore = TimeKprApplication.from(context).configStore
+            if (configStore.load().managementMode == AgentConfigStore.MANAGEMENT_MODE_EXCLUSIVE_DO) {
+                return
+            }
             val targets = ProfileProvisioningStore(context).allProvisionedUserIds().filter { it > 0 }
             if (targets.isEmpty()) return
             for (userId in targets) {
                 SecondaryUserInitService.startOnUser(context, userId)
                 val reloadIntent = Intent(ACTION_RELOAD_POLICY).setPackage(context.packageName)
-                userHandleForId(userId)?.let { handle ->
-                    context.sendBroadcastAsUser(reloadIntent, handle)
+                try {
+                    userHandleForId(userId)?.let { handle ->
+                        context.sendBroadcastAsUser(reloadIntent, handle)
+                    }
+                } catch (e: Exception) {
+                    Log.w(TAG, "Failed to send reload policy broadcast to user $userId", e)
                 }
             }
         }

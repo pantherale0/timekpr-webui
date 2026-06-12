@@ -4,6 +4,7 @@ import android.app.admin.DevicePolicyManager
 import android.content.ComponentName
 import android.content.Context
 import android.os.Bundle
+import android.util.Log
 import com.timekpr.agent.admin.TimeKprDeviceAdminReceiver
 import org.json.JSONArray
 import org.json.JSONObject
@@ -11,29 +12,39 @@ import org.json.JSONObject
 /** Pending alerts stored in DPM application restrictions (readable across affiliated profiles). */
 object ApplicationRestrictionsAlertQueue {
     private const val KEY_PENDING_ALERTS = "pending_alerts"
+    private const val TAG = "AppRestrictionsQueue"
 
     fun append(context: Context, eventType: String, linuxUsername: String, details: JSONObject) {
-        val dpm = context.getSystemService(DevicePolicyManager::class.java) ?: return
-        val admin = ComponentName(context, TimeKprDeviceAdminReceiver::class.java)
-        if (!dpm.isAdminActive(admin)) return
-        val alerts = loadAlerts(dpm, admin, context.packageName)
-        alerts.put(
-            JSONObject()
-                .put("event_type", eventType)
-                .put("linux_username", linuxUsername)
-                .put("details", details),
-        )
-        dpm.setApplicationRestrictions(admin, context.packageName, bundleFor(alerts))
+        try {
+            val dpm = context.getSystemService(DevicePolicyManager::class.java) ?: return
+            val admin = ComponentName(context, TimeKprDeviceAdminReceiver::class.java)
+            if (!dpm.isAdminActive(admin)) return
+            val alerts = loadAlerts(dpm, admin, context.packageName)
+            alerts.put(
+                JSONObject()
+                    .put("event_type", eventType)
+                    .put("linux_username", linuxUsername)
+                    .put("details", details),
+            )
+            dpm.setApplicationRestrictions(admin, context.packageName, bundleFor(alerts))
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to append alert to application restrictions", e)
+        }
     }
 
     fun drain(context: Context): List<PendingAlertStore.PendingAlert> {
-        val dpm = context.getSystemService(DevicePolicyManager::class.java) ?: return emptyList()
-        val admin = ComponentName(context, TimeKprDeviceAdminReceiver::class.java)
-        if (!dpm.isAdminActive(admin)) return emptyList()
-        val alerts = loadAlerts(dpm, admin, context.packageName)
-        if (alerts.length() == 0) return emptyList()
-        dpm.setApplicationRestrictions(admin, context.packageName, bundleFor(JSONArray()))
-        return parseAlerts(alerts)
+        try {
+            val dpm = context.getSystemService(DevicePolicyManager::class.java) ?: return emptyList()
+            val admin = ComponentName(context, TimeKprDeviceAdminReceiver::class.java)
+            if (!dpm.isAdminActive(admin)) return emptyList()
+            val alerts = loadAlerts(dpm, admin, context.packageName)
+            if (alerts.length() == 0) return emptyList()
+            dpm.setApplicationRestrictions(admin, context.packageName, bundleFor(JSONArray()))
+            return parseAlerts(alerts)
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to drain alerts from application restrictions", e)
+            return emptyList()
+        }
     }
 
     private fun loadAlerts(dpm: DevicePolicyManager, admin: ComponentName, packageName: String): JSONArray {

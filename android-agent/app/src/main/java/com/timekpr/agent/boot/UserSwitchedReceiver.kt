@@ -13,6 +13,7 @@ import com.timekpr.agent.boot.SecondaryUserInitService
 import com.timekpr.agent.monitor.UsageMonitorService
 import com.timekpr.agent.service.AgentPersistentConnectionService
 import com.timekpr.agent.vpn.DomainBlockVpnService
+import com.timekpr.agent.config.AgentConfigStore
 
 class UserSwitchedReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent?) {
@@ -20,10 +21,14 @@ class UserSwitchedReceiver : BroadcastReceiver() {
 
         val userId = readSwitchedUserId(intent)
         Log.i(TAG, "User switched to user ${userId ?: "unknown"}")
+        val app = TimeKprApplication.from(context)
+        val configStore = app.configStore
         if (userId != null && userId != 0 && android.os.Process.myUid() / 100_000 == 0) {
-            PolicyStorePayloadPush.pushToUser(context, userId)
-            bootstrapSecondaryUser(context, userId)
-            SecondaryUserInitService.startOnUser(context, userId)
+            if (configStore.load().managementMode != AgentConfigStore.MANAGEMENT_MODE_EXCLUSIVE_DO) {
+                PolicyStorePayloadPush.pushToUser(context, userId)
+                bootstrapSecondaryUser(context, userId)
+                SecondaryUserInitService.startOnUser(context, userId)
+            }
         }
 
         // Keep user-0 usage monitor alive for cross-profile reporting over the WebSocket.
@@ -32,7 +37,6 @@ class UserSwitchedReceiver : BroadcastReceiver() {
             AgentPersistentConnectionService.start(context)
         }
 
-        val app = TimeKprApplication.from(context)
         val enforcement = EnforcementController(context, app.appPolicyStore)
         enforcement.reconcileAllUsers()
     }

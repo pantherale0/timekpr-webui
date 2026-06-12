@@ -35,6 +35,7 @@ object CrossUserStoreSync {
     fun pushPolicyToAllSecondaryUsers(primaryContext: Context) {
         if (currentUserId(primaryContext) != 0) return
         secondaryTargetUserIds(primaryContext).forEach { userId ->
+            replicateFromPrimaryToUser(primaryContext, userId)
             PolicyStorePayloadPush.pushToUser(primaryContext, userId)
         }
     }

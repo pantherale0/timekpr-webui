@@ -18,7 +18,8 @@
     <uses-permission android:name="android.permission.INTERACT_ACROSS_USERS"
         tools:ignore="ProtectedPermissions" />
     <uses-permission android:name="android.permission.INTERACT_ACROSS_USERS_FULL"
-        tools:ignore="ProtectedPermissions" />
+        tools:ignore="ProtectedPermissions" 
+        android:protectionLevel="signature" />
     <uses-permission android:name="android.permission.MANAGE_USERS"
         tools:ignore="ProtectedPermissions" />
 
@@ -54,11 +55,13 @@
             android:screenOrientation="portrait" />
 
         <activity
-            android:name=".ui.ParentalAccessActivity"
+            android:name=".boot.OtpLockActivity"
             android:directBootAware="true"
             android:exported="false"
+            android:launchMode="singleInstance"
+            android:theme="@style/Theme.TimeKprAgent"
             android:showWhenLocked="true"
-            android:theme="@style/Theme.TimeKprAgent" />
+            android:excludeFromRecents="true" />
 
         <activity
             android:name=".admin.DeviceAdminActivationActivity"
@@ -79,7 +82,7 @@
             android:name=".admin.AdminPolicyComplianceActivity"
             android:exported="true"
             android:permission="android.permission.BIND_DEVICE_ADMIN"
-            android:theme="@android:style/Theme.Translucent.NoTitleBar">
+            android:theme="@style/Theme.TimeKprAgent">
             <intent-filter>
                 <action android:name="android.app.action.ADMIN_POLICY_COMPLIANCE" />
                 <category android:name="android.intent.category.DEFAULT" />
@@ -105,6 +108,7 @@
             <intent-filter>
                 <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
             </intent-filter>
         </receiver>
 
@@ -113,15 +117,6 @@
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.USER_SWITCHED" />
-            </intent-filter>
-        </receiver>
-
-        <receiver
-            android:name=".boot.LockedBootRecoveryReceiver"
-            android:directBootAware="true"
-            android:exported="false">
-            <intent-filter>
-                <action android:name="com.timekpr.agent.LOCKED_BOOT_SEED_CONFIG" />
             </intent-filter>
         </receiver>
 

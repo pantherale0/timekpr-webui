@@ -5,7 +5,6 @@ import android.content.pm.Signature
 import android.os.Build
 import java.io.File
 import java.security.MessageDigest
-import android.util.Base64
 
 object ApkSignatureVerifier {
     /**
@@ -18,7 +17,31 @@ object ApkSignatureVerifier {
     }
 
     fun encodeUrlSafeBase64(raw: ByteArray): String {
-        return Base64.encodeToString(raw, Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING)
+        val alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
+        val out = StringBuilder()
+        var i = 0
+        val len = raw.size
+        while (i < len) {
+            val b0 = raw[i++].toInt() and 0xFF
+            if (i < len) {
+                val b1 = raw[i++].toInt() and 0xFF
+                if (i < len) {
+                    val b2 = raw[i++].toInt() and 0xFF
+                    out.append(alphabet[b0 ushr 2])
+                    out.append(alphabet[((b0 and 3) shl 4) or (b1 ushr 4)])
+                    out.append(alphabet[((b1 and 15) shl 2) or (b2 ushr 6)])
+                    out.append(alphabet[b2 and 63])
+                } else {
+                    out.append(alphabet[b0 ushr 2])
+                    out.append(alphabet[((b0 and 3) shl 4) or (b1 ushr 4)])
+                    out.append(alphabet[(b1 and 15) shl 2])
+                }
+            } else {
+                out.append(alphabet[b0 ushr 2])
+                out.append(alphabet[(b0 and 3) shl 4])
+            }
+        }
+        return out.toString()
     }
 
     fun hexDigestToChecksum(hexDigest: String): String {

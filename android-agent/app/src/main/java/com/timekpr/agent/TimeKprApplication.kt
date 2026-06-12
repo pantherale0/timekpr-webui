@@ -22,6 +22,7 @@ class TimeKprApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        com.google.android.material.color.DynamicColors.applyToActivitiesIfAvailable(this)
         configStore = AgentConfigStore(this)
 
         if (DirectBootHelper.isCredentialStorageUnlocked(this)) {

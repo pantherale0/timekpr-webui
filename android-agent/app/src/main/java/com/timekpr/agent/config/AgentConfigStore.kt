@@ -14,6 +14,7 @@ data class AgentConfig(
     val agentToken: String?,
     val agentVersion: String,
     val pairingComplete: Boolean,
+    val managementMode: String,
 )
 
 class AgentConfigStore(context: Context) {
@@ -38,6 +39,8 @@ class AgentConfigStore(context: Context) {
         migrateToDeviceProtectedStorageIfNeeded()
         val systemId = prefs.getString(KEY_SYSTEM_ID, null)?.takeIf { it.isNotBlank() }
             ?: UUID.randomUUID().toString().also { saveSystemId(it) }
+        val managementMode = prefs.getString(KEY_MANAGEMENT_MODE, null)
+            ?: MANAGEMENT_MODE_EXCLUSIVE_DO
         return AgentConfig(
             serverUrl = prefs.getString(KEY_SERVER_URL, "") ?: "",
             systemId = systemId,
@@ -46,6 +49,7 @@ class AgentConfigStore(context: Context) {
             agentVersion = prefs.getString(KEY_AGENT_VERSION, null)?.takeIf { it.isNotBlank() }
                 ?: BuildConfig.DEFAULT_AGENT_VERSION,
             pairingComplete = prefs.getBoolean(KEY_PAIRING_COMPLETE, false),
+            managementMode = managementMode,
         )
     }
 
@@ -77,6 +81,10 @@ class AgentConfigStore(context: Context) {
 
     fun cachedFcmToken(): String? {
         return prefs.getString(KEY_FCM_TOKEN, null)?.takeIf { it.isNotBlank() }
+    }
+
+    fun saveManagementMode(mode: String) {
+        writeBoth { putString(KEY_MANAGEMENT_MODE, mode) }
     }
 
     fun applyPairingPayload(serverUrl: String, registrationToken: String?) {
@@ -142,5 +150,8 @@ class AgentConfigStore(context: Context) {
         private const val KEY_AGENT_VERSION = "agent_version"
         private const val KEY_PAIRING_COMPLETE = "pairing_complete"
         private const val KEY_FCM_TOKEN = "fcm_token"
+        private const val KEY_MANAGEMENT_MODE = "management_mode"
+        const val MANAGEMENT_MODE_EXCLUSIVE_DO = "exclusive_do"
+        const val MANAGEMENT_MODE_SECONDARY_USERS = "secondary_users"
     }
 }

@@ -14,7 +14,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="@string/time_exhausted_title"
-        android:textColor="#1A1A1A"
+        android:textColor="?attr/colorOnSurface"
         android:textSize="16sp"
         android:textStyle="bold" />
 
@@ -24,26 +24,26 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="4dp"
         android:text="@string/time_exhausted_body"
-        android:textColor="#333333"
+        android:textColor="?attr/colorOnSurfaceVariant"
         android:textSize="14sp" />
 
-    <Button
+    <com.google.android.material.button.MaterialButton
         android:id="@+id/time_exhausted_call"
+        style="@style/Widget.Material3.Button.TextButton"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="8dp"
-        android:minHeight="44dp"
+        android:minHeight="48dp"
         android:text="@string/time_exhausted_call"
-        android:textColor="@color/timekpr_primary"
         android:visibility="gone" />
 
-    <Button
+    <com.google.android.material.button.MaterialButton
         android:id="@+id/time_exhausted_parent_access"
+        style="@style/Widget.Material3.Button.TonalButton"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="8dp"
-        android:minHeight="44dp"
+        android:minHeight="48dp"
         android:text="@string/time_exhausted_parent_access"
-        android:textColor="@color/timekpr_primary"
         android:visibility="visible" />
 </LinearLayout>

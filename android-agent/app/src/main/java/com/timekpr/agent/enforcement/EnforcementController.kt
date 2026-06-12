@@ -27,6 +27,7 @@ import com.timekpr.agent.util.AgentLog
 import com.timekpr.agent.util.AndroidUsers
 import com.timekpr.agent.vpn.DomainBlockVpnService
 import android.os.Process
+import com.timekpr.agent.config.AgentConfigStore
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -53,6 +54,8 @@ class EnforcementController(
 
     fun reconcileAllUsers() {
         val callingUserId = Process.myUid() / 100_000
+        val configStore = TimeKprApplication.from(context).configStore
+        val mode = configStore.load().managementMode
         val allUsers = TimeKprApplication.from(context).timeLimitStore.allUsernames()
         allUsers.forEach { username ->
             val uid = getUidForUsername(username)
@@ -65,6 +68,12 @@ class EnforcementController(
                 }
                 return@forEach
             }
+            if (callingUserId == 0 && mode == AgentConfigStore.MANAGEMENT_MODE_SECONDARY_USERS) {
+                // In secondary users mode, User 0 is the parent. Skip time and app policies for User 0,
+                // but still run applyDeviceRestrictionsForUser to ensure secondary profiles are provisioned.
+                applyDeviceRestrictionsForUser(username, uid)
+                return@forEach
+            }
             applyTimePoliciesForUser(username, uid)
             applyAppPoliciesForUser(username, uid)
             applyDeviceRestrictionsForUser(username, uid)
@@ -73,18 +82,22 @@ class EnforcementController(
         if (Process.myUid() / 100_000 == 0) {
             UsageMonitorService.start(context)
         }
-        applyOwnerProfileLockdownIfNeeded()
+        if (Process.myUid() / 100_000 == 0 && mode == AgentConfigStore.MANAGEMENT_MODE_EXCLUSIVE_DO) {
+            applyOwnerProfileLockdownIfNeeded()
+        }
     }
 
     fun applyOwnerProfileLockdownIfNeeded() {
         if (Process.myUid() / 100_000 != 0) return
+        val configStore = TimeKprApplication.from(context).configStore
+        if (configStore.load().managementMode == AgentConfigStore.MANAGEMENT_MODE_SECONDARY_USERS) return
+
         val dpm = context.getSystemService(DevicePolicyManager::class.java) ?: return
         if (!dpm.isAdminActive(adminComponent)) return
 
         val ownerEval = OwnerProfileLockdown.evaluate(context)
 
         if (!ownerEval.shouldLock) {
-            OwnerProfilePinRotator.clearAppliedSlot(context)
             clearOwnerProfileLockdown(dpm)
             return
         }
@@ -105,7 +118,10 @@ class EnforcementController(
         val dpm = userContext.getSystemService(DevicePolicyManager::class.java) ?: return
         if (!dpm.isAdminActive(adminComponent)) return
 
-        if (!timeLimitStore.isAccessAllowed(username)) {
+        val configStore = TimeKprApplication.from(context).configStore
+        val isParentUser = uid == 0 && configStore.load().managementMode == AgentConfigStore.MANAGEMENT_MODE_SECONDARY_USERS
+
+        if (!timeLimitStore.isAccessAllowed(username) || (!isParentUser && !DeviceOwnerProvisioner.hasUsageAccess(userContext))) {
             enforceTimeExhaustionForUser(username, uid, dpm)
             return
         }
@@ -230,10 +246,16 @@ class EnforcementController(
         val dpm = userContext.getSystemService(DevicePolicyManager::class.java) ?: return
         if (!dpm.isAdminActive(adminComponent)) return
 
+        val configStore = TimeKprApplication.from(context).configStore
+        val mode = configStore.load().managementMode
+
         val policy = TimeKprApplication.from(context).deviceRestrictionStore.policyForUser(username)
 
         if (uid == 0) {
-            provisionProfiles(dpm, policy)
+            if (mode == AgentConfigStore.MANAGEMENT_MODE_SECONDARY_USERS) {
+                provisionProfiles(dpm, policy)
+                return
+            }
         }
 
         applyDeviceRestrictionPolicy(dpm, policy)

@@ -12,6 +12,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.IBinder
 import android.os.Process
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.timekpr.agent.R
 import com.timekpr.agent.TimeKprApplication
@@ -24,6 +25,7 @@ import com.timekpr.agent.policy.PolicyPayloadPush
 import com.timekpr.agent.policy.PolicyStorePayloadPush
 import com.timekpr.agent.vpn.DomainBlockVpnService
 import com.timekpr.agent.policy.AppPolicyStore
+import com.timekpr.agent.config.AgentConfigStore
 import com.timekpr.agent.util.AndroidUsers
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -49,6 +51,11 @@ class UsageMonitorService : Service() {
     private val processedResumeKeys = LinkedHashSet<String>()
     private var capabilityCheckCounter = 0
     private var lastBootstrappedForegroundUser = -1
+
+    private var lastTimeLimitsModified = 0L
+    private var lastDomainPolicyModified = 0L
+    private var lastAppPoliciesModified = 0L
+    private var lastDeviceRestrictionsModified = 0L
 
     override fun onCreate() {
         super.onCreate()
@@ -85,22 +92,75 @@ class UsageMonitorService : Service() {
 
         while (scope.isActive) {
             val callingUserId = Process.myUid() / 100_000
+
+            if (callingUserId != 0) {
+                val dataDir = applicationContext.applicationInfo.dataDir
+                val timeLimitsFile = java.io.File(dataDir, "shared_prefs/timekpr_time_limits.xml")
+                val domainPolicyFile = java.io.File(dataDir, "shared_prefs/timekpr_domain_policy.xml")
+                val appPoliciesFile = java.io.File(dataDir, "shared_prefs/timekpr_app_policies.xml")
+                val deviceRestrictionsFile = java.io.File(dataDir, "shared_prefs/timekpr_device_restrictions.xml")
+
+                val timeLimitsMod = if (timeLimitsFile.exists()) timeLimitsFile.lastModified() else 0L
+                val domainPolicyMod = if (domainPolicyFile.exists()) domainPolicyFile.lastModified() else 0L
+                val appPoliciesMod = if (appPoliciesFile.exists()) appPoliciesFile.lastModified() else 0L
+                val deviceRestrictionsMod = if (deviceRestrictionsFile.exists()) deviceRestrictionsFile.lastModified() else 0L
+
+                if (lastTimeLimitsModified == 0L) {
+                    lastTimeLimitsModified = timeLimitsMod
+                    lastDomainPolicyModified = domainPolicyMod
+                    lastAppPoliciesModified = appPoliciesMod
+                    lastDeviceRestrictionsModified = deviceRestrictionsMod
+                } else if (timeLimitsMod != lastTimeLimitsModified ||
+                    domainPolicyMod != lastDomainPolicyModified ||
+                    appPoliciesMod != lastAppPoliciesModified ||
+                    deviceRestrictionsMod != lastDeviceRestrictionsModified
+                ) {
+                    Log.i(TAG, "Detected policy file changes on disk for secondary user $callingUserId. Reloading policies.")
+                    lastTimeLimitsModified = timeLimitsMod
+                    lastDomainPolicyModified = domainPolicyMod
+                    lastAppPoliciesModified = appPoliciesMod
+                    lastDeviceRestrictionsModified = deviceRestrictionsMod
+
+                    val app = TimeKprApplication.from(applicationContext)
+                    app.timeLimitStore.reloadFromPrefs()
+                    app.appPolicyStore.restore()
+                    app.domainPolicyStore.restore()
+                    app.deviceRestrictionStore.restore()
+
+                    enforcement.reconcileAllUsers()
+                }
+            }
+
             if (callingUserId == 0) {
                 drainPendingAlertsFromSecondaryUsers()
             }
             val activeUid = AndroidUsers.activeUserUid(this)
-            if (callingUserId == 0 && activeUid != 0 && activeUid != lastBootstrappedForegroundUser) {
+            val configStore = TimeKprApplication.from(this).configStore
+            val mode = configStore.load().managementMode
+            if (callingUserId == 0 && activeUid != 0 && activeUid != lastBootstrappedForegroundUser &&
+                mode != AgentConfigStore.MANAGEMENT_MODE_EXCLUSIVE_DO) {
                 lastBootstrappedForegroundUser = activeUid
                 PolicyStorePayloadPush.pushToUser(this, activeUid)
                 PolicyPayloadPush.pushToUser(this, activeUid, activeUid)
                 SecondaryUserInitService.startOnUser(this, activeUid)
-                userHandleForId(activeUid)?.let { handle ->
-                    sendBroadcastAsUser(Intent(DomainBlockVpnService.ACTION_RELOAD_POLICY), handle)
+                try {
+                    userHandleForId(activeUid)?.let { handle ->
+                        sendBroadcastAsUser(Intent(DomainBlockVpnService.ACTION_RELOAD_POLICY), handle)
+                    }
+                } catch (e: Exception) {
+                    Log.w(TAG, "Failed to send reload policy broadcast to user $activeUid", e)
                 }
             }
             val username = AndroidUsers.usernameForUid(this, activeUid, timeStore)
 
             val userContext = AndroidUsers.getUserContext(this, activeUid) ?: this
+            
+            val shouldEnforceUsageAccess = !(activeUid == 0 && mode == AgentConfigStore.MANAGEMENT_MODE_SECONDARY_USERS)
+            if (shouldEnforceUsageAccess && !DeviceOwnerProvisioner.hasUsageAccess(userContext)) {
+                enforcement.applyTimePoliciesForUser(username, activeUid)
+                delay(2_000)
+                continue
+            }
             if (callingUserId == 0 && activeUid == 0) {
                 enforcement.applyOwnerProfileLockdownIfNeeded()
             }
@@ -184,6 +244,10 @@ class UsageMonitorService : Service() {
     }
 
     private fun drainPendingAlertsFromSecondaryUsers() {
+        val configStore = TimeKprApplication.from(this).configStore
+        if (configStore.load().managementMode == AgentConfigStore.MANAGEMENT_MODE_EXCLUSIVE_DO) {
+            return
+        }
         val userIds = AndroidUsers.managedSecondaryUserIds(this)
         for (userId in userIds) {
             val userContext = AndroidUsers.getUserContext(this, userId)
@@ -364,6 +428,7 @@ class UsageMonitorService : Service() {
     }
 
     companion object {
+        private const val TAG = "UsageMonitorService"
         private const val CHANNEL_ID = "timekpr_usage"
         private const val NOTIFICATION_ID = 1003
 
