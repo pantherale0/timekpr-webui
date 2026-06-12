@@ -79,6 +79,19 @@ def test_push_nintendo_schedule_skips_bedtime_when_unconfigured(app, db_session)
     cloud_device.set_bedtime_alarm.assert_not_called()
 
 
+def test_run_async_with_running_event_loop():
+    import asyncio
+    from src.nintendo_sync import run_async
+
+    async def sample():
+        return 'ok'
+
+    async def runner():
+        return run_async(sample())
+
+    assert asyncio.run(runner()) == 'ok'
+
+
 def test_build_nintendo_console_view_context(app, db_session):
     from src.database import AgentDevice, ManagedUser, ManagedUserDeviceMap
     import json

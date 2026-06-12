@@ -1,9 +1,9 @@
-import asyncio
 import aiohttp
 import logging
 from datetime import datetime, timezone
 from flask import Blueprint, jsonify, request, session
 from src.database import db, AgentDevice, Settings
+from src.nintendo_sync import run_async
 from pynintendoparental import Authenticator, NintendoParental
 
 _LOGGER = logging.getLogger(__name__)
@@ -37,7 +37,7 @@ def get_nintendo_account_summary(*, validate=False):
 
     if validate and session_token:
         try:
-            asyncio.run(_list_devices_async(session_token))
+            run_async(_list_devices_async(session_token))
             summary['token_valid'] = True
         except Exception as exc:
             _LOGGER.warning("Nintendo token validation failed: %s", exc)
@@ -64,7 +64,7 @@ def get_login_url():
         return jsonify({'success': False, 'message': 'Not authenticated'}), 401
 
     try:
-        login_url, code_verifier = asyncio.run(_get_login_url_async())
+        login_url, code_verifier = run_async(_get_login_url_async())
         session['nintendo_code_verifier'] = code_verifier
         return jsonify({
             'success': True,
@@ -96,7 +96,7 @@ def authenticate_nintendo():
         return jsonify({'success': False, 'message': 'Missing response URL or session state'}), 400
 
     try:
-        session_token = asyncio.run(_authenticate_async(response_url, code_verifier))
+        session_token = run_async(_authenticate_async(response_url, code_verifier))
         if session_token:
             Settings.set_value(NINTENDO_SESSION_TOKEN_KEY, session_token)
             Settings.set_value(NINTENDO_LINKED_AT_KEY, datetime.now(timezone.utc).isoformat())
@@ -145,7 +145,7 @@ def list_nintendo_devices():
         return jsonify({'success': False, 'message': 'Nintendo Account is not linked'}), 400
 
     try:
-        devices = asyncio.run(_list_devices_async(session_token))
+        devices = run_async(_list_devices_async(session_token))
         return jsonify({'success': True, 'devices': devices})
     except Exception as exc:
         _LOGGER.error("Nintendo list devices error: %s", exc)

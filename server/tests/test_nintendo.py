@@ -38,7 +38,7 @@ def test_authenticate_requires_auth(client):
     response = client.post('/api/nintendo/authenticate', json={'response_url': 'http://localhost/callback'})
     assert response.status_code == 401
 
-@patch('src.blueprints.api.nintendo.asyncio.run')
+@patch('src.blueprints.api.nintendo.run_async')
 def test_authenticate_nintendo(mock_async_run, auth_client):
     with auth_client.session_transaction() as sess:
         sess['nintendo_code_verifier'] = 'cached_verifier'
@@ -97,7 +97,7 @@ def test_list_devices_requires_auth(client):
     response = client.get('/api/nintendo/devices')
     assert response.status_code == 401
 
-@patch('src.blueprints.api.nintendo.asyncio.run')
+@patch('src.blueprints.api.nintendo.run_async')
 def test_list_nintendo_devices(mock_async_run, auth_client):
     Settings.set_value('nintendo_session_token', 'stored_token')
 

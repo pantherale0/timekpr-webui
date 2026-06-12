@@ -40,6 +40,7 @@ from src.nintendo_sync import (
     build_nintendo_console_stats,
     build_nintendo_mapping_stats,
     push_nintendo_schedule_changes,
+    run_async,
     save_nintendo_console_stats,
     update_nintendo_players,
 )
@@ -818,7 +819,7 @@ class BackgroundTaskManager:
         if not self.app:
             return
         try:
-            asyncio.run(self._sync_nintendo_devices_async(force=force))
+            run_async(self._sync_nintendo_devices_async(force=force))
         except Exception as exc:
             logger.error("Error in sync_nintendo_devices: %s\n%s", exc, traceback.format_exc())
 
