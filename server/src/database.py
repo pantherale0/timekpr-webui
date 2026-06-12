@@ -219,6 +219,14 @@ class AgentDevice(db.Model):
             return f'{self.display_name} ({self.system_id_suffix})'
         return self.display_name
 
+    @property
+    def nintendo_console_stats(self):
+        """Return cached Nintendo cloud console stats for this device."""
+        if (self.platform or '').strip().lower() != 'nintendo':
+            return {}
+        from src.nintendo_sync import get_nintendo_console_stats
+        return get_nintendo_console_stats(self.system_id)
+
     def __repr__(self):
         return f'<AgentDevice {self.system_id} [{self.status}]>'
 
@@ -560,6 +568,27 @@ class ManagedUserDeviceMap(db.Model):
             return config.get(key)
         except (TypeError, ValueError, json.JSONDecodeError):
             return None
+
+    @property
+    def nintendo_player(self):
+        """Return the linked Nintendo player profile for this mapping, if any."""
+        device = self.device
+        if not device or (device.platform or '').strip().lower() != 'nintendo':
+            return None
+        for player in device.linux_users:
+            if player.get('username') == self.linux_username:
+                return player
+        return None
+
+    @property
+    def display_linux_username(self):
+        """Return a human-readable device account label for UI display."""
+        player = self.nintendo_player
+        if player:
+            nickname = (player.get('nickname') or '').strip()
+            if nickname:
+                return nickname
+        return self.linux_username
 
     def mark_blocklist_synced(self, policy_hash):
         self.blocklist_policy_hash = policy_hash

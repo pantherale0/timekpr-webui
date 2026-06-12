@@ -410,12 +410,11 @@
                                 </div>
                             </div>
                             <div class="col-sm-6 col-md-4">
-                                <div class="platform-card p-3 text-center h-100 disabled"
-                                    title="Nintendo Switch monitoring is coming soon!">
-                                    <div class="platform-icon text-warning"><i class="fas fa-gamepad"></i></div>
-                                    <h5 class="fw-bold mb-1">Nintendo Switch</h5>
-                                    <span class="badge bg-secondary">Coming Soon</span>
-                                </div>
+                                 <div class="platform-card p-3 text-center h-100" onclick="selectPlatform('nintendo')">
+                                     <div class="platform-icon text-warning"><i class="fas fa-gamepad"></i></div>
+                                     <h5 class="fw-bold mb-1">Nintendo Switch</h5>
+                                     <span class="small text-muted">Cloud Parental Controls</span>
+                                 </div>
                             </div>
                             <div class="col-sm-6 col-md-4">
                                 <div class="platform-card p-3 text-center h-100 disabled"
@@ -499,7 +498,30 @@
                             <p class="text-muted small"><i class="fas fa-info-circle me-1"></i>The installer registers the background monitoring service and configures autostart components for user sessions.</p>
                         </div>
 
-                        <div class="text-center mt-4">
+                        <!-- Nintendo Instructions -->
+                        <div id="setup-instruction-nintendo" class="d-none">
+                            <div id="nintendo-link-expired-alert" class="alert alert-warning py-2 small d-none mb-3 mx-auto" style="max-width: 500px;">
+                                Your Nintendo Account session has expired. Link again to continue adding consoles.
+                            </div>
+                            <p class="mb-3">Link your Nintendo Account to enable console monitoring:</p>
+                            <ol class="text-start mb-3 mx-auto" style="max-width: 500px;">
+                                <li>Click the button below to sign in to Nintendo.</li>
+                                <li>Log in, and on the final <b>"Select this person"</b> screen, right-click (or tap and hold) the button, copy its link address, and paste it below.</li>
+                            </ol>
+                            <div class="text-center mb-3">
+                                <a href="#" id="nintendo-login-btn" target="_blank" class="btn btn-outline-primary fw-bold"><i class="fas fa-external-link-alt me-2"></i>Sign In to Nintendo Account</a>
+                            </div>
+                            <div class="form-group text-start mx-auto mb-3" style="max-width: 500px;">
+                                <label for="nintendo-redirect-url" class="form-label fw-bold small text-muted">REDIRECT LINK ADDRESS</label>
+                                <input type="text" id="nintendo-redirect-url" class="form-control" placeholder="Paste npf... redirect URL here">
+                            </div>
+                            <div class="text-center mt-4">
+                                <button class="btn btn-secondary me-2" onclick="setWizardStep(1)">Back</button>
+                                <button class="btn btn-success" onclick="submitNintendoAuth()">Link Account &amp; Continue</button>
+                            </div>
+                        </div>
+
+                        <div class="text-center mt-4" id="setup-standard-footer-btns">
                             <button class="btn btn-secondary me-2" onclick="setWizardStep(1)">Back</button>
                             <button class="btn btn-primary" onclick="goToStep3()">I have run/scanned it</button>
                         </div>
@@ -530,6 +552,28 @@
 
                             <div class="text-center mt-4">
                                 <button class="btn btn-primary" onclick="goToStep4()">Approve &amp; Continue</button>
+                            </div>
+                        </div>
+
+                        <!-- Nintendo Device Select Panel -->
+                        <div id="nintendo-device-select-panel" class="d-none text-start mx-auto" style="max-width: 500px;">
+                            <div class="text-success fs-1 mb-2 text-center"><i class="fas fa-gamepad"></i></div>
+                            <h5 class="fw-bold mb-3 text-center">Nintendo Console Found</h5>
+                            
+                            <div class="form-group mb-3">
+                                <label for="wizard-nintendo-device-select" class="form-label fw-bold small text-muted">SELECT SWITCH CONSOLE</label>
+                                <select id="wizard-nintendo-device-select" class="form-select" onchange="onNintendoConsoleChange()">
+                                    <!-- Will populate with Switch devices -->
+                                </select>
+                            </div>
+
+                            <div class="form-group mb-3">
+                                <label for="wizard-nintendo-device-label" class="form-label fw-bold small text-muted">ASSIGN A DEVICE LABEL</label>
+                                <input type="text" id="wizard-nintendo-device-label" class="form-control" placeholder="e.g. Living Room Switch">
+                            </div>
+
+                            <div class="text-center mt-4">
+                                <button class="btn btn-primary" onclick="importNintendoDevice()">Link Console &amp; Continue</button>
                             </div>
                         </div>
                     </div>
@@ -755,7 +799,30 @@
             // Clean up inputs
             document.getElementById('wizard-device-label').value = '';
             document.getElementById('wizard-user-input').value = '';
-            document.getElementById('wizard-linux-uid').value = '';
+
+            const uidInput = document.getElementById('wizard-linux-uid');
+            const uidLabel = document.getElementById('wizard-uid-label');
+            const uidGroup = uidInput ? (uidInput.closest('.form-group') || uidInput.parentElement) : null;
+            if (uidInput) {
+                uidInput.value = '';
+                uidInput.classList.remove('d-none');
+            }
+            if (uidLabel) {
+                uidLabel.classList.remove('d-none');
+            }
+            if (uidGroup) {
+                uidGroup.classList.remove('d-none');
+            }
+
+            const nintendoPanel = document.getElementById('nintendo-device-select-panel');
+            if (nintendoPanel) {
+                nintendoPanel.classList.add('d-none');
+            }
+            const nintendoRedirect = document.getElementById('nintendo-redirect-url');
+            if (nintendoRedirect) {
+                nintendoRedirect.value = '';
+            }
+
             document.getElementById('wizard-new-user-checkbox').checked = false;
             toggleNewUserField();
         }
@@ -791,7 +858,11 @@
                 subtitleEl.textContent = 'Select the hardware type you wish to enroll under Guardian.';
             } else if (step === 2) {
                 titleEl.textContent = 'Setup Instructions';
-                subtitleEl.textContent = `Follow these steps to configure your ${wizardState.platform === 'linux' ? 'Linux PC' : 'Android Device'}.`;
+                let platformName = 'Linux PC';
+                if (wizardState.platform === 'android') platformName = 'Android Device';
+                else if (wizardState.platform === 'windows') platformName = 'Windows PC';
+                else if (wizardState.platform === 'nintendo') platformName = 'Nintendo Account';
+                subtitleEl.textContent = `Follow these steps to configure your ${platformName}.`;
             } else if (step === 3) {
                 titleEl.textContent = 'Detecting Device';
                 subtitleEl.textContent = 'Waiting for your device agent client to make contact with the server.';
@@ -822,6 +893,8 @@
                         document.getElementById('setup-instruction-linux').classList.add('d-none');
                         document.getElementById('setup-instruction-android').classList.add('d-none');
                         document.getElementById('setup-instruction-windows').classList.add('d-none');
+                        document.getElementById('setup-instruction-nintendo').classList.add('d-none');
+                        document.getElementById('setup-standard-footer-btns').classList.remove('d-none');
 
                         if (platform === 'linux') {
                             document.getElementById('setup-instruction-linux').classList.remove('d-none');
@@ -852,12 +925,52 @@
                             const psCmd = `powershell -ExecutionPolicy Bypass -Command "Invoke-WebRequest -Uri '${window.location.origin}/api/pairing/windows/msi' -OutFile 'setup.msi'; Start-Process msiexec.exe -ArgumentList '/i setup.msi SERVER_URL=\\"${wizardState.wsUrl}\\" REGISTRATION_TOKEN=\\"${data.payload.registration_token || ''}\\" /qn' -Wait"`;
                             document.getElementById('windows-install-cmd').textContent = psCmd;
                             document.getElementById('windows-download-link').href = `${window.location.origin}/api/pairing/windows/msi`;
+                        } else if (platform === 'nintendo') {
+                            prepareNintendoWizardStep();
                         }
 
-                        setWizardStep(2);
+                        if (platform !== 'nintendo') {
+                            setWizardStep(2);
+                        }
                     }
                 })
                 .catch(err => console.error('Failed to load pairing configuration', err));
+        }
+
+        function prepareNintendoLoginForm(showExpiredWarning) {
+            document.getElementById('setup-instruction-nintendo').classList.remove('d-none');
+            document.getElementById('setup-standard-footer-btns').classList.add('d-none');
+            const expiredAlert = document.getElementById('nintendo-link-expired-alert');
+            if (expiredAlert) {
+                expiredAlert.classList.toggle('d-none', !showExpiredWarning);
+            }
+            fetch('/api/nintendo/login-url')
+                .then(r => r.json())
+                .then(res => {
+                    if (res.success) {
+                        document.getElementById('nintendo-login-btn').href = res.login_url;
+                    } else {
+                        alert('Failed to get Nintendo login URL: ' + res.message);
+                    }
+                })
+                .catch(err => console.error('Error fetching Nintendo login URL', err));
+            setWizardStep(2);
+        }
+
+        function prepareNintendoWizardStep() {
+            fetch('/api/nintendo/account-status?validate=1')
+                .then(r => r.json())
+                .then(status => {
+                    if (status.success && status.linked && status.token_valid !== false) {
+                        goToNintendoStep3();
+                        return;
+                    }
+                    prepareNintendoLoginForm(Boolean(status.success && status.linked && status.token_valid === false));
+                })
+                .catch(err => {
+                    console.error('Error checking Nintendo account status', err);
+                    prepareNintendoLoginForm(false);
+                });
         }
 
         function copyLinuxCommand() {
@@ -957,50 +1070,83 @@
             const uidLabel = document.getElementById('wizard-uid-label');
             const usersSelect = document.getElementById('wizard-linux-user-select');
             const uidInput = document.getElementById('wizard-linux-uid');
+            const uidGroup = uidInput ? (uidInput.closest('.form-group') || uidInput.parentElement) : null;
 
             usersSelect.innerHTML = '';
-            const detectedUsers = wizardState.detectedDevice.linux_users || [];
+            
+            if (wizardState.platform === 'nintendo') {
+                instructions.textContent = 'Select which Nintendo Switch player profile should be mapped to this child account:';
+                selectLabel.textContent = 'NINTENDO PLAYER PROFILE';
+                if (uidLabel) uidLabel.classList.add('d-none');
+                if (uidInput) {
+                    uidInput.classList.add('d-none');
+                    uidInput.value = '';
+                }
+                if (uidGroup) uidGroup.classList.add('d-none');
 
-            if (wizardState.platform === 'linux') {
-                instructions.textContent = 'Guardian found the following local accounts on the device. Select which local user account should be locked under this profile:';
-                selectLabel.textContent = 'LOCAL OS USERNAME';
-                uidLabel.textContent = 'LINUX UID (OPTIONAL)';
-                uidInput.placeholder = 'e.g. 1000';
-            } else {
-                instructions.textContent = 'Guardian found the following Android profiles on the device. Select which Android profile should be locked under this child account:';
-                selectLabel.textContent = 'ANDROID PROFILE';
-                uidLabel.textContent = 'ANDROID USER ID (UID)';
-                uidInput.placeholder = 'e.g. 0';
-            }
-
-            if (detectedUsers.length === 0) {
-                const opt = document.createElement('option');
-                opt.value = '';
-                opt.textContent = wizardState.platform === 'linux'
-                    ? 'No local accounts reported. Type username manually below'
-                    : 'No Android profiles reported.';
-                usersSelect.appendChild(opt);
-            } else {
-                detectedUsers.forEach(u => {
+                const players = wizardState.detectedDevice.players || [];
+                if (players.length === 0) {
                     const opt = document.createElement('option');
-                    opt.value = u.username;
-                    opt.textContent = `${u.username} (UID: ${u.uid})`;
-                    opt.dataset.uid = u.uid;
+                    opt.value = '';
+                    opt.textContent = 'No player profiles found.';
                     usersSelect.appendChild(opt);
-                });
-            }
-
-            // Auto fill UID on change
-            usersSelect.onchange = () => {
-                const opt = usersSelect.options[usersSelect.selectedIndex];
-                uidInput.value = opt ? (opt.dataset.uid || '') : '';
-            };
-
-            // Set initial UID if user exists
-            if (detectedUsers.length > 0) {
-                uidInput.value = detectedUsers[0].uid;
+                } else {
+                    players.forEach(p => {
+                        const opt = document.createElement('option');
+                        opt.value = p.player_id;
+                        opt.textContent = p.nickname;
+                        usersSelect.appendChild(opt);
+                    });
+                }
+                usersSelect.onchange = null;
             } else {
-                uidInput.value = '';
+                if (uidLabel) uidLabel.classList.remove('d-none');
+                if (uidInput) uidInput.classList.remove('d-none');
+                if (uidGroup) uidGroup.classList.remove('d-none');
+
+                const detectedUsers = wizardState.detectedDevice.linux_users || [];
+
+                if (wizardState.platform === 'linux') {
+                    instructions.textContent = 'Guardian found the following local accounts on the device. Select which local user account should be locked under this profile:';
+                    selectLabel.textContent = 'LOCAL OS USERNAME';
+                    if (uidLabel) uidLabel.textContent = 'LINUX UID (OPTIONAL)';
+                    if (uidInput) uidInput.placeholder = 'e.g. 1000';
+                } else {
+                    instructions.textContent = 'Guardian found the following Android profiles on the device. Select which Android profile should be locked under this child account:';
+                    selectLabel.textContent = 'ANDROID PROFILE';
+                    if (uidLabel) uidLabel.textContent = 'ANDROID USER ID (UID)';
+                    if (uidInput) uidInput.placeholder = 'e.g. 0';
+                }
+
+                if (detectedUsers.length === 0) {
+                    const opt = document.createElement('option');
+                    opt.value = '';
+                    opt.textContent = wizardState.platform === 'linux'
+                        ? 'No local accounts reported. Type username manually below'
+                        : 'No Android profiles reported.';
+                    usersSelect.appendChild(opt);
+                } else {
+                    detectedUsers.forEach(u => {
+                        const opt = document.createElement('option');
+                        opt.value = u.username;
+                        opt.textContent = `${u.username} (UID: ${u.uid})`;
+                        opt.dataset.uid = u.uid;
+                        usersSelect.appendChild(opt);
+                    });
+                }
+
+                // Auto fill UID on change
+                usersSelect.onchange = () => {
+                    const opt = usersSelect.options[usersSelect.selectedIndex];
+                    uidInput.value = opt ? (opt.dataset.uid || '') : '';
+                };
+
+                // Set initial UID if user exists
+                if (detectedUsers.length > 0) {
+                    uidInput.value = detectedUsers[0].uid;
+                } else {
+                    uidInput.value = '';
+                }
             }
         }
 
@@ -1030,6 +1176,9 @@
             userPromise
                 .then(userId => {
                     // 1. Approve device with display label
+                    if (wizardState.platform === 'nintendo') {
+                        return userId;
+                    }
                     return fetch(`/api/device/approve/${wizardState.detectedDevice.system_id}`, { method: 'POST' })
                         .then(r => r.json())
                         .then(data => {
@@ -1068,6 +1217,131 @@
                 .catch(err => {
                     alert(`Error completing onboarding: ${err.message}`);
                 });
+        }
+
+        // ── NINTENDO SWITCH SPECIFIC ONBOARDING FLOW ────────────────────────
+        let nintendoConsoles = [];
+
+        function submitNintendoAuth() {
+            const redirectUrl = document.getElementById('nintendo-redirect-url').value.trim();
+            if (!redirectUrl) {
+                alert('Please paste the redirect URL from the Nintendo login process.');
+                return;
+            }
+
+            fetch('/api/nintendo/authenticate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ response_url: redirectUrl })
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    showNotification(data.message, 'success');
+                    goToNintendoStep3();
+                } else {
+                    alert('Authentication failed: ' + data.message);
+                }
+            })
+            .catch(err => {
+                console.error('Authentication error', err);
+                alert('Failed to connect to authentication API.');
+            });
+        }
+
+        function goToNintendoStep3() {
+            setWizardStep(3);
+            
+            // Hide standard detection blocks
+            document.getElementById('detect-loading').classList.add('d-none');
+            document.getElementById('detect-success').classList.add('d-none');
+            
+            // Show Nintendo device select panel
+            const nintendoPanel = document.getElementById('nintendo-device-select-panel');
+            nintendoPanel.classList.remove('d-none');
+            
+            // Show loading placeholder inside dropdown
+            const select = document.getElementById('wizard-nintendo-device-select');
+            select.innerHTML = '<option value="" disabled selected>Loading Nintendo consoles...</option>';
+            
+            // Call API to list devices
+            fetch('/api/nintendo/devices')
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success && data.devices && data.devices.length > 0) {
+                        nintendoConsoles = data.devices;
+                        const available = data.devices.filter(dev => !dev.enrolled);
+                        if (available.length === 0) {
+                            select.innerHTML = '<option value="" disabled selected>All consoles are already enrolled</option>';
+                            return;
+                        }
+                        select.innerHTML = '<option value="" disabled selected>Select a console</option>';
+                        available.forEach(dev => {
+                            const opt = document.createElement('option');
+                            opt.value = dev.device_id;
+                            opt.textContent = `${dev.name} (${dev.model})`;
+                            select.appendChild(opt);
+                        });
+                    } else {
+                        select.innerHTML = '<option value="" disabled selected>No consoles found or failed to fetch</option>';
+                        if (data.message) {
+                            alert('Failed to load consoles: ' + data.message);
+                        }
+                    }
+                })
+                .catch(err => {
+                    console.error('Error fetching Nintendo devices', err);
+                    select.innerHTML = '<option value="" disabled selected>Error loading consoles</option>';
+                });
+        }
+
+        function onNintendoConsoleChange() {
+            const select = document.getElementById('wizard-nintendo-device-select');
+            const selectedId = select.value;
+            const consoleObj = nintendoConsoles.find(c => c.device_id === selectedId);
+            if (consoleObj) {
+                document.getElementById('wizard-nintendo-device-label').value = consoleObj.name || 'Nintendo Switch';
+            }
+        }
+
+        function importNintendoDevice() {
+            const select = document.getElementById('wizard-nintendo-device-select');
+            const selectedId = select.value;
+            if (!selectedId) {
+                alert('Please select a Nintendo Switch console.');
+                return;
+            }
+            
+            const consoleObj = nintendoConsoles.find(c => c.device_id === selectedId);
+            const label = document.getElementById('wizard-nintendo-device-label').value.trim() || consoleObj.name || 'Nintendo Switch';
+            
+            // Call API to import the device
+            fetch('/api/nintendo/import-device', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ device_id: selectedId, name: label })
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    showNotification(data.message, 'success');
+                    
+                    // Set up detectedDevice state to match standard flow in Step 4 and 5
+                    wizardState.detectedDevice = {
+                        system_id: selectedId,
+                        display_name: label,
+                        players: consoleObj.players || []
+                    };
+                    
+                    goToStep4();
+                } else {
+                    alert('Failed to import device: ' + data.message);
+                }
+            })
+            .catch(err => {
+                console.error('Error importing device', err);
+                alert('Error importing device.');
+            });
         }
     </script>
     {% block extra_js %}{% endblock %}

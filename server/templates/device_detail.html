@@ -9,6 +9,8 @@
         <h1 class="fw-bold mb-1" style="font-size: 2.25rem; font-weight: 800; letter-spacing: -0.025em;">
             {% if device.platform == 'android' %}
             <i class="fab fa-android text-success me-1"></i>
+            {% elif device.platform == 'nintendo' %}
+            <i class="fas fa-gamepad text-warning me-1"></i>
             {% else %}
             <i class="fab fa-linux text-secondary me-1"></i>
             {% endif %}
@@ -45,13 +47,19 @@
                 <strong class="fs-4 text-success d-block lh-1 fw-bold">{{ device.status|title }}</strong>
             </div>
         </div>
-        <!-- IP Address -->
+        <!-- IP Address / Connection Type -->
         <div class="col-12 col-sm-6 col-md-3">
             <div class="card border shadow-sm h-100 text-center p-3">
+                {% if device.platform == 'nintendo' %}
+                <span class="text-secondary small fw-bold text-uppercase d-block mb-1"
+                    style="font-size: 0.7rem; letter-spacing: 0.05em;">Connection Type</span>
+                <strong class="fs-4 text-warning d-block lh-1 fw-bold">Cloud Managed</strong>
+                {% else %}
                 <span class="text-secondary small fw-bold text-uppercase d-block mb-1"
                     style="font-size: 0.7rem; letter-spacing: 0.05em;">Last IP Address</span>
                 <code class="fs-4 text-body d-block lh-1 fw-bold"
                     style="font-family: monospace;">{{ device.system_ip or 'Offline' }}</code>
+                {% endif %}
             </div>
         </div>
         <!-- Host Logs Alert count -->
@@ -82,18 +90,32 @@
                         {% for mapping in mapped_accounts %}
                         <div
                             class="border rounded p-3 bg-body-secondary d-flex justify-content-between align-items-center flex-wrap gap-3">
-                            <div>
-                                <div class="fw-bold fs-5 text-body">
-                                    {{ mapping.managed_user.username }} &rarr; {{ mapping.linux_username }}
-                                </div>
-                                <div class="text-secondary small fw-semibold mt-1">
-                                    Linux UID: {{ mapping.linux_uid if mapping.linux_uid is not none else 'Unassigned'
-                                    }}
-                                    <span
-                                        class="badge {% if mapping.is_valid %}bg-success-subtle text-success border border-success-subtle{% else %}bg-warning-subtle text-warning border border-warning-subtle{% endif %} ms-2 px-2 py-0.5"
-                                        style="font-size: 0.7rem;">
-                                        {{ 'Verified' if mapping.is_valid else 'Pending Check' }}
-                                    </span>
+                            {% set mapped_player = (device.linux_users|selectattr('username', 'equalto', mapping.linux_username)|first) if (device.platform == 'nintendo' and device.linux_users) else None %}
+                            <div class="d-flex align-items-center gap-3">
+                                {% if device.platform == 'nintendo' and mapped_player and mapped_player.player_image %}
+                                <img src="{{ mapped_player.player_image }}" alt="" class="rounded-circle border" style="width: 48px; height: 48px; background-color: var(--bs-secondary-bg);">
+                                {% endif %}
+                                <div>
+                                    <div class="fw-bold fs-5 text-body">
+                                        {{ mapping.managed_user.username }} &rarr; 
+                                        {% if device.platform == 'nintendo' %}
+                                        {{ mapped_player.nickname if mapped_player else mapping.linux_username }}
+                                        {% else %}
+                                        {{ mapping.linux_username }}
+                                        {% endif %}
+                                    </div>
+                                    <div class="text-secondary small fw-semibold mt-1">
+                                        {% if device.platform == 'nintendo' %}
+                                        Nintendo Player ID: {{ mapping.linux_username }}
+                                        {% else %}
+                                        Linux UID: {{ mapping.linux_uid if mapping.linux_uid is not none else 'Unassigned' }}
+                                        {% endif %}
+                                        <span
+                                            class="badge {% if mapping.is_valid %}bg-success-subtle text-success border border-success-subtle{% else %}bg-warning-subtle text-warning border border-warning-subtle{% endif %} ms-2 px-2 py-0.5"
+                                            style="font-size: 0.7rem;">
+                                            {{ 'Verified' if mapping.is_valid else 'Pending Check' }}
+                                        </span>
+                                    </div>
                                 </div>
                             </div>
                             <div>
@@ -635,6 +657,103 @@
 
         <!-- Right Column: Device management, filtering profiles -->
         <div class="col-12 col-lg-4">
+            {% if nintendo_console %}
+            <div class="card shadow-sm border mb-4" id="nintendo-console-card">
+                <div class="card-header bg-warning text-dark py-3 d-flex align-items-center justify-content-between gap-2">
+                    <div class="d-flex align-items-center gap-2">
+                        <div class="bg-white text-warning p-2 rounded d-flex align-items-center justify-content-center"
+                            style="width: 38px; height: 38px;">
+                            <i class="fas fa-gamepad fs-5"></i>
+                        </div>
+                        <div>
+                            <h5 class="mb-0 fw-bold">Console Settings</h5>
+                            <span class="text-secondary small fw-medium">Cloud-managed parental controls</span>
+                        </div>
+                    </div>
+                    {% if nintendo_console.has_data %}
+                    <span class="badge rounded-pill px-3 py-2 {% if nintendo_console.is_stale %}bg-warning-subtle text-warning-emphasis border border-warning-subtle{% else %}bg-success-subtle text-success border border-success-subtle{% endif %}">
+                        {% if nintendo_console.is_stale %}
+                        <i class="fas fa-exclamation-circle me-1"></i>Stale{% if nintendo_console.sync_age_label %} · {{ nintendo_console.sync_age_label }}{% endif %}
+                        {% else %}
+                        <i class="fas fa-check-circle me-1"></i>Synced{% if nintendo_console.sync_age_label %} · {{ nintendo_console.sync_age_label }}{% endif %}
+                        {% endif %}
+                    </span>
+                    {% endif %}
+                </div>
+                <div class="card-body">
+                    {% if nintendo_console.has_data %}
+                    <div class="mb-4">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="small fw-bold text-uppercase text-secondary">Today's Play Time</span>
+                            <span class="small fw-semibold text-body">
+                                {% if nintendo_console.unlimited %}
+                                {{ nintendo_console.playtime_summary or 'No daily limit set' }}
+                                {% elif nintendo_console.playtime_summary %}
+                                {{ nintendo_console.playtime_summary }}
+                                {% else %}
+                                No daily limit set
+                                {% endif %}
+                            </span>
+                        </div>
+                        {% if nintendo_console.unlimited %}
+                        <div class="progress" style="height: 8px;">
+                            <div class="progress-bar bg-warning" role="progressbar" style="width: 100%;" aria-valuenow="100" aria-valuemin="0" aria-valuemax="100"></div>
+                        </div>
+                        <div class="small text-secondary mt-2">No daily limit configured on this console.</div>
+                        {% elif nintendo_console.progress_pct is not none %}
+                        <div class="progress" style="height: 8px;">
+                            <div class="progress-bar {% if nintendo_console.progress_pct >= 90 %}bg-danger{% elif nintendo_console.progress_pct >= 70 %}bg-warning{% else %}bg-success{% endif %}"
+                                role="progressbar"
+                                style="width: {{ nintendo_console.progress_pct }}%;"
+                                aria-valuenow="{{ nintendo_console.progress_pct }}"
+                                aria-valuemin="0"
+                                aria-valuemax="100"></div>
+                        </div>
+                        {% else %}
+                        <div class="small text-secondary">Play time data unavailable.</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="d-flex flex-column gap-2 mb-4">
+                        {% if nintendo_console.last_sync_dt %}
+                        <div class="d-flex justify-content-between align-items-center small">
+                            <span class="text-secondary"><i class="fas fa-sync me-1"></i>Last sync</span>
+                            <span class="fw-semibold text-body">{{ (nintendo_console.last_sync_dt|localtime).strftime('%Y-%m-%d %H:%M') }}</span>
+                        </div>
+                        {% endif %}
+                        {% if nintendo_console.timer_mode %}
+                        <div class="d-flex justify-content-between align-items-center small">
+                            <span class="text-secondary"><i class="fas fa-history me-1"></i>Timer mode</span>
+                            <span class="fw-semibold text-body">{{ nintendo_console.timer_mode }}</span>
+                        </div>
+                        {% endif %}
+                        {% if nintendo_console.bedtime %}
+                        <div class="d-flex justify-content-between align-items-center small">
+                            <span class="text-secondary"><i class="fas fa-clock me-1"></i>Bedtime alarm</span>
+                            <span class="fw-semibold text-body">{{ nintendo_console.bedtime }}</span>
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% else %}
+                    <p class="small text-secondary mb-4 fst-italic">
+                        Console details will appear after the first cloud sync.
+                    </p>
+                    {% endif %}
+
+                    <div id="nintendo-sync-error" class="alert alert-danger py-2 px-3 small d-none mb-3" role="alert"></div>
+
+                    <button type="button" class="btn btn-sm btn-outline-warning fw-bold" id="nintendo-sync-btn">
+                        <span class="nintendo-sync-btn-label"><i class="fas fa-sync me-1"></i> Sync Now</span>
+                    </button>
+
+                    <p class="small text-secondary mt-3 mb-0">
+                        <i class="fas fa-info-circle me-1"></i>
+                        The parental controls PIN is set on the Nintendo Switch and is not exposed by Nintendo's cloud API.
+                    </p>
+                </div>
+            </div>
+            {% endif %}
+
             {% if parental_access_code and has_managed_profiles %}
             <div class="card shadow-sm border mb-4">
                 <div class="card-header bg-primary text-white py-3 d-flex align-items-center gap-2">
@@ -707,26 +826,37 @@ adb reboot</pre>
                 </div>
                 <div class="card-body">
                     <div class="d-flex flex-wrap gap-2 mb-3">
-                        {% if agent_online %}
-                        <span class="badge bg-success-subtle text-success border border-success-subtle">Agent
-                            online</span>
+                        {% if device.platform == 'nintendo' %}
+                            {% if agent_online %}
+                            <span class="badge bg-success-subtle text-success border border-success-subtle">Console Active</span>
+                            {% else %}
+                            <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle">Console Inactive</span>
+                            {% endif %}
+                            <span class="badge bg-warning-subtle text-warning border border-warning-subtle">Cloud Sync</span>
                         {% else %}
-                        <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle">Agent
-                            offline</span>
-                        {% endif %}
-                        {% if fcm_available %}
-                        <span class="badge bg-primary-subtle text-primary border border-primary-subtle">FCM
-                            available</span>
-                        {% else %}
-                        <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle">No FCM
-                            token</span>
+                            {% if agent_online %}
+                            <span class="badge bg-success-subtle text-success border border-success-subtle">Agent
+                                online</span>
+                            {% else %}
+                            <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle">Agent
+                                offline</span>
+                            {% endif %}
+                            {% if fcm_available %}
+                            <span class="badge bg-primary-subtle text-primary border border-primary-subtle">FCM
+                                available</span>
+                            {% else %}
+                            <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle">No FCM
+                                token</span>
+                            {% endif %}
                         {% endif %}
                     </div>
-
+ 
                     <p class="small text-secondary mb-3">
-                        <strong>Unenroll</strong> revokes server trust and asks the agent to stop enforcement and clear
-                        local credentials.
-                        You can re-pair the device later.
+                        {% if device.platform == 'nintendo' %}
+                        <strong>Unenroll</strong> removes this Switch console from Guardian. Playtime logs and account associations will be kept as read-only history.
+                        {% else %}
+                        <strong>Unenroll</strong> revokes server trust and asks the agent to stop enforcement and clear local credentials. You can re-pair the device later.
+                        {% endif %}
                     </p>
                     <button type="button" id="unenroll-device-btn" class="btn btn-outline-danger fw-bold w-100 mb-3">
                         <i class="fas fa-unlink me-1"></i> Unenroll Device
@@ -897,7 +1027,35 @@ adb reboot</pre>
         const systemId = "{{ device.system_id }}";
         const deviceLabel = {{ device_label| tojson
     }};
-    const unenrollBtn = document.getElementById('unenroll-device-btn');
+        const nintendoSyncBtn = document.getElementById('nintendo-sync-btn');
+        const nintendoSyncError = document.getElementById('nintendo-sync-error');
+        if (nintendoSyncBtn) {
+            const defaultSyncLabel = nintendoSyncBtn.innerHTML;
+            nintendoSyncBtn.addEventListener('click', async () => {
+                nintendoSyncBtn.disabled = true;
+                if (nintendoSyncError) {
+                    nintendoSyncError.classList.add('d-none');
+                    nintendoSyncError.textContent = '';
+                }
+                nintendoSyncBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span> Syncing…';
+                try {
+                    const response = await fetch('/api/nintendo/sync', { method: 'POST' });
+                    const data = await response.json();
+                    if (!response.ok || !data.success) {
+                        throw new Error(data.message || 'Sync failed');
+                    }
+                    window.location.reload();
+                } catch (err) {
+                    if (nintendoSyncError) {
+                        nintendoSyncError.textContent = 'Nintendo sync failed: ' + err.message;
+                        nintendoSyncError.classList.remove('d-none');
+                    }
+                    nintendoSyncBtn.disabled = false;
+                    nintendoSyncBtn.innerHTML = defaultSyncLabel;
+                }
+            });
+        }
+        const unenrollBtn = document.getElementById('unenroll-device-btn');
     const factoryResetBtn = document.getElementById('factory-reset-device-btn');
     const lifecycleResult = document.getElementById('lifecycle-result');
 

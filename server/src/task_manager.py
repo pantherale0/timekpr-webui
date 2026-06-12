@@ -8,6 +8,8 @@ import threading
 import time
 import traceback
 import uuid
+import asyncio
+import aiohttp
 from contextlib import contextmanager
 from datetime import date, datetime, timezone, timedelta
 
@@ -18,6 +20,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from src.database import (
     AgentAlert,
+    AgentDevice,
     BlocklistDomain,
     BlocklistSource,
     db,
@@ -30,7 +33,16 @@ from src.database import (
     coerce_time_spent_day,
     get_mapping_time_spent_for_day,
 )
+from pynintendoparental import Authenticator, NintendoParental
 from src.agent_helper import AgentClient, AgentConnectionManager
+from src.nintendo_sync import (
+    apply_nintendo_playtime,
+    build_nintendo_console_stats,
+    build_nintendo_mapping_stats,
+    push_nintendo_schedule_changes,
+    save_nintendo_console_stats,
+    update_nintendo_players,
+)
 from src.blocklist_helper import (
     BLOCKLIST_STREAM_CHUNK_SIZE,
     BlocklistStreamParser,
@@ -294,6 +306,8 @@ class BackgroundTaskManager:
         if self.update_user_data_enabled:
             logger.info("Updating user data")
             self._update_user_data()
+            logger.info("Syncing Nintendo devices")
+            self.sync_nintendo_devices()
 
         if self.sync_domain_policies_enabled:
             logger.debug("Domain policy sync is agent-initiated")
@@ -798,6 +812,132 @@ class BackgroundTaskManager:
         )
         sync_thread.start()
         return True
+
+    def sync_nintendo_devices(self, *, force=False):
+        """Sync playtime and schedules with Nintendo servers synchronously using asyncio."""
+        if not self.app:
+            return
+        try:
+            asyncio.run(self._sync_nintendo_devices_async(force=force))
+        except Exception as exc:
+            logger.error("Error in sync_nintendo_devices: %s\n%s", exc, traceback.format_exc())
+
+    async def _sync_nintendo_devices_async(self, *, force=False):
+        """Asynchronously sync playtime and schedules with Nintendo servers."""
+        with self.app.app_context():
+            # Throttle check: Only poll Nintendo API once every 5 minutes (300 seconds)
+            last_poll_str = Settings.get_value('last_nintendo_poll_at')
+            now_utc = datetime.now(timezone.utc)
+            if not force and last_poll_str:
+                try:
+                    last_poll = datetime.fromisoformat(last_poll_str)
+                    if (now_utc - last_poll).total_seconds() < 300:
+                        logger.debug("Skipping Nintendo sync; last poll was %s", last_poll_str)
+                        return
+                except (ValueError, TypeError):
+                    pass
+
+            session_token = Settings.get_value('nintendo_session_token')
+            if not session_token:
+                logger.debug("Skipping Nintendo sync; no linked Nintendo account")
+                return
+
+            nintendo_devices = AgentDevice.query.filter_by(platform='nintendo', status='approved').all()
+            if not nintendo_devices:
+                logger.debug("Skipping Nintendo sync; no approved Nintendo devices")
+                return
+
+            schedule_push_targets = []
+
+            try:
+                async with aiohttp.ClientSession() as client_session:
+                    auth = Authenticator(session_token, client_session)
+                    await auth.async_complete_login(use_session_token=True)
+                    client = await NintendoParental.create(auth)
+
+                    await client.update()
+                    today = date.today()
+
+                    for db_device in nintendo_devices:
+                        cloud_device = client.devices.get(db_device.system_id)
+                        if not cloud_device:
+                            logger.warning(
+                                "Nintendo cloud device %s not found for enrolled console %s",
+                                db_device.system_id,
+                                db_device.system_hostname,
+                            )
+                            continue
+
+                        update_nintendo_players(db_device, cloud_device)
+                        save_nintendo_console_stats(
+                            db_device.system_id,
+                            build_nintendo_console_stats(cloud_device, now_utc=now_utc),
+                        )
+
+                        global_playtime_seconds = cloud_device.today_playing_time * 60
+                        primary_mapping = db_device.user_mappings[0] if db_device.user_mappings else None
+
+                        for mapping in db_device.user_mappings:
+                            user = mapping.managed_user
+                            if not user:
+                                continue
+
+                            player = cloud_device.players.get(mapping.linux_username)
+                            player_playtime = (player.playing_time * 60) if player else global_playtime_seconds
+
+                            previous_playtime = 0
+                            last_active_str = now_utc.isoformat()
+                            if mapping.last_config:
+                                try:
+                                    old_stats = json.loads(mapping.last_config)
+                                    previous_playtime = old_stats.get("TIME_SPENT_DAY", 0)
+                                    last_active_str = old_stats.get("last_playtime_change_at", now_utc.isoformat())
+                                except Exception:
+                                    pass
+
+                            if player_playtime > previous_playtime:
+                                last_active_str = now_utc.isoformat()
+
+                            apply_nintendo_playtime(mapping, player_playtime=player_playtime, today=today)
+                            mapping.last_config = json.dumps(
+                                build_nintendo_mapping_stats(
+                                    cloud_device,
+                                    player_playtime=player_playtime,
+                                    global_playtime_seconds=global_playtime_seconds,
+                                    last_active_str=last_active_str,
+                                    now_utc=now_utc,
+                                )
+                            )
+                            mapping.last_checked = now_utc
+                            mapping.is_valid = True
+
+                            if mapping == primary_mapping:
+                                schedule_push_targets.append((cloud_device, mapping))
+
+                    Settings.set_value('last_nintendo_poll_at', now_utc.isoformat())
+                    db.session.commit()
+                    logger.info("Nintendo cloud sync completed for %d device(s)", len(nintendo_devices))
+            except Exception as exc:
+                logger.error("Failed to sync Nintendo devices: %s\n%s", exc, traceback.format_exc())
+                db.session.rollback()
+                return
+
+            for cloud_device, mapping in schedule_push_targets:
+                try:
+                    await push_nintendo_schedule_changes(
+                        cloud_device,
+                        mapping,
+                        today=today,
+                        now_utc=now_utc,
+                    )
+                    db.session.commit()
+                except Exception as exc:
+                    logger.warning(
+                        "Failed to push Nintendo schedule for %s: %s",
+                        mapping.system_id,
+                        exc,
+                    )
+                    db.session.rollback()
 
     def _run_requested_domain_policy_sync(self, system_id, source_revisions, reason):
         try:

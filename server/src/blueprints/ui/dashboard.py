@@ -21,6 +21,8 @@ from src.settings_manager import (
     _get_android_agent_signature_checksum,
     encrypt_setting,
 )
+from src.nintendo_sync import build_nintendo_console_view_context
+from src.blueprints.api.nintendo import get_nintendo_account_summary
 from src.pairing_helper import (
     build_agent_websocket_url,
     get_server_version,
@@ -407,6 +409,8 @@ def settings():
     if provisioning['provisioning_ready'] and provisioning['payload_json']:
         provisioning_qr_data_uri = render_pairing_qr_data_uri(provisioning['payload_json'])
 
+    nintendo_account = get_nintendo_account_summary()
+
     return render_template(
         'settings.html',
         alert_webhook_settings=alert_webhook_settings,
@@ -422,6 +426,7 @@ def settings():
         provisioning=provisioning,
         provisioning_qr_data_uri=provisioning_qr_data_uri,
         server_version=get_server_version(),
+        nintendo_account=nintendo_account,
     )
 
 
@@ -511,6 +516,7 @@ def device_detail(system_id):
     android_device_policy = None
     parental_access_code = None
     android_recovery_ws_url = None
+    nintendo_console = build_nintendo_console_view_context(device, mapped_accounts)
     if (device.platform or '').strip().lower() == 'android':
         from src.android_device_policy_manager import get_or_create_policy as get_or_create_android_policy
         try:
@@ -541,6 +547,7 @@ def device_detail(system_id):
         parental_access_code=parental_access_code,
         android_recovery_ws_url=android_recovery_ws_url,
         has_managed_profiles=device.has_managed_profiles,
+        nintendo_console=nintendo_console,
     )
 
 

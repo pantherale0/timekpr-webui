@@ -12,6 +12,7 @@ from src.blueprints.api.installed_apps import api_installed_apps_bp
 from src.blueprints.api.approvals import api_approvals_bp
 from src.blueprints.api.android_device_policy import api_android_device_policy_bp
 from src.blueprints.api.linux_device_policy import api_linux_device_policy_bp
+from src.blueprints.api.nintendo import api_nintendo_bp
 
 __all__ = [
     'api_devices_bp',
@@ -27,4 +28,5 @@ __all__ = [
     'api_approvals_bp',
     'api_android_device_policy_bp',
     'api_linux_device_policy_bp',
+    'api_nintendo_bp',
 ]

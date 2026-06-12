@@ -104,11 +104,14 @@
                                             </select>
                                         </div>
                                         <div class="col-12 col-md-3">
-                                            <label class="form-label fw-bold text-muted" style="font-size: 0.7rem;">Local OS Username</label>
+                                            <label class="form-label fw-bold text-muted linux-username-label" style="font-size: 0.7rem;">Local OS Username</label>
                                             <input type="text" name="linux_username" class="form-control linux-username-input" placeholder="e.g. jordan" required list="linux-users-list-{{ user.id }}" autocomplete="off">
+                                            <select class="form-select nintendo-player-select d-none" disabled aria-label="Nintendo player profile">
+                                                <option value="" disabled selected>Select player profile</option>
+                                            </select>
                                             <datalist id="linux-users-list-{{ user.id }}"></datalist>
                                         </div>
-                                        <div class="col-12 col-md-2">
+                                        <div class="col-12 col-md-2 linux-uid-container">
                                             <label class="form-label fw-bold text-muted" style="font-size: 0.7rem;">Linux UID (Optional)</label>
                                             <input type="text" name="linux_uid" class="form-control linux-uid-input" placeholder="e.g. 1000">
                                         </div>
@@ -144,12 +147,24 @@
                                                 {% for mapping in user.device_mappings %}
                                                     <tr>
                                                          <td class="ps-3 fw-bold">
-                                                             <code class="bg-body-secondary border px-2 py-1 rounded small" style="color: var(--bs-body-color);">{{ mapping.linux_username }}</code>
-                                                             {% if mapping.android_profile_type %}
-                                                                 <div class="text-secondary small mt-1" style="font-size: 0.7rem;">
-                                                                     <i class="fab fa-android text-success"></i> Programmatic: {{ mapping.android_profile_type|title }}
+                                                             {% set mapped_player = mapping.nintendo_player %}
+                                                             <div class="d-flex align-items-center gap-2">
+                                                                 {% if mapped_player and mapped_player.player_image %}
+                                                                 <img src="{{ mapped_player.player_image }}" alt="" class="rounded-circle border" style="width: 28px; height: 28px; background-color: var(--bs-secondary-bg);">
+                                                                 {% endif %}
+                                                                 <div>
+                                                                     <code class="bg-body-secondary border px-2 py-1 rounded small" style="color: var(--bs-body-color);">{{ mapping.display_linux_username }}</code>
+                                                                     {% if mapped_player %}
+                                                                     <div class="text-secondary small mt-1" style="font-size: 0.7rem;">
+                                                                         <i class="fas fa-gamepad text-warning"></i> Nintendo Player
+                                                                     </div>
+                                                                     {% elif mapping.android_profile_type %}
+                                                                     <div class="text-secondary small mt-1" style="font-size: 0.7rem;">
+                                                                         <i class="fab fa-android text-success"></i> Programmatic: {{ mapping.android_profile_type|title }}
+                                                                     </div>
+                                                                     {% endif %}
                                                                  </div>
-                                                             {% endif %}
+                                                             </div>
                                                          </td>
                                                         <td>
                                                             <a href="{{ url_for('device_detail', system_id=mapping.system_id) }}" class="fw-bold text-decoration-none d-inline-flex align-items-center gap-1">
@@ -177,7 +192,7 @@
                                                         <td class="pe-3 text-end">
                                                             <div class="d-inline-flex gap-2">
                                                                 <a href="{{ url_for('validate_mapping', user_id=user.id, mapping_id=mapping.id) }}" class="btn btn-xs btn-outline-secondary fw-bold px-2 py-1" style="font-size: 0.75rem;">Verify</a>
-                                                                <form action="{{ url_for('delete_mapping', user_id=user.id, mapping_id=mapping.id) }}" method="POST" onsubmit="return confirm('Revoke account mapping for {{ mapping.linux_username }}?')" class="m-0">
+                                                                <form action="{{ url_for('delete_mapping', user_id=user.id, mapping_id=mapping.id) }}" method="POST" onsubmit="return confirm('Revoke account mapping for {{ mapping.display_linux_username }}?')" class="m-0">
 
                                                                 {{ csrf_field() }}                                                                    <button type="submit" class="btn btn-xs btn-outline-danger fw-bold px-2 py-1" style="font-size: 0.75rem;">Remove</button>
                                                                 </form>
@@ -242,6 +257,42 @@
         // ── Linux User Sync Logic ──────────────────────────────────────────
         const deviceSelects = document.querySelectorAll('.target-device-select');
 
+        function setLinuxUsernameMode(form, platform) {
+            const usernameLabel = form.querySelector('.linux-username-label');
+            const usernameInput = form.querySelector('.linux-username-input');
+            const nintendoSelect = form.querySelector('.nintendo-player-select');
+            const uidContainer = form.querySelector('.linux-uid-container');
+            const isNintendo = platform === 'nintendo';
+
+            if (usernameLabel) {
+                usernameLabel.textContent = isNintendo ? 'Player Profile' : 'Local OS Username';
+            }
+            if (usernameInput) {
+                usernameInput.classList.toggle('d-none', isNintendo);
+                usernameInput.required = !isNintendo;
+                if (isNintendo) {
+                    usernameInput.removeAttribute('name');
+                    usernameInput.value = '';
+                } else {
+                    usernameInput.setAttribute('name', 'linux_username');
+                }
+            }
+            if (nintendoSelect) {
+                nintendoSelect.classList.toggle('d-none', !isNintendo);
+                nintendoSelect.disabled = !isNintendo;
+                nintendoSelect.required = isNintendo;
+                if (isNintendo) {
+                    nintendoSelect.setAttribute('name', 'linux_username');
+                } else {
+                    nintendoSelect.removeAttribute('name');
+                    nintendoSelect.innerHTML = '<option value="" disabled selected>Select player profile</option>';
+                }
+            }
+            if (uidContainer) {
+                uidContainer.classList.toggle('d-none', isNintendo);
+            }
+        }
+
         deviceSelects.forEach(select => {
             select.addEventListener('change', (e) => {
                 const selectedOption = e.target.options[e.target.selectedIndex];
@@ -251,7 +302,10 @@
                 const form = e.target.closest('form');
                 const datalist = form.querySelector('datalist');
                 const usernameInput = form.querySelector('.linux-username-input');
+                const nintendoSelect = form.querySelector('.nintendo-player-select');
                 const uidInput = form.querySelector('.linux-uid-input');
+
+                setLinuxUsernameMode(form, platform);
                 
                 // Toggle Profile Provisioning Dropdown
                 const provisionContainer = form.querySelector('.profile-provision-container');
@@ -269,10 +323,23 @@
 
                 // Clear existing options
                 datalist.innerHTML = '';
+                if (nintendoSelect) {
+                    nintendoSelect.innerHTML = '<option value="" disabled selected>Select player profile</option>';
+                }
 
                 if (usersJson) {
                     try {
                         const users = JSON.parse(usersJson);
+                        if (platform === 'nintendo' && nintendoSelect) {
+                            users.forEach(player => {
+                                const option = document.createElement('option');
+                                option.value = player.username;
+                                option.textContent = (player.nickname || '').trim() || player.username;
+                                nintendoSelect.appendChild(option);
+                            });
+                            return;
+                        }
+
                         users.forEach(user => {
                             const option = document.createElement('option');
                             option.value = user.username;

@@ -155,7 +155,11 @@
                                             </span>
                                         </td>
                                         <td>
+                                            {% if device.platform == 'nintendo' %}
+                                            <code class="bg-body-secondary border px-2 py-1 rounded small" style="color: var(--bs-body-color);">Cloud</code>
+                                            {% else %}
                                             <code class="bg-body-secondary border px-2 py-1 rounded small" style="color: var(--bs-body-color);">{{ device.system_ip }}</code>
+                                            {% endif %}
                                         </td>
                                         <td class="text-center">
                                             <span class="badge bg-secondary p-2">{{ device.user_mappings|length }} linked accounts</span>

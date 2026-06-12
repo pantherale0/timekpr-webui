@@ -196,7 +196,30 @@ class AgentConnectionManager(metaclass=AgentConnectionManagerMeta):
     @classmethod
     def is_online(cls, system_id):
         """Check if a system_id is currently online"""
-        return system_id in cls.active_connections
+        if system_id in cls.active_connections:
+            return True
+
+        # Hook for cloud-managed Nintendo devices
+        try:
+            device = AgentDevice.query.get(system_id)
+            if device and device.platform == 'nintendo':
+                for mapping in device.user_mappings:
+                    if mapping.last_config:
+                        try:
+                            stats = json.loads(mapping.last_config)
+                            last_active_str = stats.get("last_playtime_change_at")
+                            if last_active_str:
+                                last_active = datetime.fromisoformat(last_active_str)
+                                if last_active.tzinfo is None:
+                                    last_active = last_active.replace(tzinfo=timezone.utc)
+                                now = datetime.now(timezone.utc)
+                                if (now - last_active).total_seconds() <= 600:  # 10 minutes
+                                    return True
+                        except Exception:
+                            pass
+        except Exception:
+            pass
+        return False
 
     @classmethod
     def get_online_system_ids(cls):

@@ -195,6 +195,81 @@
         </div>
     </div>
 
+    <!-- Nintendo Switch Account -->
+    <div class="col-12">
+        <div class="card border shadow-sm">
+            <div class="card-header bg-warning text-dark py-3 d-flex align-items-center gap-2">
+                <i class="fas fa-gamepad fs-5"></i>
+                <h5 class="mb-0 fw-bold">Nintendo Switch Account</h5>
+            </div>
+            <div class="card-body p-4">
+                <p class="text-secondary small fw-medium mb-3">
+                    Link your Nintendo Account once to manage Switch consoles through Nintendo's parental controls cloud API.
+                    Enrolled consoles stay in Guardian even if you unlink the account, but cloud sync will stop until you link again.
+                </p>
+
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                    <span class="small fw-bold text-muted">ACCOUNT STATUS</span>
+                    <span id="nintendo-settings-status-badge" class="badge {% if nintendo_account.linked %}bg-success{% else %}bg-secondary{% endif %} p-2">
+                        {% if nintendo_account.linked %}Linked{% else %}Not linked{% endif %}
+                    </span>
+                </div>
+
+                <div id="nintendo-settings-linked-info" class="border rounded p-3 bg-body-secondary mb-3 {% if not nintendo_account.linked %}d-none{% endif %}">
+                    {% if nintendo_account.linked_at %}
+                    <div class="small fw-semibold mb-2">
+                        <span class="text-muted">Linked since:</span>
+                        <span id="nintendo-settings-linked-at">{{ nintendo_account.linked_at }}</span>
+                    </div>
+                    {% endif %}
+                    <div class="small fw-semibold">
+                        <span class="text-muted">Enrolled consoles:</span>
+                        <span id="nintendo-settings-device-count">{{ nintendo_account.enrolled_device_count }}</span>
+                    </div>
+                    {% if nintendo_account.enrolled_devices %}
+                    <ul id="nintendo-settings-device-list" class="small mb-0 mt-2 ps-3">
+                        {% for device in nintendo_account.enrolled_devices %}
+                        <li><a href="{{ url_for('ui_dashboard.device_detail', system_id=device.system_id) }}">{{ device.display_name }}</a></li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                    <ul id="nintendo-settings-device-list" class="small mb-0 mt-2 ps-3 d-none"></ul>
+                    {% endif %}
+                </div>
+
+                <div id="nintendo-settings-actions" class="d-flex flex-wrap gap-2 mb-3 {% if not nintendo_account.linked %}d-none{% endif %}">
+                    <button type="button" class="btn btn-outline-warning btn-sm fw-bold" id="nintendo-settings-relink-btn">
+                        <i class="fas fa-link me-1"></i> Re-link Account
+                    </button>
+                    <button type="button" class="btn btn-outline-danger btn-sm fw-bold" id="nintendo-settings-unlink-btn">
+                        <i class="fas fa-unlink me-1"></i> Unlink Account
+                    </button>
+                </div>
+
+                <div id="nintendo-settings-link-panel" class="{% if nintendo_account.linked %}d-none{% endif %}">
+                    <ol class="text-secondary small mb-3">
+                        <li>Click the button below to sign in to Nintendo.</li>
+                        <li>On the final <strong>"Select this person"</strong> screen, copy the button link address and paste it below.</li>
+                    </ol>
+                    <div class="mb-3">
+                        <a href="#" id="nintendo-settings-login-btn" target="_blank" class="btn btn-outline-primary fw-bold">
+                            <i class="fas fa-external-link-alt me-2"></i>Sign In to Nintendo Account
+                        </a>
+                    </div>
+                    <div class="mb-3">
+                        <label for="nintendo-settings-redirect-url" class="form-label fw-bold small text-muted">REDIRECT LINK ADDRESS</label>
+                        <input type="text" id="nintendo-settings-redirect-url" class="form-control" placeholder="Paste npf... redirect URL here">
+                    </div>
+                    <button type="button" class="btn btn-success fw-bold" id="nintendo-settings-link-btn">
+                        <i class="fas fa-check me-1"></i> Link Account
+                    </button>
+                </div>
+
+                <div id="nintendo-settings-message" class="alert py-2 px-3 small d-none mt-3 mb-0" role="alert"></div>
+            </div>
+        </div>
+    </div>
+
     <!-- Security / Password Credentials -->
     <div class="col-12 col-md-6">
         <div class="card border shadow-sm h-100">
@@ -360,6 +435,146 @@
                 confirmPasswordField.setCustomValidity('');
                 confirmPasswordField.classList.remove('is-invalid');
             }
+        });
+    }
+
+    const nintendoSettingsLoginBtn = document.getElementById('nintendo-settings-login-btn');
+    const nintendoSettingsLinkBtn = document.getElementById('nintendo-settings-link-btn');
+    const nintendoSettingsRelinkBtn = document.getElementById('nintendo-settings-relink-btn');
+    const nintendoSettingsUnlinkBtn = document.getElementById('nintendo-settings-unlink-btn');
+    const nintendoSettingsLinkPanel = document.getElementById('nintendo-settings-link-panel');
+    const nintendoSettingsLinkedInfo = document.getElementById('nintendo-settings-linked-info');
+    const nintendoSettingsActions = document.getElementById('nintendo-settings-actions');
+    const nintendoSettingsStatusBadge = document.getElementById('nintendo-settings-status-badge');
+    const nintendoSettingsMessage = document.getElementById('nintendo-settings-message');
+    const nintendoSettingsRedirectUrl = document.getElementById('nintendo-settings-redirect-url');
+
+    function showNintendoSettingsMessage(text, type) {
+        if (!nintendoSettingsMessage) return;
+        nintendoSettingsMessage.textContent = text;
+        nintendoSettingsMessage.className = `alert alert-${type} py-2 px-3 small mt-3 mb-0`;
+        nintendoSettingsMessage.classList.remove('d-none');
+    }
+
+    function refreshNintendoSettingsUi(summary) {
+        const linked = Boolean(summary && summary.linked);
+        if (nintendoSettingsStatusBadge) {
+            nintendoSettingsStatusBadge.textContent = linked ? 'Linked' : 'Not linked';
+            nintendoSettingsStatusBadge.className = `badge ${linked ? 'bg-success' : 'bg-secondary'} p-2`;
+        }
+        if (nintendoSettingsLinkedInfo) {
+            nintendoSettingsLinkedInfo.classList.toggle('d-none', !linked);
+        }
+        if (nintendoSettingsActions) {
+            nintendoSettingsActions.classList.toggle('d-none', !linked);
+        }
+        if (nintendoSettingsLinkPanel) {
+            nintendoSettingsLinkPanel.classList.add('d-none');
+        }
+        const linkedAtEl = document.getElementById('nintendo-settings-linked-at');
+        if (linkedAtEl && summary.linked_at) {
+            linkedAtEl.textContent = summary.linked_at;
+        }
+        const countEl = document.getElementById('nintendo-settings-device-count');
+        if (countEl) {
+            countEl.textContent = summary.enrolled_device_count || 0;
+        }
+        const listEl = document.getElementById('nintendo-settings-device-list');
+        if (listEl) {
+            listEl.innerHTML = '';
+            (summary.enrolled_devices || []).forEach(device => {
+                const li = document.createElement('li');
+                const link = document.createElement('a');
+                link.href = `/devices/${encodeURIComponent(device.system_id)}`;
+                link.textContent = device.display_name;
+                li.appendChild(link);
+                listEl.appendChild(li);
+            });
+            listEl.classList.toggle('d-none', !(summary.enrolled_devices || []).length);
+        }
+    }
+
+    function prepareNintendoSettingsLogin() {
+        if (nintendoSettingsLinkPanel) {
+            nintendoSettingsLinkPanel.classList.remove('d-none');
+        }
+        if (nintendoSettingsRedirectUrl) {
+            nintendoSettingsRedirectUrl.value = '';
+        }
+        fetch('/api/nintendo/login-url')
+            .then(r => r.json())
+            .then(res => {
+                if (res.success && nintendoSettingsLoginBtn) {
+                    nintendoSettingsLoginBtn.href = res.login_url;
+                } else {
+                    showNintendoSettingsMessage(res.message || 'Failed to get Nintendo login URL', 'danger');
+                }
+            })
+            .catch(() => showNintendoSettingsMessage('Failed to get Nintendo login URL', 'danger'));
+    }
+
+    if (nintendoSettingsLinkBtn) {
+        if (!{{ 'true' if nintendo_account.linked else 'false' }}) {
+            prepareNintendoSettingsLogin();
+        }
+        nintendoSettingsLinkBtn.addEventListener('click', () => {
+            const redirectUrl = (nintendoSettingsRedirectUrl && nintendoSettingsRedirectUrl.value || '').trim();
+            if (!redirectUrl) {
+                showNintendoSettingsMessage('Please paste the redirect URL from the Nintendo login process.', 'warning');
+                return;
+            }
+            nintendoSettingsLinkBtn.disabled = true;
+            fetch('/api/nintendo/authenticate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ response_url: redirectUrl }),
+            })
+                .then(r => r.json())
+                .then(data => {
+                    if (!data.success) {
+                        throw new Error(data.message || 'Authentication failed');
+                    }
+                    return fetch('/api/nintendo/account-status');
+                })
+                .then(r => r.json())
+                .then(summary => {
+                    if (!summary.success) {
+                        throw new Error(summary.message || 'Failed to refresh account status');
+                    }
+                    refreshNintendoSettingsUi(summary);
+                    showNintendoSettingsMessage('Nintendo Account linked successfully.', 'success');
+                })
+                .catch(err => showNintendoSettingsMessage(err.message, 'danger'))
+                .finally(() => {
+                    nintendoSettingsLinkBtn.disabled = false;
+                });
+        });
+    }
+
+    if (nintendoSettingsRelinkBtn) {
+        nintendoSettingsRelinkBtn.addEventListener('click', prepareNintendoSettingsLogin);
+    }
+
+    if (nintendoSettingsUnlinkBtn) {
+        nintendoSettingsUnlinkBtn.addEventListener('click', () => {
+            if (!confirm('Unlink the Nintendo Account? Enrolled consoles will remain, but cloud sync will stop until you link again.')) {
+                return;
+            }
+            nintendoSettingsUnlinkBtn.disabled = true;
+            fetch('/api/nintendo/unlink', { method: 'POST' })
+                .then(r => r.json())
+                .then(data => {
+                    if (!data.success) {
+                        throw new Error(data.message || 'Failed to unlink account');
+                    }
+                    refreshNintendoSettingsUi({ linked: false, enrolled_device_count: {{ nintendo_account.enrolled_device_count }}, enrolled_devices: {{ nintendo_account.enrolled_devices | tojson }} });
+                    prepareNintendoSettingsLogin();
+                    showNintendoSettingsMessage('Nintendo Account unlinked.', 'success');
+                })
+                .catch(err => showNintendoSettingsMessage(err.message, 'danger'))
+                .finally(() => {
+                    nintendoSettingsUnlinkBtn.disabled = false;
+                });
         });
     }
 </script>

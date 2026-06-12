@@ -15,3 +15,4 @@ qrcode[pil]>=7.4.2
 google-auth>=2.29.0
 Flask-Migrate==4.0.7
 psycopg2-binary>=2.9.9
+pynintendoparental>=2.4.0
