@@ -204,7 +204,13 @@ def _create_missing_tables(missing_tables):
         "Creating missing database tables: %s",
         ", ".join(sorted(missing_tables)),
     )
-    db.create_all()
+    try:
+        db.create_all()
+    except Exception as exc:
+        _LOGGER.warning(
+            "Could not create missing database tables via create_all(): %s",
+            exc,
+        )
 
 
 def _repair_stamped_empty_database(migrations_dir, migrations_exist):

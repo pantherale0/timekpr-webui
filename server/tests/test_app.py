@@ -368,6 +368,99 @@ def test_ensure_database_schema_repairs_stamped_empty_database(app, db_session):
     assert table_names >= set(db.metadata.tables.keys())
 
 
+def test_android_device_policy_refactor_migration(app, db_session):
+    from flask_migrate import upgrade
+
+    migrations_dir = os.path.join(app.root_path, 'migrations')
+    for table_name in db.inspect(db.engine).get_table_names():
+        db.session.execute(text(f'DROP TABLE IF EXISTS "{table_name}"'))
+    db.session.commit()
+
+    upgrade(directory=migrations_dir, revision='6f4e9d1f9b34')
+
+    now = datetime.now(timezone.utc)
+    db.session.execute(
+        text('''
+            INSERT INTO agent_device (system_id, status, secure_token, date_added)
+            VALUES (:system_id, 'approved', 'tok', :now)
+        '''),
+        {'system_id': 'android-refactor', 'now': now},
+    )
+    db.session.execute(
+        text('''
+            INSERT INTO managed_user (username, system_ip, date_added)
+            VALUES ('child', '127.0.0.1', :now)
+        '''),
+        {'now': now},
+    )
+    managed_user_id = db.session.execute(text('SELECT id FROM managed_user WHERE username = "child"')).scalar_one()
+    db.session.execute(
+        text('''
+            INSERT INTO managed_user_device_map (
+                managed_user_id, system_id, linux_username, date_added, last_modified,
+                blocklist_is_synced
+            ) VALUES (
+                :managed_user_id, :system_id, 'child', :now, :now, 0
+            )
+        '''),
+        {
+            'managed_user_id': managed_user_id,
+            'system_id': 'android-refactor',
+            'now': now,
+        },
+    )
+    device_map_id = db.session.execute(
+        text('SELECT id FROM managed_user_device_map WHERE system_id = :system_id'),
+        {'system_id': 'android-refactor'},
+    ).scalar_one()
+    db.session.execute(
+        text('''
+            INSERT INTO mapping_android_device_policy (
+                device_map_id, screen_capture_disabled, camera_access,
+                install_apps_disabled, uninstall_apps_disabled, developer_settings,
+                microphone_access, usb_data_access, factory_reset_disabled,
+                adjust_volume_disabled, modify_accounts_disabled,
+                mount_physical_media_disabled, bluetooth_disabled,
+                outgoing_calls_disabled, sms_disabled,
+                short_support_message, long_support_message,
+                revision, is_synced, created_at, updated_at,
+                block_wifi_tethering, block_nfc
+            ) VALUES (
+                :device_map_id, 1, 'CAMERA_ACCESS_DISABLED',
+                0, 0, 'DEVELOPER_SETTINGS_UNSPECIFIED',
+                'MICROPHONE_ACCESS_UNSPECIFIED', 'USB_DATA_ACCESS_UNSPECIFIED', 0,
+                0, 0, 0, 0, 0, 0,
+                'Short msg', 'Long msg',
+                'rev-1', 0, :now, :now, 0, 0
+            )
+        '''),
+        {'device_map_id': device_map_id, 'now': now},
+    )
+    db.session.commit()
+
+    _ensure_database_schema(migrations_dir)
+
+    policy_columns = {col['name'] for col in db.inspect(db.engine).get_columns('mapping_android_device_policy')}
+    assert 'system_id' in policy_columns
+    assert 'device_map_id' not in policy_columns
+
+    row = db.session.execute(
+        text('''
+            SELECT system_id, screen_capture_disabled, short_support_message
+            FROM mapping_android_device_policy
+            WHERE system_id = :system_id
+        '''),
+        {'system_id': 'android-refactor'},
+    ).one()
+    assert row.system_id == 'android-refactor'
+    assert bool(row.screen_capture_disabled) is True
+    assert row.short_support_message == 'Short msg'
+
+    device_columns = {col['name'] for col in db.inspect(db.engine).get_columns('agent_device')}
+    assert 'is_device_owner' in device_columns
+    assert 'android_force_installed_app' in set(db.inspect(db.engine).get_table_names())
+
+
 def test_ensure_database_schema_applies_pending_column_migrations(app, db_session):
     db.session.execute(text('DROP TABLE IF EXISTS app_policy'))
     db.session.execute(text('''
