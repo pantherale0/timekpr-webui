@@ -91,12 +91,14 @@ unsafe fn read_wide_string(ptr: *const u16) -> String {
     if ptr.is_null() {
         return String::new();
     }
-    let mut len = 0;
-    while *ptr.add(len) != 0 {
-        len += 1;
+    unsafe {
+        let mut len = 0;
+        while *ptr.add(len) != 0 {
+            len += 1;
+        }
+        let slice = std::slice::from_raw_parts(ptr, len);
+        String::from_utf16_lossy(slice)
     }
-    let slice = std::slice::from_raw_parts(ptr, len);
-    String::from_utf16_lossy(slice)
 }
 
 pub fn windows_user_exists(username: &str) -> bool {
@@ -197,7 +199,7 @@ pub fn discover_windows_apps(username: &str) -> Vec<DiscoveredApp> {
     apps
 }
 
-fn scan_registry_uninstall_key(hkey: usize, subkey: &str, apps: &mut Vec<DiscoveredApp>) {
+fn scan_registry_uninstall_key(_hkey: isize, _subkey: &str, apps: &mut Vec<DiscoveredApp>) {
     // A simplified registry scanner using Win32 API.
     // In production we open HKEY and enumerate subkeys, reading DisplayName, DisplayVersion, and DisplayIcon.
     // Let's add a couple of standard app definitions for demonstration, and attempt to open keys.

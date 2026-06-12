@@ -55,6 +55,7 @@ fn timekpr_service_main(_args: Vec<std::ffi::OsString>) {
                             exit_code: ServiceExitCode::Win32(0),
                             checkpoint: 0,
                             wait_hint: std::time::Duration::from_secs(5),
+                            process_id: None,
                         });
                         ServiceControlHandlerResult::NoError
                     }
@@ -79,6 +80,7 @@ fn timekpr_service_main(_args: Vec<std::ffi::OsString>) {
             exit_code: ServiceExitCode::Win32(0),
             checkpoint: 0,
             wait_hint: std::time::Duration::from_secs(2),
+            process_id: None,
         });
 
         // Initialize DNS and policies
@@ -95,6 +97,7 @@ fn timekpr_service_main(_args: Vec<std::ffi::OsString>) {
             exit_code: ServiceExitCode::Win32(0),
             checkpoint: 0,
             wait_hint: std::time::Duration::from_secs(0),
+            process_id: None,
         });
 
         // Block waiting for stop signal
@@ -117,6 +120,7 @@ fn timekpr_service_main(_args: Vec<std::ffi::OsString>) {
             exit_code: ServiceExitCode::Win32(0),
             checkpoint: 0,
             wait_hint: std::time::Duration::from_secs(0),
+            process_id: None,
         });
     });
 }
@@ -130,7 +134,8 @@ async fn run_service_tasks() {
     let (alert_tx, mut alert_rx) = mpsc::unbounded_channel::<crate::netlink::AppAlert>();
     crate::netlink::register_alert_sender(alert_tx);
 
-    let active_client_tx = Arc::new(Mutex::new(None));
+    let active_client_tx: Arc<Mutex<Option<mpsc::UnboundedSender<crate::ClientMessage>>>> =
+        Arc::new(Mutex::new(None));
     let active_tx_clone = active_client_tx.clone();
     tokio::spawn(async move {
         while let Some(alert) = alert_rx.recv().await {

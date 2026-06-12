@@ -631,6 +631,7 @@ fn resolve_next_policies(
     Ok(next_policies)
 }
 
+#[cfg_attr(not(target_os = "linux"), allow(unused_variables))]
 fn clear_domain_grant_dedupe(state: &PersistedDomainPolicyState) {
     #[cfg(target_os = "linux")]
     {

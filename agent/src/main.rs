@@ -1531,6 +1531,8 @@ pub(crate) async fn start_agent_reconnect_loop(
                 });
 
                 let (shutdown_tx, shutdown_rx) = watch::channel(false);
+                #[cfg(target_os = "windows")]
+                let _ = shutdown_rx;
                 #[cfg(target_os = "linux")]
                 let listener_handles = spawn_logind_listeners(client_tx.clone(), shutdown_rx);
                 #[cfg(target_os = "windows")]

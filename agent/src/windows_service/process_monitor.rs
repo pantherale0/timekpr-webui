@@ -132,10 +132,9 @@ fn is_non_essential_app(name: &str) -> bool {
 }
 
 #[cfg(target_os = "windows")]
-fn read_u8_string(array: &[i8]) -> String {
-    let u8_slice = unsafe { std::slice::from_raw_parts(array.as_ptr() as *const u8, array.len()) };
-    let len = u8_slice.iter().position(|&c| c == 0).unwrap_or(u8_slice.len());
-    String::from_utf8_lossy(&u8_slice[..len]).into_owned()
+fn read_u8_string(array: &[u8]) -> String {
+    let len = array.iter().position(|&c| c == 0).unwrap_or(array.len());
+    String::from_utf8_lossy(&array[..len]).into_owned()
 }
 
 #[cfg(not(target_os = "windows"))]

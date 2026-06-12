@@ -61,7 +61,7 @@ pub fn get_active_session_user_rid() -> Option<u32> {
         let mut bytes_returned = 0;
 
         let success = windows_sys::Win32::System::RemoteDesktop::WTSQuerySessionInformationW(
-            std::ptr::null_mut(), // WTS_CURRENT_SERVER_HANDLE
+            0, // WTS_CURRENT_SERVER_HANDLE
             active_session_id,
             windows_sys::Win32::System::RemoteDesktop::WTSUserName,
             &mut buffer,
@@ -96,10 +96,12 @@ unsafe fn read_wide_string(ptr: *const u16) -> String {
     if ptr.is_null() {
         return String::new();
     }
-    let mut len = 0;
-    while *ptr.add(len) != 0 {
-        len += 1;
+    unsafe {
+        let mut len = 0;
+        while *ptr.add(len) != 0 {
+            len += 1;
+        }
+        let slice = std::slice::from_raw_parts(ptr, len);
+        String::from_utf16_lossy(slice)
     }
-    let slice = std::slice::from_raw_parts(ptr, len);
-    String::from_utf16_lossy(slice)
 }

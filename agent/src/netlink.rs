@@ -1,9 +1,7 @@
-use serde_json::json;
-use std::collections::{HashMap, HashSet};
-use std::mem;
+#[cfg(target_os = "linux")]
+use std::collections::HashMap;
 use std::sync::{Mutex, OnceLock};
 use tokio::sync::mpsc;
-use tokio::time::Instant;
 
 #[cfg(target_os = "linux")]
 use std::os::unix::io::{AsRawFd, RawFd};
@@ -78,6 +76,10 @@ pub async fn run_process_monitor(
 #[cfg(target_os = "linux")]
 mod linux_impl {
     use super::*;
+    use serde_json::json;
+    use std::collections::{HashMap, HashSet};
+    use std::mem;
+    use tokio::time::Instant;
 
     // ── Netlink / CN_PROC constants ─────────────────────────────────────────
     const NETLINK_CONNECTOR: i32 = 11;
