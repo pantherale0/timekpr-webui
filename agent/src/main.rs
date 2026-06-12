@@ -160,6 +160,7 @@ enum ClientMessage {
         linux_users: Option<Vec<LinuxUser>>,
         #[serde(skip_serializing_if = "Option::is_none")]
         paired: Option<bool>,
+        platform: String,
     },
     #[serde(rename = "register")]
     Register {
@@ -1356,6 +1357,7 @@ pub(crate) async fn start_agent_reconnect_loop(
                     },
                     linux_users: Some(users_vec),
                     paired: Some(agent_token.is_some()),
+                    platform: std::env::consts::OS.to_string(),
                 };
                 let hello_json = serde_json::to_string(&hello_msg).unwrap();
                 if let Err(e) = ws_stream.send(Message::Text(hello_json.into())).await {

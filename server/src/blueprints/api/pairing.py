@@ -1,6 +1,7 @@
 import logging
+import os
 
-from flask import Blueprint, jsonify, request, send_file, session
+from flask import Blueprint, jsonify, request, send_file, session, redirect
 from io import BytesIO
 
 from src.agent_helper import AgentConnectionManager
@@ -13,6 +14,9 @@ from src.pairing_helper import (
     pairing_payload_json,
     render_pairing_qr_png,
     resolve_android_provisioning,
+    get_android_apk_storage_dir,
+    is_dev_server_version,
+    GITHUB_RELEASE_REPO,
 )
 from src.settings_manager import (
     _get_agent_websocket_url,
@@ -139,3 +143,24 @@ def provisioning_apk():
         conditional=True,
         etag=True,
     )
+
+
+@api_pairing_bp.route('/api/pairing/windows/msi', methods=['GET'])
+def windows_msi():
+    """Serve the local Windows agent MSI installer or redirect to GitHub Releases."""
+    msi_filename = 'timekpr-agent-x86_64-pc-windows-msvc.msi'
+    local_path = os.path.join(get_android_apk_storage_dir(), msi_filename)
+    if os.path.isfile(local_path) and os.path.getsize(local_path) > 0:
+        return send_file(
+            local_path,
+            mimetype='application/octet-stream',
+            download_name=msi_filename,
+            max_age=3600,
+            conditional=True,
+            etag=True,
+        )
+
+    version = get_server_version()
+    if is_dev_server_version(version):
+        return redirect(f'https://github.com/{GITHUB_RELEASE_REPO}/releases/latest/download/{msi_filename}')
+    return redirect(f'https://github.com/{GITHUB_RELEASE_REPO}/releases/download/{version}/{msi_filename}')

@@ -1024,7 +1024,8 @@ class AppPolicy(db.Model):
 
     PLATFORM_LINUX = 'linux'
     PLATFORM_ANDROID = 'android'
-    VALID_PLATFORMS = {PLATFORM_LINUX, PLATFORM_ANDROID}
+    PLATFORM_WINDOWS = 'windows'
+    VALID_PLATFORMS = {PLATFORM_LINUX, PLATFORM_ANDROID, PLATFORM_WINDOWS}
 
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(120), unique=True, nullable=False)
@@ -1122,7 +1123,8 @@ class DeviceInstalledApplication(db.Model):
 
     PLATFORM_LINUX = 'linux'
     PLATFORM_ANDROID = 'android'
-    VALID_PLATFORMS = {PLATFORM_LINUX, PLATFORM_ANDROID}
+    PLATFORM_WINDOWS = 'windows'
+    VALID_PLATFORMS = {PLATFORM_LINUX, PLATFORM_ANDROID, PLATFORM_WINDOWS}
 
     id = db.Column(db.Integer, primary_key=True)
     system_id = db.Column(db.String(50), db.ForeignKey('agent_device.system_id'), nullable=False)

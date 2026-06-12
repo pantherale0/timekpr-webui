@@ -1,26 +1,30 @@
 <!DOCTYPE html>
 <html lang="en" data-bs-theme="light">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{% block title %}Guardian Parental Controls{% endblock %}</title>
-    <meta name="description" content="Guardian Parental Control Web Console. Monitor weekly device usage, manage application locks, restrict login schedules, and protect child accounts.">
-    
+    <meta name="description"
+        content="Guardian Parental Control Web Console. Monitor weekly device usage, manage application locks, restrict login schedules, and protect child accounts.">
+
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website">
     <meta property="og:title" content="Guardian Parental Control Web Console">
-    <meta property="og:description" content="Guardian Parental Control Web Console. Monitor weekly device usage, manage application locks, restrict login schedules, and protect child accounts.">
+    <meta property="og:description"
+        content="Guardian Parental Control Web Console. Monitor weekly device usage, manage application locks, restrict login schedules, and protect child accounts.">
 
     <!-- Bootstrap 5.3 & AdminLTE 4 & FontAwesome 6 via jsDelivr CDN -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/admin-lte@4.0.0/dist/css/adminlte.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap" rel="stylesheet">
-    
+    <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap"
+        rel="stylesheet">
+
     <!-- Custom Stylesheet -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    
+
     <!-- Theme Manager -->
     <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
     <script>
@@ -43,18 +47,20 @@
             };
         })();
     </script>
-    
+
     <style>
         body {
             font-family: 'Atkinson Hyperlegible', sans-serif;
         }
+
         .app-sidebar .sidebar-brand {
             height: 60px;
             display: flex;
             align-items: center;
             padding: 0 1.5rem;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
         }
+
         .brand-link {
             text-decoration: none;
             color: #fff;
@@ -63,20 +69,23 @@
             gap: 0.5rem;
             font-weight: 700;
         }
+
         .brand-icon-shield {
             font-size: 1.5rem;
             color: #10b981;
         }
+
         .sidebar-footer .btn-xs {
             padding: 0.25rem 0.5rem;
             font-size: 0.75rem;
             border-radius: 0.25rem;
         }
+
         .flash-messages-container {
             position: relative;
             z-index: 1050;
         }
-        
+
         /* Wizard Stepper Styling */
         .wizard-stepper {
             display: flex;
@@ -84,6 +93,7 @@
             margin-bottom: 2rem;
             position: relative;
         }
+
         .wizard-stepper::before {
             content: '';
             position: absolute;
@@ -94,6 +104,7 @@
             background-color: var(--bs-border-color);
             z-index: 1;
         }
+
         .step-node {
             width: 32px;
             height: 32px;
@@ -110,36 +121,43 @@
             color: var(--bs-secondary-color);
             transition: all 0.2s ease;
         }
+
         .step-node.active {
             background-color: #0d6efd;
             border-color: #0d6efd;
             color: #fff;
             box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.25);
         }
+
         .step-node.completed {
             background-color: #10b981;
             border-color: #10b981;
             color: #fff;
         }
+
         .platform-card {
             border: 2px solid var(--bs-border-color);
             border-radius: 0.5rem;
             cursor: pointer;
             transition: all 0.2s;
         }
+
         .platform-card:hover:not(.disabled) {
             border-color: #0d6efd;
             transform: translateY(-2px);
             background-color: var(--bs-light-bg-subtle);
         }
+
         .platform-card.selected {
             border-color: #0d6efd;
             background-color: var(--bs-primary-bg-subtle);
         }
+
         .platform-card.disabled {
             opacity: 0.5;
             cursor: not-allowed;
         }
+
         .platform-icon {
             font-size: 2.5rem;
             margin-bottom: 0.5rem;
@@ -147,6 +165,7 @@
     </style>
     {% block extra_head %}{% endblock %}
 </head>
+
 <body class="layout-fixed sidebar-expand-lg bg-body-tertiary">
     <div class="app-wrapper">
         <!-- Top Navbar Header -->
@@ -160,7 +179,8 @@
                         </a>
                     </li>
                     <li class="nav-item d-none d-md-inline-block">
-                        <span class="navbar-text fw-bold text-secondary text-uppercase tracking-wide" style="font-size: 0.85rem; letter-spacing: 0.05em;">Parental Portal</span>
+                        <span class="navbar-text fw-bold text-secondary text-uppercase tracking-wide"
+                            style="font-size: 0.85rem; letter-spacing: 0.05em;">Parental Portal</span>
                     </li>
                 </ul>
                 <!-- End Left Links -->
@@ -168,19 +188,23 @@
                 <!-- Start Right Links -->
                 <ul class="navbar-nav ms-auto align-items-center">
                     <li class="nav-item">
-                        <button class="btn btn-sm btn-primary me-3 d-flex align-items-center gap-1" onclick="openOnboardingWizard()">
+                        <button class="btn btn-sm btn-primary me-3 d-flex align-items-center gap-1"
+                            onclick="openOnboardingWizard()">
                             <i class="fas fa-plus"></i> <span>Add Device</span>
                         </button>
                     </li>
                     <li class="nav-item">
-                        <span class="badge rounded-pill bg-warning text-dark me-2" id="navbar-approvals-badge" style="display: none; cursor: pointer;" aria-live="polite" onclick="location.href='{{ url_for('ui_dashboard.admin_approvals') }}'">
+                        <span class="badge rounded-pill bg-warning text-dark me-2" id="navbar-approvals-badge"
+                            style="display: none; cursor: pointer;" aria-live="polite"
+                            onclick="location.href='{{ url_for('ui_dashboard.admin_approvals') }}'">
                             <i class="fas fa-clipboard-check me-1"></i>
                             <span id="navbar-approvals-count">0</span> Requests
                         </span>
                     </li>
                     <li class="nav-item">
                         <!-- Background Task Dot/Indicator -->
-                        <span class="badge rounded-pill bg-danger text-white me-2" id="navbar-task-badge" style="display: none; cursor: pointer;" onclick="location.href='{{ url_for('settings') }}'">
+                        <span class="badge rounded-pill bg-danger text-white me-2" id="navbar-task-badge"
+                            style="display: none; cursor: pointer;" onclick="location.href='{{ url_for('settings') }}'">
                             <span class="task-status-indicator-dot danger me-1"></span> Tasks Offline
                         </span>
                     </li>
@@ -197,60 +221,71 @@
                     <i class="fas fa-shield-alt brand-icon-shield"></i>
                     <div class="d-flex flex-column text-start">
                         <span class="brand-text fw-bold lh-1">Guardian</span>
-                        <span class="text-muted small fw-bold text-uppercase tracking-wider" style="font-size: 0.65rem; letter-spacing: 0.05em;">Parental Controls</span>
+                        <span class="text-muted small fw-bold text-uppercase tracking-wider"
+                            style="font-size: 0.65rem; letter-spacing: 0.05em;">Parental Controls</span>
                     </div>
                 </a>
             </div>
-            
+
             <div class="sidebar-wrapper d-flex flex-column justify-content-between h-100">
                 <nav class="mt-3">
-                    <ul class="nav sidebar-menu flex-column" data-lte-toggle="treeview" role="menu" data-accordion="false">
+                    <ul class="nav sidebar-menu flex-column" data-lte-toggle="treeview" role="menu"
+                        data-accordion="false">
                         <li class="nav-header text-muted fw-bold" style="font-size: 0.75rem;">MAIN</li>
                         <li class="nav-item">
-                            <a href="{{ url_for('dashboard') }}" class="nav-link {% if request.path == '/' or request.path == url_for('dashboard') %}active{% endif %}">
+                            <a href="{{ url_for('dashboard') }}"
+                                class="nav-link {% if request.path == '/' or request.path == url_for('dashboard') %}active{% endif %}">
                                 <i class="nav-icon fas fa-chart-pie"></i>
                                 <p>Dashboard</p>
                             </a>
                         </li>
-                        
-                        <li class="nav-header text-muted fw-bold mt-2" style="font-size: 0.75rem;">PARENTAL CONTROLS</li>
+
+                        <li class="nav-header text-muted fw-bold mt-2" style="font-size: 0.75rem;">PARENTAL CONTROLS
+                        </li>
                         <li class="nav-item">
-                            <a href="{{ url_for('weekly_schedule') }}" class="nav-link {% if request.path.startswith('/weekly-schedule') %}active{% endif %}">
+                            <a href="{{ url_for('weekly_schedule') }}"
+                                class="nav-link {% if request.path.startswith('/weekly-schedule') %}active{% endif %}">
                                 <i class="nav-icon fas fa-clock"></i>
                                 <p>Schedules &amp; Limits</p>
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a href="{{ url_for('ui_dashboard.admin_restrictions') }}" class="nav-link {% if request.path.startswith('/admin/restrictions') %}active{% endif %}">
+                            <a href="{{ url_for('ui_dashboard.admin_restrictions') }}"
+                                class="nav-link {% if request.path.startswith('/admin/restrictions') %}active{% endif %}">
                                 <i class="nav-icon fas fa-globe"></i>
                                 <p>Web Content Filters</p>
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a href="{{ url_for('ui_apparmor.admin_app_policies') }}" class="nav-link {% if request.path.startswith('/admin/app-policies') %}active{% endif %}">
+                            <a href="{{ url_for('ui_apparmor.admin_app_policies') }}"
+                                class="nav-link {% if request.path.startswith('/admin/app-policies') %}active{% endif %}">
                                 <i class="nav-icon fas fa-lock"></i>
                                 <p>App Locks</p>
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a href="{{ url_for('ui_dashboard.admin_approvals') }}" class="nav-link {% if request.path.startswith('/admin/approvals') %}active{% endif %}">
+                            <a href="{{ url_for('ui_dashboard.admin_approvals') }}"
+                                class="nav-link {% if request.path.startswith('/admin/approvals') %}active{% endif %}">
                                 <i class="nav-icon fas fa-clipboard-check"></i>
                                 <p class="d-flex align-items-center justify-content-between w-100 mb-0">
                                     <span>Access Requests</span>
-                                    <span class="badge bg-warning text-dark ms-2" id="sidebar-approvals-badge" style="display: none;">0</span>
+                                    <span class="badge bg-warning text-dark ms-2" id="sidebar-approvals-badge"
+                                        style="display: none;">0</span>
                                 </p>
                             </a>
                         </li>
 
                         <li class="nav-header text-muted fw-bold mt-2" style="font-size: 0.75rem;">ADMINISTRATION</li>
                         <li class="nav-item">
-                            <a href="{{ url_for('ui_dashboard.admin_devices') }}" class="nav-link {% if request.path.startswith('/admin/devices') %}active{% endif %}">
+                            <a href="{{ url_for('ui_dashboard.admin_devices') }}"
+                                class="nav-link {% if request.path.startswith('/admin/devices') %}active{% endif %}">
                                 <i class="nav-icon fas fa-laptop"></i>
                                 <p>Devices</p>
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a href="{{ url_for('ui_dashboard.admin_users') }}" class="nav-link {% if request.path.startswith('/admin/users') or request.path == url_for('ui_dashboard.admin') %}active{% endif %}">
+                            <a href="{{ url_for('ui_dashboard.admin_users') }}"
+                                class="nav-link {% if request.path.startswith('/admin/users') or request.path == url_for('ui_dashboard.admin') %}active{% endif %}">
                                 <i class="nav-icon fas fa-users"></i>
                                 <p>Child Accounts</p>
                             </a>
@@ -258,7 +293,8 @@
 
                         <li class="nav-header text-muted fw-bold mt-2" style="font-size: 0.75rem;">SYSTEM</li>
                         <li class="nav-item">
-                            <a href="{{ url_for('settings') }}" class="nav-link {% if request.path.startswith('/settings') %}active{% endif %}">
+                            <a href="{{ url_for('settings') }}"
+                                class="nav-link {% if request.path.startswith('/settings') %}active{% endif %}">
                                 <i class="nav-icon fas fa-cog"></i>
                                 <p>Settings</p>
                             </a>
@@ -267,7 +303,8 @@
                 </nav>
 
                 <!-- Sidebar Footer Actions -->
-                <div class="sidebar-footer p-3 border-top mt-auto" style="border-color: rgba(255, 255, 255, 0.1) !important;">
+                <div class="sidebar-footer p-3 border-top mt-auto"
+                    style="border-color: rgba(255, 255, 255, 0.1) !important;">
                     {% if oidc_enabled and session_user %}
                     <div class="text-muted small mb-2 text-truncate text-center">
                         <i class="fas fa-user-circle me-1"></i> {{ session_user.username }}
@@ -287,27 +324,28 @@
             <!-- Global Flash Messages -->
             <div class="container-fluid flash-messages-container px-4">
                 {% block flash_messages %}
-                    {% with messages = get_flashed_messages(with_categories=true) %}
-                        {% if messages %}
-                            {% for category, message in messages %}
-                                <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show shadow-sm mb-3" role="alert">
-                                    <div class="d-flex align-items-center gap-2">
-                                        {% if category == 'success' %}
-                                            <i class="fas fa-check-circle text-success fs-5"></i>
-                                        {% elif category == 'danger' or category == 'error' %}
-                                            <i class="fas fa-exclamation-circle text-danger fs-5"></i>
-                                        {% elif category == 'warning' %}
-                                            <i class="fas fa-exclamation-triangle text-warning fs-5"></i>
-                                        {% else %}
-                                            <i class="fas fa-info-circle text-info fs-5"></i>
-                                        {% endif %}
-                                        <span>{{ message }}</span>
-                                    </div>
-                                    <button type="submit" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                                </div>
-                            {% endfor %}
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                {% for category, message in messages %}
+                <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show shadow-sm mb-3"
+                    role="alert">
+                    <div class="d-flex align-items-center gap-2">
+                        {% if category == 'success' %}
+                        <i class="fas fa-check-circle text-success fs-5"></i>
+                        {% elif category == 'danger' or category == 'error' %}
+                        <i class="fas fa-exclamation-circle text-danger fs-5"></i>
+                        {% elif category == 'warning' %}
+                        <i class="fas fa-exclamation-triangle text-warning fs-5"></i>
+                        {% else %}
+                        <i class="fas fa-info-circle text-info fs-5"></i>
                         {% endif %}
-                    {% endwith %}
+                        <span>{{ message }}</span>
+                    </div>
+                    <button type="submit" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+                {% endfor %}
+                {% endif %}
+                {% endwith %}
                 {% endblock %}
             </div>
 
@@ -321,12 +359,15 @@
     </div>
 
     <!-- GLOBAL DEVICE ONBOARDING WIZARD MODAL -->
-    <div class="modal fade" id="onboardingWizardModal" tabindex="-1" aria-labelledby="onboardingWizardModalLabel" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal fade" id="onboardingWizardModal" tabindex="-1" aria-labelledby="onboardingWizardModalLabel"
+        aria-hidden="true" data-bs-backdrop="static">
         <div class="modal-dialog modal-lg modal-dialog-centered">
             <div class="modal-content shadow-lg">
                 <div class="modal-header bg-dark text-white">
-                    <h5 class="modal-title" id="onboardingWizardModalLabel"><i class="fas fa-plug text-success me-2"></i>Onboard New Device</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close" onclick="closeWizard()"></button>
+                    <h5 class="modal-title" id="onboardingWizardModalLabel"><i
+                            class="fas fa-plug text-success me-2"></i>Onboard New Device</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"
+                        onclick="closeWizard()"></button>
                 </div>
                 <div class="modal-body p-4">
                     <!-- Wizard Stepper Progress -->
@@ -337,10 +378,11 @@
                         <div class="step-node" id="step-node-4">4</div>
                         <div class="step-node" id="step-node-5">5</div>
                     </div>
-                    
+
                     <div class="text-center mb-3">
                         <h4 class="fw-bold" id="step-title">Choose Platform</h4>
-                        <p class="text-muted small" id="step-subtitle">Select the hardware type you wish to enroll under Guardian.</p>
+                        <p class="text-muted small" id="step-subtitle">Select the hardware type you wish to enroll under
+                            Guardian.</p>
                     </div>
 
                     <!-- STEP 1: Select Platform -->
@@ -361,21 +403,23 @@
                                 </div>
                             </div>
                             <div class="col-sm-6 col-md-4">
-                                <div class="platform-card p-3 text-center h-100 disabled" title="Windows agent support is coming soon!">
+                                <div class="platform-card p-3 text-center h-100" onclick="selectPlatform('windows')">
                                     <div class="platform-icon text-info"><i class="fab fa-windows"></i></div>
                                     <h5 class="fw-bold mb-1">Windows PC</h5>
-                                    <span class="badge bg-secondary">Coming Soon</span>
+                                    <span class="small text-muted">Windows 10, 11 (64-bit)</span>
                                 </div>
                             </div>
                             <div class="col-sm-6 col-md-4">
-                                <div class="platform-card p-3 text-center h-100 disabled" title="Nintendo Switch monitoring is coming soon!">
+                                <div class="platform-card p-3 text-center h-100 disabled"
+                                    title="Nintendo Switch monitoring is coming soon!">
                                     <div class="platform-icon text-warning"><i class="fas fa-gamepad"></i></div>
                                     <h5 class="fw-bold mb-1">Nintendo Switch</h5>
                                     <span class="badge bg-secondary">Coming Soon</span>
                                 </div>
                             </div>
                             <div class="col-sm-6 col-md-4">
-                                <div class="platform-card p-3 text-center h-100 disabled" title="Xbox parent control limits are coming soon!">
+                                <div class="platform-card p-3 text-center h-100 disabled"
+                                    title="Xbox parent control limits are coming soon!">
                                     <div class="platform-icon text-danger"><i class="fab fa-xbox"></i></div>
                                     <h5 class="fw-bold mb-1">Xbox Console</h5>
                                     <span class="badge bg-secondary">Coming Soon</span>
@@ -388,42 +432,73 @@
                     <div class="wizard-step-panel d-none" id="step-panel-2">
                         <!-- Linux Instructions -->
                         <div id="setup-instruction-linux" class="d-none">
-                            <p class="mb-3">Open a terminal window on the target Linux machine and execute the following installation script command to install the Guardian Agent Daemon:</p>
+                            <p class="mb-3">Open a terminal window on the target Linux machine and execute the following
+                                installation script command to install the Guardian Agent Daemon:</p>
                             <div class="position-relative mb-3">
-                                <pre class="bg-dark text-white p-3 rounded text-wrap font-monospace" style="font-size: 0.85rem;" id="linux-install-cmd">curl -sSL http://yourserver/scripts/install-agent.sh | sudo bash -s -- --url ws://yourserver/ws</pre>
-                                <button class="btn btn-sm btn-outline-light position-absolute top-0 end-0 m-2" onclick="copyLinuxCommand()">Copy</button>
+                                <pre class="bg-dark text-white p-3 rounded text-wrap font-monospace"
+                                    style="font-size: 0.85rem;"
+                                    id="linux-install-cmd">curl -sSL http://yourserver/scripts/install-agent.sh | sudo bash -s -- --url ws://yourserver/ws</pre>
+                                <button class="btn btn-sm btn-outline-light position-absolute top-0 end-0 m-2"
+                                    onclick="copyLinuxCommand()">Copy</button>
                             </div>
-                            <p class="text-muted small"><i class="fas fa-info-circle me-1"></i>The script registers a systemd background service and initiates the secure pairing process.</p>
+                            <p class="text-muted small"><i class="fas fa-info-circle me-1"></i>The script registers a
+                                systemd background service and initiates the secure pairing process.</p>
                         </div>
-                        
+
                         <!-- Android Instructions -->
                         <div id="setup-instruction-android" class="d-none">
                             <ul class="nav nav-tabs mb-3" id="androidTab" role="tablist">
                                 <li class="nav-item" role="presentation">
-                                    <button class="nav-link active" id="qr-tab" data-bs-toggle="tab" data-bs-target="#qr-pane" type="button" role="tab" aria-controls="qr-pane" aria-selected="true">Standard Pairing QR</button>
+                                    <button class="nav-link active" id="qr-tab" data-bs-toggle="tab"
+                                        data-bs-target="#qr-pane" type="button" role="tab" aria-controls="qr-pane"
+                                        aria-selected="true">Standard Pairing QR</button>
                                 </li>
                                 <li class="nav-item" role="presentation">
-                                    <button class="nav-link" id="mdm-tab" data-bs-toggle="tab" data-bs-target="#mdm-pane" type="button" role="tab" aria-controls="mdm-pane" aria-selected="false">MDM Provisioning QR</button>
+                                    <button class="nav-link" id="mdm-tab" data-bs-toggle="tab"
+                                        data-bs-target="#mdm-pane" type="button" role="tab" aria-controls="mdm-pane"
+                                        aria-selected="false">MDM Provisioning QR</button>
                                 </li>
                             </ul>
                             <div class="tab-content" id="androidTabContent">
-                                <div class="tab-pane fade show active text-center" id="qr-pane" role="tabpanel" aria-labelledby="qr-tab">
-                                    <p class="mb-2">Download the Guardian APK, open it on the child's Android device, and scan the QR code to connect:</p>
-                                    <img id="android-qr-img" src="" alt="Pairing QR" class="img-fluid border rounded p-2 bg-white mb-2" style="max-height: 200px;">
+                                <div class="tab-pane fade show active text-center" id="qr-pane" role="tabpanel"
+                                    aria-labelledby="qr-tab">
+                                    <p class="mb-2">Download the Guardian APK, open it on the child's Android device,
+                                        and scan the QR code to connect:</p>
+                                    <img id="android-qr-img" src="" alt="Pairing QR"
+                                        class="img-fluid border rounded p-2 bg-white mb-2" style="max-height: 200px;">
                                     <div class="small"><code id="android-ws-url"></code></div>
                                 </div>
-                                <div class="tab-pane fade text-center" id="mdm-pane" role="tabpanel" aria-labelledby="mdm-tab">
-                                    <p class="mb-2">For a fresh setup, tap the welcome screen 6 times, scan the QR code below to enroll as Device Owner:</p>
+                                <div class="tab-pane fade text-center" id="mdm-pane" role="tabpanel"
+                                    aria-labelledby="mdm-tab">
+                                    <p class="mb-2">For a fresh setup, tap the welcome screen 6 times, scan the QR code
+                                        below to enroll as Device Owner:</p>
                                     <div id="mdm-qr-container">
-                                        <img id="android-mdm-qr-img" src="" alt="MDM QR" class="img-fluid border rounded p-2 bg-white mb-2" style="max-height: 200px;">
+                                        <img id="android-mdm-qr-img" src="" alt="MDM QR"
+                                            class="img-fluid border rounded p-2 bg-white mb-2"
+                                            style="max-height: 200px;">
                                     </div>
                                     <div class="alert alert-warning small py-2 d-none" id="mdm-unavailable-alert">
-                                        MDM provisioning is unavailable. Make sure an Android APK has been uploaded in Settings.
+                                        MDM provisioning is unavailable. Make sure an Android APK has been uploaded in
+                                        Settings.
                                     </div>
                                 </div>
                             </div>
                         </div>
-                        
+
+                        <!-- Windows Instructions -->
+                        <div id="setup-instruction-windows" class="d-none">
+                            <p class="mb-3">Open PowerShell as Administrator on the target Windows machine and run the following command to download and install the Guardian Agent automatically:</p>
+                            <div class="position-relative mb-3">
+                                <pre class="bg-dark text-white p-3 rounded text-wrap font-monospace" style="font-size: 0.85rem;" id="windows-install-cmd">powershell -ExecutionPolicy Bypass -Command "..."</pre>
+                                <button class="btn btn-sm btn-outline-light position-absolute top-0 end-0 m-2" onclick="copyWindowsCommand()">Copy</button>
+                            </div>
+                            <p class="mb-3">Alternatively, you can download the MSI installer package directly and run it:</p>
+                            <div class="text-center mb-3">
+                                <a id="windows-download-link" href="#" class="btn btn-outline-primary fw-bold" download><i class="fas fa-download me-2"></i>Download MSI Installer</a>
+                            </div>
+                            <p class="text-muted small"><i class="fas fa-info-circle me-1"></i>The installer registers the background monitoring service and configures autostart components for user sessions.</p>
+                        </div>
+
                         <div class="text-center mt-4">
                             <button class="btn btn-secondary me-2" onclick="setWizardStep(1)">Back</button>
                             <button class="btn btn-primary" onclick="goToStep3()">I have run/scanned it</button>
@@ -433,22 +508,26 @@
                     <!-- STEP 3: Detecting / Approving Device -->
                     <div class="wizard-step-panel d-none text-center" id="step-panel-3">
                         <div id="detect-loading">
-                            <div class="spinner-border text-primary mb-3" style="width: 3rem; height: 3rem;" role="status">
+                            <div class="spinner-border text-primary mb-3" style="width: 3rem; height: 3rem;"
+                                role="status">
                                 <span class="visually-hidden">Loading...</span>
                             </div>
                             <p class="lead">Scanning for new agent connections...</p>
-                            <p class="text-muted small">Guardian is waiting for the device client to connect to the WebSocket hub. This usually takes a few seconds.</p>
+                            <p class="text-muted small">Guardian is waiting for the device client to connect to the
+                                WebSocket hub. This usually takes a few seconds.</p>
                         </div>
-                        
+
                         <div id="detect-success" class="d-none">
                             <div class="text-success fs-1 mb-2"><i class="fas fa-check-circle"></i></div>
                             <h5 class="fw-bold mb-3" id="detected-device-text">Device Connected!</h5>
-                            
+
                             <div class="form-group text-start mx-auto" style="max-width: 400px;">
-                                <label for="wizard-device-label" class="form-label fw-bold small text-muted">ASSIGN A DEVICE LABEL</label>
-                                <input type="text" id="wizard-device-label" class="form-control" placeholder="e.g. Jordan's Laptop">
+                                <label for="wizard-device-label" class="form-label fw-bold small text-muted">ASSIGN A
+                                    DEVICE LABEL</label>
+                                <input type="text" id="wizard-device-label" class="form-control"
+                                    placeholder="e.g. Jordan's Laptop">
                             </div>
-                            
+
                             <div class="text-center mt-4">
                                 <button class="btn btn-primary" onclick="goToStep4()">Approve &amp; Continue</button>
                             </div>
@@ -459,15 +538,17 @@
                     <div class="wizard-step-panel d-none" id="step-panel-4">
                         <div style="max-width: 500px; margin: 0 auto;">
                             <div class="form-check mb-3">
-                                <input class="form-check-input" type="checkbox" id="wizard-new-user-checkbox" onchange="toggleNewUserField()">
+                                <input class="form-check-input" type="checkbox" id="wizard-new-user-checkbox"
+                                    onchange="toggleNewUserField()">
                                 <label class="form-check-label fw-bold" for="wizard-new-user-checkbox">
                                     Create a new child profile for this device
                                 </label>
                             </div>
-                            
+
                             <!-- Select Existing User -->
                             <div class="form-group mb-3" id="wizard-existing-user-group">
-                                <label for="wizard-user-select" class="form-label fw-bold small text-muted">SELECT CHILD PROFILE</label>
+                                <label for="wizard-user-select" class="form-label fw-bold small text-muted">SELECT CHILD
+                                    PROFILE</label>
                                 <select id="wizard-user-select" class="form-select">
                                     <option value="" disabled selected>Select child account</option>
                                 </select>
@@ -475,13 +556,16 @@
 
                             <!-- Create New User Inline -->
                             <div class="form-group mb-3 d-none" id="wizard-new-user-group">
-                                <label for="wizard-user-input" class="form-label fw-bold small text-muted">NEW CHILD PROFILE NAME</label>
-                                <input type="text" id="wizard-user-input" class="form-control" placeholder="e.g. Jordan">
+                                <label for="wizard-user-input" class="form-label fw-bold small text-muted">NEW CHILD
+                                    PROFILE NAME</label>
+                                <input type="text" id="wizard-user-input" class="form-control"
+                                    placeholder="e.g. Jordan">
                             </div>
 
                             <div class="text-center mt-4">
                                 <button class="btn btn-secondary me-2" onclick="setWizardStep(2)">Back</button>
-                                <button class="btn btn-primary" id="wizard-profile-next-btn" onclick="goToStep5()">Next</button>
+                                <button class="btn btn-primary" id="wizard-profile-next-btn"
+                                    onclick="goToStep5()">Next</button>
                             </div>
                         </div>
                     </div>
@@ -491,22 +575,28 @@
                         <div style="max-width: 500px; margin: 0 auto;">
                             <!-- Mappings Info -->
                             <div id="wizard-mapping-section">
-                                <p class="mb-3 text-center" id="wizard-mapping-instructions">Guardian found the following local accounts on the device. Select which local user account should be locked under this profile:</p>
+                                <p class="mb-3 text-center" id="wizard-mapping-instructions">Guardian found the
+                                    following local accounts on the device. Select which local user account should be
+                                    locked under this profile:</p>
                                 <div class="form-group mb-3">
-                                    <label for="wizard-linux-user-select" class="form-label fw-bold small text-muted" id="wizard-user-select-label">LOCAL OS USERNAME</label>
+                                    <label for="wizard-linux-user-select" class="form-label fw-bold small text-muted"
+                                        id="wizard-user-select-label">LOCAL OS USERNAME</label>
                                     <select id="wizard-linux-user-select" class="form-select">
                                         <!-- Will populate dynamically -->
                                     </select>
                                 </div>
                                 <div class="form-group mb-3">
-                                    <label for="wizard-linux-uid" class="form-label fw-bold small text-muted" id="wizard-uid-label">LINUX UID (OPTIONAL)</label>
-                                    <input type="text" id="wizard-linux-uid" class="form-control" placeholder="e.g. 1000">
+                                    <label for="wizard-linux-uid" class="form-label fw-bold small text-muted"
+                                        id="wizard-uid-label">LINUX UID (OPTIONAL)</label>
+                                    <input type="text" id="wizard-linux-uid" class="form-control"
+                                        placeholder="e.g. 1000">
                                 </div>
                             </div>
 
                             <div class="text-center mt-4">
                                 <button class="btn btn-secondary me-2" onclick="setWizardStep(4)">Back</button>
-                                <button class="btn btn-success" onclick="completeOnboarding()">Complete Onboarding</button>
+                                <button class="btn btn-success" onclick="completeOnboarding()">Complete
+                                    Onboarding</button>
                             </div>
                         </div>
                     </div>
@@ -519,7 +609,8 @@
     <div id="notification-toast" class="notification-toast">
         <div class="toast-content">
             <svg class="toast-icon" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-                <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zm-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.061L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z"/>
+                <path
+                    d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zm-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.061L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z" />
             </svg>
             <span class="toast-message">Changes saved successfully!</span>
         </div>
@@ -528,7 +619,7 @@
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/admin-lte@4.0.0/dist/js/adminlte.min.js"></script>
-    
+
     <!-- Background Task Poller & Onboarding Wizard Controller -->
     <script>
         function showNotification(message, type = 'success') {
@@ -588,7 +679,7 @@
                         updateApprovalsBadges(data.pending_approvals);
                     }
                 })
-                .catch(() => {});
+                .catch(() => { });
         }
 
         document.addEventListener('DOMContentLoaded', () => {
@@ -603,7 +694,7 @@
                             const badge = document.getElementById('navbar-task-badge');
                             const status = data.status;
                             const hasIssues = !status.running || !status.thread_alive || status.last_error;
-                            
+
                             if (hasIssues) {
                                 badge.style.display = 'inline-flex';
                             } else {
@@ -660,7 +751,7 @@
                 discoveryInterval = null;
             }
             setWizardStep(1);
-            
+
             // Clean up inputs
             document.getElementById('wizard-device-label').value = '';
             document.getElementById('wizard-user-input').value = '';
@@ -671,7 +762,7 @@
 
         function setWizardStep(step) {
             wizardState.step = step;
-            
+
             // Update stepper nodes
             for (let i = 1; i <= 5; i++) {
                 const node = document.getElementById(`step-node-${i}`);
@@ -715,10 +806,10 @@
 
         function selectPlatform(platform) {
             wizardState.platform = platform;
-            
+
             // Highlight card
             document.querySelectorAll('.platform-card').forEach(c => c.classList.remove('selected'));
-            
+
             // Load Pairing Details via AJAX
             fetch('/api/pairing/config')
                 .then(r => r.json())
@@ -726,20 +817,21 @@
                     if (data.success) {
                         wizardState.wsUrl = data.payload.server_url;
                         wizardState.pairingPayload = JSON.stringify(data.payload);
-                        
+
                         // Setup step 2 instructions based on platform
                         document.getElementById('setup-instruction-linux').classList.add('d-none');
                         document.getElementById('setup-instruction-android').classList.add('d-none');
-                        
+                        document.getElementById('setup-instruction-windows').classList.add('d-none');
+
                         if (platform === 'linux') {
                             document.getElementById('setup-instruction-linux').classList.remove('d-none');
-                            document.getElementById('linux-install-cmd').textContent = 
+                            document.getElementById('linux-install-cmd').textContent =
                                 `wget -qO- ${window.location.origin}/scripts/install-agent.sh | sudo bash -s -- --url "${wizardState.wsUrl}"`;
                         } else if (platform === 'android') {
                             document.getElementById('setup-instruction-android').classList.remove('d-none');
                             document.getElementById('android-qr-img').src = '/api/pairing/qr.png';
                             document.getElementById('android-ws-url').textContent = wizardState.wsUrl;
-                            
+
                             // Load MDM Provisioning details
                             fetch('/api/pairing/provisioning/config')
                                 .then(r => r.json())
@@ -755,8 +847,13 @@
                                         mdmAlert.classList.remove('d-none');
                                     }
                                 });
+                        } else if (platform === 'windows') {
+                            document.getElementById('setup-instruction-windows').classList.remove('d-none');
+                            const psCmd = `powershell -ExecutionPolicy Bypass -Command "Invoke-WebRequest -Uri '${window.location.origin}/api/pairing/windows/msi' -OutFile 'setup.msi'; Start-Process msiexec.exe -ArgumentList '/i setup.msi SERVER_URL=\\"${wizardState.wsUrl}\\" REGISTRATION_TOKEN=\\"${data.payload.registration_token || ''}\\" /qn' -Wait"`;
+                            document.getElementById('windows-install-cmd').textContent = psCmd;
+                            document.getElementById('windows-download-link').href = `${window.location.origin}/api/pairing/windows/msi`;
                         }
-                        
+
                         setWizardStep(2);
                     }
                 })
@@ -770,11 +867,18 @@
             });
         }
 
+        function copyWindowsCommand() {
+            const cmdText = document.getElementById('windows-install-cmd').innerText;
+            navigator.clipboard.writeText(cmdText).then(() => {
+                alert('Command copied to clipboard!');
+            });
+        }
+
         function goToStep3() {
             setWizardStep(3);
             document.getElementById('detect-loading').classList.remove('d-none');
             document.getElementById('detect-success').classList.add('d-none');
-            
+
             // Poll for pending devices
             discoveryInterval = setInterval(pollPendingDevices, 3000);
             pollPendingDevices();
@@ -788,11 +892,11 @@
                         // Filter by selected platform if possible
                         let device = data.devices.find(d => d.platform === wizardState.platform);
                         if (!device) device = data.devices[0]; // fallback
-                        
+
                         wizardState.detectedDevice = device;
                         clearInterval(discoveryInterval);
                         discoveryInterval = null;
-                        
+
                         document.getElementById('detect-loading').classList.add('d-none');
                         document.getElementById('detect-success').classList.remove('d-none');
                         document.getElementById('wizard-device-label').value = device.display_name;
@@ -836,7 +940,7 @@
             const checked = document.getElementById('wizard-new-user-checkbox').checked;
             const select = document.getElementById('wizard-user-select');
             const newName = document.getElementById('wizard-user-input').value.trim();
-            
+
             if (!checked && !select.value) {
                 alert('Please select an existing child profile or check the box to create one.');
                 return;
@@ -847,16 +951,16 @@
             }
 
             setWizardStep(5);
-            
+
             const instructions = document.getElementById('wizard-mapping-instructions');
             const selectLabel = document.getElementById('wizard-user-select-label');
             const uidLabel = document.getElementById('wizard-uid-label');
             const usersSelect = document.getElementById('wizard-linux-user-select');
             const uidInput = document.getElementById('wizard-linux-uid');
-            
+
             usersSelect.innerHTML = '';
             const detectedUsers = wizardState.detectedDevice.linux_users || [];
-            
+
             if (wizardState.platform === 'linux') {
                 instructions.textContent = 'Guardian found the following local accounts on the device. Select which local user account should be locked under this profile:';
                 selectLabel.textContent = 'LOCAL OS USERNAME';
@@ -868,12 +972,12 @@
                 uidLabel.textContent = 'ANDROID USER ID (UID)';
                 uidInput.placeholder = 'e.g. 0';
             }
-            
+
             if (detectedUsers.length === 0) {
                 const opt = document.createElement('option');
                 opt.value = '';
-                opt.textContent = wizardState.platform === 'linux' 
-                    ? 'No local accounts reported. Type username manually below' 
+                opt.textContent = wizardState.platform === 'linux'
+                    ? 'No local accounts reported. Type username manually below'
                     : 'No Android profiles reported.';
                 usersSelect.appendChild(opt);
             } else {
@@ -885,13 +989,13 @@
                     usersSelect.appendChild(opt);
                 });
             }
-            
+
             // Auto fill UID on change
             usersSelect.onchange = () => {
                 const opt = usersSelect.options[usersSelect.selectedIndex];
                 uidInput.value = opt ? (opt.dataset.uid || '') : '';
             };
-            
+
             // Set initial UID if user exists
             if (detectedUsers.length > 0) {
                 uidInput.value = detectedUsers[0].uid;
@@ -905,20 +1009,20 @@
             const newName = document.getElementById('wizard-user-input').value.trim();
             const existingUserId = document.getElementById('wizard-user-select').value;
             const deviceName = document.getElementById('wizard-device-label').value.trim();
-            
+
             let userPromise;
             if (isNewUser) {
                 // Create user profile via AJAX
                 userPromise = fetch('/api/user/create', {
                     method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({username: newName})
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: newName })
                 })
-                .then(r => r.json())
-                .then(data => {
-                    if (!data.success) throw new Error(data.message);
-                    return data.user.id;
-                });
+                    .then(r => r.json())
+                    .then(data => {
+                        if (!data.success) throw new Error(data.message);
+                        return data.user.id;
+                    });
             } else {
                 userPromise = Promise.resolve(existingUserId);
             }
@@ -937,10 +1041,10 @@
                     // 2. Link account mapping
                     const mappingData = new FormData();
                     mappingData.append('system_id', wizardState.detectedDevice.system_id);
-                    
+
                     const mappedUser = document.getElementById('wizard-linux-user-select').value;
                     const mappedUid = document.getElementById('wizard-linux-uid').value.trim();
-                    
+
                     mappingData.append('linux_username', mappedUser || (wizardState.platform === 'android' ? 'android-agent' : ''));
                     if (mappedUid) {
                         mappingData.append('linux_uid', mappedUid);
@@ -950,11 +1054,11 @@
                         method: 'POST',
                         body: mappingData
                     })
-                    .then(r => {
-                        // Redirect handles verification down the line
-                        // Since redirect yields HTML, we assume success or check status
-                        return userId;
-                    });
+                        .then(r => {
+                            // Redirect handles verification down the line
+                            // Since redirect yields HTML, we assume success or check status
+                            return userId;
+                        });
                 })
                 .then(userId => {
                     // 3. Trigger validation check to finalize sync
@@ -968,4 +1072,5 @@
     </script>
     {% block extra_js %}{% endblock %}
 </body>
+
 </html>
