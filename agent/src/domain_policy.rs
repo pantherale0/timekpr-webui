@@ -1,4 +1,6 @@
+#[cfg(target_os = "linux")]
 use crate::approval_deduper;
+#[cfg(target_os = "linux")]
 use crate::firewall::{self, FirewallPolicy};
 use crate::local_dns::{DnsPolicy, LocalDnsController};
 use serde::{Deserialize, Serialize};
@@ -403,16 +405,21 @@ impl DomainPolicyRuntime {
                 linux_username: policy.linux_username.clone(),
             })
             .collect();
-        let firewall_policies: Vec<FirewallPolicy> = resolved_policies
-            .iter()
-            .map(|policy| FirewallPolicy {
-                uid: policy.uid,
-                listen_port: policy.listen_port,
-            })
-            .collect();
 
         self.dns_controller.reconcile(&dns_policies).await?;
-        firewall::reconcile(&firewall_policies)?;
+
+        #[cfg(target_os = "linux")]
+        {
+            let firewall_policies: Vec<FirewallPolicy> = resolved_policies
+                .iter()
+                .map(|policy| FirewallPolicy {
+                    uid: policy.uid,
+                    listen_port: policy.listen_port,
+                })
+                .collect();
+            firewall::reconcile(&firewall_policies)?;
+        }
+
         Ok(())
     }
 
@@ -625,8 +632,11 @@ fn resolve_next_policies(
 }
 
 fn clear_domain_grant_dedupe(state: &PersistedDomainPolicyState) {
-    for policy in state.policies.values() {
-        approval_deduper::on_domain_grants_synced(&policy.allowed_domains);
+    #[cfg(target_os = "linux")]
+    {
+        for policy in state.policies.values() {
+            approval_deduper::on_domain_grants_synced(&policy.allowed_domains);
+        }
     }
 }
 

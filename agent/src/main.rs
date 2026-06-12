@@ -75,6 +75,7 @@ fn get_system_users_map() -> HashMap<u32, String> {
 }
 use tokio_tungstenite::{connect_async, tungstenite::protocol::Message};
 use uuid::Uuid;
+#[cfg(target_os = "linux")]
 use zbus::{Connection, Proxy};
 
 type HmacSha256 = Hmac<Sha256>;
@@ -979,11 +980,11 @@ fn spawn_installed_apps_scheduler(
     })
 }
 
-#[cfg(target_os = "linux")]
 fn is_user_session_class(session_class: Option<&str>) -> bool {
     session_class.is_some_and(|class_name| class_name.starts_with("user"))
 }
 
+#[cfg(target_os = "linux")]
 async fn resolve_session_snapshot(connection: &Connection, object_path: &str) -> Option<SessionSnapshot> {
     let proxy = match Proxy::new(
         connection,
@@ -1011,6 +1012,7 @@ async fn resolve_session_snapshot(connection: &Connection, object_path: &str) ->
     })
 }
 
+#[cfg(target_os = "linux")]
 async fn run_session_listener(
     tx: mpsc::UnboundedSender<ClientMessage>,
     mut shutdown: watch::Receiver<bool>,
@@ -1137,6 +1139,7 @@ async fn run_session_listener(
     }
 }
 
+#[cfg(target_os = "linux")]
 async fn run_sleep_listener(
     tx: mpsc::UnboundedSender<ClientMessage>,
     mut shutdown: watch::Receiver<bool>,
@@ -1200,6 +1203,7 @@ async fn run_sleep_listener(
     }
 }
 
+#[cfg(target_os = "linux")]
 async fn run_shutdown_listener(
     tx: mpsc::UnboundedSender<ClientMessage>,
     mut shutdown: watch::Receiver<bool>,
@@ -1261,6 +1265,7 @@ async fn run_shutdown_listener(
     }
 }
 
+#[cfg(target_os = "linux")]
 fn spawn_logind_listeners(
     tx: mpsc::UnboundedSender<ClientMessage>,
     shutdown_rx: watch::Receiver<bool>,

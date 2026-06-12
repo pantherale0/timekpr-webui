@@ -2,6 +2,7 @@ use serde_json::json;
 #[cfg(target_os = "linux")]
 use std::process::Command;
 
+#[cfg(target_os = "linux")]
 use crate::approval_deduper;
 use crate::local_dns;
 use crate::netlink;
@@ -14,9 +15,19 @@ pub fn on_domain_blocked(linux_username: &str, domain: &str, domain_access_mode:
         return;
     }
 
-    if domain_access_mode == MODE_APPROVAL_ON_BLOCK
-        && approval_deduper::should_emit("domain_access", &registrable)
-    {
+    let should_alert = {
+        #[cfg(target_os = "linux")]
+        {
+            domain_access_mode == MODE_APPROVAL_ON_BLOCK
+                && approval_deduper::should_emit("domain_access", &registrable)
+        }
+        #[cfg(target_os = "windows")]
+        {
+            domain_access_mode == MODE_APPROVAL_ON_BLOCK
+        }
+    };
+
+    if should_alert {
         netlink::send_app_alert(
             "access_requested",
             linux_username,

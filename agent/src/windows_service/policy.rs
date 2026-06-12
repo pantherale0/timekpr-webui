@@ -46,7 +46,7 @@ pub fn get_windows_users_map() -> HashMap<u32, String> {
         let mut resume_handle = 0;
 
         // Call NetUserEnum at level 3
-        let status = windows_sys::Win32_Networking_ActiveDirectory::NetUserEnum(
+        let status = windows_sys::Win32::NetworkManagement::NetManagement::NetUserEnum(
             std::ptr::null(),
             3,
             0, // FILTER_TEMP_DUPLICATE_ACCOUNT / standard accounts
@@ -74,7 +74,7 @@ pub fn get_windows_users_map() -> HashMap<u32, String> {
         }
 
         if !bufptr.is_null() {
-            windows_sys::Win32_Networking_ActiveDirectory::NetApiBufferFree(bufptr as *const std::ffi::c_void);
+            windows_sys::Win32::NetworkManagement::NetManagement::NetApiBufferFree(bufptr as *const std::ffi::c_void);
         }
     }
 
@@ -173,19 +173,19 @@ pub fn discover_windows_apps(username: &str) -> Vec<DiscoveredApp> {
 
     // 1. Scan registry (HKLM Uninstall key)
     scan_registry_uninstall_key(
-        windows_sys::Win32_System_Registry::HKEY_LOCAL_MACHINE,
+        windows_sys::Win32::System::Registry::HKEY_LOCAL_MACHINE,
         r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall",
         &mut apps,
     );
     scan_registry_uninstall_key(
-        windows_sys::Win32_System_Registry::HKEY_LOCAL_MACHINE,
+        windows_sys::Win32::System::Registry::HKEY_LOCAL_MACHINE,
         r"SOFTWARE\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall",
         &mut apps,
     );
 
     // 2. Scan registry (HKCU Uninstall key for current user session - mock or helper)
     scan_registry_uninstall_key(
-        windows_sys::Win32_System_Registry::HKEY_CURRENT_USER,
+        windows_sys::Win32::System::Registry::HKEY_CURRENT_USER,
         r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall",
         &mut apps,
     );

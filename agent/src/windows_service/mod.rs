@@ -126,17 +126,39 @@ async fn run_service_tasks() {
     // 1. Start Named Pipe IPC Server
     tokio::spawn(ipc::start_ipc_server());
 
-    // 2. Start Process Monitor
+    // 2. Set up global AppAlert channel for process monitor
+    let (alert_tx, mut alert_rx) = mpsc::unbounded_channel::<crate::netlink::AppAlert>();
+    crate::netlink::register_alert_sender(alert_tx);
+
+    let active_client_tx = Arc::new(Mutex::new(None));
+    let active_tx_clone = active_client_tx.clone();
+    tokio::spawn(async move {
+        while let Some(alert) = alert_rx.recv().await {
+            let msg = crate::build_alert_message(
+                &alert.event_type,
+                Some(alert.linux_username),
+                alert.payload,
+            );
+            let opt_tx = {
+                let guard = active_tx_clone.lock().unwrap();
+                guard.clone()
+            };
+            if let Some(tx) = opt_tx {
+                let _ = tx.send(msg);
+            }
+        }
+    });
+
+    // 3. Start Process Monitor
     tokio::spawn(process_monitor::start_process_monitor());
 
-    // 3. Start local DNS Controller / server from local_dns
+    // 4. Start local DNS Controller / server from local_dns
     // (the actual hickory DNS listener)
     if let Err(message) = crate::domain_policy::initialize_runtime().await {
         eprintln!("Failed to restore persisted domain policy: {}", message);
     }
 
-    // 4. Start WebSocket Agent loop from main.rs
-    let active_client_tx = Arc::new(Mutex::new(None));
+    // 5. Start WebSocket Agent loop from main.rs
     crate::start_agent_reconnect_loop(active_client_tx).await;
 }
 

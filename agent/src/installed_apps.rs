@@ -97,6 +97,7 @@ pub fn discover_for_user(linux_username: &str) -> Vec<DiscoveredApp> {
     apps
 }
 
+#[cfg(target_os = "linux")]
 pub fn parse_desktop_file(path: &Path, linux_username: &str) -> Option<DiscoveredApp> {
     let contents = fs::read_to_string(path).ok()?;
     let mut in_desktop_entry = false;
@@ -165,10 +166,12 @@ pub fn parse_desktop_file(path: &Path, linux_username: &str) -> Option<Discovere
     })
 }
 
+#[cfg(target_os = "linux")]
 fn parse_bool(value: &str) -> bool {
     matches!(value.trim().to_ascii_lowercase().as_str(), "true" | "1" | "yes")
 }
 
+#[cfg(target_os = "linux")]
 pub fn normalize_exec_to_path(exec_line: &str) -> Option<String> {
     for token in exec_line.split_whitespace() {
         if token.starts_with('/') && !token.contains('%') {
@@ -178,8 +181,10 @@ pub fn normalize_exec_to_path(exec_line: &str) -> Option<String> {
     None
 }
 
+#[cfg(target_os = "linux")]
 const ICON_SYSTEM_PREFIXES: &[&str] = &["/usr/share/pixmaps", "/usr/share/icons"];
 
+#[cfg(target_os = "linux")]
 fn is_allowed_icon_path(canonical: &Path, user_home: Option<&Path>) -> bool {
     if ICON_SYSTEM_PREFIXES
         .iter()
@@ -195,6 +200,7 @@ fn is_allowed_icon_path(canonical: &Path, user_home: Option<&Path>) -> bool {
     false
 }
 
+#[cfg(target_os = "linux")]
 fn read_allowed_png_icon(candidate: &Path, user_home: Option<&Path>) -> Option<Vec<u8>> {
     if candidate.extension().and_then(|ext| ext.to_str()) != Some("png") {
         return None;
@@ -217,6 +223,7 @@ fn read_allowed_png_icon(candidate: &Path, user_home: Option<&Path>) -> Option<V
     Some(bytes)
 }
 
+#[cfg(target_os = "linux")]
 fn resolve_icon_png(icon_name: &str, user_home: Option<&Path>) -> Option<Vec<u8>> {
     let trimmed = icon_name.trim();
     if trimmed.is_empty() {
