@@ -1,21 +1,35 @@
+#[cfg(target_os = "linux")]
 mod apparmor;
+#[cfg(target_os = "linux")]
 mod approval_deduper;
+#[cfg(target_os = "linux")]
 mod approval_policy;
+#[cfg(target_os = "linux")]
 mod audit_monitor;
 mod domain_notify;
 mod domain_policy;
+#[cfg(target_os = "linux")]
 mod firewall;
 mod installed_apps;
+#[cfg(target_os = "linux")]
 mod linux_device_policy;
 mod local_dns;
 mod netlink;
+#[cfg(target_os = "linux")]
 mod timekpr_dbus;
 mod update_verify;
+#[cfg(target_os = "linux")]
 mod terminal_monitor;
+
+#[cfg(target_os = "windows")]
+pub mod windows_service;
+#[cfg(target_os = "windows")]
+pub mod windows_user_agent;
 
 use chrono::{SecondsFormat, Utc};
 use futures_util::{SinkExt, StreamExt};
 use hmac::{Hmac, Mac};
+#[cfg(target_os = "linux")]
 use logind_zbus::manager::ManagerProxy;
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;
@@ -23,14 +37,19 @@ use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::fs;
 use std::path::Path;
+#[cfg(target_os = "linux")]
 use std::process::Command;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
-use timekpr_dbus::{AllowedHoursDay, TimekprDbusClient};
+#[cfg(target_os = "linux")]
+use timekpr_dbus::TimekprDbusClient;
 use tokio::sync::{mpsc, watch};
 use tokio::task::JoinHandle;
 use tokio::time::sleep;
 
+pub type AllowedHoursDay = HashMap<String, HashMap<String, i32>>;
+
+#[cfg(target_os = "linux")]
 fn get_system_users_map() -> HashMap<u32, String> {
     let mut map = HashMap::new();
     if let Ok(content) = fs::read_to_string("/etc/passwd") {
@@ -48,6 +67,11 @@ fn get_system_users_map() -> HashMap<u32, String> {
         }
     }
     map
+}
+
+#[cfg(target_os = "windows")]
+fn get_system_users_map() -> HashMap<u32, String> {
+    windows_service::policy::get_windows_users_map()
 }
 use tokio_tungstenite::{connect_async, tungstenite::protocol::Message};
 use uuid::Uuid;
@@ -170,18 +194,37 @@ struct SessionSnapshot {
 }
 
 fn get_config_path() -> String {
-    let primary_dir = "/etc/timekpr-agent";
-    let primary_path = format!("{}/config.json", primary_dir);
-    let fallback_path = "config.json";
+    #[cfg(target_os = "windows")]
+    {
+        let primary_dir = "C:\\ProgramData\\TimeKpr";
+        let primary_path = format!("{}\\config.json", primary_dir);
+        let fallback_path = "config.json";
 
-    if Path::new(&primary_path).exists() {
-        primary_path
-    } else if Path::new(fallback_path).exists() {
-        fallback_path.to_string()
-    } else if fs::create_dir_all(primary_dir).is_ok() {
-        primary_path
-    } else {
-        fallback_path.to_string()
+        if Path::new(&primary_path).exists() {
+            primary_path
+        } else if Path::new(fallback_path).exists() {
+            fallback_path.to_string()
+        } else if fs::create_dir_all(primary_dir).is_ok() {
+            primary_path
+        } else {
+            fallback_path.to_string()
+        }
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let primary_dir = "/etc/timekpr-agent";
+        let primary_path = format!("{}/config.json", primary_dir);
+        let fallback_path = "config.json";
+
+        if Path::new(&primary_path).exists() {
+            primary_path
+        } else if Path::new(fallback_path).exists() {
+            fallback_path.to_string()
+        } else if fs::create_dir_all(primary_dir).is_ok() {
+            primary_path
+        } else {
+            fallback_path.to_string()
+        }
     }
 }
 
@@ -242,31 +285,44 @@ fn clear_agent_enrollment() -> Result<(), String> {
 }
 
 fn get_system_hostname() -> Option<String> {
-    if let Ok(hostname) = std::env::var("HOSTNAME") {
-        let trimmed = hostname.trim();
-        if !trimmed.is_empty() {
-            return Some(trimmed.to_string());
+    #[cfg(target_os = "windows")]
+    {
+        if let Ok(name) = std::env::var("COMPUTERNAME") {
+            let trimmed = name.trim();
+            if !trimmed.is_empty() {
+                return Some(trimmed.to_string());
+            }
         }
+        None
     }
-
-    if let Ok(hostname_file) = fs::read_to_string("/etc/hostname") {
-        let trimmed = hostname_file.trim();
-        if !trimmed.is_empty() {
-            return Some(trimmed.to_string());
-        }
-    }
-
-    if let Ok(output) = Command::new("hostname").output() {
-        if output.status.success() {
-            let hostname = String::from_utf8_lossy(&output.stdout);
+    #[cfg(not(target_os = "windows"))]
+    {
+        if let Ok(hostname) = std::env::var("HOSTNAME") {
             let trimmed = hostname.trim();
             if !trimmed.is_empty() {
                 return Some(trimmed.to_string());
             }
         }
-    }
 
-    None
+        if let Ok(hostname_file) = fs::read_to_string("/etc/hostname") {
+            let trimmed = hostname_file.trim();
+            if !trimmed.is_empty() {
+                return Some(trimmed.to_string());
+            }
+        }
+
+        if let Ok(output) = Command::new("hostname").output() {
+            if output.status.success() {
+                let hostname = String::from_utf8_lossy(&output.stdout);
+                let trimmed = hostname.trim();
+                if !trimmed.is_empty() {
+                    return Some(trimmed.to_string());
+                }
+            }
+        }
+
+        None
+    }
 }
 
 fn build_full_access_day() -> AllowedHoursDay {
@@ -393,6 +449,7 @@ fn command_requires_linux_username(action: &str) -> bool {
     )
 }
 
+#[cfg(target_os = "linux")]
 fn validate_command_username(action: &str, username: &str) -> Result<(), String> {
     if !command_requires_linux_username(action) {
         return Ok(());
@@ -406,6 +463,18 @@ fn validate_command_username(action: &str, username: &str) -> Result<(), String>
     Ok(())
 }
 
+#[cfg(target_os = "windows")]
+fn validate_command_username(action: &str, username: &str) -> Result<(), String> {
+    if !command_requires_linux_username(action) {
+        return Ok(());
+    }
+    if !windows_service::policy::windows_user_exists(username) {
+        return Err(format!("Windows user '{}' does not exist on this system", username));
+    }
+    Ok(())
+}
+
+#[cfg(target_os = "linux")]
 async fn handle_command(action: &str, username: &str, args: &serde_json::Value) -> (bool, String, serde_json::Value) {
     if let Err(message) = validate_command_username(action, username) {
         return (false, message, serde_json::json!({}));
@@ -661,6 +730,11 @@ async fn handle_command(action: &str, username: &str, args: &serde_json::Value) 
     }
 }
 
+#[cfg(target_os = "windows")]
+async fn handle_command(action: &str, username: &str, args: &serde_json::Value) -> (bool, String, serde_json::Value) {
+    windows_service::policy::handle_windows_command(action, username, args).await
+}
+
 async fn download_release_bytes(
     client: &reqwest::Client,
     url: &str,
@@ -904,6 +978,7 @@ fn spawn_installed_apps_scheduler(
     })
 }
 
+#[cfg(target_os = "linux")]
 fn is_user_session_class(session_class: Option<&str>) -> bool {
     session_class.is_some_and(|class_name| class_name.starts_with("user"))
 }
@@ -1196,8 +1271,8 @@ fn spawn_logind_listeners(
     ]
 }
 
-#[tokio::main]
-async fn main() {
+#[cfg(target_os = "linux")]
+async fn run_linux_main() {
     println!("Starting Timekpr Client Agent...");
     if let Err(message) = domain_policy::initialize_runtime().await {
         eprintln!("Failed to restore persisted domain policy: {}", message);
@@ -1244,6 +1319,12 @@ async fn main() {
         }
     });
 
+    start_agent_reconnect_loop(active_client_tx).await;
+}
+
+pub(crate) async fn start_agent_reconnect_loop(
+    active_client_tx: Arc<Mutex<Option<mpsc::UnboundedSender<ClientMessage>>>>,
+) {
     loop {
         let mut device_unenrolled = false;
         let config = load_or_create_config();
@@ -1443,7 +1524,10 @@ async fn main() {
                 });
 
                 let (shutdown_tx, shutdown_rx) = watch::channel(false);
+                #[cfg(target_os = "linux")]
                 let listener_handles = spawn_logind_listeners(client_tx.clone(), shutdown_rx);
+                #[cfg(target_os = "windows")]
+                let listener_handles: Vec<JoinHandle<()>> = Vec::new();
                 let (policy_sync_tx, policy_sync_rx) = mpsc::unbounded_channel::<()>();
                 let policy_sync_handle = spawn_policy_sync_scheduler(
                     client_tx.clone(),
@@ -1566,6 +1650,24 @@ async fn main() {
     }
 }
 
+#[cfg(target_os = "linux")]
+#[tokio::main]
+async fn main() {
+    run_linux_main().await;
+}
+
+#[cfg(target_os = "windows")]
+#[tokio::main]
+async fn main() {
+    let args: Vec<String> = std::env::args().collect();
+    if args.iter().any(|arg| arg == "--user-agent") {
+        windows_user_agent::run_user_agent().await;
+        return;
+    }
+
+    windows_service::run_service().await;
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
@@ -1598,6 +1700,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(target_os = "linux")]
     fn user_session_class_filter_matches_systemd_user_sessions() {
         assert!(is_user_session_class(Some("user")));
         assert!(is_user_session_class(Some("user-light")));

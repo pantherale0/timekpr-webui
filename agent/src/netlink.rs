@@ -1,13 +1,17 @@
 use serde_json::json;
 use std::collections::{HashMap, HashSet};
 use std::mem;
-use std::os::unix::io::{AsRawFd, RawFd};
 use std::sync::{Mutex, OnceLock};
 use tokio::sync::mpsc;
 use tokio::time::Instant;
 
+#[cfg(target_os = "linux")]
+use std::os::unix::io::{AsRawFd, RawFd};
+#[cfg(target_os = "linux")]
 use crate::apparmor;
+#[cfg(target_os = "linux")]
 use crate::approval_deduper;
+#[cfg(target_os = "linux")]
 use crate::linux_device_policy;
 
 /// Alert payload ready to be forwarded to the server.
@@ -41,6 +45,7 @@ pub fn send_app_alert(event_type: &str, linux_username: &str, payload: serde_jso
 }
 
 /// Configuration for which usernames (and their UIDs) to monitor.
+#[cfg(target_os = "linux")]
 #[derive(Clone)]
 pub struct MonitorConfig {
     /// Maps UID → linux username for users we care about.
@@ -49,6 +54,7 @@ pub struct MonitorConfig {
 
 /// Background task: open a Netlink process connector socket and relay exec/exit
 /// events for monitored UIDs to the main event loop via `alert_tx`.
+#[cfg(target_os = "linux")]
 pub async fn run_process_monitor(
     config: MonitorConfig,
     alert_tx: mpsc::UnboundedSender<AppAlert>,

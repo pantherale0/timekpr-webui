@@ -1,4 +1,5 @@
 use serde_json::json;
+#[cfg(target_os = "linux")]
 use std::process::Command;
 
 use crate::approval_deduper;
@@ -35,14 +36,25 @@ fn show_domain_blocked_notification(domain: &str) {
         "{domain} is blocked. A request was sent to your parent. \
          You can ask them to approve access in TimeKpr."
     );
-    let _ = Command::new("notify-send")
-        .args([
-            "TimeKpr",
+    #[cfg(target_os = "linux")]
+    {
+        let _ = Command::new("notify-send")
+            .args([
+                "TimeKpr",
+                &body,
+                "-u",
+                "normal",
+                "-a",
+                "TimeKpr Agent",
+            ])
+            .spawn();
+    }
+    #[cfg(target_os = "windows")]
+    {
+        // Broadcast the notification to the user session helper via our IPC
+        crate::windows_service::ipc::broadcast_toast_notification(
+            "Website Blocked",
             &body,
-            "-u",
-            "normal",
-            "-a",
-            "TimeKpr Agent",
-        ])
-        .spawn();
+        );
+    }
 }

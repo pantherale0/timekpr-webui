@@ -57,6 +57,30 @@ jobs:
       - name: Run cargo check
         run: cargo check --manifest-path agent/Cargo.toml
 
+  windows-check:
+    needs: changes
+    if: startsWith(github.ref, 'refs/tags/v') || needs.changes.outputs.linux_agent_changed == 'true' || github.event_name == 'workflow_dispatch'
+    runs-on: windows-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "agent -> target"
+
+      - name: Run cargo check
+        run: cargo check --manifest-path agent/Cargo.toml --target x86_64-pc-windows-msvc
+
+      - name: Run cargo test
+        run: cargo test --manifest-path agent/Cargo.toml --target x86_64-pc-windows-msvc
+
   android-check:
     needs: changes
     if: startsWith(github.ref, 'refs/tags/v') || needs.changes.outputs.android_agent_changed == 'true' || github.event_name == 'workflow_dispatch'
@@ -157,6 +181,68 @@ jobs:
             dist/timekpr-agent-${{ matrix.target }}.tar.gz
             dist/timekpr-agent-${{ matrix.target }}.tar.gz.sha256
 
+  windows-release-build:
+    needs: windows-check
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: windows-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain with target
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "agent -> target"
+
+      - name: Build release binary
+        shell: bash
+        run: |
+          export TIMEKPR_AGENT_VERSION="${{ github.ref_name }}"
+          cargo build --release --manifest-path agent/Cargo.toml --target x86_64-pc-windows-msvc
+
+      - name: Compile MSI installer
+        shell: bash
+        run: |
+          mkdir -p dist
+          TAG="${{ github.ref_name }}"
+          VERSION="${TAG#v}"
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]]; then
+            VERSION="0.0.0"
+          fi
+          echo "Building MSI with version $VERSION"
+          
+          WIX_BIN="${WIX}bin"
+          WIX_BIN_UNIX="$(echo "$WIX_BIN" | tr '\\' '/')"
+          
+          "$WIX_BIN_UNIX/candle.exe" \
+            -dVersion="$VERSION" \
+            -dSourceDir="agent/target/x86_64-pc-windows-msvc/release" \
+            -o "agent/timekpr-agent.wixobj" \
+            "agent/timekpr-agent.wxs"
+            
+          "$WIX_BIN_UNIX/light.exe" \
+            -ext WixUIExtension \
+            -o "dist/timekpr-agent-x86_64-pc-windows-msvc.msi" \
+            "agent/timekpr-agent.wixobj"
+
+      - name: Generate SHA-256 checksum
+        shell: bash
+        run: |
+          sha256sum "dist/timekpr-agent-x86_64-pc-windows-msvc.msi" | awk '{print $1}' > "dist/timekpr-agent-x86_64-pc-windows-msvc.msi.sha256"
+
+      - name: Upload packaged asset
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-agent-msi
+          path: |
+            dist/timekpr-agent-x86_64-pc-windows-msvc.msi
+            dist/timekpr-agent-x86_64-pc-windows-msvc.msi.sha256
+
   android-release-build:
     needs: android-check
     if: startsWith(github.ref, 'refs/tags/v')
@@ -249,7 +335,7 @@ jobs:
             dist/timekpr-android-agent-${{ github.ref_name }}.signature-checksum
 
   publish-release:
-    needs: [linux-release-build, android-release-build]
+    needs: [linux-release-build, android-release-build, windows-release-build]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:

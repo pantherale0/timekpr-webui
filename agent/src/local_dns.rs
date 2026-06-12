@@ -404,23 +404,32 @@ async fn forward_tcp_query(query_bytes: &[u8], upstream_servers: &[SocketAddr]) 
 
 fn load_upstream_servers() -> Vec<SocketAddr> {
     let mut upstreams = Vec::new();
-    if let Ok(resolv_conf) = std::fs::read_to_string("/etc/resolv.conf") {
-        for line in resolv_conf.lines() {
-            let trimmed = line.trim();
-            if !trimmed.starts_with("nameserver ") {
-                continue;
+    #[cfg(target_os = "linux")]
+    {
+        if let Ok(resolv_conf) = std::fs::read_to_string("/etc/resolv.conf") {
+            for line in resolv_conf.lines() {
+                let trimmed = line.trim();
+                if !trimmed.starts_with("nameserver ") {
+                    continue;
+                }
+                let Some(address) = trimmed.split_whitespace().nth(1) else {
+                    continue;
+                };
+                let Ok(ip_addr) = address.parse::<IpAddr>() else {
+                    continue;
+                };
+                if ip_addr.is_loopback() {
+                    continue;
+                }
+                upstreams.push(SocketAddr::new(ip_addr, 53));
             }
-            let Some(address) = trimmed.split_whitespace().nth(1) else {
-                continue;
-            };
-            let Ok(ip_addr) = address.parse::<IpAddr>() else {
-                continue;
-            };
-            if ip_addr.is_loopback() {
-                continue;
-            }
-            upstreams.push(SocketAddr::new(ip_addr, 53));
         }
+    }
+    #[cfg(target_os = "windows")]
+    {
+        // On Windows we default to Google Public DNS and Cloudflare DNS
+        upstreams.push(SocketAddr::new(IpAddr::V4(Ipv4Addr::new(8, 8, 8, 8)), 53));
+        upstreams.push(SocketAddr::new(IpAddr::V4(Ipv4Addr::new(1, 1, 1, 1)), 53));
     }
 
     if upstreams.is_empty() {

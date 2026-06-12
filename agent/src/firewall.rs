@@ -1,8 +1,13 @@
+#[cfg(target_os = "linux")]
 use std::process::Command;
 
+#[cfg(target_os = "linux")]
 const NAT_TABLE: &str = "nat";
+#[cfg(target_os = "linux")]
 const FILTER_TABLE: &str = "filter";
+#[cfg(target_os = "linux")]
 const NAT_CHAIN: &str = "TIMEKPR_UID_DNS";
+#[cfg(target_os = "linux")]
 const FILTER_CHAIN: &str = "TIMEKPR_UID_EGRESS";
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -11,6 +16,7 @@ pub struct FirewallPolicy {
     pub listen_port: u16,
 }
 
+#[cfg(target_os = "linux")]
 pub fn reconcile(policies: &[FirewallPolicy]) -> Result<(), String> {
     ensure_chain(NAT_TABLE, NAT_CHAIN)?;
     ensure_chain(FILTER_TABLE, FILTER_CHAIN)?;
@@ -37,6 +43,7 @@ pub fn reconcile(policies: &[FirewallPolicy]) -> Result<(), String> {
     Ok(())
 }
 
+#[cfg(target_os = "linux")]
 fn ensure_chain(table: &str, chain: &str) -> Result<(), String> {
     let status = Command::new("iptables")
         .args(["-t", table, "-L", chain])
@@ -49,6 +56,7 @@ fn ensure_chain(table: &str, chain: &str) -> Result<(), String> {
     run_iptables(["-t", table, "-N", chain])
 }
 
+#[cfg(target_os = "linux")]
 fn ensure_jump(table: &str, from_chain: &str, to_chain: &str) -> Result<(), String> {
     let status = Command::new("iptables")
         .args(["-t", table, "-C", from_chain, "-j", to_chain])
@@ -61,10 +69,12 @@ fn ensure_jump(table: &str, from_chain: &str, to_chain: &str) -> Result<(), Stri
     run_iptables(["-t", table, "-A", from_chain, "-j", to_chain])
 }
 
+#[cfg(target_os = "linux")]
 fn flush_chain(table: &str, chain: &str) -> Result<(), String> {
     run_iptables(["-t", table, "-F", chain])
 }
 
+#[cfg(target_os = "linux")]
 fn append_nat_redirect(policy: &FirewallPolicy, protocol: &str) -> Result<(), String> {
     run_iptables([
         "-t",
@@ -86,6 +96,7 @@ fn append_nat_redirect(policy: &FirewallPolicy, protocol: &str) -> Result<(), St
     ])
 }
 
+#[cfg(target_os = "linux")]
 fn append_dns_tls_block(policy: &FirewallPolicy, protocol: &str) -> Result<(), String> {
     run_iptables([
         "-t",
@@ -105,11 +116,13 @@ fn append_dns_tls_block(policy: &FirewallPolicy, protocol: &str) -> Result<(), S
     ])
 }
 
+#[cfg(target_os = "linux")]
 fn append_port_guard(uid: u32, port: u16, protocol: &str) -> Result<(), String> {
     let args = build_port_guard_args(uid, port, protocol);
     run_iptables_owned(&args)
 }
 
+#[cfg(target_os = "linux")]
 fn build_port_guard_args(uid: u32, port: u16, protocol: &str) -> Vec<String> {
     vec![
         "-t".to_string(),
@@ -130,6 +143,7 @@ fn build_port_guard_args(uid: u32, port: u16, protocol: &str) -> Vec<String> {
     ]
 }
 
+#[cfg(target_os = "linux")]
 fn run_iptables<const N: usize>(args: [&str; N]) -> Result<(), String> {
     let output = Command::new("iptables")
         .args(args)
@@ -147,6 +161,7 @@ fn run_iptables<const N: usize>(args: [&str; N]) -> Result<(), String> {
     ))
 }
 
+#[cfg(target_os = "linux")]
 fn run_iptables_owned(args: &[String]) -> Result<(), String> {
     let output = Command::new("iptables")
         .args(args)
@@ -164,9 +179,18 @@ fn run_iptables_owned(args: &[String]) -> Result<(), String> {
     ))
 }
 
+#[cfg(target_os = "windows")]
+pub fn reconcile(_policies: &[FirewallPolicy]) -> Result<(), String> {
+    // Windows firewall settings are applied at the system layer via network DNS
+    // redirection and Windows Defender Firewall commands, so we no-op here.
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{build_port_guard_args, FirewallPolicy};
+    use super::FirewallPolicy;
+    #[cfg(target_os = "linux")]
+    use super::build_port_guard_args;
 
     fn render_rules(policies: &[FirewallPolicy]) -> Vec<String> {
         let mut rules = Vec::new();
@@ -211,6 +235,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(target_os = "linux")]
     fn port_guard_negates_uid_owner_match_in_supported_position() {
         let args = build_port_guard_args(1000, 23002, "udp");
         assert_eq!(

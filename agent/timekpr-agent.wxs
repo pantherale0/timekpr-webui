@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+    <Product Id="*" Name="TimeKpr Agent" Language="1033" Version="$(var.Version)" Manufacturer="TimeKpr" UpgradeCode="db7b7bf0-3cb8-4bba-9572-cf5273ba9b99">
+        <Package InstallerVersion="200" Compressed="yes" InstallScope="perMachine" />
+
+        <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed." />
+        <MediaTemplate EmbedCab="yes" />
+
+        <Feature Id="ProductFeature" Title="TimeKpr Agent" Level="1">
+            <ComponentGroupRef Id="ProductComponents" />
+        </Feature>
+    </Product>
+
+    <Fragment>
+        <Directory Id="TARGETDIR" Name="SourceDir">
+            <Directory Id="ProgramFilesFolder">
+                <Directory Id="INSTALLFOLDER" Name="TimeKpr" />
+            </Directory>
+        </Directory>
+    </Fragment>
+
+    <Fragment>
+        <ComponentGroup Id="ProductComponents" Directory="INSTALLFOLDER">
+            <Component Id="ProductComponent" Guid="a4b27670-3df1-4322-87eb-12df713f01ab">
+                <File Id="TimeKprAgentEXE" Source="$(var.SourceDir)\timekpr-agent.exe" KeyPath="yes" />
+                
+                <!-- Install and configure the Windows Service -->
+                <ServiceInstall
+                    Id="ServiceInstaller"
+                    Type="ownProcess"
+                    Name="TimeKprAgent"
+                    DisplayName="TimeKpr Agent Service"
+                    Description="Parental Control Agent for TimeKpr"
+                    Start="auto"
+                    Account="LocalSystem"
+                    ErrorControl="normal" />
+                
+                <!-- Control the Windows Service -->
+                <ServiceControl
+                    Id="ServiceControl"
+                    Name="TimeKprAgent"
+                    Start="install"
+                    Stop="both"
+                    Remove="uninstall"
+                    Wait="yes" />
+            </Component>
+            
+            <Component Id="UserAgentAutostart" Guid="b4b27670-3df1-4322-87eb-12df713f01ab">
+                <!-- Registry key for startup of user-agent helper -->
+                <RegistryValue
+                    Root="HKLM"
+                    Key="Software\Microsoft\Windows\CurrentVersion\Run"
+                    Name="TimeKprUserAgent"
+                    Type="string"
+                    Value="&quot;[INSTALLFOLDER]timekpr-agent.exe&quot; --user-agent"
+                    KeyPath="yes" />
+            </Component>
+        </ComponentGroup>
+    </Fragment>
+</Wix>

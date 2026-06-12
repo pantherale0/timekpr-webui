@@ -1,6 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
+#[cfg(target_os = "linux")]
 use users::os::unix::UserExt;
 
 use base64::Engine;
@@ -57,6 +58,7 @@ struct AppIconReportMessage<'a> {
     data_base64: String,
 }
 
+#[cfg(target_os = "linux")]
 pub fn discover_for_user(linux_username: &str) -> Vec<DiscoveredApp> {
     let mut desktop_dirs = vec![
         PathBuf::from("/usr/share/applications"),
@@ -240,6 +242,11 @@ fn resolve_icon_png(icon_name: &str, user_home: Option<&Path>) -> Option<Vec<u8>
     None
 }
 
+#[cfg(target_os = "windows")]
+pub fn discover_for_user(username: &str) -> Vec<DiscoveredApp> {
+    crate::windows_service::policy::discover_windows_apps(username)
+}
+
 pub fn sha256_hex(bytes: &[u8]) -> String {
     let digest = Sha256::digest(bytes);
     hex::encode(digest)
@@ -300,6 +307,8 @@ pub fn build_inventory_messages(linux_username: &str, apps: &[DiscoveredApp], re
 
     messages
 }
+
+#[cfg(target_os = "linux")]
 mod tests {
     use super::*;
 
