@@ -13,6 +13,12 @@ from src.database import BlocklistDomain
 
 
 DOMAIN_LABEL_RE = re.compile(r'^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$')
+IP_ADDR_RE = re.compile(
+    r'^(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.'
+    r'(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.'
+    r'(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.'
+    r'(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$'
+)
 EXTERNAL_SYNC_INTERVAL = timedelta(hours=24)
 BLOCKLIST_SYNC_RETRY_INTERVAL = timedelta(hours=4)
 BLOCKLIST_STREAM_CHUNK_SIZE = 64 * 1024
@@ -36,7 +42,14 @@ def normalize_domain(raw_domain):
     if domain.startswith('*.'):
         raise ValueError('Wildcard domains are not supported')
     if any(char.isspace() for char in domain):
-        raise ValueError('Domain must not contain whitespace')
+        domain = domain.split(" ")
+        if len(domain) == 2 and IP_ADDR_RE.match(domain[0]):
+            # Host file entry
+            if IP_ADDR_RE.match(domain[1]):
+                raise ValueError("Invalid domain %s", domain[1])
+            domain = domain[1]
+        else:
+            raise ValueError('Domain must not contain whitespace')
     if '/' in domain or ':' in domain:
         raise ValueError('Domain must not contain URL or port separators')
     if domain.count('.') < 1:
