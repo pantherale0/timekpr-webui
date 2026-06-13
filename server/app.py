@@ -154,6 +154,7 @@ from src.blueprints import (
     api_linux_device_policy_bp,
     api_nintendo_bp,
     api_xbox_bp,
+    api_screenshots_bp,
     websocket_bp,
 )
 
@@ -176,6 +177,7 @@ app.register_blueprint(api_android_device_policy_bp)
 app.register_blueprint(api_linux_device_policy_bp)
 app.register_blueprint(api_nintendo_bp)
 app.register_blueprint(api_xbox_bp)
+app.register_blueprint(api_screenshots_bp)
 app.register_blueprint(websocket_bp)
 
 # Register WebSocket endpoint via Flask-Sock

@@ -562,6 +562,10 @@ def _default_config():
         "linux_device_policy_state": {},
         "active_session_username": None,
         "enforced_linux_device_policy": None,
+        "screenshot_policy": {
+            "enabled": False,
+            "intervalSeconds": 300,
+        },
     }
 
 
@@ -799,6 +803,22 @@ class DebugAgentProtocol:
             "type": "app_icon_report",
             "content_hash": _DEBUG_ICON_HASH,
             "mime_type": "image/png",
+            "data_base64": base64.b64encode(_DEBUG_ICON_PNG).decode("ascii"),
+        }
+
+    def build_screenshot_report(self, linux_username=None):
+        username = (linux_username or sorted(self.config["users"])[0] if self.config["users"] else "debug-user")
+        content_hash = hashlib.sha256(_DEBUG_ICON_PNG).hexdigest()
+        return {
+            "type": "screenshot_report",
+            "screenshot_id": str(uuid.uuid4()),
+            "linux_username": username,
+            "captured_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "mime_type": "image/png",
+            "width": 1,
+            "height": 1,
+            "content_hash": content_hash,
+            "active_window_title": "Debug Agent Desktop",
             "data_base64": base64.b64encode(_DEBUG_ICON_PNG).decode("ascii"),
         }
 
@@ -1204,6 +1224,13 @@ class DebugAgentProtocol:
         if action == "refresh_installed_apps" and success:
             reports = data.pop("reports", [])
             extra_messages.extend(reports)
+        if action == "capture_screenshot" and success:
+            target_username = (
+                (args.get("linux_username") or "").strip()
+                or (username or "").strip()
+                or None
+            )
+            extra_messages.append(self.build_screenshot_report(target_username))
         return (
             {
                 "type": "command_response",
@@ -1463,6 +1490,26 @@ class DebugAgentProtocol:
                 True,
                 "Installed apps refresh queued",
                 {"queued": True, "reports": self.build_installed_apps_payloads(username)},
+                False,
+            )
+
+        if action == "sync_screenshot_policy":
+            screenshot_policy = args.get("screenshot_policy")
+            if not isinstance(screenshot_policy, dict):
+                return False, "Missing 'screenshot_policy' argument", {}, False
+            self.config["screenshot_policy"] = _json_clone(screenshot_policy)
+            return True, "Screenshot policy synchronized", {}, True
+
+        if action == "capture_screenshot":
+            target_username = (
+                (args.get("linux_username") or "").strip()
+                or (username or "").strip()
+                or None
+            )
+            return (
+                True,
+                "Screenshot capture queued",
+                {"queued": True, "linux_username": target_username},
                 False,
             )
 

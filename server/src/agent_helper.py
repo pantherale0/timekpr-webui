@@ -707,6 +707,32 @@ class AgentClient:
             raise RuntimeError(message or 'Agent rejected refresh_installed_apps')
         return data or {"queued": True}
 
+    def sync_screenshot_policy(self, screenshot_policy):
+        """Synchronize screenshot capture policy to the connected desktop agent."""
+        success, message, _ = AgentConnectionManager.send_command_sync(
+            self.system_id,
+            "sync_screenshot_policy",
+            "",
+            {"screenshot_policy": screenshot_policy or {}},
+        )
+        return success, message
+
+    def capture_screenshot(self, linux_username=None):
+        """Ask the connected Linux agent to capture and upload a screenshot now."""
+        args = {}
+        if linux_username:
+            args['linux_username'] = linux_username
+        success, message, data = AgentConnectionManager.send_command_sync(
+            self.system_id,
+            "capture_screenshot",
+            linux_username or "",
+            args,
+            timeout=45,
+        )
+        if not success:
+            raise RuntimeError(message or 'Agent rejected capture_screenshot')
+        return data or {"queued": True}
+
     def unenroll_device(self, username):
         """Ask the connected agent to stop enforcement and clear local enrollment state."""
         success, message, _ = AgentConnectionManager.send_command_sync(

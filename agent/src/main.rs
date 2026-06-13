@@ -13,6 +13,7 @@ mod firewall;
 mod installed_apps;
 #[cfg(target_os = "linux")]
 mod linux_device_policy;
+mod screenshot;
 mod local_dns;
 mod netlink;
 #[cfg(target_os = "linux")]
@@ -85,6 +86,7 @@ const AGENT_VERSION: &str = match option_env!("TIMEKPR_AGENT_VERSION") {
 };
 const POLICY_SYNC_INTERVAL_SECS: u64 = 4 * 60 * 60;
 const INSTALLED_APPS_SYNC_INTERVAL_SECS: u64 = 24 * 60 * 60;
+const DEFAULT_SCREENSHOT_INTERVAL_SECS: u64 = 300;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 struct Config {
@@ -138,6 +140,16 @@ enum ServerMessage {
         apps_total: Option<u64>,
         #[serde(default)]
         pending: bool,
+        #[serde(default)]
+        message: Option<String>,
+    },
+    #[serde(rename = "screenshot_report_ack")]
+    ScreenshotReportAck {
+        #[serde(default)]
+        screenshot_id: Option<String>,
+        success: bool,
+        #[serde(default)]
+        duplicate: bool,
         #[serde(default)]
         message: Option<String>,
     },
@@ -447,8 +459,108 @@ fn command_requires_linux_username(action: &str) -> bool {
             | "finalize_domain_policy_sync"
             | "abort_domain_policy_sync"
             | "sync_domain_policy"
+            | "sync_screenshot_policy"
+            | "capture_screenshot"
             | "unenroll"
     )
+}
+
+static SCREENSHOT_POLICY: std::sync::OnceLock<screenshot::SharedScreenshotPolicy> = std::sync::OnceLock::new();
+static SCREENSHOT_TRIGGER_TX: Mutex<Option<mpsc::UnboundedSender<Option<String>>>> = Mutex::new(None);
+
+fn get_screenshot_policy_handle() -> &'static screenshot::SharedScreenshotPolicy {
+    SCREENSHOT_POLICY.get_or_init(screenshot::new_shared_screenshot_policy)
+}
+
+fn set_screenshot_trigger_tx(sender: mpsc::UnboundedSender<Option<String>>) {
+    if let Ok(mut guard) = SCREENSHOT_TRIGGER_TX.lock() {
+        *guard = Some(sender);
+    }
+}
+
+fn clear_screenshot_trigger_tx() {
+    if let Ok(mut guard) = SCREENSHOT_TRIGGER_TX.lock() {
+        *guard = None;
+    }
+}
+
+fn push_screenshot_reports(report_tx: &mpsc::UnboundedSender<String>, linux_username: Option<&str>) {
+    let captures = screenshot::capture_screenshots(linux_username);
+    for capture in captures {
+        match screenshot::build_screenshot_report(&capture) {
+            Ok(serialized) => {
+                let _ = report_tx.send(serialized);
+            }
+            Err(error) => {
+                eprintln!("Failed to build screenshot report: {error}");
+            }
+        }
+    }
+}
+
+fn spawn_screenshot_capture_worker(
+    mut trigger_rx: mpsc::UnboundedReceiver<Option<String>>,
+    report_tx: mpsc::UnboundedSender<String>,
+    mut shutdown: watch::Receiver<bool>,
+) -> JoinHandle<()> {
+    tokio::spawn(async move {
+        loop {
+            tokio::select! {
+                changed = shutdown.changed() => {
+                    if changed.is_err() || *shutdown.borrow() {
+                        break;
+                    }
+                }
+                maybe_trigger = trigger_rx.recv() => {
+                    let Some(username) = maybe_trigger else {
+                        break;
+                    };
+                    let report_sender = report_tx.clone();
+                    let target = username;
+                    let _ = tokio::task::spawn_blocking(move || {
+                        push_screenshot_reports(&report_sender, target.as_deref());
+                    })
+                    .await;
+                }
+            }
+        }
+    })
+}
+
+fn spawn_screenshot_scheduler(
+    trigger_tx: mpsc::UnboundedSender<Option<String>>,
+    policy: screenshot::SharedScreenshotPolicy,
+    mut shutdown: watch::Receiver<bool>,
+) -> JoinHandle<()> {
+    tokio::spawn(async move {
+        loop {
+            let sleep_secs = {
+                let guard = policy.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+                if guard.enabled {
+                    guard.interval_seconds.max(60)
+                } else {
+                    DEFAULT_SCREENSHOT_INTERVAL_SECS
+                }
+            };
+
+            tokio::select! {
+                changed = shutdown.changed() => {
+                    if changed.is_err() || *shutdown.borrow() {
+                        break;
+                    }
+                }
+                _ = sleep(Duration::from_secs(sleep_secs)) => {
+                    let enabled = policy
+                        .lock()
+                        .map(|guard| guard.enabled)
+                        .unwrap_or(false);
+                    if enabled {
+                        let _ = trigger_tx.send(None);
+                    }
+                }
+            }
+        }
+    })
 }
 
 #[cfg(target_os = "linux")]
@@ -715,6 +827,27 @@ async fn handle_command(action: &str, username: &str, args: &serde_json::Value) 
             "Installed apps refresh queued".to_string(),
             serde_json::json!({ "queued": true, "linux_username": username }),
         ),
+        "sync_screenshot_policy" => {
+            match screenshot::apply_screenshot_policy(get_screenshot_policy_handle(), args) {
+                Ok(()) => (
+                    true,
+                    "Screenshot policy synchronized".to_string(),
+                    serde_json::json!({}),
+                ),
+                Err(message) => (false, message, serde_json::json!({})),
+            }
+        }
+        "capture_screenshot" => (
+            true,
+            "Screenshot capture queued".to_string(),
+            serde_json::json!({
+                "queued": true,
+                "linux_username": args
+                    .get("linux_username")
+                    .and_then(|value| value.as_str())
+                    .or_else(|| if username.trim().is_empty() { None } else { Some(username) }),
+            }),
+        ),
         "unenroll" => {
             if let Err(message) = linux_device_policy::clear_on_unenroll().await {
                 eprintln!("Warning: failed to clear linux device policy on unenroll: {message}");
@@ -734,7 +867,28 @@ async fn handle_command(action: &str, username: &str, args: &serde_json::Value) 
 
 #[cfg(target_os = "windows")]
 async fn handle_command(action: &str, username: &str, args: &serde_json::Value) -> (bool, String, serde_json::Value) {
-    windows_service::policy::handle_windows_command(action, username, args).await
+    match action {
+        "sync_screenshot_policy" => match screenshot::apply_screenshot_policy(get_screenshot_policy_handle(), args) {
+            Ok(()) => (
+                true,
+                "Screenshot policy synchronized".to_string(),
+                serde_json::json!({}),
+            ),
+            Err(message) => (false, message, serde_json::json!({})),
+        },
+        "capture_screenshot" => (
+            true,
+            "Screenshot capture queued".to_string(),
+            serde_json::json!({
+                "queued": true,
+                "linux_username": args
+                    .get("linux_username")
+                    .and_then(|value| value.as_str())
+                    .or_else(|| if username.trim().is_empty() { None } else { Some(username) }),
+            }),
+        ),
+        _ => windows_service::policy::handle_windows_command(action, username, args).await,
+    }
 }
 
 async fn download_release_bytes(
@@ -1465,6 +1619,7 @@ pub(crate) async fn start_agent_reconnect_loop(
                                     );
                                 }
                             }
+                            Ok(ServerMessage::ScreenshotReportAck { .. }) => {}
                             Ok(ServerMessage::CommandRequest { .. }) => {
                                 eprintln!("Received command request before the message loop was ready.");
                             }
@@ -1550,6 +1705,19 @@ pub(crate) async fn start_agent_reconnect_loop(
                     inventory_users,
                     shutdown_tx.subscribe(),
                 );
+                let (screenshot_trigger_tx, screenshot_trigger_rx) = mpsc::unbounded_channel::<Option<String>>();
+                set_screenshot_trigger_tx(screenshot_trigger_tx.clone());
+                let screenshot_policy = get_screenshot_policy_handle().clone();
+                let screenshot_capture_handle = spawn_screenshot_capture_worker(
+                    screenshot_trigger_rx,
+                    inventory_tx.clone(),
+                    shutdown_tx.subscribe(),
+                );
+                let screenshot_scheduler_handle = spawn_screenshot_scheduler(
+                    screenshot_trigger_tx.clone(),
+                    screenshot_policy,
+                    shutdown_tx.subscribe(),
+                );
 
                 let startup_details = serde_json::json!({
                     "source": "agent_service",
@@ -1585,6 +1753,21 @@ pub(crate) async fn start_agent_reconnect_loop(
                                     push_inventory_for_user(&inventory_tx, &username);
                                 }
 
+                                if action == "capture_screenshot" && success {
+                                    let target_username = args
+                                        .get("linux_username")
+                                        .and_then(|value| value.as_str())
+                                        .map(|value| value.to_string())
+                                        .or_else(|| {
+                                            if username.trim().is_empty() {
+                                                None
+                                            } else {
+                                                Some(username.to_string())
+                                            }
+                                        });
+                                    let _ = screenshot_trigger_tx.send(target_username);
+                                }
+
                                 if action == "unenroll" && success {
                                     device_unenrolled = true;
                                     let _ = shutdown_tx.send(true);
@@ -1607,6 +1790,16 @@ pub(crate) async fn start_agent_reconnect_loop(
                                         "Installed apps report rejected: {}",
                                         message.as_deref().unwrap_or("unknown error")
                                     );
+                                }
+                            }
+                            Ok(ServerMessage::ScreenshotReportAck { success, message, duplicate, .. }) => {
+                                if !success {
+                                    eprintln!(
+                                        "Screenshot report rejected: {}",
+                                        message.as_deref().unwrap_or("unknown error")
+                                    );
+                                } else if duplicate {
+                                    eprintln!("Screenshot report ignored as duplicate");
                                 }
                             }
                             Ok(other) => {
@@ -1632,6 +1825,7 @@ pub(crate) async fn start_agent_reconnect_loop(
                     let mut guard = active_client_tx.lock().unwrap();
                     *guard = None;
                 }
+                clear_screenshot_trigger_tx();
 
                 let _ = shutdown_tx.send(true);
                 drop(client_tx);
@@ -1642,6 +1836,8 @@ pub(crate) async fn start_agent_reconnect_loop(
                 }
                 let _ = policy_sync_handle.await;
                 let _ = installed_apps_handle.await;
+                let _ = screenshot_capture_handle.await;
+                let _ = screenshot_scheduler_handle.await;
                 let _ = writer_handle.await;
             }
             Err(e) => {

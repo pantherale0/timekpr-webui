@@ -20,6 +20,7 @@ from src.blueprints.api import (
     api_linux_device_policy_bp,
     api_nintendo_bp,
     api_xbox_bp,
+    api_screenshots_bp,
 )
 from src.blueprints.websocket import websocket_bp
 
@@ -43,5 +44,6 @@ __all__ = [
     'api_linux_device_policy_bp',
     'api_nintendo_bp',
     'api_xbox_bp',
+    'api_screenshots_bp',
     'websocket_bp',
 ]

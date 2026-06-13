@@ -1138,6 +1138,23 @@ class BackgroundTaskManager:
                             reason,
                             linux_message,
                         )
+                    screenshot_success, screenshot_message = self._sync_screenshot_policy_system(
+                        system_id,
+                    )
+                    if screenshot_success:
+                        logger.info(
+                            "Completed screenshot policy sync for %s (%s): %s",
+                            system_id,
+                            reason,
+                            screenshot_message,
+                        )
+                    else:
+                        logger.warning(
+                            "Screenshot policy sync failed for %s (%s): %s",
+                            system_id,
+                            reason,
+                            screenshot_message,
+                        )
                 finally:
                     db.session.remove()
         except (RuntimeError, TypeError, ValueError, SQLAlchemyError):
@@ -1297,6 +1314,11 @@ class BackgroundTaskManager:
         from src.linux_device_policy_manager import sync_linux_device_policies_for_system
 
         return sync_linux_device_policies_for_system(system_id)
+
+    def _sync_screenshot_policy_system(self, system_id):
+        from src.screenshot_settings_manager import sync_screenshot_policies_for_system
+
+        return sync_screenshot_policies_for_system(system_id)
 
     def _sync_domain_policy_system(self, system_id, agent_source_revisions=None):
         mapping_state, source_state_map = self._build_domain_policy_mapping_state(system_id)
