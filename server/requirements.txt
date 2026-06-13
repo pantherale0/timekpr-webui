@@ -16,3 +16,5 @@ google-auth>=2.29.0
 Flask-Migrate==4.0.7
 psycopg2-binary>=2.9.9
 pynintendoparental>=2.4.0
+pyfamilysafety==2.0.0b4
+python-dateutil>=2.9.0

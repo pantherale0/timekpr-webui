@@ -6,8 +6,10 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
     <div>
-        <h1 class="fw-bold mb-1" style="font-size: 2.25rem; font-weight: 800; letter-spacing: -0.025em;">Child Accounts</h1>
-        <p class="text-secondary mb-0 fw-medium">Create and manage managed user profiles and link them to local device user accounts.</p>
+        <h1 class="fw-bold mb-1" style="font-size: 2.25rem; font-weight: 800; letter-spacing: -0.025em;">Child Accounts
+        </h1>
+        <p class="text-secondary mb-0 fw-medium">Create and manage managed user profiles and link them to local device
+            user accounts.</p>
     </div>
 
     <!-- User Search Filter Bar -->
@@ -15,7 +17,8 @@
         <span class="position-absolute start-0 top-50 translate-middle-y ps-3 text-secondary">
             <i class="fas fa-search"></i>
         </span>
-        <input type="text" id="user-search" class="form-control rounded-pill ps-5" placeholder="Search child accounts...">
+        <input type="text" id="user-search" class="form-control rounded-pill ps-5"
+            placeholder="Search child accounts...">
     </div>
 </div>
 
@@ -30,12 +33,15 @@
             <div class="card-body p-4">
                 <form action="{{ url_for('create_managed_user') }}" method="POST" class="row g-3 align-items-end">
 
-                {{ csrf_field() }}                    <div class="col-12 col-md-9">
-                        <label for="username" class="form-label fw-bold small text-muted text-uppercase mb-2" style="font-size: 0.75rem; letter-spacing: 0.05em;">Child Profile Name</label>
-                        <input type="text" id="username" name="username" class="form-control" placeholder="e.g. Jordan" required>
+                    {{ csrf_field() }} <div class="col-12 col-md-9">
+                        <label for="username" class="form-label fw-bold small text-muted text-uppercase mb-2"
+                            style="font-size: 0.75rem; letter-spacing: 0.05em;">Child Profile Name</label>
+                        <input type="text" id="username" name="username" class="form-control" placeholder="e.g. Jordan"
+                            required>
                     </div>
                     <div class="col-12 col-md-3">
-                        <button type="submit" class="btn btn-primary w-100 fw-bold"><i class="fas fa-plus me-1"></i> Create Profile</button>
+                        <button type="submit" class="btn btn-primary w-100 fw-bold"><i class="fas fa-plus me-1"></i>
+                            Create Profile</button>
                     </div>
                 </form>
             </div>
@@ -51,175 +57,229 @@
 
         <div id="users-cards-container" class="row g-4">
             {% if users %}
-                {% for user in users %}
-                    <div class="col-12 user-card-item" data-username="{{ user.username|lower }}">
-                        <div class="card border shadow-sm">
-                            <!-- User Card Header -->
-                            <div class="card-header bg-body-secondary d-flex justify-content-between align-items-center p-3 flex-wrap gap-2">
-                                <div class="d-flex align-items-center gap-3">
-                                    <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center fw-bold shadow-sm" style="width: 46px; height: 46px; font-size: 1.2rem; background: linear-gradient(135deg, #0d6efd 0%, #1d4ed8 100%);">
-                                        {{ user.username[:2]|upper }}
-                                    </div>
-                                    <div>
-                                        <h5 class="mb-0 fw-bold">{{ user.username }}</h5>
-                                        <span class="text-secondary small fw-semibold">
-                                            <i class="fas fa-link me-1"></i>
-                                            {{ user.device_mappings|length }} linked device accounts ({{ user.device_mappings|selectattr('is_valid')|list|length }} verified)
-                                        </span>
-                                    </div>
-                                </div>
-                                <div class="d-flex gap-2">
-                                    <a href="{{ url_for('ui_dashboard.edit_user_profile', user_id=user.id) }}" class="btn btn-sm btn-primary fw-bold px-3">
-                                        <i class="fas fa-edit me-1"></i> Edit Profile
-                                    </a>
-                                    <a href="{{ url_for('validate_user', user_id=user.id) }}" class="btn btn-sm btn-outline-secondary fw-bold px-3">
-                                        <i class="fas fa-sync me-1"></i> Verify
-                                    </a>
-                                    <form action="{{ url_for('delete_user', user_id=user.id) }}" method="POST" onsubmit="return confirm('Delete managed user {{ user.username }} and all account mappings?')" class="m-0">
-
-                                    {{ csrf_field() }}                                        <button type="submit" class="btn btn-sm btn-danger fw-bold px-3"><i class="fas fa-trash me-1"></i> Delete</button>
-                                    </form>
-                                </div>
+            {% for user in users %}
+            <div class="col-12 user-card-item" data-username="{{ user.username|lower }}">
+                <div class="card border shadow-sm">
+                    <!-- User Card Header -->
+                    <div
+                        class="card-header bg-body-secondary d-flex justify-content-between align-items-center p-3 flex-wrap gap-2">
+                        <div class="d-flex align-items-center gap-3">
+                            <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center fw-bold shadow-sm"
+                                style="width: 46px; height: 46px; font-size: 1.2rem; background: linear-gradient(135deg, #0d6efd 0%, #1d4ed8 100%);">
+                                {{ user.username[:2]|upper }}
                             </div>
-
-                            <!-- Card Body -->
-                            <div class="card-body p-3">
-                                <!-- Create Mapping Block -->
-                                <div class="bg-body-secondary border rounded p-3 mb-3">
-                                    <h6 class="fw-bold text-secondary text-uppercase mb-3" style="font-size: 0.75rem; letter-spacing: 0.05em;"><i class="fas fa-plus-circle me-1"></i>Link New Hardware Account Mapping</h6>
-                                    <form action="{{ url_for('add_user_mapping', user_id=user.id) }}" method="POST" class="row g-3 align-items-end">
-
-                                    {{ csrf_field() }}                                        <div class="col-12 col-md-3">
-                                            <label class="form-label fw-bold text-muted" style="font-size: 0.7rem;">Target Device</label>
-                                            <select name="system_id" class="form-select target-device-select" required>
-                                                <option value="" disabled selected>Select hardware</option>
-                                                {% for device in approved_devices %}
-                                                    <option value="{{ device.system_id }}" 
-                                                            data-linux-users="{{ device.linux_users|tojson|forceescape }}"
-                                                            data-platform="{{ device.platform }}"
-                                                            data-is-device-owner="{{ 'true' if device.is_device_owner else 'false' }}">
-                                                        {{ device_labels.get(device.system_id, device.display_name) }} ({{ device.system_ip }})
-                                                    </option>
-                                                {% endfor %}
-                                            </select>
-                                        </div>
-                                        <div class="col-12 col-md-3">
-                                            <label class="form-label fw-bold text-muted linux-username-label" style="font-size: 0.7rem;">Local OS Username</label>
-                                            <input type="text" name="linux_username" class="form-control linux-username-input" placeholder="e.g. jordan" required list="linux-users-list-{{ user.id }}" autocomplete="off">
-                                            <select class="form-select nintendo-player-select d-none" disabled aria-label="Nintendo player profile">
-                                                <option value="" disabled selected>Select player profile</option>
-                                            </select>
-                                            <datalist id="linux-users-list-{{ user.id }}"></datalist>
-                                        </div>
-                                        <div class="col-12 col-md-2 linux-uid-container">
-                                            <label class="form-label fw-bold text-muted" style="font-size: 0.7rem;">Linux UID (Optional)</label>
-                                            <input type="text" name="linux_uid" class="form-control linux-uid-input" placeholder="e.g. 1000">
-                                        </div>
-                                        <div class="col-12 col-md-2 profile-provision-container" style="display: none;">
-                                            <label class="form-label fw-bold text-muted" style="font-size: 0.7rem;">Profile Provisioning</label>
-                                            <select name="android_profile_type" class="form-select form-select-sm profile-provision-select">
-                                                <option value="">Map to Existing</option>
-                                                <option value="restricted">Create Restricted Profile</option>
-                                                <option value="standard">Create Standard User</option>
-                                            </select>
-                                        </div>
-                                        <div class="col-12 col-md-2 ms-auto">
-                                            <button type="submit" class="btn btn-sm btn-primary w-100 fw-bold py-2"><i class="fas fa-link me-1"></i> Link Mapping</button>
-                                        </div>
-                                    </form>
-                                </div>
-
-                                <!-- Current Mappings Table -->
-                                {% if user.device_mappings %}
-                                    <div class="table-responsive">
-                                        <table class="table table-striped align-middle mb-0" style="font-size: 0.9rem;">
-                                            <thead>
-                                                <tr class="table-light border-bottom">
-                                                    <th class="ps-3 text-secondary fw-bold" style="font-size: 0.75rem; text-transform: uppercase;">Device User</th>
-                                                    <th class="text-secondary fw-bold" style="font-size: 0.75rem; text-transform: uppercase;">Target Device</th>
-                                                    <th class="text-secondary fw-bold text-center" style="font-size: 0.75rem; text-transform: uppercase;">UID</th>
-                                                    <th class="text-secondary fw-bold text-center" style="font-size: 0.75rem; text-transform: uppercase;">Status</th>
-                                                    <th class="text-secondary fw-bold" style="font-size: 0.75rem; text-transform: uppercase;">Last Connection Check</th>
-                                                    <th class="pe-3 text-secondary fw-bold text-end" style="font-size: 0.75rem; text-transform: uppercase;">Actions</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {% for mapping in user.device_mappings %}
-                                                    <tr>
-                                                         <td class="ps-3 fw-bold">
-                                                             {% set mapped_player = mapping.nintendo_player %}
-                                                             <div class="d-flex align-items-center gap-2">
-                                                                 {% if mapped_player and mapped_player.player_image %}
-                                                                 <img src="{{ mapped_player.player_image }}" alt="" class="rounded-circle border" style="width: 28px; height: 28px; background-color: var(--bs-secondary-bg);">
-                                                                 {% endif %}
-                                                                 <div>
-                                                                     <code class="bg-body-secondary border px-2 py-1 rounded small" style="color: var(--bs-body-color);">{{ mapping.display_linux_username }}</code>
-                                                                     {% if mapped_player %}
-                                                                     <div class="text-secondary small mt-1" style="font-size: 0.7rem;">
-                                                                         <i class="fas fa-gamepad text-warning"></i> Nintendo Player
-                                                                     </div>
-                                                                     {% elif mapping.android_profile_type %}
-                                                                     <div class="text-secondary small mt-1" style="font-size: 0.7rem;">
-                                                                         <i class="fab fa-android text-success"></i> Programmatic: {{ mapping.android_profile_type|title }}
-                                                                     </div>
-                                                                     {% endif %}
-                                                                 </div>
-                                                             </div>
-                                                         </td>
-                                                        <td>
-                                                            <a href="{{ url_for('device_detail', system_id=mapping.system_id) }}" class="fw-bold text-decoration-none d-inline-flex align-items-center gap-1">
-                                                                <i class="fas fa-laptop text-secondary small"></i>
-                                                                <span>{{ device_labels.get(mapping.system_id, mapping.system_id) }}</span>
-                                                            </a>
-                                                        </td>
-                                                        <td class="text-center">
-                                                            <span class="badge bg-body-secondary text-body border fw-bold">{{ mapping.linux_uid if mapping.linux_uid is not none else '-' }}</span>
-                                                        </td>
-                                                        <td class="text-center">
-                                                            {% if mapping.is_valid %}
-                                                                <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1">Verified</span>
-                                                            {% else %}
-                                                                <span class="badge bg-warning-subtle text-warning border border-warning-subtle px-2 py-1">Unverified</span>
-                                                            {% endif %}
-                                                        </td>
-                                                        <td class="text-secondary small">
-                                                            {% if mapping.last_checked %}
-                                                                {{ (mapping.last_checked|localtime).strftime('%Y-%m-%d %H:%M') }}
-                                                            {% else %}
-                                                                Never checked
-                                                            {% endif %}
-                                                        </td>
-                                                        <td class="pe-3 text-end">
-                                                            <div class="d-inline-flex gap-2">
-                                                                <a href="{{ url_for('validate_mapping', user_id=user.id, mapping_id=mapping.id) }}" class="btn btn-xs btn-outline-secondary fw-bold px-2 py-1" style="font-size: 0.75rem;">Verify</a>
-                                                                <form action="{{ url_for('delete_mapping', user_id=user.id, mapping_id=mapping.id) }}" method="POST" onsubmit="return confirm('Revoke account mapping for {{ mapping.display_linux_username }}?')" class="m-0">
-
-                                                                {{ csrf_field() }}                                                                    <button type="submit" class="btn btn-xs btn-outline-danger fw-bold px-2 py-1" style="font-size: 0.75rem;">Remove</button>
-                                                                </form>
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                {% endfor %}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                {% else %}
-                                    <p class="text-secondary mb-0 small fw-semibold text-center py-2"><i class="fas fa-exclamation-circle me-1"></i>No active device mappings linked. Link one above or use the wizard to begin tracking screen time.</p>
-                                {% endif %}
+                            <div>
+                                <h5 class="mb-0 fw-bold">{{ user.username }}</h5>
+                                <span class="text-secondary small fw-semibold">
+                                    <i class="fas fa-link me-1"></i>
+                                    {{ user.device_mappings|length }} linked device accounts ({{
+                                    user.device_mappings|selectattr('is_valid')|list|length }} verified)
+                                </span>
                             </div>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <a href="{{ url_for('ui_dashboard.edit_user_profile', user_id=user.id) }}"
+                                class="btn btn-sm btn-primary fw-bold px-3">
+                                <i class="fas fa-edit me-1"></i> Edit Profile
+                            </a>
+                            <a href="{{ url_for('validate_user', user_id=user.id) }}"
+                                class="btn btn-sm btn-outline-secondary fw-bold px-3">
+                                <i class="fas fa-sync me-1"></i> Verify
+                            </a>
+                            <form action="{{ url_for('delete_user', user_id=user.id) }}" method="POST"
+                                onsubmit="return confirm('Delete managed user {{ user.username }} and all account mappings?')"
+                                class="m-0">
+
+                                {{ csrf_field() }} <button type="submit" class="btn btn-sm btn-danger fw-bold px-3"><i
+                                        class="fas fa-trash me-1"></i> Delete</button>
+                            </form>
                         </div>
                     </div>
-                {% endfor %}
-            {% else %}
-                <div class="col-12">
-                    <div class="card border shadow-sm p-5 text-center bg-body-tertiary">
-                        <div class="bg-body-secondary text-secondary rounded-circle d-flex align-items-center justify-content-center mx-auto mb-3" style="width: 64px; height: 64px;">
-                            <i class="fas fa-users fs-3"></i>
+
+                    <!-- Card Body -->
+                    <div class="card-body p-3">
+                        <!-- Create Mapping Block -->
+                        <div class="bg-body-secondary border rounded p-3 mb-3">
+                            <h6 class="fw-bold text-secondary text-uppercase mb-3"
+                                style="font-size: 0.75rem; letter-spacing: 0.05em;"><i
+                                    class="fas fa-plus-circle me-1"></i>Link New Hardware Account Mapping</h6>
+                            <form action="{{ url_for('add_user_mapping', user_id=user.id) }}" method="POST"
+                                class="row g-3 align-items-end">
+
+                                {{ csrf_field() }} <div class="col-12 col-md-3">
+                                    <label class="form-label fw-bold text-muted" style="font-size: 0.7rem;">Target
+                                        Device</label>
+                                    <select name="system_id" class="form-select target-device-select" required>
+                                        <option value="" disabled selected>Select hardware</option>
+                                        {% for device in approved_devices %}
+                                        <option value="{{ device.system_id }}"
+                                            data-linux-users="{{ device.linux_users|tojson|forceescape }}"
+                                            data-platform="{{ device.platform }}"
+                                            data-is-device-owner="{{ 'true' if device.is_device_owner else 'false' }}">
+                                            {% if device.system_ip %}
+                                            {{ device_labels.get(device.system_id, device.display_name) }} ({{
+                                            device.system_ip }})
+                                            {% else %}
+                                            {{ device_labels.get(device.system_id, device.display_name) }} (Cloud)
+                                            {% endif %}
+                                        </option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="col-12 col-md-3">
+                                    <label class="form-label fw-bold text-muted linux-username-label"
+                                        style="font-size: 0.7rem;">Local OS Username</label>
+                                    <input type="text" name="linux_username" class="form-control linux-username-input"
+                                        placeholder="e.g. jordan" required list="linux-users-list-{{ user.id }}"
+                                        autocomplete="off">
+                                    <select class="form-select nintendo-player-select d-none" disabled
+                                        aria-label="Nintendo player profile">
+                                        <option value="" disabled selected>Select player profile</option>
+                                    </select>
+                                    <datalist id="linux-users-list-{{ user.id }}"></datalist>
+                                </div>
+                                <div class="col-12 col-md-2 linux-uid-container">
+                                    <label class="form-label fw-bold text-muted" style="font-size: 0.7rem;">Linux UID
+                                        (Optional)</label>
+                                    <input type="text" name="linux_uid" class="form-control linux-uid-input"
+                                        placeholder="e.g. 1000">
+                                </div>
+                                <div class="col-12 col-md-2 profile-provision-container" style="display: none;">
+                                    <label class="form-label fw-bold text-muted" style="font-size: 0.7rem;">Profile
+                                        Provisioning</label>
+                                    <select name="android_profile_type"
+                                        class="form-select form-select-sm profile-provision-select">
+                                        <option value="">Map to Existing</option>
+                                        <option value="restricted">Create Restricted Profile</option>
+                                        <option value="standard">Create Standard User</option>
+                                    </select>
+                                </div>
+                                <div class="col-12 col-md-2 ms-auto">
+                                    <button type="submit" class="btn btn-sm btn-primary w-100 fw-bold py-2"><i
+                                            class="fas fa-link me-1"></i> Link Mapping</button>
+                                </div>
+                            </form>
                         </div>
-                        <h5 class="fw-bold mb-2">No Child Profiles Configured</h5>
-                        <p class="text-secondary mx-auto mb-3" style="max-width: 400px;">Create your first child profile above to start managing schedules, time limits, and security restrictions.</p>
+
+                        <!-- Current Mappings Table -->
+                        {% if user.device_mappings %}
+                        <div class="table-responsive">
+                            <table class="table table-striped align-middle mb-0" style="font-size: 0.9rem;">
+                                <thead>
+                                    <tr class="table-light border-bottom">
+                                        <th class="ps-3 text-secondary fw-bold"
+                                            style="font-size: 0.75rem; text-transform: uppercase;">Device User</th>
+                                        <th class="text-secondary fw-bold"
+                                            style="font-size: 0.75rem; text-transform: uppercase;">Target Device</th>
+                                        <th class="text-secondary fw-bold text-center"
+                                            style="font-size: 0.75rem; text-transform: uppercase;">UID</th>
+                                        <th class="text-secondary fw-bold text-center"
+                                            style="font-size: 0.75rem; text-transform: uppercase;">Status</th>
+                                        <th class="text-secondary fw-bold"
+                                            style="font-size: 0.75rem; text-transform: uppercase;">Last Connection Check
+                                        </th>
+                                        <th class="pe-3 text-secondary fw-bold text-end"
+                                            style="font-size: 0.75rem; text-transform: uppercase;">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for mapping in user.device_mappings %}
+                                    <tr>
+                                        <td class="ps-3 fw-bold">
+                                            {% set mapped_player = mapping.nintendo_player %}
+                                            <div class="d-flex align-items-center gap-2">
+                                                {% if mapped_player and mapped_player.player_image %}
+                                                <img src="{{ mapped_player.player_image }}" alt=""
+                                                    class="rounded-circle border"
+                                                    style="width: 28px; height: 28px; background-color: var(--bs-secondary-bg);">
+                                                {% endif %}
+                                                <div>
+                                                    <code class="bg-body-secondary border px-2 py-1 rounded small"
+                                                        style="color: var(--bs-body-color);">{{ mapping.display_linux_username }}</code>
+                                                    {% if mapped_player %}
+                                                    <div class="text-secondary small mt-1" style="font-size: 0.7rem;">
+                                                        <i class="fas fa-gamepad text-warning"></i> Nintendo Player
+                                                    </div>
+                                                    {% elif mapping.android_profile_type %}
+                                                    <div class="text-secondary small mt-1" style="font-size: 0.7rem;">
+                                                        <i class="fab fa-android text-success"></i> Programmatic: {{
+                                                        mapping.android_profile_type|title }}
+                                                    </div>
+                                                    {% endif %}
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <a href="{{ url_for('device_detail', system_id=mapping.system_id) }}"
+                                                class="fw-bold text-decoration-none d-inline-flex align-items-center gap-1">
+                                                <i class="fas fa-laptop text-secondary small"></i>
+                                                <span>{{ device_labels.get(mapping.system_id, mapping.system_id)
+                                                    }}</span>
+                                            </a>
+                                        </td>
+                                        <td class="text-center">
+                                            <span class="badge bg-body-secondary text-body border fw-bold">{{
+                                                mapping.linux_uid if mapping.linux_uid is not none else '-' }}</span>
+                                        </td>
+                                        <td class="text-center">
+                                            {% if mapping.is_valid %}
+                                            <span
+                                                class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1">Verified</span>
+                                            {% else %}
+                                            <span
+                                                class="badge bg-warning-subtle text-warning border border-warning-subtle px-2 py-1">Unverified</span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="text-secondary small">
+                                            {% if mapping.last_checked %}
+                                            {{ (mapping.last_checked|localtime).strftime('%Y-%m-%d %H:%M') }}
+                                            {% else %}
+                                            Never checked
+                                            {% endif %}
+                                        </td>
+                                        <td class="pe-3 text-end">
+                                            <div class="d-inline-flex gap-2">
+                                                <a href="{{ url_for('validate_mapping', user_id=user.id, mapping_id=mapping.id) }}"
+                                                    class="btn btn-xs btn-outline-secondary fw-bold px-2 py-1"
+                                                    style="font-size: 0.75rem;">Verify</a>
+                                                <form
+                                                    action="{{ url_for('delete_mapping', user_id=user.id, mapping_id=mapping.id) }}"
+                                                    method="POST"
+                                                    onsubmit="return confirm('Revoke account mapping for {{ mapping.display_linux_username }}?')"
+                                                    class="m-0">
+
+                                                    {{ csrf_field() }} <button type="submit"
+                                                        class="btn btn-xs btn-outline-danger fw-bold px-2 py-1"
+                                                        style="font-size: 0.75rem;">Remove</button>
+                                                </form>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% else %}
+                        <p class="text-secondary mb-0 small fw-semibold text-center py-2"><i
+                                class="fas fa-exclamation-circle me-1"></i>No active device mappings linked. Link one
+                            above or use the wizard to begin tracking screen time.</p>
+                        {% endif %}
                     </div>
                 </div>
+            </div>
+            {% endfor %}
+            {% else %}
+            <div class="col-12">
+                <div class="card border shadow-sm p-5 text-center bg-body-tertiary">
+                    <div class="bg-body-secondary text-secondary rounded-circle d-flex align-items-center justify-content-center mx-auto mb-3"
+                        style="width: 64px; height: 64px;">
+                        <i class="fas fa-users fs-3"></i>
+                    </div>
+                    <h5 class="fw-bold mb-2">No Child Profiles Configured</h5>
+                    <p class="text-secondary mx-auto mb-3" style="max-width: 400px;">Create your first child profile
+                        above to start managing schedules, time limits, and security restrictions.</p>
+                </div>
+            </div>
             {% endif %}
         </div>
     </div>
@@ -306,7 +366,7 @@
                 const uidInput = form.querySelector('.linux-uid-input');
 
                 setLinuxUsernameMode(form, platform);
-                
+
                 // Toggle Profile Provisioning Dropdown
                 const provisionContainer = form.querySelector('.profile-provision-container');
                 const provisionSelect = form.querySelector('.profile-provision-select');

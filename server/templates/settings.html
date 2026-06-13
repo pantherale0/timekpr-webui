@@ -270,6 +270,81 @@
         </div>
     </div>
 
+    <!-- Xbox Account -->
+    <div class="col-12">
+        <div class="card border shadow-sm">
+            <div class="card-header bg-success text-white py-3 d-flex align-items-center gap-2">
+                <i class="fab fa-xbox fs-5"></i>
+                <h5 class="mb-0 fw-bold">Xbox Live Account</h5>
+            </div>
+            <div class="card-body p-4">
+                <p class="text-secondary small fw-medium mb-3">
+                    Link your Microsoft Xbox Live Account once to track Xbox console screen time through Microsoft's Family Safety API.
+                    Enrolled consoles stay in Guardian even if you unlink the account, but cloud sync will stop until you link again.
+                </p>
+
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                    <span class="small fw-bold text-muted">ACCOUNT STATUS</span>
+                    <span id="xbox-settings-status-badge" class="badge {% if xbox_account.linked %}bg-success{% else %}bg-secondary{% endif %} p-2">
+                        {% if xbox_account.linked %}Linked{% else %}Not linked{% endif %}
+                    </span>
+                </div>
+
+                <div id="xbox-settings-linked-info" class="border rounded p-3 bg-body-secondary mb-3 {% if not xbox_account.linked %}d-none{% endif %}">
+                    {% if xbox_account.linked_at %}
+                    <div class="small fw-semibold mb-2">
+                        <span class="text-muted">Linked since:</span>
+                        <span id="xbox-settings-linked-at">{{ xbox_account.linked_at }}</span>
+                    </div>
+                    {% endif %}
+                    <div class="small fw-semibold">
+                        <span class="text-muted">Enrolled consoles:</span>
+                        <span id="xbox-settings-device-count">{{ xbox_account.enrolled_device_count }}</span>
+                    </div>
+                    {% if xbox_account.enrolled_devices %}
+                    <ul id="xbox-settings-device-list" class="small mb-0 mt-2 ps-3">
+                        {% for device in xbox_account.enrolled_devices %}
+                        <li><a href="{{ url_for('ui_dashboard.device_detail', system_id=device.system_id) }}">{{ device.display_name }}</a></li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                    <ul id="xbox-settings-device-list" class="small mb-0 mt-2 ps-3 d-none"></ul>
+                    {% endif %}
+                </div>
+
+                <div id="xbox-settings-actions" class="d-flex flex-wrap gap-2 mb-3 {% if not xbox_account.linked %}d-none{% endif %}">
+                    <button type="button" class="btn btn-outline-warning btn-sm fw-bold" id="xbox-settings-relink-btn">
+                        <i class="fas fa-link me-1"></i> Re-link Account
+                    </button>
+                    <button type="button" class="btn btn-outline-danger btn-sm fw-bold" id="xbox-settings-unlink-btn">
+                        <i class="fas fa-unlink me-1"></i> Unlink Account
+                    </button>
+                </div>
+
+                <div id="xbox-settings-link-panel" class="{% if xbox_account.linked %}d-none{% endif %}">
+                    <ol class="text-secondary small mb-3">
+                        <li>Click the button below to sign in to Microsoft.</li>
+                        <li>On the final blank redirect page, copy the full address bar URL (which starts with <code>https://login.live.com/oauth20_desktop.srf?code=...</code>) and paste it below.</li>
+                    </ol>
+                    <div class="mb-3">
+                        <a href="#" id="xbox-settings-login-btn" target="_blank" class="btn btn-outline-primary fw-bold">
+                            <i class="fas fa-external-link-alt me-2"></i>Sign In to Microsoft Account
+                        </a>
+                    </div>
+                    <div class="mb-3">
+                        <label for="xbox-settings-redirect-url" class="form-label fw-bold small text-muted">REDIRECT LINK ADDRESS</label>
+                        <input type="text" id="xbox-settings-redirect-url" class="form-control" placeholder="Paste live.com redirect URL here">
+                    </div>
+                    <button type="button" class="btn btn-success fw-bold" id="xbox-settings-link-btn">
+                        <i class="fas fa-check me-1"></i> Link Account
+                    </button>
+                </div>
+
+                <div id="xbox-settings-message" class="alert py-2 px-3 small d-none mt-3 mb-0" role="alert"></div>
+            </div>
+        </div>
+    </div>
+
     <!-- Security / Password Credentials -->
     <div class="col-12 col-md-6">
         <div class="card border shadow-sm h-100">
@@ -574,6 +649,147 @@
                 .catch(err => showNintendoSettingsMessage(err.message, 'danger'))
                 .finally(() => {
                     nintendoSettingsUnlinkBtn.disabled = false;
+                });
+        });
+    }
+
+    // Xbox Integration Scripts
+    const xboxSettingsLoginBtn = document.getElementById('xbox-settings-login-btn');
+    const xboxSettingsLinkBtn = document.getElementById('xbox-settings-link-btn');
+    const xboxSettingsRelinkBtn = document.getElementById('xbox-settings-relink-btn');
+    const xboxSettingsUnlinkBtn = document.getElementById('xbox-settings-unlink-btn');
+    const xboxSettingsLinkPanel = document.getElementById('xbox-settings-link-panel');
+    const xboxSettingsLinkedInfo = document.getElementById('xbox-settings-linked-info');
+    const xboxSettingsActions = document.getElementById('xbox-settings-actions');
+    const xboxSettingsStatusBadge = document.getElementById('xbox-settings-status-badge');
+    const xboxSettingsMessage = document.getElementById('xbox-settings-message');
+    const xboxSettingsRedirectUrl = document.getElementById('xbox-settings-redirect-url');
+
+    function showXboxSettingsMessage(text, type) {
+        if (!xboxSettingsMessage) return;
+        xboxSettingsMessage.textContent = text;
+        xboxSettingsMessage.className = `alert alert-${type} py-2 px-3 small mt-3 mb-0`;
+        xboxSettingsMessage.classList.remove('d-none');
+    }
+
+    function refreshXboxSettingsUi(summary) {
+        const linked = Boolean(summary && summary.linked);
+        if (xboxSettingsStatusBadge) {
+            xboxSettingsStatusBadge.textContent = linked ? 'Linked' : 'Not linked';
+            xboxSettingsStatusBadge.className = `badge ${linked ? 'bg-success' : 'bg-secondary'} p-2`;
+        }
+        if (xboxSettingsLinkedInfo) {
+            xboxSettingsLinkedInfo.classList.toggle('d-none', !linked);
+        }
+        if (xboxSettingsActions) {
+            xboxSettingsActions.classList.toggle('d-none', !linked);
+        }
+        if (xboxSettingsLinkPanel) {
+            xboxSettingsLinkPanel.classList.add('d-none');
+        }
+        const linkedAtEl = document.getElementById('xbox-settings-linked-at');
+        if (linkedAtEl && summary.linked_at) {
+            linkedAtEl.textContent = summary.linked_at;
+        }
+        const countEl = document.getElementById('xbox-settings-device-count');
+        if (countEl) {
+            countEl.textContent = summary.enrolled_device_count || 0;
+        }
+        const listEl = document.getElementById('xbox-settings-device-list');
+        if (listEl) {
+            listEl.innerHTML = '';
+            (summary.enrolled_devices || []).forEach(device => {
+                const li = document.createElement('li');
+                const link = document.createElement('a');
+                link.href = `/devices/${encodeURIComponent(device.system_id)}`;
+                link.textContent = device.display_name;
+                li.appendChild(link);
+                listEl.appendChild(li);
+            });
+            listEl.classList.toggle('d-none', !(summary.enrolled_devices || []).length);
+        }
+    }
+
+    function prepareXboxSettingsLogin() {
+        if (xboxSettingsLinkPanel) {
+            xboxSettingsLinkPanel.classList.remove('d-none');
+        }
+        if (xboxSettingsRedirectUrl) {
+            xboxSettingsRedirectUrl.value = '';
+        }
+        fetch('/api/xbox/login-url')
+            .then(r => r.json())
+            .then(res => {
+                if (res.success && xboxSettingsLoginBtn) {
+                    xboxSettingsLoginBtn.href = res.login_url;
+                } else {
+                    showXboxSettingsMessage(res.message || 'Failed to get Xbox login URL', 'danger');
+                }
+            })
+            .catch(() => showXboxSettingsMessage('Failed to get Xbox login URL', 'danger'));
+    }
+
+    if (xboxSettingsLinkBtn) {
+        if (!{{ 'true' if xbox_account.linked else 'false' }}) {
+            prepareXboxSettingsLogin();
+        }
+        xboxSettingsLinkBtn.addEventListener('click', () => {
+            const redirectUrl = (xboxSettingsRedirectUrl && xboxSettingsRedirectUrl.value || '').trim();
+            if (!redirectUrl) {
+                showXboxSettingsMessage('Please paste the redirect URL from the Microsoft login process.', 'warning');
+                return;
+            }
+            xboxSettingsLinkBtn.disabled = true;
+            fetch('/api/xbox/authenticate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ response_url: redirectUrl }),
+            })
+                .then(r => r.json())
+                .then(data => {
+                    if (!data.success) {
+                        throw new Error(data.message || 'Authentication failed');
+                    }
+                    return fetch('/api/xbox/account-status');
+                })
+                .then(r => r.json())
+                .then(summary => {
+                    if (!summary.success) {
+                        throw new Error(summary.message || 'Failed to refresh account status');
+                    }
+                    refreshXboxSettingsUi(summary);
+                    showXboxSettingsMessage('Xbox Account linked successfully.', 'success');
+                })
+                .catch(err => showXboxSettingsMessage(err.message, 'danger'))
+                .finally(() => {
+                    xboxSettingsLinkBtn.disabled = false;
+                });
+        });
+    }
+
+    if (xboxSettingsRelinkBtn) {
+        xboxSettingsRelinkBtn.addEventListener('click', prepareXboxSettingsLogin);
+    }
+
+    if (xboxSettingsUnlinkBtn) {
+        xboxSettingsUnlinkBtn.addEventListener('click', () => {
+            if (!confirm('Unlink the Xbox Account? Enrolled consoles will remain, but cloud sync will stop until you link again.')) {
+                return;
+            }
+            xboxSettingsUnlinkBtn.disabled = true;
+            fetch('/api/xbox/unlink', { method: 'POST' })
+                .then(r => r.json())
+                .then(data => {
+                    if (!data.success) {
+                        throw new Error(data.message || 'Failed to unlink account');
+                    }
+                    refreshXboxSettingsUi({ linked: false, enrolled_device_count: {{ xbox_account.enrolled_device_count }}, enrolled_devices: {{ xbox_account.enrolled_devices | tojson }} });
+                    prepareXboxSettingsLogin();
+                    showXboxSettingsMessage('Xbox Account unlinked.', 'success');
+                })
+                .catch(err => showXboxSettingsMessage(err.message, 'danger'))
+                .finally(() => {
+                    xboxSettingsUnlinkBtn.disabled = false;
                 });
         });
     }

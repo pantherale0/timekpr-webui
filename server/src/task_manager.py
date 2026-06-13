@@ -34,6 +34,7 @@ from src.database import (
     get_mapping_time_spent_for_day,
 )
 from pynintendoparental import Authenticator, NintendoParental
+from pyfamilysafety import FamilySafety, Authenticator as XboxAuthenticator
 from src.agent_helper import AgentClient, AgentConnectionManager
 from src.nintendo_sync import (
     apply_nintendo_playtime,
@@ -43,6 +44,14 @@ from src.nintendo_sync import (
     run_async,
     save_nintendo_console_stats,
     update_nintendo_players,
+)
+from src.xbox_sync import (
+    apply_xbox_playtime,
+    build_xbox_console_stats,
+    build_xbox_mapping_stats,
+    push_xbox_schedule_changes,
+    save_xbox_console_stats,
+    update_xbox_players,
 )
 from src.blocklist_helper import (
     BLOCKLIST_STREAM_CHUNK_SIZE,
@@ -309,6 +318,8 @@ class BackgroundTaskManager:
             self._update_user_data()
             logger.info("Syncing Nintendo devices")
             self.sync_nintendo_devices()
+            logger.info("Syncing Xbox devices")
+            self.sync_xbox_devices()
 
         if self.sync_domain_policies_enabled:
             logger.debug("Domain policy sync is agent-initiated")
@@ -939,6 +950,137 @@ class BackgroundTaskManager:
                         exc,
                     )
                     db.session.rollback()
+
+    def sync_xbox_devices(self, *, force=False):
+        """Sync playtime with Microsoft Family Safety servers synchronously using asyncio."""
+        if not self.app:
+            return
+        try:
+            run_async(self._sync_xbox_devices_async(force=force))
+        except Exception as exc:
+            logger.error("Error in sync_xbox_devices: %s\n%s", exc, traceback.format_exc())
+
+    async def _sync_xbox_devices_async(self, *, force=False):
+        """Asynchronously sync playtime with Microsoft Family Safety servers."""
+        with self.app.app_context():
+            # Throttle check: Only poll Xbox API once every 5 minutes (300 seconds)
+            last_poll_str = Settings.get_value('last_xbox_poll_at')
+            now_utc = datetime.now(timezone.utc)
+            if not force and last_poll_str:
+                try:
+                    last_poll = datetime.fromisoformat(last_poll_str)
+                    if (now_utc - last_poll).total_seconds() < 300:
+                        logger.debug("Skipping Xbox sync; last poll was %s", last_poll_str)
+                        return
+                except (ValueError, TypeError):
+                    pass
+
+            session_token = Settings.get_value('xbox_refresh_token')
+            if not session_token:
+                logger.debug("Skipping Xbox sync; no linked Xbox account")
+                return
+
+            xbox_devices = AgentDevice.query.filter_by(platform='xbox', status='approved').all()
+            if not xbox_devices:
+                logger.debug("Skipping Xbox sync; no approved Xbox devices")
+                return
+
+            try:
+                auth = await XboxAuthenticator.create(session_token, use_refresh_token=True)
+                client = FamilySafety(auth)
+                await client.update()
+
+                # Update stored refresh token in settings (if rotated)
+                if auth.refresh_token and auth.refresh_token != session_token:
+                    Settings.set_value('xbox_refresh_token', auth.refresh_token)
+
+                today = date.today()
+
+                for db_device in xbox_devices:
+                    cloud_device = None
+                    for account in client.accounts:
+                        if account.devices:
+                            matched = [d for d in account.devices if d.device_id == db_device.system_id]
+                            if matched:
+                                cloud_device = matched[0]
+                                break
+
+                    if not cloud_device:
+                        logger.warning(
+                            "Xbox cloud device %s not found for enrolled console %s",
+                            db_device.system_id,
+                            db_device.system_hostname,
+                        )
+                        continue
+
+                    update_xbox_players(db_device, client.accounts)
+                    save_xbox_console_stats(
+                        db_device.system_id,
+                        build_xbox_console_stats(cloud_device, now_utc=now_utc),
+                    )
+
+                    for mapping in db_device.user_mappings:
+                        user = mapping.managed_user
+                        if not user:
+                            continue
+
+                        mapped_account = [acc for acc in client.accounts if acc.user_id == mapping.linux_username]
+                        player_playtime = 0
+                        if mapped_account and mapped_account[0].devices:
+                            member_device = [d for d in mapped_account[0].devices if d.device_id == db_device.system_id]
+                            if member_device:
+                                raw_time = member_device[0].today_time_used or 0
+                                if raw_time > 10000:
+                                    player_playtime = int(raw_time // 1000)
+                                else:
+                                    player_playtime = int(raw_time)
+
+                        previous_playtime = 0
+                        last_active_str = now_utc.isoformat()
+                        if mapping.last_config:
+                            try:
+                                old_stats = json.loads(mapping.last_config)
+                                previous_playtime = old_stats.get("TIME_SPENT_DAY", 0)
+                                last_active_str = old_stats.get("last_playtime_change_at", now_utc.isoformat())
+                            except Exception:
+                                pass
+
+                        if player_playtime > previous_playtime:
+                            last_active_str = now_utc.isoformat()
+
+                        apply_xbox_playtime(mapping, player_playtime=player_playtime, today=today)
+                        mapping.last_config = json.dumps(
+                            build_xbox_mapping_stats(
+                                cloud_device,
+                                player_playtime=player_playtime,
+                                last_active_str=last_active_str,
+                                now_utc=now_utc,
+                            )
+                        )
+                        mapping.last_checked = now_utc
+                        mapping.is_valid = True
+
+                        if mapped_account:
+                            try:
+                                await push_xbox_schedule_changes(
+                                    mapped_account[0],
+                                    mapping,
+                                    today=today,
+                                    now_utc=now_utc,
+                                )
+                            except Exception as push_exc:
+                                logger.warning(
+                                    "Failed to push Xbox schedule changes for %s: %s",
+                                    mapping.system_id,
+                                    push_exc,
+                                )
+
+                Settings.set_value('last_xbox_poll_at', now_utc.isoformat())
+                db.session.commit()
+                logger.info("Xbox cloud sync completed for %d device(s)", len(xbox_devices))
+            except Exception as exc:
+                logger.error("Failed to sync Xbox devices: %s\n%s", exc, traceback.format_exc())
+                db.session.rollback()
 
     def _run_requested_domain_policy_sync(self, system_id, source_revisions, reason):
         try:

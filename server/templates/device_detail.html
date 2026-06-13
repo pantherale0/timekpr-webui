@@ -11,6 +11,8 @@
             <i class="fab fa-android text-success me-1"></i>
             {% elif device.platform == 'nintendo' %}
             <i class="fas fa-gamepad text-warning me-1"></i>
+            {% elif device.platform == 'xbox' %}
+            <i class="fab fa-xbox text-danger me-1"></i>
             {% else %}
             <i class="fab fa-linux text-secondary me-1"></i>
             {% endif %}
@@ -50,7 +52,7 @@
         <!-- IP Address / Connection Type -->
         <div class="col-12 col-sm-6 col-md-3">
             <div class="card border shadow-sm h-100 text-center p-3">
-                {% if device.platform == 'nintendo' %}
+                {% if device.platform == 'nintendo' or device.platform == 'xbox' %}
                 <span class="text-secondary small fw-bold text-uppercase d-block mb-1"
                     style="font-size: 0.7rem; letter-spacing: 0.05em;">Connection Type</span>
                 <strong class="fs-4 text-warning d-block lh-1 fw-bold">Cloud Managed</strong>
@@ -90,23 +92,23 @@
                         {% for mapping in mapped_accounts %}
                         <div
                             class="border rounded p-3 bg-body-secondary d-flex justify-content-between align-items-center flex-wrap gap-3">
-                            {% set mapped_player = (device.linux_users|selectattr('username', 'equalto', mapping.linux_username)|first) if (device.platform == 'nintendo' and device.linux_users) else None %}
+                            {% set mapped_player = (device.linux_users|selectattr('username', 'equalto', mapping.linux_username)|first) if ((device.platform == 'nintendo' or device.platform == 'xbox') and device.linux_users) else None %}
                             <div class="d-flex align-items-center gap-3">
-                                {% if device.platform == 'nintendo' and mapped_player and mapped_player.player_image %}
+                                {% if (device.platform == 'nintendo' or device.platform == 'xbox') and mapped_player and mapped_player.player_image %}
                                 <img src="{{ mapped_player.player_image }}" alt="" class="rounded-circle border" style="width: 48px; height: 48px; background-color: var(--bs-secondary-bg);">
                                 {% endif %}
                                 <div>
                                     <div class="fw-bold fs-5 text-body">
                                         {{ mapping.managed_user.username }} &rarr; 
-                                        {% if device.platform == 'nintendo' %}
+                                        {% if device.platform == 'nintendo' or device.platform == 'xbox' %}
                                         {{ mapped_player.nickname if mapped_player else mapping.linux_username }}
                                         {% else %}
                                         {{ mapping.linux_username }}
                                         {% endif %}
                                     </div>
                                     <div class="text-secondary small fw-semibold mt-1">
-                                        {% if device.platform == 'nintendo' %}
-                                        Nintendo Player ID: {{ mapping.linux_username }}
+                                        {% if device.platform == 'nintendo' or device.platform == 'xbox' %}
+                                        {% if device.platform == 'nintendo' %}Nintendo Player ID{% else %}Xbox User ID{% endif %}: {{ mapping.linux_username }}
                                         {% else %}
                                         Linux UID: {{ mapping.linux_uid if mapping.linux_uid is not none else 'Unassigned' }}
                                         {% endif %}
@@ -754,6 +756,80 @@
             </div>
             {% endif %}
 
+            {% if xbox_console %}
+            <div class="card shadow-sm border mb-4" id="xbox-console-card">
+                <div class="card-header text-white py-3 d-flex align-items-center justify-content-between gap-2" style="background-color: hsl(120, 60%, 20%); border-bottom: 1px solid hsl(120, 60%, 15%);">
+                    <div class="d-flex align-items-center gap-2">
+                        <div class="bg-white text-dark p-2 rounded d-flex align-items-center justify-content-center"
+                            style="width: 38px; height: 38px; color: hsl(120, 60%, 25%) !important;">
+                            <i class="fab fa-xbox fs-5"></i>
+                        </div>
+                        <div>
+                            <h5 class="mb-0 fw-bold">Console Settings</h5>
+                            <span class="text-white-50 small fw-medium">Cloud-managed parental controls</span>
+                        </div>
+                    </div>
+                    {% if xbox_console.has_data %}
+                    <span class="badge rounded-pill px-3 py-2 {% if xbox_console.is_stale %}bg-warning-subtle text-warning-emphasis border border-warning-subtle{% else %}bg-success-subtle text-success border border-success-subtle{% endif %}">
+                        {% if xbox_console.is_stale %}
+                        <i class="fas fa-exclamation-circle me-1"></i>Stale{% if xbox_console.sync_age_label %} · {{ xbox_console.sync_age_label }}{% endif %}
+                        {% else %}
+                        <i class="fas fa-check-circle me-1"></i>Synced{% if xbox_console.sync_age_label %} · {{ xbox_console.sync_age_label }}{% endif %}
+                        {% endif %}
+                    </span>
+                    {% endif %}
+                </div>
+                <div class="card-body">
+                    {% if xbox_console.has_data %}
+                    <div class="mb-4">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="small fw-bold text-uppercase text-secondary">Today's Play Time</span>
+                            <span class="small fw-semibold text-body">
+                                {{ xbox_console.playtime_summary or 'No play time reported' }}
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="d-flex flex-column gap-2 mb-4">
+                        {% if xbox_console.last_sync_dt %}
+                        <div class="d-flex justify-content-between align-items-center small">
+                            <span class="text-secondary"><i class="fas fa-sync me-1"></i>Last sync</span>
+                            <span class="fw-semibold text-body">{{ (xbox_console.last_sync_dt|localtime).strftime('%Y-%m-%d %H:%M') }}</span>
+                        </div>
+                        {% endif %}
+                        {% if xbox_console.device_name %}
+                        <div class="d-flex justify-content-between align-items-center small">
+                            <span class="text-secondary"><i class="fas fa-laptop me-1"></i>Console Name</span>
+                            <span class="fw-semibold text-body">{{ xbox_console.device_name }}</span>
+                        </div>
+                        {% endif %}
+                        {% if xbox_console.device_model %}
+                        <div class="d-flex justify-content-between align-items-center small">
+                            <span class="text-secondary"><i class="fas fa-info-circle me-1"></i>Model</span>
+                            <span class="fw-semibold text-body">{{ xbox_console.device_model }}</span>
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% else %}
+                    <p class="small text-secondary mb-4 fst-italic">
+                        Console details will appear after the first cloud sync.
+                    </p>
+                    {% endif %}
+
+                    <div id="xbox-sync-error" class="alert alert-danger py-2 px-3 small d-none mb-3" role="alert"></div>
+
+                    <button type="button" class="btn btn-sm text-white fw-bold" id="xbox-sync-btn" style="background-color: hsl(120, 60%, 25%); border: 1px solid hsl(120, 60%, 20%);">
+                        <span class="xbox-sync-btn-label"><i class="fas fa-sync me-1"></i> Sync Now</span>
+                    </button>
+
+                    <p class="small text-secondary mt-3 mb-0">
+                        <i class="fas fa-info-circle me-1"></i>
+                        Xbox limits and features are managed through Microsoft Family Safety and are read-only in Guardian.
+                    </p>
+                </div>
+            </div>
+            {% endif %}
+
             {% if parental_access_code and has_managed_profiles %}
             <div class="card shadow-sm border mb-4">
                 <div class="card-header bg-primary text-white py-3 d-flex align-items-center gap-2">
@@ -1052,6 +1128,34 @@ adb reboot</pre>
                     }
                     nintendoSyncBtn.disabled = false;
                     nintendoSyncBtn.innerHTML = defaultSyncLabel;
+                }
+            });
+        }
+        const xboxSyncBtn = document.getElementById('xbox-sync-btn');
+        const xboxSyncError = document.getElementById('xbox-sync-error');
+        if (xboxSyncBtn) {
+            const defaultSyncLabel = xboxSyncBtn.innerHTML;
+            xboxSyncBtn.addEventListener('click', async () => {
+                xboxSyncBtn.disabled = true;
+                if (xboxSyncError) {
+                    xboxSyncError.classList.add('d-none');
+                    xboxSyncError.textContent = '';
+                }
+                xboxSyncBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span> Syncing…';
+                try {
+                    const response = await fetch('/api/xbox/sync', { method: 'POST' });
+                    const data = await response.json();
+                    if (!response.ok || !data.success) {
+                        throw new Error(data.message || 'Sync failed');
+                    }
+                    window.location.reload();
+                } catch (err) {
+                    if (xboxSyncError) {
+                        xboxSyncError.textContent = 'Xbox sync failed: ' + err.message;
+                        xboxSyncError.classList.remove('d-none');
+                    }
+                    xboxSyncBtn.disabled = false;
+                    xboxSyncBtn.innerHTML = defaultSyncLabel;
                 }
             });
         }

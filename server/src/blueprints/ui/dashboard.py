@@ -23,6 +23,8 @@ from src.settings_manager import (
 )
 from src.nintendo_sync import build_nintendo_console_view_context
 from src.blueprints.api.nintendo import get_nintendo_account_summary
+from src.xbox_sync import build_xbox_console_view_context
+from src.blueprints.api.xbox import get_xbox_account_summary
 from src.pairing_helper import (
     build_agent_websocket_url,
     get_server_version,
@@ -410,6 +412,7 @@ def settings():
         provisioning_qr_data_uri = render_pairing_qr_data_uri(provisioning['payload_json'])
 
     nintendo_account = get_nintendo_account_summary()
+    xbox_account = get_xbox_account_summary()
 
     return render_template(
         'settings.html',
@@ -427,6 +430,7 @@ def settings():
         provisioning_qr_data_uri=provisioning_qr_data_uri,
         server_version=get_server_version(),
         nintendo_account=nintendo_account,
+        xbox_account=xbox_account,
     )
 
 
@@ -517,6 +521,7 @@ def device_detail(system_id):
     parental_access_code = None
     android_recovery_ws_url = None
     nintendo_console = build_nintendo_console_view_context(device, mapped_accounts)
+    xbox_console = build_xbox_console_view_context(device, mapped_accounts)
     if (device.platform or '').strip().lower() == 'android':
         from src.android_device_policy_manager import get_or_create_policy as get_or_create_android_policy
         try:
@@ -548,6 +553,7 @@ def device_detail(system_id):
         android_recovery_ws_url=android_recovery_ws_url,
         has_managed_profiles=device.has_managed_profiles,
         nintendo_console=nintendo_console,
+        xbox_console=xbox_console,
     )
 
 

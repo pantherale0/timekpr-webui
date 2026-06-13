@@ -417,12 +417,11 @@
                                  </div>
                             </div>
                             <div class="col-sm-6 col-md-4">
-                                <div class="platform-card p-3 text-center h-100 disabled"
-                                    title="Xbox parent control limits are coming soon!">
-                                    <div class="platform-icon text-danger"><i class="fab fa-xbox"></i></div>
-                                    <h5 class="fw-bold mb-1">Xbox Console</h5>
-                                    <span class="badge bg-secondary">Coming Soon</span>
-                                </div>
+                                 <div class="platform-card p-3 text-center h-100" onclick="selectPlatform('xbox')">
+                                     <div class="platform-icon text-danger"><i class="fab fa-xbox"></i></div>
+                                     <h5 class="fw-bold mb-1">Xbox Console</h5>
+                                     <span class="small text-muted">Cloud Parental Controls</span>
+                                 </div>
                             </div>
                         </div>
                     </div>
@@ -521,6 +520,29 @@
                             </div>
                         </div>
 
+                        <!-- Xbox Instructions -->
+                        <div id="setup-instruction-xbox" class="d-none">
+                            <div id="xbox-link-expired-alert" class="alert alert-warning py-2 small d-none mb-3 mx-auto" style="max-width: 500px;">
+                                Your Xbox Live/Microsoft session has expired. Link again to continue adding consoles.
+                            </div>
+                            <p class="mb-3">Link your Microsoft Xbox Live Account to enable console monitoring:</p>
+                            <ol class="text-start mb-3 mx-auto" style="max-width: 500px;">
+                                <li>Click the button below to sign in to Microsoft Live.</li>
+                                <li>Log in, and on the final blank screen (after clicking Yes/Accept), copy the complete address/URL of the page, and paste it below.</li>
+                            </ol>
+                            <div class="text-center mb-3">
+                                <a href="#" id="xbox-login-btn" target="_blank" class="btn btn-outline-primary fw-bold"><i class="fas fa-external-link-alt me-2"></i>Sign In to Microsoft Account</a>
+                            </div>
+                            <div class="form-group text-start mx-auto mb-3" style="max-width: 500px;">
+                                <label for="xbox-redirect-url" class="form-label fw-bold small text-muted">REDIRECT LINK ADDRESS</label>
+                                <input type="text" id="xbox-redirect-url" class="form-control" placeholder="Paste Microsoft redirect URL here">
+                            </div>
+                            <div class="text-center mt-4">
+                                <button class="btn btn-secondary me-2" onclick="setWizardStep(1)">Back</button>
+                                <button class="btn btn-success" onclick="submitXboxAuth()">Link Account &amp; Continue</button>
+                            </div>
+                        </div>
+
                         <div class="text-center mt-4" id="setup-standard-footer-btns">
                             <button class="btn btn-secondary me-2" onclick="setWizardStep(1)">Back</button>
                             <button class="btn btn-primary" onclick="goToStep3()">I have run/scanned it</button>
@@ -574,6 +596,28 @@
 
                             <div class="text-center mt-4">
                                 <button class="btn btn-primary" onclick="importNintendoDevice()">Link Console &amp; Continue</button>
+                            </div>
+                        </div>
+
+                        <!-- Xbox Device Select Panel -->
+                        <div id="xbox-device-select-panel" class="d-none text-start mx-auto" style="max-width: 500px;">
+                            <div class="text-danger fs-1 mb-2 text-center"><i class="fab fa-xbox"></i></div>
+                            <h5 class="fw-bold mb-3 text-center">Xbox Console Found</h5>
+                            
+                            <div class="form-group mb-3">
+                                <label for="wizard-xbox-device-select" class="form-label fw-bold small text-muted">SELECT XBOX CONSOLE</label>
+                                <select id="wizard-xbox-device-select" class="form-select" onchange="onXboxConsoleChange()">
+                                    <!-- Will populate with Xbox devices -->
+                                </select>
+                            </div>
+
+                            <div class="form-group mb-3">
+                                <label for="wizard-xbox-device-label" class="form-label fw-bold small text-muted">ASSIGN A DEVICE LABEL</label>
+                                <input type="text" id="wizard-xbox-device-label" class="form-control" placeholder="e.g. Family Room Xbox">
+                            </div>
+
+                            <div class="text-center mt-4">
+                                <button class="btn btn-primary" onclick="importXboxDevice()">Link Console &amp; Continue</button>
                             </div>
                         </div>
                     </div>
@@ -823,6 +867,15 @@
                 nintendoRedirect.value = '';
             }
 
+            const xboxPanel = document.getElementById('xbox-device-select-panel');
+            if (xboxPanel) {
+                xboxPanel.classList.add('d-none');
+            }
+            const xboxRedirect = document.getElementById('xbox-redirect-url');
+            if (xboxRedirect) {
+                xboxRedirect.value = '';
+            }
+
             document.getElementById('wizard-new-user-checkbox').checked = false;
             toggleNewUserField();
         }
@@ -862,6 +915,7 @@
                 if (wizardState.platform === 'android') platformName = 'Android Device';
                 else if (wizardState.platform === 'windows') platformName = 'Windows PC';
                 else if (wizardState.platform === 'nintendo') platformName = 'Nintendo Account';
+                else if (wizardState.platform === 'xbox') platformName = 'Xbox Live Account';
                 subtitleEl.textContent = `Follow these steps to configure your ${platformName}.`;
             } else if (step === 3) {
                 titleEl.textContent = 'Detecting Device';
@@ -894,6 +948,7 @@
                         document.getElementById('setup-instruction-android').classList.add('d-none');
                         document.getElementById('setup-instruction-windows').classList.add('d-none');
                         document.getElementById('setup-instruction-nintendo').classList.add('d-none');
+                        document.getElementById('setup-instruction-xbox').classList.add('d-none');
                         document.getElementById('setup-standard-footer-btns').classList.remove('d-none');
 
                         if (platform === 'linux') {
@@ -922,14 +977,16 @@
                                 });
                         } else if (platform === 'windows') {
                             document.getElementById('setup-instruction-windows').classList.remove('d-none');
-                            const psCmd = `powershell -ExecutionPolicy Bypass -Command "Invoke-WebRequest -Uri '${window.location.origin}/api/pairing/windows/msi' -OutFile 'setup.msi'; Start-Process msiexec.exe -ArgumentList '/i setup.msi SERVER_URL=\\"${wizardState.wsUrl}\\" REGISTRATION_TOKEN=\\"${data.payload.registration_token || ''}\\" /qn' -Wait"`;
+                            const psCmd = `powershell -ExecutionPolicy Bypass -Command "Invoke-WebRequest -Uri '${window.location.origin}/api/pairing/windows/msi' -OutFile 'setup.msi'; Start-Process msiexec.exe -ArgumentList '/i setup.msi SERVER_URL=\\"${window.location.origin}/api/pairing/windows/msi' -OutFile 'setup.msi'; Start-Process msiexec.exe -ArgumentList '/i setup.msi SERVER_URL=\\"${wizardState.wsUrl}\\" REGISTRATION_TOKEN=\\"${data.payload.registration_token || ''}\\" /qn' -Wait"`;
                             document.getElementById('windows-install-cmd').textContent = psCmd;
                             document.getElementById('windows-download-link').href = `${window.location.origin}/api/pairing/windows/msi`;
                         } else if (platform === 'nintendo') {
                             prepareNintendoWizardStep();
+                        } else if (platform === 'xbox') {
+                            prepareXboxWizardStep();
                         }
 
-                        if (platform !== 'nintendo') {
+                        if (platform !== 'nintendo' && platform !== 'xbox') {
                             setWizardStep(2);
                         }
                     }
@@ -970,6 +1027,42 @@
                 .catch(err => {
                     console.error('Error checking Nintendo account status', err);
                     prepareNintendoLoginForm(false);
+                });
+        }
+
+        function prepareXboxLoginForm(showExpiredWarning) {
+            document.getElementById('setup-instruction-xbox').classList.remove('d-none');
+            document.getElementById('setup-standard-footer-btns').classList.add('d-none');
+            const expiredAlert = document.getElementById('xbox-link-expired-alert');
+            if (expiredAlert) {
+                expiredAlert.classList.toggle('d-none', !showExpiredWarning);
+            }
+            fetch('/api/xbox/login-url')
+                .then(r => r.json())
+                .then(res => {
+                    if (res.success) {
+                        document.getElementById('xbox-login-btn').href = res.login_url;
+                    } else {
+                        alert('Failed to get Xbox login URL: ' + res.message);
+                    }
+                })
+                .catch(err => console.error('Error fetching Xbox login URL', err));
+            setWizardStep(2);
+        }
+
+        function prepareXboxWizardStep() {
+            fetch('/api/xbox/account-status?validate=1')
+                .then(r => r.json())
+                .then(status => {
+                    if (status.success && status.linked && status.token_valid !== false) {
+                        goToXboxStep3();
+                        return;
+                    }
+                    prepareXboxLoginForm(Boolean(status.success && status.linked && status.token_valid === false));
+                })
+                .catch(err => {
+                    console.error('Error checking Xbox account status', err);
+                    prepareXboxLoginForm(false);
                 });
         }
 
@@ -1074,9 +1167,11 @@
 
             usersSelect.innerHTML = '';
             
-            if (wizardState.platform === 'nintendo') {
-                instructions.textContent = 'Select which Nintendo Switch player profile should be mapped to this child account:';
-                selectLabel.textContent = 'NINTENDO PLAYER PROFILE';
+            if (wizardState.platform === 'nintendo' || wizardState.platform === 'xbox') {
+                instructions.textContent = wizardState.platform === 'nintendo'
+                    ? 'Select which Nintendo Switch player profile should be mapped to this child account:'
+                    : 'Select which Xbox Live member profile should be mapped to this child account:';
+                selectLabel.textContent = wizardState.platform === 'nintendo' ? 'NINTENDO PLAYER PROFILE' : 'XBOX MEMBER PROFILE';
                 if (uidLabel) uidLabel.classList.add('d-none');
                 if (uidInput) {
                     uidInput.classList.add('d-none');
@@ -1176,7 +1271,7 @@
             userPromise
                 .then(userId => {
                     // 1. Approve device with display label
-                    if (wizardState.platform === 'nintendo') {
+                    if (wizardState.platform === 'nintendo' || wizardState.platform === 'xbox') {
                         return userId;
                     }
                     return fetch(`/api/device/approve/${wizardState.detectedDevice.system_id}`, { method: 'POST' })
@@ -1317,6 +1412,135 @@
             
             // Call API to import the device
             fetch('/api/nintendo/import-device', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ device_id: selectedId, name: label })
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    showNotification(data.message, 'success');
+                    
+                    // Set up detectedDevice state to match standard flow in Step 4 and 5
+                    wizardState.detectedDevice = {
+                        system_id: selectedId,
+                        display_name: label,
+                        players: consoleObj.players || []
+                    };
+                    
+                    goToStep4();
+                } else {
+                    alert('Failed to import device: ' + data.message);
+                }
+            })
+            .catch(err => {
+                console.error('Error importing device', err);
+                alert('Error importing device.');
+            });
+        }
+
+        // ── XBOX LIVE SPECIFIC ONBOARDING FLOW ────────────────────────
+        let xboxConsoles = [];
+
+        function submitXboxAuth() {
+            const redirectUrl = document.getElementById('xbox-redirect-url').value.trim();
+            if (!redirectUrl) {
+                alert('Please paste the redirect URL from the Microsoft login process.');
+                return;
+            }
+
+            fetch('/api/xbox/authenticate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ response_url: redirectUrl })
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    showNotification(data.message, 'success');
+                    goToXboxStep3();
+                } else {
+                    alert('Authentication failed: ' + data.message);
+                }
+            })
+            .catch(err => {
+                console.error('Authentication error', err);
+                alert('Failed to connect to authentication API.');
+            });
+        }
+
+        function goToXboxStep3() {
+            setWizardStep(3);
+            
+            // Hide standard detection blocks
+            document.getElementById('detect-loading').classList.add('d-none');
+            document.getElementById('detect-success').classList.add('d-none');
+            
+            // Show Xbox device select panel
+            const xboxPanel = document.getElementById('xbox-device-select-panel');
+            if (xboxPanel) xboxPanel.classList.remove('d-none');
+            
+            // Show loading placeholder inside dropdown
+            const select = document.getElementById('wizard-xbox-device-select');
+            if (select) select.innerHTML = '<option value="" disabled selected>Loading Xbox consoles...</option>';
+            
+            // Call API to list devices
+            fetch('/api/xbox/devices')
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success && data.devices && data.devices.length > 0) {
+                        xboxConsoles = data.devices;
+                        const available = data.devices.filter(dev => !dev.enrolled);
+                        if (available.length === 0) {
+                            if (select) select.innerHTML = '<option value="" disabled selected>All consoles are already enrolled</option>';
+                            return;
+                        }
+                        if (select) {
+                            select.innerHTML = '<option value="" disabled selected>Select a console</option>';
+                            available.forEach(dev => {
+                                const opt = document.createElement('option');
+                                opt.value = dev.device_id;
+                                opt.textContent = `${dev.name} (${dev.model})`;
+                                select.appendChild(opt);
+                            });
+                        }
+                    } else {
+                        if (select) select.innerHTML = '<option value="" disabled selected>No consoles found or failed to fetch</option>';
+                        if (data.message) {
+                            alert('Failed to load consoles: ' + data.message);
+                        }
+                    }
+                })
+                .catch(err => {
+                    console.error('Error fetching Xbox devices', err);
+                    if (select) select.innerHTML = '<option value="" disabled selected>Error loading consoles</option>';
+                });
+        }
+
+        function onXboxConsoleChange() {
+            const select = document.getElementById('wizard-xbox-device-select');
+            if (!select) return;
+            const selectedId = select.value;
+            const consoleObj = xboxConsoles.find(c => c.device_id === selectedId);
+            if (consoleObj) {
+                document.getElementById('wizard-xbox-device-label').value = consoleObj.name || 'Xbox Console';
+            }
+        }
+
+        function importXboxDevice() {
+            const select = document.getElementById('wizard-xbox-device-select');
+            if (!select) return;
+            const selectedId = select.value;
+            if (!selectedId) {
+                alert('Please select an Xbox console.');
+                return;
+            }
+            
+            const consoleObj = xboxConsoles.find(c => c.device_id === selectedId);
+            const label = document.getElementById('wizard-xbox-device-label').value.trim() || consoleObj.name || 'Xbox Console';
+            
+            // Call API to import the device
+            fetch('/api/xbox/import-device', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ device_id: selectedId, name: label })

@@ -227,6 +227,14 @@ class AgentDevice(db.Model):
         from src.nintendo_sync import get_nintendo_console_stats
         return get_nintendo_console_stats(self.system_id)
 
+    @property
+    def xbox_console_stats(self):
+        """Return cached Xbox cloud console stats for this device."""
+        if (self.platform or '').strip().lower() != 'xbox':
+            return {}
+        from src.xbox_sync import get_xbox_console_stats
+        return get_xbox_console_stats(self.system_id)
+
     def __repr__(self):
         return f'<AgentDevice {self.system_id} [{self.status}]>'
 
@@ -581,13 +589,31 @@ class ManagedUserDeviceMap(db.Model):
         return None
 
     @property
+    def xbox_player(self):
+        """Return the linked Xbox family roster profile for this mapping, if any."""
+        device = self.device
+        if not device or (device.platform or '').strip().lower() != 'xbox':
+            return None
+        for player in device.linux_users:
+            if player.get('username') == self.linux_username:
+                return player
+        return None
+
+    @property
     def display_linux_username(self):
         """Return a human-readable device account label for UI display."""
-        player = self.nintendo_player
-        if player:
-            nickname = (player.get('nickname') or '').strip()
-            if nickname:
-                return nickname
+        if self.device and (self.device.platform or '').strip().lower() == 'xbox':
+            player = self.xbox_player
+            if player:
+                nickname = (player.get('nickname') or '').strip()
+                if nickname:
+                    return nickname
+        else:
+            player = self.nintendo_player
+            if player:
+                nickname = (player.get('nickname') or '').strip()
+                if nickname:
+                    return nickname
         return self.linux_username
 
     def mark_blocklist_synced(self, policy_hash):
