@@ -289,6 +289,42 @@ def _runtime_init_lock_path():
     return os.path.join(app.instance_path, '.runtime_init.lock')
 
 
+def _sync_postgres_sequences():
+    """Sync PostgreSQL sequence generators to match the maximum ID in each table."""
+    db_uri = app.config.get('SQLALCHEMY_DATABASE_URI', '')
+    is_pg = db_uri.startswith('postgresql://') or db_uri.startswith('postgresql+psycopg2://')
+    if not is_pg:
+        return
+
+    _LOGGER.info("Syncing PostgreSQL sequences...")
+    from sqlalchemy import text
+    try:
+        for table_name, table in db.metadata.tables.items():
+            for col in table.primary_key.columns:
+                is_int = False
+                try:
+                    is_int = col.type.python_type is int
+                except Exception:
+                    pass
+
+                if is_int:
+                    col_name = col.name
+                    seq_query = text(f"SELECT pg_get_serial_sequence('{table_name}', '{col_name}')")
+                    seq_name = db.session.execute(seq_query).scalar()
+                    if seq_name:
+                        sync_query = text(
+                            f"SELECT setval('{seq_name}', COALESCE(MAX({col_name}), 1), "
+                            f"CASE WHEN MAX({col_name}) IS NULL THEN false ELSE true END) "
+                            f"FROM {table_name}"
+                        )
+                        db.session.execute(sync_query)
+        db.session.commit()
+        _LOGGER.info("Successfully synced PostgreSQL sequences.")
+    except Exception as exc:
+        db.session.rollback()
+        _LOGGER.warning("Warning: Could not sync PostgreSQL sequences: %s", exc)
+
+
 def _initialize_database():
     """Initialize or upgrade the database schema using a cross-process file lock."""
     from flask_migrate import stamp
@@ -331,6 +367,7 @@ def _initialize_database():
                     _LOGGER.info("Ensuring database is up to date (dir: %s)...", migrations_dir)
                 _apply_database_schema(migrations_dir)
 
+            _sync_postgres_sequences()
             _init_admin_password()
         finally:
             fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
