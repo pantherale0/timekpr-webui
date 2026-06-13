@@ -1138,6 +1138,23 @@ class BackgroundTaskManager:
                             reason,
                             linux_message,
                         )
+                    recall_success, recall_message = self._sync_recall_policy_system(
+                        system_id,
+                    )
+                    if recall_success:
+                        logger.info(
+                            "Completed recall policy sync for %s (%s): %s",
+                            system_id,
+                            reason,
+                            recall_message,
+                        )
+                    else:
+                        logger.warning(
+                            "Recall policy sync failed for %s (%s): %s",
+                            system_id,
+                            reason,
+                            recall_message,
+                        )
                 finally:
                     db.session.remove()
         except (RuntimeError, TypeError, ValueError, SQLAlchemyError):
@@ -1297,6 +1314,11 @@ class BackgroundTaskManager:
         from src.linux_device_policy_manager import sync_linux_device_policies_for_system
 
         return sync_linux_device_policies_for_system(system_id)
+
+    def _sync_recall_policy_system(self, system_id):
+        from src.recall_manager import sync_recall_policies_for_system
+
+        return sync_recall_policies_for_system(system_id)
 
     def _sync_domain_policy_system(self, system_id, agent_source_revisions=None):
         mapping_state, source_state_map = self._build_domain_policy_mapping_state(system_id)

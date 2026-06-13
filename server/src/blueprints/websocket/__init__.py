@@ -14,6 +14,7 @@ from src.agent_push import android_should_use_persistent_websocket, update_devic
 from src.alerts_manager import _store_agent_alert
 from src.apparmor_manager import _store_app_usage_from_alert
 from src.installed_apps_manager import handle_app_icon_report, handle_installed_apps_report
+from src.screenshot_manager import handle_screenshot_report
 from src.pairing_helper import resolve_android_update_info
 
 _LOGGER = logging.getLogger(__name__)
@@ -411,6 +412,40 @@ def ws_agent_handler(ws):
                             system_id,
                             exc,
                         )
+                elif msg_type == "screenshot_report":
+                    try:
+                        result = handle_screenshot_report(system_id, msg)
+                        ws.send(json.dumps({
+                            "type": "screenshot_report_ack",
+                            "screenshot_id": msg.get("screenshot_id"),
+                            "success": result.get("success", True),
+                            "duplicate": result.get("duplicate", False),
+                        }))
+                    except ValueError as exc:
+                        _LOGGER.warning(
+                            "Rejected invalid screenshot report from %s: %s",
+                            system_id,
+                            exc,
+                        )
+                        ws.send(json.dumps({
+                            "type": "screenshot_report_ack",
+                            "screenshot_id": msg.get("screenshot_id"),
+                            "success": False,
+                            "message": str(exc),
+                        }))
+                    except SQLAlchemyError as exc:
+                        db.session.rollback()
+                        _LOGGER.error(
+                            "Failed to store screenshot from %s: %s",
+                            system_id,
+                            exc,
+                        )
+                        ws.send(json.dumps({
+                            "type": "screenshot_report_ack",
+                            "screenshot_id": msg.get("screenshot_id"),
+                            "success": False,
+                            "message": "Database error",
+                        }))
                 else:
                     _LOGGER.warning(
                         "Received unexpected message type from client %s: %s",

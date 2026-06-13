@@ -1668,3 +1668,94 @@ class PolicyApprovalGrant(db.Model):
 
     def __repr__(self):
         return f'<PolicyApprovalGrant {self.grant_type}:{self.target_value} [{self.status}]>'
+
+
+class DeviceRecallSettings(db.Model):
+    __tablename__ = 'device_recall_settings'
+
+    DEFAULT_INTERVAL_SECONDS = 300
+    DEFAULT_RETENTION_HOURS = 168
+    MIN_INTERVAL_SECONDS = 60
+    MAX_INTERVAL_SECONDS = 3600
+    MIN_RETENTION_HOURS = 24
+    MAX_RETENTION_HOURS = 720
+
+    system_id = db.Column(
+        db.String(50),
+        db.ForeignKey('agent_device.system_id'),
+        primary_key=True,
+    )
+    enabled = db.Column(db.Boolean, nullable=False, default=False)
+    interval_seconds = db.Column(db.Integer, nullable=False, default=DEFAULT_INTERVAL_SECONDS)
+    retention_hours = db.Column(db.Integer, nullable=False, default=DEFAULT_RETENTION_HOURS)
+    revision = db.Column(db.String(64), nullable=False, default='')
+    is_synced = db.Column(db.Boolean, nullable=False, default=False)
+    last_synced_at = db.Column(db.DateTime(timezone=True), nullable=True)
+    last_sync_error = db.Column(db.Text, nullable=True)
+    created_at = db.Column(
+        db.DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+    updated_at = db.Column(
+        db.DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+    device = db.relationship(
+        'AgentDevice',
+        backref=db.backref('recall_settings', uselist=False, cascade='all, delete-orphan'),
+    )
+
+    def __repr__(self):
+        return f'<DeviceRecallSettings {self.system_id} enabled={self.enabled}>'
+
+
+class DeviceScreenshot(db.Model):
+    __tablename__ = 'device_screenshot'
+
+    id = db.Column(db.Integer, primary_key=True)
+    system_id = db.Column(db.String(50), db.ForeignKey('agent_device.system_id'), nullable=False)
+    screenshot_id = db.Column(db.String(64), nullable=False)
+    linux_username = db.Column(db.String(80), nullable=True)
+    captured_at = db.Column(db.DateTime(timezone=True), nullable=False)
+    mime_type = db.Column(db.String(64), nullable=False, default='image/jpeg')
+    width = db.Column(db.Integer, nullable=True)
+    height = db.Column(db.Integer, nullable=True)
+    content_hash = db.Column(db.String(64), nullable=False)
+    active_window_title = db.Column(db.String(255), nullable=True)
+    data = db.Column(db.LargeBinary, nullable=False)
+    created_at = db.Column(
+        db.DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+    device = db.relationship(
+        'AgentDevice',
+        backref=db.backref('screenshots', cascade='all, delete-orphan'),
+    )
+
+    __table_args__ = (
+        db.UniqueConstraint('system_id', 'screenshot_id', name='device_screenshot_uc'),
+        db.Index('device_screenshot_system_captured_idx', 'system_id', 'captured_at'),
+    )
+
+    def __repr__(self):
+        return f'<DeviceScreenshot {self.system_id} {self.screenshot_id}>'
+
+    def to_summary_dict(self):
+        return {
+            'id': self.id,
+            'screenshot_id': self.screenshot_id,
+            'system_id': self.system_id,
+            'linux_username': self.linux_username,
+            'captured_at': self.captured_at.isoformat() if self.captured_at else None,
+            'mime_type': self.mime_type,
+            'width': self.width,
+            'height': self.height,
+            'content_hash': self.content_hash,
+            'active_window_title': self.active_window_title,
+        }
