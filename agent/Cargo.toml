@@ -43,6 +43,8 @@ windows-sys = { version = "0.52", features = [
     "Win32_NetworkManagement_NetManagement",
     "Win32_System_Registry",
     "Win32_System_Console",
-    "Win32_System_RemoteDesktop"
+    "Win32_System_RemoteDesktop",
+    "Win32_Graphics_Gdi",
+    "Win32_System_StationsAndDesktops",
 ] }
 windows-service = "0.6.0"

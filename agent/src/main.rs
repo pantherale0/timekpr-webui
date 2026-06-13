@@ -867,7 +867,28 @@ async fn handle_command(action: &str, username: &str, args: &serde_json::Value) 
 
 #[cfg(target_os = "windows")]
 async fn handle_command(action: &str, username: &str, args: &serde_json::Value) -> (bool, String, serde_json::Value) {
-    windows_service::policy::handle_windows_command(action, username, args).await
+    match action {
+        "sync_recall_policy" => match screenshot::apply_recall_policy(get_recall_policy_handle(), args) {
+            Ok(()) => (
+                true,
+                "Recall policy synchronized".to_string(),
+                serde_json::json!({}),
+            ),
+            Err(message) => (false, message, serde_json::json!({})),
+        },
+        "capture_screenshot" => (
+            true,
+            "Screenshot capture queued".to_string(),
+            serde_json::json!({
+                "queued": true,
+                "linux_username": args
+                    .get("linux_username")
+                    .and_then(|value| value.as_str())
+                    .or_else(|| if username.trim().is_empty() { None } else { Some(username) }),
+            }),
+        ),
+        _ => windows_service::policy::handle_windows_command(action, username, args).await,
+    }
 }
 
 async fn download_release_bytes(
