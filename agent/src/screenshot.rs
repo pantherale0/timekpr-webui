@@ -273,10 +273,11 @@ mod win32 {
     use image::{ImageBuffer, Rgba};
     use std::mem::size_of;
     use std::ptr::null_mut;
-    use windows_sys::Win32::Foundation::{CloseHandle, HWND};
+    use windows_sys::Win32::Foundation::{CloseHandle, HWND, HANDLE};
     use windows_sys::Win32::Graphics::Gdi::{
-        BitBlt, CreateCompatibleBitmap, CreateCompatibleDC, DeleteDC, DeleteObject, GetDIBits,
-        SelectObject, BITMAPINFO, BITMAPINFOHEADER, BI_RGB, DIB_RGB_COLORS, RGBQUAD, SRCCOPY,
+        BitBlt, CreateCompatibleBitmap, CreateCompatibleDC, DeleteDC, DeleteObject, GetDC, GetDIBits,
+        ReleaseDC, SelectObject, BITMAPINFO, BITMAPINFOHEADER, BI_RGB, DIB_RGB_COLORS, RGBQUAD,
+        SRCCOPY,
     };
     use windows_sys::Win32::Security::{ImpersonateLoggedOnUser, RevertToSelf};
     use windows_sys::Win32::System::RemoteDesktop::{
@@ -287,19 +288,23 @@ mod win32 {
         CloseDesktop, OpenInputDesktop, SetThreadDesktop, DESKTOP_READOBJECTS,
     };
     use windows_sys::Win32::UI::WindowsAndMessaging::{
-        GetDC, GetDesktopWindow, GetForegroundWindow, GetSystemMetrics, GetWindowTextW, ReleaseDC,
-        SM_CXSCREEN, SM_CYSCREEN,
+        GetDesktopWindow, GetForegroundWindow, GetSystemMetrics, GetWindowTextW, SM_CXSCREEN,
+        SM_CYSCREEN,
     };
+
+    fn handle_is_valid(handle: HANDLE) -> bool {
+        handle != 0
+    }
 
     unsafe fn read_wide_string(ptr: *const u16) -> String {
         if ptr.is_null() {
             return String::new();
         }
         let mut len = 0;
-        while *ptr.add(len) != 0 {
+        while unsafe { *ptr.add(len) } != 0 {
             len += 1;
         }
-        let slice = std::slice::from_raw_parts(ptr, len);
+        let slice = unsafe { std::slice::from_raw_parts(ptr, len) };
         String::from_utf16_lossy(slice)
     }
 
@@ -359,7 +364,7 @@ mod win32 {
 
     unsafe fn active_window_title() -> Option<String> {
         let hwnd: HWND = GetForegroundWindow();
-        if hwnd.is_null() {
+        if !handle_is_valid(hwnd) {
             return None;
         }
         let mut buffer = [0u16; 512];
@@ -373,7 +378,7 @@ mod win32 {
 
     unsafe fn capture_desktop_bitmap() -> Option<(Vec<u8>, u32, u32)> {
         let desktop = OpenInputDesktop(0, 0, DESKTOP_READOBJECTS);
-        if desktop.is_null() {
+        if !handle_is_valid(desktop) {
             return None;
         }
         if SetThreadDesktop(desktop) == 0 {
@@ -383,7 +388,7 @@ mod win32 {
 
         let hwnd = GetDesktopWindow();
         let screen_dc = GetDC(hwnd);
-        if screen_dc.is_null() {
+        if !handle_is_valid(screen_dc) {
             CloseDesktop(desktop);
             return None;
         }
@@ -391,14 +396,14 @@ mod win32 {
         let width = GetSystemMetrics(SM_CXSCREEN).max(1) as u32;
         let height = GetSystemMetrics(SM_CYSCREEN).max(1) as u32;
         let mem_dc = CreateCompatibleDC(screen_dc);
-        if mem_dc.is_null() {
+        if !handle_is_valid(mem_dc) {
             ReleaseDC(hwnd, screen_dc);
             CloseDesktop(desktop);
             return None;
         }
 
         let bitmap = CreateCompatibleBitmap(screen_dc, width as i32, height as i32);
-        if bitmap.is_null() {
+        if !handle_is_valid(bitmap) {
             DeleteDC(mem_dc);
             ReleaseDC(hwnd, screen_dc);
             CloseDesktop(desktop);
@@ -472,7 +477,7 @@ mod win32 {
 
     fn capture_for_session(session_id: u32, username: &str) -> Option<CapturedScreenshot> {
         unsafe {
-            let mut token = null_mut();
+            let mut token: HANDLE = 0;
             if WTSQueryUserToken(session_id, &mut token) == 0 {
                 return None;
             }
