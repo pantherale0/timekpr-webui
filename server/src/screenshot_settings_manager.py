@@ -1,4 +1,4 @@
-"""Business logic for Linux device screenshot recall settings and agent sync."""
+"""Business logic for device screenshot capture settings and agent sync."""
 
 from __future__ import annotations
 
@@ -9,17 +9,17 @@ from datetime import datetime, timezone
 
 from sqlalchemy.exc import SQLAlchemyError
 
-from src.database import AgentDevice, DeviceRecallSettings, db
+from src.database import AgentDevice, DeviceScreenshotSettings, db
 
 _LOGGER = logging.getLogger(__name__)
 
 
-def _is_linux_device(device: AgentDevice) -> bool:
+def _is_desktop_device(device: AgentDevice) -> bool:
     platform = (device.platform or 'linux').strip().lower()
     return platform not in {'android', 'nintendo', 'xbox'}
 
 
-def build_recall_policy_payload(settings: DeviceRecallSettings) -> dict:
+def build_screenshot_policy_payload(settings: DeviceScreenshotSettings) -> dict:
     return {
         'enabled': bool(settings.enabled),
         'intervalSeconds': int(settings.interval_seconds),
@@ -31,26 +31,26 @@ def compute_revision(payload: dict) -> str:
     return hashlib.sha256(canonical.encode('utf-8')).hexdigest()
 
 
-def get_or_create_settings(device: AgentDevice) -> DeviceRecallSettings:
-    if not _is_linux_device(device):
-        raise ValueError('Screenshot recall is only supported for Linux devices')
+def get_or_create_settings(device: AgentDevice) -> DeviceScreenshotSettings:
+    if not _is_desktop_device(device):
+        raise ValueError('Screen history is only supported for Linux and Windows devices')
 
-    settings = device.recall_settings
+    settings = device.screenshot_settings
     if settings is None:
-        settings = DeviceRecallSettings(
+        settings = DeviceScreenshotSettings(
             system_id=device.system_id,
             enabled=False,
-            interval_seconds=DeviceRecallSettings.DEFAULT_INTERVAL_SECONDS,
-            retention_hours=DeviceRecallSettings.DEFAULT_RETENTION_HOURS,
+            interval_seconds=DeviceScreenshotSettings.DEFAULT_INTERVAL_SECONDS,
+            retention_hours=DeviceScreenshotSettings.DEFAULT_RETENTION_HOURS,
         )
-        payload = build_recall_policy_payload(settings)
+        payload = build_screenshot_policy_payload(settings)
         settings.revision = compute_revision(payload)
         db.session.add(settings)
         db.session.flush()
     return settings
 
 
-def build_settings_summary(settings: DeviceRecallSettings, device: AgentDevice) -> dict:
+def build_settings_summary(settings: DeviceScreenshotSettings, device: AgentDevice) -> dict:
     return {
         'system_id': settings.system_id,
         'enabled': settings.enabled,
@@ -87,7 +87,7 @@ def _coerce_int(value, field_name: str, minimum: int, maximum: int) -> int:
     return parsed
 
 
-def upsert_settings(device: AgentDevice, body: dict) -> DeviceRecallSettings:
+def upsert_settings(device: AgentDevice, body: dict) -> DeviceScreenshotSettings:
     settings = get_or_create_settings(device)
     changed = False
 
@@ -98,21 +98,21 @@ def upsert_settings(device: AgentDevice, body: dict) -> DeviceRecallSettings:
         settings.interval_seconds = _coerce_int(
             body.get('interval_seconds'),
             'interval_seconds',
-            DeviceRecallSettings.MIN_INTERVAL_SECONDS,
-            DeviceRecallSettings.MAX_INTERVAL_SECONDS,
+            DeviceScreenshotSettings.MIN_INTERVAL_SECONDS,
+            DeviceScreenshotSettings.MAX_INTERVAL_SECONDS,
         )
         changed = True
     if 'retention_hours' in body:
         settings.retention_hours = _coerce_int(
             body.get('retention_hours'),
             'retention_hours',
-            DeviceRecallSettings.MIN_RETENTION_HOURS,
-            DeviceRecallSettings.MAX_RETENTION_HOURS,
+            DeviceScreenshotSettings.MIN_RETENTION_HOURS,
+            DeviceScreenshotSettings.MAX_RETENTION_HOURS,
         )
         changed = True
 
     if changed:
-        payload = build_recall_policy_payload(settings)
+        payload = build_screenshot_policy_payload(settings)
         settings.revision = compute_revision(payload)
         settings.is_synced = False
         settings.updated_at = datetime.now(timezone.utc)
@@ -120,7 +120,7 @@ def upsert_settings(device: AgentDevice, body: dict) -> DeviceRecallSettings:
     return settings
 
 
-def _mark_sync_result(settings: DeviceRecallSettings, success: bool, message: str | None = None) -> None:
+def _mark_sync_result(settings: DeviceScreenshotSettings, success: bool, message: str | None = None) -> None:
     now = datetime.now(timezone.utc)
     settings.last_synced_at = now
     if success:
@@ -128,34 +128,34 @@ def _mark_sync_result(settings: DeviceRecallSettings, success: bool, message: st
         settings.last_sync_error = None
     else:
         settings.is_synced = False
-        settings.last_sync_error = (message or 'Recall policy sync failed')[:500]
+        settings.last_sync_error = (message or 'Screenshot policy sync failed')[:500]
 
 
-def sync_recall_policy_for_device(device: AgentDevice) -> tuple[bool, str]:
+def sync_screenshot_policy_for_device(device: AgentDevice) -> tuple[bool, str]:
     from src.agent_helper import AgentClient, AgentConnectionManager
 
-    if not _is_linux_device(device):
-        return True, 'Recall policy not applicable for this platform'
+    if not _is_desktop_device(device):
+        return True, 'Screenshot policy not applicable for this platform'
 
     if not AgentConnectionManager.is_online(device.system_id):
         return False, 'Device is offline'
 
     settings = get_or_create_settings(device)
-    payload = build_recall_policy_payload(settings)
+    payload = build_screenshot_policy_payload(settings)
     agent = AgentClient(device.system_id)
-    success, message = agent.sync_recall_policy(payload)
+    success, message = agent.sync_screenshot_policy(payload)
     _mark_sync_result(settings, success, message)
     try:
         db.session.commit()
     except SQLAlchemyError as exc:
         db.session.rollback()
-        _LOGGER.error('Failed to persist recall sync state for %s: %s', device.system_id, exc)
-        return False, 'Database error while saving recall sync state'
-    return success, message or ('Recall policy synchronized' if success else 'Recall policy sync failed')
+        _LOGGER.error('Failed to persist screenshot sync state for %s: %s', device.system_id, exc)
+        return False, 'Database error while saving screenshot sync state'
+    return success, message or ('Screenshot policy synchronized' if success else 'Screenshot policy sync failed')
 
 
-def sync_recall_policies_for_system(system_id: str) -> tuple[bool, str]:
+def sync_screenshot_policies_for_system(system_id: str) -> tuple[bool, str]:
     device = AgentDevice.query.get(system_id)
     if device is None:
         return False, 'Device not found'
-    return sync_recall_policy_for_device(device)
+    return sync_screenshot_policy_for_device(device)

@@ -594,9 +594,9 @@
                 </div>
             </div>
 
-            {% if recall_settings is not none %}
-            <!-- Screen Recall -->
-            <div class="card shadow-sm border mb-4" id="recall-card">
+            {% if screenshot_settings is not none %}
+            <!-- Screen History -->
+            <div class="card shadow-sm border mb-4" id="screen-history-card">
                 <div class="card-header bg-body-secondary py-3 d-flex justify-content-between align-items-center flex-wrap gap-3">
                     <div class="d-flex align-items-center gap-2">
                         <div class="bg-primary-subtle text-primary p-2 rounded d-flex align-items-center justify-content-center"
@@ -604,16 +604,16 @@
                             <i class="fas fa-images fs-5"></i>
                         </div>
                         <div>
-                            <h5 class="mb-0 fw-bold">Screen Recall</h5>
+                            <h5 class="mb-0 fw-bold">Screen History</h5>
                             <span class="text-secondary small fw-semibold">
-                                Periodic desktop screenshots from this Linux device, similar to Windows Recall.
+                                Periodic desktop screenshots from this device for parental review.
                             </span>
                         </div>
                     </div>
-                    <span id="recall-sync-badge"
-                        class="badge {% if recall_settings.is_synced %}bg-success-subtle text-success border border-success-subtle{% else %}bg-warning-subtle text-warning border border-warning-subtle{% endif %} px-2.5 py-1.5 fw-bold"
+                    <span id="screen-history-sync-badge"
+                        class="badge {% if screenshot_settings.is_synced %}bg-success-subtle text-success border border-success-subtle{% else %}bg-warning-subtle text-warning border border-warning-subtle{% endif %} px-2.5 py-1.5 fw-bold"
                         style="font-size: 0.75rem;">
-                        {% if recall_settings.is_synced %}
+                        {% if screenshot_settings.is_synced %}
                         <i class="fas fa-check-circle me-1"></i> Synced to Agent
                         {% else %}
                         <i class="fas fa-sync me-1"></i> Sync Pending
@@ -621,63 +621,63 @@
                     </span>
                 </div>
                 <div class="card-body">
-                    <div id="recall-alert" class="alert d-none mb-3" role="alert"></div>
+                    <div id="screen-history-alert" class="alert d-none mb-3" role="alert"></div>
                     <div class="row g-3 mb-4">
                         <div class="col-12 col-md-4">
                             <div class="form-check form-switch">
-                                <input class="form-check-input" type="checkbox" id="recall_enabled"
-                                    {% if recall_settings.enabled %}checked{% endif %}>
-                                <label class="form-check-label fw-bold small" for="recall_enabled">Enable Screen Recall</label>
+                                <input class="form-check-input" type="checkbox" id="screen-history_enabled"
+                                    {% if screenshot_settings.enabled %}checked{% endif %}>
+                                <label class="form-check-label fw-bold small" for="screen-history_enabled">Enable Screen History</label>
                             </div>
                             <div class="form-text">When enabled, the agent captures the desktop on a schedule while a user session is active.</div>
                         </div>
                         <div class="col-12 col-md-4">
-                            <label class="form-label fw-bold text-body small" for="recall_interval_seconds">Capture Interval</label>
-                            <select id="recall_interval_seconds" class="form-select form-select-sm">
-                                <option value="60" {% if recall_settings.interval_seconds == 60 %}selected{% endif %}>Every 1 minute</option>
-                                <option value="300" {% if recall_settings.interval_seconds == 300 %}selected{% endif %}>Every 5 minutes</option>
-                                <option value="900" {% if recall_settings.interval_seconds == 900 %}selected{% endif %}>Every 15 minutes</option>
-                                <option value="1800" {% if recall_settings.interval_seconds == 1800 %}selected{% endif %}>Every 30 minutes</option>
+                            <label class="form-label fw-bold text-body small" for="screen-history_interval_seconds">Capture Interval</label>
+                            <select id="screen-history_interval_seconds" class="form-select form-select-sm">
+                                <option value="60" {% if screenshot_settings.interval_seconds == 60 %}selected{% endif %}>Every 1 minute</option>
+                                <option value="300" {% if screenshot_settings.interval_seconds == 300 %}selected{% endif %}>Every 5 minutes</option>
+                                <option value="900" {% if screenshot_settings.interval_seconds == 900 %}selected{% endif %}>Every 15 minutes</option>
+                                <option value="1800" {% if screenshot_settings.interval_seconds == 1800 %}selected{% endif %}>Every 30 minutes</option>
                             </select>
                         </div>
                         <div class="col-12 col-md-4">
-                            <label class="form-label fw-bold text-body small" for="recall_retention_hours">Retention</label>
-                            <select id="recall_retention_hours" class="form-select form-select-sm">
-                                <option value="24" {% if recall_settings.retention_hours == 24 %}selected{% endif %}>24 hours</option>
-                                <option value="168" {% if recall_settings.retention_hours == 168 %}selected{% endif %}>7 days</option>
-                                <option value="720" {% if recall_settings.retention_hours == 720 %}selected{% endif %}>30 days</option>
+                            <label class="form-label fw-bold text-body small" for="screen-history_retention_hours">Retention</label>
+                            <select id="screen-history_retention_hours" class="form-select form-select-sm">
+                                <option value="24" {% if screenshot_settings.retention_hours == 24 %}selected{% endif %}>24 hours</option>
+                                <option value="168" {% if screenshot_settings.retention_hours == 168 %}selected{% endif %}>7 days</option>
+                                <option value="720" {% if screenshot_settings.retention_hours == 720 %}selected{% endif %}>30 days</option>
                             </select>
                         </div>
                     </div>
                     <div class="d-flex flex-wrap gap-2 mb-4">
-                        <button type="button" id="recall-save-btn" class="btn btn-sm btn-primary fw-bold">
-                            <i class="fas fa-save me-1"></i> Save Recall Settings
+                        <button type="button" id="screen-history-save-btn" class="btn btn-sm btn-primary fw-bold">
+                            <i class="fas fa-save me-1"></i> Save Settings
                         </button>
                         {% if agent_online %}
-                        <button type="button" id="recall-capture-btn" class="btn btn-sm btn-outline-primary fw-bold">
+                        <button type="button" id="screen-history-capture-btn" class="btn btn-sm btn-outline-primary fw-bold">
                             <i class="fas fa-camera me-1"></i> Capture Now
                         </button>
                         {% endif %}
-                        <button type="button" id="recall-clear-btn" class="btn btn-sm btn-outline-danger fw-bold">
+                        <button type="button" id="screen-history-clear-btn" class="btn btn-sm btn-outline-danger fw-bold">
                             <i class="fas fa-trash-alt me-1"></i> Clear History
                         </button>
                     </div>
 
-                    <div id="recall-loading" class="text-center py-4" style="display: none;">
+                    <div id="screen-history-loading" class="text-center py-4" style="display: none;">
                         <div class="spinner-border text-primary" role="status">
                             <span class="visually-hidden">Loading screenshots...</span>
                         </div>
                     </div>
-                    <div id="recall-empty" class="text-center text-secondary py-4" style="display: none;">
+                    <div id="screen-history-empty" class="text-center text-secondary py-4" style="display: none;">
                         <i class="fas fa-image fs-3 mb-2 d-block"></i>
                         <p class="mb-0 small fw-semibold">No screenshots captured yet.</p>
                     </div>
-                    <div id="recall-gallery" class="row g-3"></div>
-                    <div id="recall-pagination" class="d-flex justify-content-between align-items-center mt-3" style="display: none;">
-                        <span id="recall-pagination-label" class="small text-secondary"></span>
+                    <div id="screen-history-gallery" class="row g-3"></div>
+                    <div id="screen-history-pagination" class="d-flex justify-content-between align-items-center mt-3" style="display: none;">
+                        <span id="screen-history-pagination-label" class="small text-secondary"></span>
                         <div class="btn-group btn-group-sm">
-                            <button type="button" id="recall-prev-btn" class="btn btn-outline-secondary">Previous</button>
-                            <button type="button" id="recall-next-btn" class="btn btn-outline-secondary">Next</button>
+                            <button type="button" id="screen-history-prev-btn" class="btn btn-outline-secondary">Previous</button>
+                            <button type="button" id="screen-history-next-btn" class="btn btn-outline-secondary">Next</button>
                         </div>
                     </div>
                 </div>
@@ -1842,42 +1842,42 @@ adb reboot</pre>
         });
     })();
 
-    {% if recall_settings is not none %}
-    (function initRecallPanel() {
+    {% if screenshot_settings is not none %}
+    (function initScreenHistoryPanel() {
         const systemId = {{ device.system_id|tojson }};
         const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
-        const recallAlert = document.getElementById('recall-alert');
-        const recallGallery = document.getElementById('recall-gallery');
-        const recallLoading = document.getElementById('recall-loading');
-        const recallEmpty = document.getElementById('recall-empty');
-        const recallPagination = document.getElementById('recall-pagination');
-        const recallPaginationLabel = document.getElementById('recall-pagination-label');
-        const recallSyncBadge = document.getElementById('recall-sync-badge');
-        let recallPage = 1;
-        let recallPages = 0;
+        const historyAlert = document.getElementById('screen-history-alert');
+        const historyGallery = document.getElementById('screen-history-gallery');
+        const historyLoading = document.getElementById('screen-history-loading');
+        const historyEmpty = document.getElementById('screen-history-empty');
+        const historyPagination = document.getElementById('screen-history-pagination');
+        const historyPaginationLabel = document.getElementById('screen-history-pagination-label');
+        const historySyncBadge = document.getElementById('screen-history-sync-badge');
+        let historyPage = 1;
+        let historyPages = 0;
 
-        function showRecallAlert(message, isSuccess) {
-            recallAlert.textContent = message;
-            recallAlert.className = `alert mb-3 alert-${isSuccess ? 'success' : 'danger'}`;
-            recallAlert.classList.remove('d-none');
+        function showHistoryAlert(message, isSuccess) {
+            historyAlert.textContent = message;
+            historyAlert.className = `alert mb-3 alert-${isSuccess ? 'success' : 'danger'}`;
+            historyAlert.classList.remove('d-none');
         }
 
-        function updateRecallSyncBadge(isSynced) {
-            if (!recallSyncBadge) return;
+        function updateHistorySyncBadge(isSynced) {
+            if (!historySyncBadge) return;
             if (isSynced) {
-                recallSyncBadge.className = 'badge bg-success-subtle text-success border border-success-subtle px-2.5 py-1.5 fw-bold';
-                recallSyncBadge.innerHTML = '<i class="fas fa-check-circle me-1"></i> Synced to Agent';
+                historySyncBadge.className = 'badge bg-success-subtle text-success border border-success-subtle px-2.5 py-1.5 fw-bold';
+                historySyncBadge.innerHTML = '<i class="fas fa-check-circle me-1"></i> Synced to Agent';
             } else {
-                recallSyncBadge.className = 'badge bg-warning-subtle text-warning border border-warning-subtle px-2.5 py-1.5 fw-bold';
-                recallSyncBadge.innerHTML = '<i class="fas fa-sync me-1"></i> Sync Pending';
+                historySyncBadge.className = 'badge bg-warning-subtle text-warning border border-warning-subtle px-2.5 py-1.5 fw-bold';
+                historySyncBadge.innerHTML = '<i class="fas fa-sync me-1"></i> Sync Pending';
             }
         }
 
-        async function loadRecallScreenshots(page = 1) {
-            recallLoading.style.display = 'block';
-            recallGallery.innerHTML = '';
-            recallEmpty.style.display = 'none';
-            recallPagination.style.display = 'none';
+        async function loadHistoryScreenshots(page = 1) {
+            historyLoading.style.display = 'block';
+            historyGallery.innerHTML = '';
+            historyEmpty.style.display = 'none';
+            historyPagination.style.display = 'none';
 
             try {
                 const response = await fetch(`/api/devices/${encodeURIComponent(systemId)}/screenshots?page=${page}&per_page=12`);
@@ -1886,22 +1886,22 @@ adb reboot</pre>
                     throw new Error(data.message || 'Failed to load screenshots');
                 }
 
-                recallPage = data.page;
-                recallPages = data.pages;
+                historyPage = data.page;
+                historyPages = data.pages;
                 const items = data.items || [];
 
                 if (!items.length) {
-                    recallEmpty.style.display = 'block';
+                    historyEmpty.style.display = 'block';
                     return;
                 }
 
-                recallGallery.innerHTML = items.map((item) => {
+                historyGallery.innerHTML = items.map((item) => {
                     const capturedAt = item.captured_at ? new Date(item.captured_at).toLocaleString() : 'Unknown time';
                     const title = item.active_window_title ? `<div class="small text-secondary text-truncate mt-1" title="${item.active_window_title}">${item.active_window_title}</div>` : '';
                     const user = item.linux_username ? `<span class="badge bg-body-secondary text-body border">${item.linux_username}</span>` : '';
                     return `
                         <div class="col-12 col-sm-6 col-lg-4">
-                            <button type="button" class="btn p-0 border rounded w-100 text-start bg-body recall-shot-btn" data-screenshot-id="${item.id}">
+                            <button type="button" class="btn p-0 border rounded w-100 text-start bg-body screen-history-shot-btn" data-screenshot-id="${item.id}">
                                 <img src="/api/screenshots/${item.id}" alt="Screenshot" class="w-100 rounded-top" style="aspect-ratio: 16/10; object-fit: cover; background: var(--bs-secondary-bg);">
                                 <div class="p-2">
                                     <div class="small fw-bold text-body">${capturedAt}</div>
@@ -1913,63 +1913,63 @@ adb reboot</pre>
                     `;
                 }).join('');
 
-                if (recallPages > 1) {
-                    recallPagination.style.display = 'flex';
-                    const start = ((recallPage - 1) * data.per_page) + 1;
+                if (historyPages > 1) {
+                    historyPagination.style.display = 'flex';
+                    const start = ((historyPage - 1) * data.per_page) + 1;
                     const end = start + items.length - 1;
-                    recallPaginationLabel.textContent = `Showing ${start}-${end} of ${data.total} screenshots`;
-                    document.getElementById('recall-prev-btn').disabled = recallPage <= 1;
-                    document.getElementById('recall-next-btn').disabled = recallPage >= recallPages;
+                    historyPaginationLabel.textContent = `Showing ${start}-${end} of ${data.total} screenshots`;
+                    document.getElementById('screen-history-prev-btn').disabled = historyPage <= 1;
+                    document.getElementById('screen-history-next-btn').disabled = historyPage >= historyPages;
                 }
             } catch (error) {
-                showRecallAlert(error.message || 'Failed to load screenshots', false);
+                showHistoryAlert(error.message || 'Failed to load screenshots', false);
             } finally {
-                recallLoading.style.display = 'none';
+                historyLoading.style.display = 'none';
             }
         }
 
-        recallGallery?.addEventListener('click', (event) => {
-            const button = event.target.closest('.recall-shot-btn');
+        historyGallery?.addEventListener('click', (event) => {
+            const button = event.target.closest('.screen-history-shot-btn');
             if (!button) return;
             const screenshotId = button.dataset.screenshotId;
             if (!screenshotId) return;
             window.open(`/api/screenshots/${screenshotId}`, '_blank', 'noopener');
         });
 
-        document.getElementById('recall-save-btn')?.addEventListener('click', async () => {
-            const saveBtn = document.getElementById('recall-save-btn');
+        document.getElementById('screen-history-save-btn')?.addEventListener('click', async () => {
+            const saveBtn = document.getElementById('screen-history-save-btn');
             saveBtn.disabled = true;
-            recallAlert.classList.add('d-none');
+            historyAlert.classList.add('d-none');
             try {
-                const response = await fetch(`/api/devices/${encodeURIComponent(systemId)}/recall`, {
+                const response = await fetch(`/api/devices/${encodeURIComponent(systemId)}/screenshot-settings`, {
                     method: 'PUT',
                     headers: {
                         'Content-Type': 'application/json',
                         'X-CSRFToken': csrfToken,
                     },
                     body: JSON.stringify({
-                        enabled: document.getElementById('recall_enabled').checked,
-                        interval_seconds: Number(document.getElementById('recall_interval_seconds').value),
-                        retention_hours: Number(document.getElementById('recall_retention_hours').value),
+                        enabled: document.getElementById('screen-history_enabled').checked,
+                        interval_seconds: Number(document.getElementById('screen-history_interval_seconds').value),
+                        retention_hours: Number(document.getElementById('screen-history_retention_hours').value),
                     }),
                 });
                 const data = await response.json();
                 if (!response.ok || !data.success) {
-                    throw new Error(data.message || 'Failed to save recall settings');
+                    throw new Error(data.message || 'Failed to save screen history settings');
                 }
-                showRecallAlert('Recall settings saved.', true);
-                updateRecallSyncBadge(Boolean(data.settings?.is_synced));
+                showHistoryAlert('Screen history settings saved.', true);
+                updateHistorySyncBadge(Boolean(data.settings?.is_synced));
             } catch (error) {
-                showRecallAlert(error.message || 'Failed to save recall settings', false);
+                showHistoryAlert(error.message || 'Failed to save screen history settings', false);
             } finally {
                 saveBtn.disabled = false;
             }
         });
 
-        document.getElementById('recall-capture-btn')?.addEventListener('click', async () => {
-            const captureBtn = document.getElementById('recall-capture-btn');
+        document.getElementById('screen-history-capture-btn')?.addEventListener('click', async () => {
+            const captureBtn = document.getElementById('screen-history-capture-btn');
             captureBtn.disabled = true;
-            recallAlert.classList.add('d-none');
+            historyAlert.classList.add('d-none');
             try {
                 const response = await fetch(`/api/devices/${encodeURIComponent(systemId)}/screenshots/capture`, {
                     method: 'POST',
@@ -1983,22 +1983,22 @@ adb reboot</pre>
                 if (!response.ok || !data.success) {
                     throw new Error(data.message || 'Failed to request screenshot');
                 }
-                showRecallAlert('Screenshot capture requested. Refreshing gallery shortly...', true);
-                setTimeout(() => loadRecallScreenshots(recallPage), 3000);
+                showHistoryAlert('Screenshot capture requested. Refreshing gallery shortly...', true);
+                setTimeout(() => loadHistoryScreenshots(historyPage), 3000);
             } catch (error) {
-                showRecallAlert(error.message || 'Failed to request screenshot', false);
+                showHistoryAlert(error.message || 'Failed to request screenshot', false);
             } finally {
                 captureBtn.disabled = false;
             }
         });
 
-        document.getElementById('recall-clear-btn')?.addEventListener('click', async () => {
+        document.getElementById('screen-history-clear-btn')?.addEventListener('click', async () => {
             if (!window.confirm('Delete all stored screenshots for this device?')) {
                 return;
             }
-            const clearBtn = document.getElementById('recall-clear-btn');
+            const clearBtn = document.getElementById('screen-history-clear-btn');
             clearBtn.disabled = true;
-            recallAlert.classList.add('d-none');
+            historyAlert.classList.add('d-none');
             try {
                 const response = await fetch(`/api/devices/${encodeURIComponent(systemId)}/screenshots`, {
                     method: 'DELETE',
@@ -2008,27 +2008,27 @@ adb reboot</pre>
                 if (!response.ok || !data.success) {
                     throw new Error(data.message || 'Failed to clear screenshots');
                 }
-                showRecallAlert(`Deleted ${data.deleted || 0} screenshot(s).`, true);
-                await loadRecallScreenshots(1);
+                showHistoryAlert(`Deleted ${data.deleted || 0} screenshot(s).`, true);
+                await loadHistoryScreenshots(1);
             } catch (error) {
-                showRecallAlert(error.message || 'Failed to clear screenshots', false);
+                showHistoryAlert(error.message || 'Failed to clear screenshots', false);
             } finally {
                 clearBtn.disabled = false;
             }
         });
 
-        document.getElementById('recall-prev-btn')?.addEventListener('click', () => {
-            if (recallPage > 1) {
-                loadRecallScreenshots(recallPage - 1);
+        document.getElementById('screen-history-prev-btn')?.addEventListener('click', () => {
+            if (historyPage > 1) {
+                loadHistoryScreenshots(historyPage - 1);
             }
         });
-        document.getElementById('recall-next-btn')?.addEventListener('click', () => {
-            if (recallPage < recallPages) {
-                loadRecallScreenshots(recallPage + 1);
+        document.getElementById('screen-history-next-btn')?.addEventListener('click', () => {
+            if (historyPage < historyPages) {
+                loadHistoryScreenshots(historyPage + 1);
             }
         });
 
-        loadRecallScreenshots(1);
+        loadHistoryScreenshots(1);
     })();
     {% endif %}
 </script>

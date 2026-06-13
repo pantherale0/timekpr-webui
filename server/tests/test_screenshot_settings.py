@@ -1,4 +1,4 @@
-"""Tests for Linux screenshot recall storage and settings."""
+"""Tests for desktop screenshot history storage and settings."""
 
 import base64
 import hashlib
@@ -6,9 +6,9 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from src.database import AgentDevice, DeviceRecallSettings, DeviceScreenshot
-from src.recall_manager import (
-    build_recall_policy_payload,
+from src.database import AgentDevice, DeviceScreenshotSettings, DeviceScreenshot
+from src.screenshot_settings_manager import (
+    build_screenshot_policy_payload,
     compute_revision,
     get_or_create_settings,
     upsert_settings,
@@ -27,7 +27,7 @@ _TINY_PNG = base64.b64decode(
 
 @pytest.fixture
 def linux_device(db_session):
-    device = AgentDevice(system_id='linux-recall-1', status='approved', platform='linux')
+    device = AgentDevice(system_id='linux-screen-history-1', status='approved', platform='linux')
     db_session.add(device)
     db_session.commit()
     return device
@@ -35,7 +35,7 @@ def linux_device(db_session):
 
 @pytest.fixture
 def android_device(db_session):
-    device = AgentDevice(system_id='android-recall-1', status='approved', platform='android')
+    device = AgentDevice(system_id='android-screen-history-1', status='approved', platform='android')
     db_session.add(device)
     db_session.commit()
     return device
@@ -57,16 +57,16 @@ def _build_report(system_id, screenshot_id='11111111-1111-4111-8111-111111111111
     }
 
 
-def test_get_or_create_recall_settings(linux_device, db_session):
+def test_get_or_create_screenshot_settings(linux_device, db_session):
     settings = get_or_create_settings(linux_device)
     db_session.commit()
 
     assert settings.enabled is False
-    assert settings.interval_seconds == DeviceRecallSettings.DEFAULT_INTERVAL_SECONDS
-    assert settings.retention_hours == DeviceRecallSettings.DEFAULT_RETENTION_HOURS
+    assert settings.interval_seconds == DeviceScreenshotSettings.DEFAULT_INTERVAL_SECONDS
+    assert settings.retention_hours == DeviceScreenshotSettings.DEFAULT_RETENTION_HOURS
 
 
-def test_upsert_recall_settings_updates_revision(linux_device, db_session):
+def test_upsert_screenshot_settings_updates_revision(linux_device, db_session):
     settings = upsert_settings(linux_device, {
         'enabled': True,
         'interval_seconds': 120,
@@ -77,7 +77,7 @@ def test_upsert_recall_settings_updates_revision(linux_device, db_session):
     assert settings.enabled is True
     assert settings.interval_seconds == 120
     assert settings.retention_hours == 48
-    expected = build_recall_policy_payload(settings)
+    expected = build_screenshot_policy_payload(settings)
     assert settings.revision == compute_revision(expected)
 
 
@@ -119,6 +119,6 @@ def test_prune_expired_screenshots(linux_device, db_session):
     assert list_screenshots_for_device(linux_device.system_id)['total'] == 0
 
 
-def test_recall_settings_rejected_for_android(android_device, db_session):
-    with pytest.raises(ValueError, match='only supported for Linux'):
+def test_screenshot_settings_rejected_for_android(android_device, db_session):
+    with pytest.raises(ValueError, match='only supported for Linux and Windows'):
         get_or_create_settings(android_device)

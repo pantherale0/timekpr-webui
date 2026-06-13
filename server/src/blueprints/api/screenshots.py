@@ -1,4 +1,4 @@
-"""REST API for Linux device screenshot recall."""
+"""REST API for desktop device screenshot history."""
 
 import logging
 
@@ -6,10 +6,10 @@ from flask import Blueprint, jsonify, request, session, send_file
 from io import BytesIO
 
 from src.database import AgentDevice
-from src.recall_manager import (
+from src.screenshot_settings_manager import (
     build_settings_summary,
     get_or_create_settings,
-    sync_recall_policy_for_device,
+    sync_screenshot_policy_for_device,
     upsert_settings,
 )
 from src.screenshot_manager import (
@@ -30,26 +30,26 @@ def _require_auth():
     return None
 
 
-def _get_linux_device_or_404(system_id):
+def _get_desktop_device_or_404(system_id):
     device = AgentDevice.query.get(system_id)
     if device is None:
         return None, (jsonify({'success': False, 'message': 'Device not found'}), 404)
     platform = (device.platform or 'linux').strip().lower()
     if platform in {'android', 'nintendo', 'xbox'}:
         return None, (
-            jsonify({'success': False, 'message': 'Screenshot recall is only available for Linux devices'}),
+            jsonify({'success': False, 'message': 'Screen history is only available for Linux and Windows devices'}),
             400,
         )
     return device, None
 
 
-@api_screenshots_bp.route('/api/devices/<system_id>/recall', methods=['GET'])
-def get_device_recall_settings(system_id):
+@api_screenshots_bp.route('/api/devices/<system_id>/screenshot-settings', methods=['GET'])
+def get_device_screenshot_settings(system_id):
     auth_response = _require_auth()
     if auth_response is not None:
         return auth_response
 
-    device, error_response = _get_linux_device_or_404(system_id)
+    device, error_response = _get_desktop_device_or_404(system_id)
     if error_response is not None:
         return error_response
 
@@ -65,13 +65,13 @@ def get_device_recall_settings(system_id):
     })
 
 
-@api_screenshots_bp.route('/api/devices/<system_id>/recall', methods=['PUT'])
-def update_device_recall_settings(system_id):
+@api_screenshots_bp.route('/api/devices/<system_id>/screenshot-settings', methods=['PUT'])
+def update_device_screenshot_settings(system_id):
     auth_response = _require_auth()
     if auth_response is not None:
         return auth_response
 
-    device, error_response = _get_linux_device_or_404(system_id)
+    device, error_response = _get_desktop_device_or_404(system_id)
     if error_response is not None:
         return error_response
 
@@ -86,7 +86,7 @@ def update_device_recall_settings(system_id):
     sync_success = False
     sync_message = None
     if AgentConnectionManager.is_online(system_id):
-        sync_success, sync_message = sync_recall_policy_for_device(device)
+        sync_success, sync_message = sync_screenshot_policy_for_device(device)
 
     return jsonify({
         'success': True,
@@ -96,17 +96,17 @@ def update_device_recall_settings(system_id):
     })
 
 
-@api_screenshots_bp.route('/api/devices/<system_id>/recall/sync', methods=['POST'])
-def sync_device_recall_settings(system_id):
+@api_screenshots_bp.route('/api/devices/<system_id>/screenshot-settings/sync', methods=['POST'])
+def sync_device_screenshot_settings(system_id):
     auth_response = _require_auth()
     if auth_response is not None:
         return auth_response
 
-    device, error_response = _get_linux_device_or_404(system_id)
+    device, error_response = _get_desktop_device_or_404(system_id)
     if error_response is not None:
         return error_response
 
-    success, message = sync_recall_policy_for_device(device)
+    success, message = sync_screenshot_policy_for_device(device)
     settings = get_or_create_settings(device)
     status_code = 200 if success else 409
     return jsonify({
@@ -122,7 +122,7 @@ def list_device_screenshots(system_id):
     if auth_response is not None:
         return auth_response
 
-    device, error_response = _get_linux_device_or_404(system_id)
+    device, error_response = _get_desktop_device_or_404(system_id)
     if error_response is not None:
         return error_response
 
@@ -151,7 +151,7 @@ def get_screenshot_image(screenshot_id):
     return send_file(
         BytesIO(screenshot.data),
         mimetype=screenshot.mime_type,
-        download_name=f'recall-{screenshot.screenshot_id}.jpg',
+        download_name=f'screenshot-{screenshot.screenshot_id}.jpg',
     )
 
 
@@ -161,7 +161,7 @@ def capture_device_screenshot(system_id):
     if auth_response is not None:
         return auth_response
 
-    device, error_response = _get_linux_device_or_404(system_id)
+    device, error_response = _get_desktop_device_or_404(system_id)
     if error_response is not None:
         return error_response
 
@@ -187,7 +187,7 @@ def clear_device_screenshots(system_id):
     if auth_response is not None:
         return auth_response
 
-    device, error_response = _get_linux_device_or_404(system_id)
+    device, error_response = _get_desktop_device_or_404(system_id)
     if error_response is not None:
         return error_response
 

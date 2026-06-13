@@ -522,11 +522,11 @@ def device_detail(system_id):
     android_recovery_ws_url = None
     nintendo_console = build_nintendo_console_view_context(device, mapped_accounts)
     xbox_console = build_xbox_console_view_context(device, mapped_accounts)
-    recall_settings = None
+    screenshot_settings = None
     if (device.platform or 'linux').strip().lower() not in {'android', 'nintendo', 'xbox'}:
-        from src.recall_manager import get_or_create_settings
+        from src.screenshot_settings_manager import get_or_create_settings
         try:
-            recall_settings = get_or_create_settings(device)
+            screenshot_settings = get_or_create_settings(device)
         except ValueError:
             pass
     if (device.platform or '').strip().lower() == 'android':
@@ -561,7 +561,7 @@ def device_detail(system_id):
         has_managed_profiles=device.has_managed_profiles,
         nintendo_console=nintendo_console,
         xbox_console=xbox_console,
-        recall_settings=recall_settings,
+        screenshot_settings=screenshot_settings,
     )
 
 

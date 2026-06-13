@@ -86,7 +86,7 @@ const AGENT_VERSION: &str = match option_env!("TIMEKPR_AGENT_VERSION") {
 };
 const POLICY_SYNC_INTERVAL_SECS: u64 = 4 * 60 * 60;
 const INSTALLED_APPS_SYNC_INTERVAL_SECS: u64 = 24 * 60 * 60;
-const DEFAULT_RECALL_INTERVAL_SECS: u64 = 300;
+const DEFAULT_SCREENSHOT_INTERVAL_SECS: u64 = 300;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 struct Config {
@@ -459,17 +459,17 @@ fn command_requires_linux_username(action: &str) -> bool {
             | "finalize_domain_policy_sync"
             | "abort_domain_policy_sync"
             | "sync_domain_policy"
-            | "sync_recall_policy"
+            | "sync_screenshot_policy"
             | "capture_screenshot"
             | "unenroll"
     )
 }
 
-static RECALL_POLICY: std::sync::OnceLock<screenshot::SharedRecallPolicy> = std::sync::OnceLock::new();
+static SCREENSHOT_POLICY: std::sync::OnceLock<screenshot::SharedScreenshotPolicy> = std::sync::OnceLock::new();
 static SCREENSHOT_TRIGGER_TX: Mutex<Option<mpsc::UnboundedSender<Option<String>>>> = Mutex::new(None);
 
-fn get_recall_policy_handle() -> &'static screenshot::SharedRecallPolicy {
-    RECALL_POLICY.get_or_init(screenshot::new_shared_recall_policy)
+fn get_screenshot_policy_handle() -> &'static screenshot::SharedScreenshotPolicy {
+    SCREENSHOT_POLICY.get_or_init(screenshot::new_shared_screenshot_policy)
 }
 
 fn set_screenshot_trigger_tx(sender: mpsc::UnboundedSender<Option<String>>) {
@@ -527,9 +527,9 @@ fn spawn_screenshot_capture_worker(
     })
 }
 
-fn spawn_recall_scheduler(
+fn spawn_screenshot_scheduler(
     trigger_tx: mpsc::UnboundedSender<Option<String>>,
-    policy: screenshot::SharedRecallPolicy,
+    policy: screenshot::SharedScreenshotPolicy,
     mut shutdown: watch::Receiver<bool>,
 ) -> JoinHandle<()> {
     tokio::spawn(async move {
@@ -539,7 +539,7 @@ fn spawn_recall_scheduler(
                 if guard.enabled {
                     guard.interval_seconds.max(60)
                 } else {
-                    DEFAULT_RECALL_INTERVAL_SECS
+                    DEFAULT_SCREENSHOT_INTERVAL_SECS
                 }
             };
 
@@ -827,11 +827,11 @@ async fn handle_command(action: &str, username: &str, args: &serde_json::Value) 
             "Installed apps refresh queued".to_string(),
             serde_json::json!({ "queued": true, "linux_username": username }),
         ),
-        "sync_recall_policy" => {
-            match screenshot::apply_recall_policy(get_recall_policy_handle(), args) {
+        "sync_screenshot_policy" => {
+            match screenshot::apply_screenshot_policy(get_screenshot_policy_handle(), args) {
                 Ok(()) => (
                     true,
-                    "Recall policy synchronized".to_string(),
+                    "Screenshot policy synchronized".to_string(),
                     serde_json::json!({}),
                 ),
                 Err(message) => (false, message, serde_json::json!({})),
@@ -868,10 +868,10 @@ async fn handle_command(action: &str, username: &str, args: &serde_json::Value) 
 #[cfg(target_os = "windows")]
 async fn handle_command(action: &str, username: &str, args: &serde_json::Value) -> (bool, String, serde_json::Value) {
     match action {
-        "sync_recall_policy" => match screenshot::apply_recall_policy(get_recall_policy_handle(), args) {
+        "sync_screenshot_policy" => match screenshot::apply_screenshot_policy(get_screenshot_policy_handle(), args) {
             Ok(()) => (
                 true,
-                "Recall policy synchronized".to_string(),
+                "Screenshot policy synchronized".to_string(),
                 serde_json::json!({}),
             ),
             Err(message) => (false, message, serde_json::json!({})),
@@ -1707,15 +1707,15 @@ pub(crate) async fn start_agent_reconnect_loop(
                 );
                 let (screenshot_trigger_tx, screenshot_trigger_rx) = mpsc::unbounded_channel::<Option<String>>();
                 set_screenshot_trigger_tx(screenshot_trigger_tx.clone());
-                let recall_policy = get_recall_policy_handle().clone();
+                let screenshot_policy = get_screenshot_policy_handle().clone();
                 let screenshot_capture_handle = spawn_screenshot_capture_worker(
                     screenshot_trigger_rx,
                     inventory_tx.clone(),
                     shutdown_tx.subscribe(),
                 );
-                let recall_scheduler_handle = spawn_recall_scheduler(
+                let screenshot_scheduler_handle = spawn_screenshot_scheduler(
                     screenshot_trigger_tx.clone(),
-                    recall_policy,
+                    screenshot_policy,
                     shutdown_tx.subscribe(),
                 );
 
@@ -1837,7 +1837,7 @@ pub(crate) async fn start_agent_reconnect_loop(
                 let _ = policy_sync_handle.await;
                 let _ = installed_apps_handle.await;
                 let _ = screenshot_capture_handle.await;
-                let _ = recall_scheduler_handle.await;
+                let _ = screenshot_scheduler_handle.await;
                 let _ = writer_handle.await;
             }
             Err(e) => {

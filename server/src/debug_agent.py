@@ -562,7 +562,7 @@ def _default_config():
         "linux_device_policy_state": {},
         "active_session_username": None,
         "enforced_linux_device_policy": None,
-        "recall_policy": {
+        "screenshot_policy": {
             "enabled": False,
             "intervalSeconds": 300,
         },
@@ -1493,12 +1493,12 @@ class DebugAgentProtocol:
                 False,
             )
 
-        if action == "sync_recall_policy":
-            recall_policy = args.get("recall_policy")
-            if not isinstance(recall_policy, dict):
-                return False, "Missing 'recall_policy' argument", {}, False
-            self.config["recall_policy"] = _json_clone(recall_policy)
-            return True, "Recall policy synchronized", {}, True
+        if action == "sync_screenshot_policy":
+            screenshot_policy = args.get("screenshot_policy")
+            if not isinstance(screenshot_policy, dict):
+                return False, "Missing 'screenshot_policy' argument", {}, False
+            self.config["screenshot_policy"] = _json_clone(screenshot_policy)
+            return True, "Screenshot policy synchronized", {}, True
 
         if action == "capture_screenshot":
             target_username = (

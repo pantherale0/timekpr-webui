@@ -1138,22 +1138,22 @@ class BackgroundTaskManager:
                             reason,
                             linux_message,
                         )
-                    recall_success, recall_message = self._sync_recall_policy_system(
+                    screenshot_success, screenshot_message = self._sync_screenshot_policy_system(
                         system_id,
                     )
-                    if recall_success:
+                    if screenshot_success:
                         logger.info(
-                            "Completed recall policy sync for %s (%s): %s",
+                            "Completed screenshot policy sync for %s (%s): %s",
                             system_id,
                             reason,
-                            recall_message,
+                            screenshot_message,
                         )
                     else:
                         logger.warning(
-                            "Recall policy sync failed for %s (%s): %s",
+                            "Screenshot policy sync failed for %s (%s): %s",
                             system_id,
                             reason,
-                            recall_message,
+                            screenshot_message,
                         )
                 finally:
                     db.session.remove()
@@ -1315,10 +1315,10 @@ class BackgroundTaskManager:
 
         return sync_linux_device_policies_for_system(system_id)
 
-    def _sync_recall_policy_system(self, system_id):
-        from src.recall_manager import sync_recall_policies_for_system
+    def _sync_screenshot_policy_system(self, system_id):
+        from src.screenshot_settings_manager import sync_screenshot_policies_for_system
 
-        return sync_recall_policies_for_system(system_id)
+        return sync_screenshot_policies_for_system(system_id)
 
     def _sync_domain_policy_system(self, system_id, agent_source_revisions=None):
         mapping_state, source_state_map = self._build_domain_policy_mapping_state(system_id)

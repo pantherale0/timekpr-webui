@@ -1,4 +1,4 @@
-"""Storage and retrieval for Linux agent screenshot recall."""
+"""Storage and retrieval for agent desktop screenshot history."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import desc
 from sqlalchemy.exc import SQLAlchemyError
 
-from src.database import AgentDevice, DeviceRecallSettings, DeviceScreenshot, db
+from src.database import AgentDevice, DeviceScreenshotSettings, DeviceScreenshot, db
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -153,9 +153,9 @@ def handle_screenshot_report(system_id: str, payload: dict) -> dict:
     screenshot = DeviceScreenshot(**normalized)
     db.session.add(screenshot)
 
-    retention_hours = DeviceRecallSettings.DEFAULT_RETENTION_HOURS
-    if device.recall_settings is not None:
-        retention_hours = device.recall_settings.retention_hours
+    retention_hours = DeviceScreenshotSettings.DEFAULT_RETENTION_HOURS
+    if device.screenshot_settings is not None:
+        retention_hours = device.screenshot_settings.retention_hours
     prune_expired_screenshots(system_id, retention_hours)
 
     try:

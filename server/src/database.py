@@ -1670,8 +1670,8 @@ class PolicyApprovalGrant(db.Model):
         return f'<PolicyApprovalGrant {self.grant_type}:{self.target_value} [{self.status}]>'
 
 
-class DeviceRecallSettings(db.Model):
-    __tablename__ = 'device_recall_settings'
+class DeviceScreenshotSettings(db.Model):
+    __tablename__ = 'device_screenshot_settings'
 
     DEFAULT_INTERVAL_SECONDS = 300
     DEFAULT_RETENTION_HOURS = 168
@@ -1706,11 +1706,11 @@ class DeviceRecallSettings(db.Model):
 
     device = db.relationship(
         'AgentDevice',
-        backref=db.backref('recall_settings', uselist=False, cascade='all, delete-orphan'),
+        backref=db.backref('screenshot_settings', uselist=False, cascade='all, delete-orphan'),
     )
 
     def __repr__(self):
-        return f'<DeviceRecallSettings {self.system_id} enabled={self.enabled}>'
+        return f'<DeviceScreenshotSettings {self.system_id} enabled={self.enabled}>'
 
 
 class DeviceScreenshot(db.Model):

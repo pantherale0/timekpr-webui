@@ -18,12 +18,12 @@ const MAX_CAPTURE_WIDTH: u32 = 1280;
 const JPEG_QUALITY: u8 = 75;
 
 #[derive(Clone, Debug)]
-pub struct RecallPolicy {
+pub struct ScreenshotPolicy {
     pub enabled: bool,
     pub interval_seconds: u64,
 }
 
-impl Default for RecallPolicy {
+impl Default for ScreenshotPolicy {
     fn default() -> Self {
         Self {
             enabled: false,
@@ -32,16 +32,16 @@ impl Default for RecallPolicy {
     }
 }
 
-pub type SharedRecallPolicy = Arc<Mutex<RecallPolicy>>;
+pub type SharedScreenshotPolicy = Arc<Mutex<ScreenshotPolicy>>;
 
-pub fn new_shared_recall_policy() -> SharedRecallPolicy {
-    Arc::new(Mutex::new(RecallPolicy::default()))
+pub fn new_shared_screenshot_policy() -> SharedScreenshotPolicy {
+    Arc::new(Mutex::new(ScreenshotPolicy::default()))
 }
 
-pub fn apply_recall_policy(shared: &SharedRecallPolicy, payload: &serde_json::Value) -> Result<(), String> {
+pub fn apply_screenshot_policy(shared: &SharedScreenshotPolicy, payload: &serde_json::Value) -> Result<(), String> {
     let policy_value = payload
-        .get("recall_policy")
-        .ok_or_else(|| "Missing recall_policy argument".to_string())?;
+        .get("screenshot_policy")
+        .ok_or_else(|| "Missing screenshot_policy argument".to_string())?;
 
     let enabled = policy_value
         .get("enabled")
@@ -55,7 +55,7 @@ pub fn apply_recall_policy(shared: &SharedRecallPolicy, payload: &serde_json::Va
 
     let mut guard = shared
         .lock()
-        .map_err(|_| "Recall policy lock poisoned".to_string())?;
+        .map_err(|_| "Screenshot policy lock poisoned".to_string())?;
     guard.enabled = enabled;
     guard.interval_seconds = interval_seconds;
     Ok(())
@@ -578,15 +578,15 @@ mod tests {
     use super::*;
 
     #[test]
-    fn apply_recall_policy_updates_shared_state() {
-        let shared = new_shared_recall_policy();
+    fn apply_screenshot_policy_updates_shared_state() {
+        let shared = new_shared_screenshot_policy();
         let payload = serde_json::json!({
-            "recall_policy": {
+            "screenshot_policy": {
                 "enabled": true,
                 "intervalSeconds": 120
             }
         });
-        apply_recall_policy(&shared, &payload).expect("policy should apply");
+        apply_screenshot_policy(&shared, &payload).expect("policy should apply");
         let guard = shared.lock().unwrap();
         assert!(guard.enabled);
         assert_eq!(guard.interval_seconds, 120);

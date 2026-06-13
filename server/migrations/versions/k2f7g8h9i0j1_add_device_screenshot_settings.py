@@ -1,4 +1,4 @@
-"""add device recall settings and screenshot storage
+"""add device screenshot settings and screenshot storage
 
 Revision ID: k2f7g8h9i0j1
 Revises: c1aa5a072532
@@ -16,7 +16,7 @@ depends_on = None
 
 def upgrade():
     op.create_table(
-        'device_recall_settings',
+        'device_screenshot_settings',
         sa.Column('system_id', sa.String(length=50), nullable=False),
         sa.Column('enabled', sa.Boolean(), nullable=False, server_default=sa.false()),
         sa.Column('interval_seconds', sa.Integer(), nullable=False, server_default='300'),
@@ -60,4 +60,4 @@ def upgrade():
 def downgrade():
     op.drop_index('device_screenshot_system_captured_idx', table_name='device_screenshot')
     op.drop_table('device_screenshot')
-    op.drop_table('device_recall_settings')
+    op.drop_table('device_screenshot_settings')

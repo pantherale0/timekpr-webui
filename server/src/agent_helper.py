@@ -707,13 +707,13 @@ class AgentClient:
             raise RuntimeError(message or 'Agent rejected refresh_installed_apps')
         return data or {"queued": True}
 
-    def sync_recall_policy(self, recall_policy):
-        """Synchronize screenshot recall policy to the connected Linux agent."""
+    def sync_screenshot_policy(self, screenshot_policy):
+        """Synchronize screenshot capture policy to the connected desktop agent."""
         success, message, _ = AgentConnectionManager.send_command_sync(
             self.system_id,
-            "sync_recall_policy",
+            "sync_screenshot_policy",
             "",
-            {"recall_policy": recall_policy or {}},
+            {"screenshot_policy": screenshot_policy or {}},
         )
         return success, message
 
