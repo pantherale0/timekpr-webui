@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, timezone
+from src.users_manager import _refresh_managed_user_summary
 from src.database import (
     coerce_time_left_day,
     coerce_time_spent_day,
@@ -461,3 +462,37 @@ def test_database_model_missing_lines(db_session):
 
     monthly = user.get_usage_monthly_grouped(months=24)
     assert len(monthly) == 24
+
+
+def test_refresh_managed_user_summary_with_mixed_timezones(db_session):
+    device1 = AgentDevice(system_id="dev-naive", status="approved", secure_token="tok1")
+    device2 = AgentDevice(system_id="dev-aware", status="approved", secure_token="tok2")
+    user = ManagedUser(username="test_tz_user", system_ip="Unassigned", is_valid=True)
+    db_session.add_all([device1, device2, user])
+    db_session.flush()
+
+    naive_time = datetime.now()  # timezone-naive
+    aware_time = datetime.now(timezone.utc)  # timezone-aware
+
+    mapping1 = ManagedUserDeviceMap(
+        managed_user_id=user.id,
+        system_id=device1.system_id,
+        linux_username="test_tz_user",
+        is_valid=True,
+        last_checked=naive_time,
+    )
+    mapping2 = ManagedUserDeviceMap(
+        managed_user_id=user.id,
+        system_id=device2.system_id,
+        linux_username="test_tz_user",
+        is_valid=True,
+        last_checked=aware_time,
+    )
+    db_session.add_all([mapping1, mapping2])
+    db_session.commit()
+
+    # This should not raise TypeError
+    _refresh_managed_user_summary(user)
+    assert user.last_checked is not None
+    assert user.last_checked.tzinfo is not None
+

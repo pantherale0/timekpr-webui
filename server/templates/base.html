@@ -178,10 +178,12 @@
                             <i class="fas fa-bars"></i>
                         </a>
                     </li>
+                    {% block top_nav_left %}
                     <li class="nav-item d-none d-md-inline-block">
                         <span class="navbar-text fw-bold text-secondary text-uppercase tracking-wide"
                             style="font-size: 0.85rem; letter-spacing: 0.05em;">Parental Portal</span>
                     </li>
+                    {% endblock %}
                 </ul>
                 <!-- End Left Links -->
 
@@ -227,7 +229,7 @@
                 </a>
             </div>
 
-            <div class="sidebar-wrapper d-flex flex-column justify-content-between h-100">
+            <div class="sidebar-wrapper d-flex flex-column justify-content-between" style="height: calc(100% - 60px); overflow-y: auto;">
                 <nav class="mt-3">
                     <ul class="nav sidebar-menu flex-column" data-lte-toggle="treeview" role="menu"
                         data-accordion="false">

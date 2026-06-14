@@ -38,8 +38,12 @@ def _refresh_managed_user_summary(user):
     )
 
     user.last_checked = max(
-        (mapping.last_checked for mapping in valid_mappings if mapping.last_checked),
-        default=datetime.now(timezone.utc).replace(tzinfo=None),
+        (
+            mapping.last_checked if mapping.last_checked.tzinfo is not None
+            else mapping.last_checked.replace(tzinfo=timezone.utc)
+            for mapping in valid_mappings if mapping.last_checked
+        ),
+        default=datetime.now(timezone.utc),
     )
     user.last_config = json.dumps({
         "TIME_SPENT_DAY": shared_spent,

@@ -1,4 +1,5 @@
 import logging
+from datetime import timezone
 from flask import Blueprint, session, request, jsonify, flash, redirect, url_for
 from sqlalchemy.exc import SQLAlchemyError
 from src.database import db, ManagedUser, UserWeeklySchedule, UserDailyTimeInterval
@@ -178,7 +179,11 @@ def get_intervals_sync_status(user_id):
     if intervals:
         synced_intervals = [i for i in intervals if i.last_synced]
         if synced_intervals:
-            last_synced = max(i.last_synced for i in synced_intervals)
+            last_synced = max(
+                i.last_synced if i.last_synced.tzinfo is not None
+                else i.last_synced.replace(tzinfo=timezone.utc)
+                for i in synced_intervals
+            )
             last_synced = last_synced.strftime('%Y-%m-%d %H:%M')
     
     enabled_count = sum(1 for i in intervals if i.is_enabled)

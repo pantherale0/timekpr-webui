@@ -252,3 +252,195 @@ body > .theme-toggle:hover {
   background-color: var(--danger-color);
   animation: pulse-dot 1.5s infinite;
 }
+
+/* ==========================================================================
+   ENHANCED UI LAYOUT & NAV OVERRIDES
+   ========================================================================== */
+
+/* Sliding Segmented Control Pills */
+.segmented-control {
+  display: inline-flex;
+  background-color: var(--bs-secondary-bg);
+  border: 1px solid var(--bs-border-color);
+  border-radius: 2rem;
+  padding: 3px;
+  position: relative;
+  gap: 4px;
+  align-items: center;
+}
+
+.segmented-tab-btn {
+  border: none;
+  background: transparent;
+  padding: 0.35rem 1.1rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--bs-secondary-color);
+  border-radius: 1.75rem;
+  cursor: pointer;
+  transition: all 180ms cubic-bezier(0.4, 0, 0.2, 1);
+  white-space: nowrap;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.segmented-tab-btn:hover {
+  color: var(--bs-body-color);
+  background-color: rgba(0, 0, 0, 0.04);
+}
+
+[data-theme="dark"] .segmented-tab-btn:hover {
+  background-color: rgba(255, 255, 255, 0.04);
+}
+
+.segmented-tab-btn.active {
+  background-color: var(--bs-body-bg) !important;
+  color: var(--bs-body-color) !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.08), 0 2px 4px -1px rgba(0, 0, 0, 0.04);
+  transform: scale(1.02);
+}
+
+/* Accent Card Borders & Clean Headers */
+.card-accent-warning {
+  border-left: 4px solid var(--warning-color) !important;
+}
+.card-accent-danger {
+  border-left: 4px solid var(--danger-color) !important;
+}
+.card-accent-primary {
+  border-left: 4px solid var(--info-color) !important;
+}
+.card-accent-success {
+  border-left: 4px solid var(--success-color) !important;
+}
+
+.card-accent-warning .card-header,
+.card-accent-danger .card-header,
+.card-accent-primary .card-header,
+.card-accent-success .card-header {
+  background-color: transparent !important;
+  border-bottom: 1px solid var(--bs-border-color) !important;
+}
+
+.card-accent-warning .card-title-accent {
+  color: var(--warning-color) !important;
+}
+.card-accent-danger .card-title-accent {
+  color: var(--danger-color) !important;
+}
+.card-accent-primary .card-title-accent {
+  color: var(--info-color) !important;
+}
+.card-accent-success .card-title-accent {
+  color: var(--success-color) !important;
+}
+
+/* Modern Empty States */
+.empty-state {
+  padding: 3rem 1.5rem;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.empty-state-svg {
+  width: 72px;
+  height: 72px;
+  margin-bottom: 1.25rem;
+  color: var(--bs-secondary-color);
+  opacity: 0.45;
+  transition: transform 250ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.empty-state:hover .empty-state-svg {
+  transform: scale(1.08) rotate(2deg);
+}
+
+.empty-state-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin-bottom: 0.4rem;
+  color: var(--bs-body-color);
+}
+
+.empty-state-desc {
+  font-size: 0.85rem;
+  color: var(--bs-secondary-color);
+  max-width: 320px;
+  margin: 0 auto 1.25rem auto;
+  line-height: 1.4;
+}
+
+/* Custom Horizontal Range Scrubber playhead (No Purple, net 2px radius edges) */
+.custom-range {
+  -webkit-appearance: none;
+  width: 100%;
+  background: transparent;
+}
+
+.custom-range:focus {
+  outline: none;
+}
+
+/* Chrome/Safari Thumb */
+.custom-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  height: 24px;
+  width: 12px;
+  border-radius: 2px;
+  background: var(--accent-cta, #f97316);
+  cursor: pointer;
+  margin-top: -8px;
+  box-shadow: 0 0 8px rgba(249, 115, 22, 0.4);
+  transition: transform 100ms ease, background-color 100ms ease;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.custom-range::-webkit-slider-thumb:hover {
+  transform: scaleY(1.15) scaleX(1.05);
+  background: var(--accent-cta-hover, #ea580c);
+}
+
+/* Firefox Thumb */
+.custom-range::-moz-range-thumb {
+  height: 24px;
+  width: 12px;
+  border-radius: 2px;
+  background: var(--accent-cta, #f97316);
+  cursor: pointer;
+  box-shadow: 0 0 8px rgba(249, 115, 22, 0.4);
+  transition: transform 100ms ease, background-color 100ms ease;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.custom-range::-moz-range-thumb:hover {
+  transform: scaleY(1.15) scaleX(1.05);
+  background: var(--accent-cta-hover, #ea580c);
+}
+
+/* Track styling */
+.custom-range::-webkit-slider-runnable-track {
+  width: 100%;
+  height: 8px;
+  cursor: pointer;
+  background: var(--bs-border-color);
+  border-radius: 4px;
+}
+
+.custom-range::-moz-range-track {
+  width: 100%;
+  height: 8px;
+  cursor: pointer;
+  background: var(--bs-border-color);
+  border-radius: 4px;
+}
+
+/* Vertical tick line */
+.timeline-tick-line {
+  width: 1px;
+  height: 12px;
+  background-color: var(--bs-border-color);
+  opacity: 0.8;
+}
