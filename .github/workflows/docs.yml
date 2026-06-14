@@ -1,0 +1,73 @@
+name: Documentation
+
+on:
+  pull_request:
+    paths:
+      - "docs/**"
+      - "mkdocs.yml"
+      - "requirements-docs.txt"
+      - ".github/workflows/docs.yml"
+  push:
+    branches:
+      - "master"
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install documentation dependencies
+        run: pip install -r requirements-docs.txt
+
+      - name: Build docs (strict)
+        env:
+          DISABLE_MKDOCS_2_WARNING: "true"
+        run: mkdocs build --strict
+
+  deploy:
+    needs: build
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install documentation dependencies
+        run: pip install -r requirements-docs.txt
+
+      - name: Configure git author
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Deploy dev docs
+        if: github.ref == 'refs/heads/master'
+        env:
+          DISABLE_MKDOCS_2_WARNING: "true"
+        run: mike deploy dev --push --update-aliases dev
+
+      - name: Deploy release docs
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          DISABLE_MKDOCS_2_WARNING: "true"
+        run: mike deploy "${GITHUB_REF_NAME}" --push --update-aliases latest

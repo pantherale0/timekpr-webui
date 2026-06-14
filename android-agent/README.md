@@ -1,6 +1,6 @@
 # Guardian Android Agent
 
-Kotlin/Android port of the Guardian Rust Linux agent. See [docs/android-agent.md](../docs/android-agent.md) for architecture and deployment notes.
+Kotlin/Android port of the Guardian Rust Linux client. See the [Android agent documentation](https://pantherale0.github.io/timekpr-webui/platforms/android-agent/) (`docs/platforms/android-agent.md`) for architecture and deployment notes.
 
 ## Quick start
 
@@ -12,7 +12,7 @@ Kotlin/Android port of the Guardian Rust Linux agent. See [docs/android-agent.md
    `adb dpm set-device-owner com.guardian.agent/.admin.GuardianDeviceAdminReceiver`
    (device must have no accounts; factory reset or new user profile). Without device owner, enable Device Admin, Usage Access, and VPN manually on the phone.
 
-Connectivity uses **FCM + short WebSocket sessions**, not a 24/7 socket. See `docs/android-agent.md`.
+Connectivity uses **FCM + short WebSocket sessions**, not a 24/7 socket. See the [Android agent docs](https://pantherale0.github.io/timekpr-webui/platforms/android-agent/).
 
 ## Project layout
 

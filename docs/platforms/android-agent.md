@@ -1,4 +1,4 @@
-# TimeKpr Android Agent
+# Android agent
 
 The Android agent (`android-agent/`) is a Kotlin port of the Rust Linux client. It connects to the same Flask WebSocket hub (`/ws`), uses the identical JSON protocol, and enforces policies using Android-native APIs.
 
@@ -166,7 +166,7 @@ Local release signing uses the same variables via `ANDROID_KEYSTORE_PATH` or `an
 For full MDM-style control, provision the app as **Device Owner** using the MDM provisioning QR above, your EMM, or:
 
 ```bash
-adb dpm set-device-owner com.timekpr.agent/.admin.TimeKprDeviceAdminReceiver
+adb dpm set-device-owner com.guardian.agent/.admin.GuardianDeviceAdminReceiver
 ```
 
 The agent implements Android 12+ provisioning handlers (`GET_PROVISIONING_MODE`, `ADMIN_POLICY_COMPLIANCE`) so QR-based device-owner enrollment applies server config automatically.
@@ -181,8 +181,8 @@ Android allows multiple user profiles (e.g. secondary users, guests, restricted 
 
 Due to Android security restrictions, standard **Device Admin (DA)** applications are sandboxed and cannot view or manage other profiles on the system. Attempting to query secondary users on a standard Device Admin install causes Android to throw a `SecurityException`, falling back to returning only the current user profile (User 0).
 
-> [!IMPORTANT]
-> To discover, monitor, and enforce rules on secondary user profiles (e.g., child profiles on a shared tablet), the agent app **MUST** be provisioned as the **Device Owner (DO)**.
+!!! important
+    To discover, monitor, and enforce rules on secondary user profiles (e.g., child profiles on a shared tablet), the agent app **must** be provisioned as **Device Owner (DO)**.
 
 ### Provisioning Device Owner
 
@@ -202,12 +202,19 @@ If the device is already set up and you do not want to perform a factory reset, 
    adb shell dpm set-device-owner com.timekpr.agent/.admin.TimeKprDeviceAdminReceiver
    ```
 
-> [!WARNING]
-> Android forbids setting a Device Owner via ADB if there are any active accounts (e.g., Google account, Samsung account, email accounts) configured on the device. If you see an error like `Run-time exception: java.lang.IllegalStateException: Not allowed to set the device owner because there are already some accounts`, you must:
-> 1. Go to **Settings → Passwords & Accounts** (or **Accounts & Backup**) on the device.
-> 2. Temporarily **remove all accounts** listed.
-> 3. Run the `adb shell dpm set-device-owner ...` command again.
-> 4. Once successful, you can re-add the Google and other accounts.
+!!! warning "ADB Device Owner blockers"
+    Android forbids setting Device Owner via ADB when accounts or extra users exist. Common errors:
+
+    - `Not allowed to set the device owner because there are already some accounts`
+    - `Not allowed to set the device owner because there are already several users on the device`
+
+    To use ADB provisioning you must temporarily remove all accounts on User 0 **and** remove secondary users, then run:
+
+    ```bash
+    adb shell dpm set-device-owner com.guardian.agent/.admin.GuardianDeviceAdminReceiver
+    ```
+
+    Re-add accounts and recreate child profiles **after** Device Owner is set. See [Troubleshooting](../troubleshooting/index.md#android-multi-user-and-device-owner).
 
 ### Multi-User Management Workflow
 
@@ -364,7 +371,7 @@ After each authenticated sync session the agent scans launcher-visible packages 
 
 The agent also handles `refresh_installed_apps` RPC for on-demand rescans of a specific mapped profile while connected.
 
-See [app-discovery.md](app-discovery.md) for the full protocol reference.
+See [App discovery](../features/app-discovery.md) for the full protocol reference.
 
 ## Building
 

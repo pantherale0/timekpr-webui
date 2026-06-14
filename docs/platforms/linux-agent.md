@@ -1,6 +1,6 @@
-# Linux (Rust) agent
+# Linux agent
 
-The Rust agent connects outbound to the TimeKpr server over WebSocket, enforces AppArmor policies, domain blocklists via local DNS, and reports usage/alerts.
+The Rust agent connects outbound to the Guardian server over WebSocket, enforces AppArmor policies, domain blocklists via local DNS, and reports usage/alerts.
 
 ## Access approvals (app launch + domains)
 

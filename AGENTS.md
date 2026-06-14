@@ -14,10 +14,10 @@ This repository implements a server–agent parental controls system that manage
   - `python debug_agent.py --server-url "ws://127.0.0.1:5000/ws" --agent-version "vX.Y"`
 - Rust agent (from `agent/`):
   - Build: `cargo build --release`
-  - See `docs/linux-agent.md` for AppArmor enforcement, domain blocklists, and access approvals.
+  - See the [Linux agent docs](https://pantherale0.github.io/timekpr-webui/platforms/linux-agent/) (or `docs/platforms/linux-agent.md`) for AppArmor enforcement, domain blocklists, and access approvals.
 - Android agent (from `android-agent/`):
   - Build: `./gradlew assembleDebug`
-  - See `docs/android-agent.md` for pairing QR, permissions, and policy mapping.
+  - See the [Android agent docs](https://pantherale0.github.io/timekpr-webui/platforms/android-agent/) (or `docs/platforms/android-agent.md`) for pairing QR, permissions, and policy mapping.
 - Tests (from `server/`):
   - `pytest` (project includes tests under `server/tests/`)
 - Agents (from `.agents/`):
