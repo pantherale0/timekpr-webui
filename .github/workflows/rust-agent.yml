@@ -103,35 +103,37 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: aarch64-linux-android, armv7-linux-androideabi, x86_64-linux-android
+          targets: aarch64-linux-android
 
       - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: "agent -> target"
 
+      - name: Cache cargo-ndk
+        id: cache-cargo-ndk
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/cargo-ndk
+          key: ${{ runner.os }}-cargo-ndk-v3
+
       - name: Install cargo-ndk
+        if: steps.cache-cargo-ndk.outputs.cache-hit != 'true'
         run: cargo install cargo-ndk
 
       - name: Build Android Rust targets
         run: |
-          cargo ndk --target aarch64-linux-android build --lib --release
-          cargo ndk --target armv7-linux-androideabi build --lib --release
-          cargo ndk --target x86_64 build --lib --release
+          cargo ndk --target aarch64-linux-android build --lib
         working-directory: agent
 
       - name: Copy native libraries to Android project
         run: |
           mkdir -p android-agent/app/src/main/jniLibs/arm64-v8a
-          mkdir -p android-agent/app/src/main/jniLibs/armeabi-v7a
-          mkdir -p android-agent/app/src/main/jniLibs/x86_64
-          cp agent/target/aarch64-linux-android/release/libguardian_agent.so android-agent/app/src/main/jniLibs/arm64-v8a/
-          cp agent/target/armv7-linux-androideabi/release/libguardian_agent.so android-agent/app/src/main/jniLibs/armeabi-v7a/
-          cp agent/target/x86_64-linux-android/release/libguardian_agent.so android-agent/app/src/main/jniLibs/x86_64/
+          cp agent/target/aarch64-linux-android/debug/libguardian_agent.so android-agent/app/src/main/jniLibs/arm64-v8a/
 
       - name: Generate UniFFI Kotlin bindings
         run: |
-          cargo run --features=uniffi/cli --bin uniffi-bindgen generate --language kotlin --library --out-dir ../android-agent/app/src/main/java/ target/aarch64-linux-android/release/libguardian_agent.so
+          cargo run --features=uniffi/cli --bin uniffi-bindgen generate --language kotlin --library --no-format --out-dir ../android-agent/app/src/main/java/ target/aarch64-linux-android/debug/libguardian_agent.so
         working-directory: agent
 
       - name: Build debug APK
@@ -306,7 +308,15 @@ jobs:
         with:
           workspaces: "agent -> target"
 
+      - name: Cache cargo-ndk
+        id: cache-cargo-ndk
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/cargo-ndk
+          key: ${{ runner.os }}-cargo-ndk-v3
+
       - name: Install cargo-ndk
+        if: steps.cache-cargo-ndk.outputs.cache-hit != 'true'
         run: cargo install cargo-ndk
 
       - name: Build Android Rust targets
@@ -327,7 +337,7 @@ jobs:
 
       - name: Generate UniFFI Kotlin bindings
         run: |
-          cargo run --features=uniffi/cli --bin uniffi-bindgen generate --language kotlin --library --out-dir ../android-agent/app/src/main/java/ target/aarch64-linux-android/release/libguardian_agent.so
+          cargo run --features=uniffi/cli --bin uniffi-bindgen generate --language kotlin --library --no-format --out-dir ../android-agent/app/src/main/java/ target/aarch64-linux-android/release/libguardian_agent.so
         working-directory: agent
 
       - name: Decode release keystore
