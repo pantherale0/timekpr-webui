@@ -83,7 +83,7 @@ Historical **Circle Home Plus** hardware is a different model (LAN DNS/filter). 
 | Per-app time limits | Partial | Vendor | Partial | Vendor | Vendor | Partial | Vendor |
 | App blocking / allowlists | Yes | Vendor | Partial | Vendor | Vendor | Vendor | Vendor |
 | Web / domain filtering | Yes | Vendor | Vendor | Partial | Vendor | Partial | Vendor |
-| HTTPS / DNS-bypass resistant filtering | Partial | Partial | Partial | Partial | Partial | Partial | Partial |
+| DNS-bypass resistant filtering (on managed device) | Yes | Partial | Partial | Partial | Partial | Partial | Partial |
 | YouTube history monitoring | No | Partial | Partial | Partial | Vendor | Vendor | Partial (Kaspersky, Norton) |
 | Geofencing / GPS tracking | No | Vendor | Vendor | Vendor | Vendor | Partial | Vendor |
 | Location / panic button | No | Vendor | Partial | Partial | Vendor (Qustodio) | Partial | Vendor |
@@ -102,7 +102,7 @@ Historical **Circle Home Plus** hardware is a different model (LAN DNS/filter). 
 **Guardian partial notes:**
 
 - **Per-app limits** — policy presets and lockout suspend/block apps; not identical to vendor “30 minutes per app per day” UIs.
-- **HTTPS filtering** — DNS-level (Linux/Windows) or VPN DNS (Android); determined kids can still use alternate networks or VPNs, same as PCMag notes for commercial filters.
+- **DNS-bypass resistant filtering** — blocklists are enforced **locally on each managed device** (Linux/Windows per-user DNS sinkhole; Android local DNS VPN with always-on VPN when Device Owner), so switching Wi‑Fi or cellular does **not** bypass filtering the way router or account-level DNS products can. Residual bypass vectors are narrower: another unmanaged device, disabling the agent (requires admin access), direct IP connections, or a third-party VPN app if not blocked by policy—Guardian can suspend non-allowlisted apps on Android Device Owner, but does not auto-block all VPN clients today.
 - **Remote lock** — time lockout and app suspension, not always a full device PIN lock.
 - **Factory reset** — Android Device Owner only.
 
@@ -268,7 +268,7 @@ Many households use **Guardian for PCs, Linux, and consoles** plus **Family Link
 
 ## Philosophy
 
-PCMag’s 2026 guide and [All About Cookies’ testing methodology](https://allaboutcookies.org/best-parental-control-apps) both note that invasive spyware can be counterproductive and that determined children often bypass filters (VPN, alternate browsers, alternate devices). Guardian leans toward:
+PCMag’s 2026 guide and [All About Cookies’ testing methodology](https://allaboutcookies.org/best-parental-control-apps) both note that invasive spyware can be counterproductive and that determined children often bypass **browser- or account-level** filters (VPN, alternate browsers, alternate devices). On devices you fully manage, Guardian’s local agents reduce the “just join another Wi‑Fi” bypass common to router DNS and some mobile filter apps. Guardian leans toward:
 
 - **Enforcement** on devices you administer (block, suspend, DNS filter, polkit)
 - **Transparent access requests** instead of covert message reading
