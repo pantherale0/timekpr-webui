@@ -1,0 +1,7 @@
+{
+  "server_url": "ws://localhost:5000/ws",
+  "system_id": "cf3a0437-7214-4805-969b-686948e23ce7",
+  "registration_token": null,
+  "agent_token": null,
+  "github_repo": null
+}

@@ -12,12 +12,12 @@ use users::get_user_by_name;
 use users::os::unix::UserExt;
 
 const PROFILE_DIR: &str = "/etc/apparmor.d";
-const STATE_DIR_PRIMARY: &str = "/var/lib/timekpr-agent";
-const STATE_DIR_FALLBACK: &str = "/etc/timekpr-agent";
+const STATE_DIR_PRIMARY: &str = "/var/lib/guardian-agent";
+const STATE_DIR_FALLBACK: &str = "/etc/guardian-agent";
 const STATE_FILENAME: &str = "apparmor-policy.json";
 const MATCH_TYPE_EXECUTABLE: &str = "executable";
 const MATCH_TYPE_PATH_PATTERN: &str = "path_pattern";
-const GLOBAL_PROFILE_PREFIX: &str = "timekpr-global-exec";
+const GLOBAL_PROFILE_PREFIX: &str = "guardian-global-exec";
 const PATH_PATTERN_SUFFIX: &str = "/**";
 const SCRIPT_INTERPRETERS: &[&str] = &[
     "bash",
@@ -347,7 +347,7 @@ impl AppArmorRuntime {
     }
 
     fn unload_exact_profiles_for_user(&self, username: &str) -> Result<(), String> {
-        unload_profiles_with_prefix(&format!("timekpr-{}-", username))
+        unload_profiles_with_prefix(&format!("guardian-{}-", username))
     }
 
     fn refresh_global_exec_profiles(&self) -> Result<(), String> {
@@ -525,7 +525,7 @@ fn make_profile_name(username: &str, app_name: &str) -> String {
         .chars()
         .map(|c| if c.is_alphanumeric() || c == '-' || c == '_' { c } else { '_' })
         .collect();
-    format!("timekpr-{}-{}", username, sanitized_app.to_lowercase())
+    format!("guardian-{}-{}", username, sanitized_app.to_lowercase())
 }
 
 fn normalized_match_type(match_type: &str) -> &str {
@@ -757,7 +757,7 @@ fn generate_global_exec_profile(
     path_rules: &[ResolvedPathRule],
 ) -> String {
     format!(
-        r#"# Timekpr managed global path-exec baseline
+        r#"# Guardian managed global path-exec baseline
 profile {profile_name} {attachment_path} flags=(default_allow) {{
 #include <abstractions/base>
 {path_rule_lines}}}
@@ -777,7 +777,7 @@ fn generate_profile(
     match preset {
         "complain" => String::new(),
         "blocked" => format!(
-            r#"# Timekpr managed profile – BLOCK execution
+            r#"# Guardian managed profile – BLOCK execution
 profile {profile_name} {executable_path} {{
   # Deny everything
   deny /** rwlkx,
@@ -789,7 +789,7 @@ profile {profile_name} {executable_path} {{
             executable_path = executable_path,
         ),
         "no_internet" => format!(
-            r#"# Timekpr managed profile – NO INTERNET
+            r#"# Guardian managed profile – NO INTERNET
 profile {profile_name} {executable_path} {{
   # Allow standard file access
 #include <abstractions/base>
@@ -831,20 +831,20 @@ mod tests {
     fn profile_name_sanitizes_special_characters() {
         assert_eq!(
             make_profile_name("alice", "Google Chrome"),
-            "timekpr-alice-google_chrome"
+            "guardian-alice-google_chrome"
         );
     }
 
     #[test]
     fn blocked_profile_denies_everything() {
-        let profile = generate_profile("timekpr-alice-steam", "/usr/bin/steam", "blocked", "");
+        let profile = generate_profile("guardian-alice-steam", "/usr/bin/steam", "blocked", "");
         assert!(profile.contains("deny /** rwlkx,"));
         assert!(profile.contains("deny network,"));
     }
 
     #[test]
     fn no_internet_profile_denies_network() {
-        let profile = generate_profile("timekpr-bob-firefox", "/usr/bin/firefox", "no_internet", "");
+        let profile = generate_profile("guardian-bob-firefox", "/usr/bin/firefox", "no_internet", "");
         assert!(profile.contains("deny network inet,"));
         assert!(profile.contains("deny network inet6,"));
         assert!(!profile.contains("deny /** rwlkx,"));
@@ -852,13 +852,13 @@ mod tests {
 
     #[test]
     fn complain_profile_generates_no_apparmor_profile() {
-        let profile = generate_profile("timekpr-alice-steam", "/usr/bin/steam", "complain", "");
+        let profile = generate_profile("guardian-alice-steam", "/usr/bin/steam", "complain", "");
         assert!(profile.is_empty());
     }
 
     #[test]
     fn allowed_preset_generates_empty_profile() {
-        let profile = generate_profile("timekpr-bob-vlc", "/usr/bin/vlc", "allowed", "");
+        let profile = generate_profile("guardian-bob-vlc", "/usr/bin/vlc", "allowed", "");
         assert!(profile.is_empty());
     }
 

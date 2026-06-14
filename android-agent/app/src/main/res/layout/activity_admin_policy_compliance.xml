@@ -31,7 +31,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
-            android:text="Choose how TimeKpr will partition and restrict parental controls on this device. This setting cannot be changed later without factory resetting or re-provisioning."
+            android:text="Choose how Guardian will partition and restrict parental controls on this device. This setting cannot be changed later without factory resetting or re-provisioning."
             android:textAppearance="?attr/textAppearanceBodyMedium"
             android:textColor="?android:attr/textColorSecondary" />
 

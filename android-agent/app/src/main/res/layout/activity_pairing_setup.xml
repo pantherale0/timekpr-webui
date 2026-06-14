@@ -8,14 +8,14 @@
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Connect to TimeKpr"
+        android:text="Connect to Guardian"
         android:textAppearance="?attr/textAppearanceHeadlineMedium" />
 
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="8dp"
-        android:text="Scan the QR code shown in the TimeKpr server settings, or enter the WebSocket URL manually." />
+        android:text="Scan the QR code shown in the Guardian server settings, or enter the WebSocket URL manually." />
 
     <EditText
         android:id="@+id/serverUrlInput"

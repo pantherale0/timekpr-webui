@@ -24,7 +24,7 @@
         tools:ignore="ProtectedPermissions" />
 
     <application
-        android:name=".TimeKprApplication"
+        android:name=".GuardianApplication"
         android:allowBackup="false"
         android:crossProfile="true"
         android:directBootAware="true"
@@ -32,7 +32,7 @@
         android:label="@string/app_name"
         android:networkSecurityConfig="@xml/network_security_config"
         android:supportsRtl="true"
-        android:theme="@style/Theme.TimeKprAgent">
+        android:theme="@style/Theme.GuardianAgent">
 
         <activity
             android:name=".ui.MainActivity"
@@ -47,7 +47,7 @@
         <activity
             android:name=".ui.PairingSetupActivity"
             android:exported="false"
-            android:theme="@style/Theme.TimeKprAgent" />
+            android:theme="@style/Theme.GuardianAgent" />
 
         <activity
             android:name=".ui.QrScanActivity"
@@ -59,7 +59,7 @@
             android:directBootAware="true"
             android:exported="false"
             android:launchMode="singleInstance"
-            android:theme="@style/Theme.TimeKprAgent"
+            android:theme="@style/Theme.GuardianAgent"
             android:showWhenLocked="true"
             android:excludeFromRecents="true" />
 
@@ -82,7 +82,7 @@
             android:name=".admin.AdminPolicyComplianceActivity"
             android:exported="true"
             android:permission="android.permission.BIND_DEVICE_ADMIN"
-            android:theme="@style/Theme.TimeKprAgent">
+            android:theme="@style/Theme.GuardianAgent">
             <intent-filter>
                 <action android:name="android.app.action.ADMIN_POLICY_COMPLIANCE" />
                 <category android:name="android.intent.category.DEFAULT" />
@@ -90,7 +90,7 @@
         </activity>
 
         <receiver
-            android:name=".admin.TimeKprDeviceAdminReceiver"
+            android:name=".admin.GuardianDeviceAdminReceiver"
             android:exported="true"
             android:permission="android.permission.BIND_DEVICE_ADMIN">
             <meta-data
@@ -145,7 +145,7 @@
             android:exported="false" />
 
         <service
-            android:name=".push.TimeKprMessagingService"
+            android:name=".push.GuardianMessagingService"
             android:exported="false">
             <intent-filter>
                 <action android:name="com.google.firebase.MESSAGING_EVENT" />
@@ -156,7 +156,7 @@
             android:name=".policy.PolicyPayloadReceiver"
             android:exported="false">
             <intent-filter>
-                <action android:name="com.timekpr.agent.policy.ACTION_POLICY_PAYLOAD" />
+                <action android:name="com.guardian.agent.policy.ACTION_POLICY_PAYLOAD" />
             </intent-filter>
         </receiver>
 
@@ -164,7 +164,7 @@
             android:name=".monitor.UsageAlertForwardReceiver"
             android:exported="false">
             <intent-filter>
-                <action android:name="com.timekpr.agent.monitor.FORWARD_USAGE_ALERT" />
+                <action android:name="com.guardian.agent.monitor.FORWARD_USAGE_ALERT" />
             </intent-filter>
         </receiver>
 
@@ -176,7 +176,7 @@
             android:taskAffinity=""
             android:theme="@android:style/Theme.Translucent.NoTitleBar">
             <intent-filter>
-                <action android:name="com.timekpr.agent.monitor.RELAY_USAGE_ALERT" />
+                <action android:name="com.guardian.agent.monitor.RELAY_USAGE_ALERT" />
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity>
@@ -185,7 +185,7 @@
             android:name=".policy.PolicyStoreReloadReceiver"
             android:exported="false">
             <intent-filter>
-                <action android:name="com.timekpr.agent.policy.ACTION_RELOAD_STORES" />
+                <action android:name="com.guardian.agent.policy.ACTION_RELOAD_STORES" />
             </intent-filter>
         </receiver>
 
@@ -203,7 +203,7 @@
             </intent-filter>
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="timekpr_domain_policy" />
+                android:value="guardian_domain_policy" />
         </service>
 
         <service
@@ -212,7 +212,7 @@
             android:foregroundServiceType="specialUse">
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="timekpr_usage_monitor" />
+                android:value="guardian_usage_monitor" />
         </service>
 
         <service
@@ -221,7 +221,7 @@
             android:foregroundServiceType="specialUse">
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="timekpr_agent_connection" />
+                android:value="guardian_agent_connection" />
         </service>
     </application>
 </manifest>

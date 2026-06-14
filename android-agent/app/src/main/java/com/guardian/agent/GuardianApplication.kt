@@ -1,0 +1,46 @@
+package com.guardian.agent
+
+import android.app.Application
+import com.guardian.agent.admin.DeviceOwnerProvisioner
+import com.guardian.agent.config.AgentConfigStore
+import com.guardian.agent.policy.AppPolicyStore
+import com.guardian.agent.policy.DeviceRestrictionStore
+import com.guardian.agent.policy.DomainPolicyStore
+import com.guardian.agent.policy.TimeLimitStore
+import com.guardian.agent.policy.PolicyIpcServer
+import com.guardian.agent.util.DirectBootHelper
+
+class GuardianApplication : Application() {
+    lateinit var configStore: AgentConfigStore
+        private set
+
+    val timeLimitStore: TimeLimitStore by lazy { TimeLimitStore(this) }
+    val domainPolicyStore: DomainPolicyStore by lazy { DomainPolicyStore(this).also { it.restore() } }
+    val appPolicyStore: AppPolicyStore by lazy { AppPolicyStore(this).also { it.restore() } }
+    val deviceRestrictionStore: DeviceRestrictionStore by lazy { DeviceRestrictionStore(this).also { it.restore() } }
+    val policyIpcServer: PolicyIpcServer by lazy { PolicyIpcServer(this) }
+
+    override fun onCreate() {
+        super.onCreate()
+        com.google.android.material.color.DynamicColors.applyToActivitiesIfAvailable(this)
+        configStore = AgentConfigStore(this)
+
+        if (DirectBootHelper.isCredentialStorageUnlocked(this)) {
+            configStore.migrateToDeviceProtectedStorageIfNeeded()
+            if ((android.os.Process.myUid() / 100_000) == 0) {
+                policyIpcServer.start()
+                com.guardian.agent.admin.SecondaryUserProvisioner.ensurePrimaryUiVisible(this)
+            }
+            DeviceOwnerProvisioner.applyIfDeviceOwner(this)
+        } else if ((android.os.Process.myUid() / 100_000) == 0) {
+            policyIpcServer.start()
+            DeviceOwnerProvisioner.applyIfDeviceOwner(this)
+        }
+    }
+
+    companion object {
+        fun from(context: android.content.Context): GuardianApplication {
+            return context.applicationContext as GuardianApplication
+        }
+    }
+}

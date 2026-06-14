@@ -14,7 +14,7 @@ use users::os::unix::UserExt;
 
 use crate::netlink::AppAlert;
 
-const STATE_FILE: &str = "/etc/timekpr-agent/terminal_offsets.json";
+const STATE_FILE: &str = "/etc/guardian-agent/terminal_offsets.json";
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 struct UserOffsets {
@@ -42,48 +42,48 @@ fn current_unix_timestamp() -> u64 {
 
 /// Write Bash/Zsh/Fish global profile hooks system-wide
 pub fn deploy_shell_hooks() {
-    let bash_zsh_hook = r#"# Timekpr-WebUI terminal logger hook for Bash and Zsh
+    let bash_zsh_hook = r#"# Guardian-WebUI terminal logger hook for Bash and Zsh
 if [ -n "$BASH_VERSION" ] || [ -n "$ZSH_VERSION" ]; then
-    if [ -z "$TIMEKPR_SESSION_ID" ]; then
-        export TIMEKPR_SESSION_ID=$(cat /proc/sys/kernel/random/uuid 2>/dev/null || echo "$$_$(date +%s)")
+    if [ -z "$GUARDIAN_SESSION_ID" ]; then
+        export GUARDIAN_SESSION_ID=$(cat /proc/sys/kernel/random/uuid 2>/dev/null || echo "$$_$(date +%s)")
     fi
 
-    log_timekpr_cmd() {
+    log_guardian_cmd() {
         local last_cmd="$1"
         if [ -n "$last_cmd" ] && [[ "$last_cmd" != logger* ]]; then
-            logger -t "timekpr-terminal" -- "{\"tty\":\"$(tty 2>/dev/null || echo unknown)\",\"pwd\":\"$PWD\",\"cmd\":\"$last_cmd\",\"session_id\":\"$TIMEKPR_SESSION_ID\",\"user\":\"$USER\"}"
+            logger -t "guardian-terminal" -- "{\"tty\":\"$(tty 2>/dev/null || echo unknown)\",\"pwd\":\"$PWD\",\"cmd\":\"$last_cmd\",\"session_id\":\"$GUARDIAN_SESSION_ID\",\"user\":\"$USER\"}"
         fi
     }
 
     if [ -n "$BASH_VERSION" ]; then
-        timekpr_bash_preexec() {
-            log_timekpr_cmd "$BASH_COMMAND"
+        guardian_bash_preexec() {
+            log_guardian_cmd "$BASH_COMMAND"
         }
-        trap 'timekpr_bash_preexec' DEBUG
+        trap 'guardian_bash_preexec' DEBUG
     elif [ -n "$ZSH_VERSION" ]; then
         preexec() {
-            log_timekpr_cmd "$1"
+            log_guardian_cmd "$1"
         }
     fi
 fi
 "#;
 
-    let fish_hook = r#"# Timekpr-WebUI terminal logger hook for Fish
+    let fish_hook = r#"# Guardian-WebUI terminal logger hook for Fish
 if status is-interactive
-    if not set -q TIMEKPR_SESSION_ID
-        set -gx TIMEKPR_SESSION_ID (cat /proc/sys/kernel/random/uuid 2>/dev/null; or echo "$fish_pid"_(date +%s))
+    if not set -q GUARDIAN_SESSION_ID
+        set -gx GUARDIAN_SESSION_ID (cat /proc/sys/kernel/random/uuid 2>/dev/null; or echo "$fish_pid"_(date +%s))
     end
 
-    function timekpr_preexec --on-event fish_preexec
+    function guardian_preexec --on-event fish_preexec
         set -l last_cmd $argv[1]
         if test -n "$last_cmd"; and not string match -r '^logger' "$last_cmd"
-            logger -t "timekpr-terminal" -- "{\"tty\":\""(tty 2>/dev/null; or echo unknown)"\",\"pwd\":\"$PWD\",\"cmd\":\"$last_cmd\",\"session_id\":\"$TIMEKPR_SESSION_ID\",\"user\":\"$USER\"}"
+            logger -t "guardian-terminal" -- "{\"tty\":\""(tty 2>/dev/null; or echo unknown)"\",\"pwd\":\"$PWD\",\"cmd\":\"$last_cmd\",\"session_id\":\"$GUARDIAN_SESSION_ID\",\"user\":\"$USER\"}"
         end
     end
 end
 "#;
 
-    let sh_path = "/etc/profile.d/timekpr-terminal.sh";
+    let sh_path = "/etc/profile.d/guardian-terminal.sh";
     if let Err(e) = fs::write(sh_path, bash_zsh_hook) {
         eprintln!("terminal_monitor: failed to write shell hook to {}: {}", sh_path, e);
     } else {
@@ -92,7 +92,7 @@ end
 
     let fish_dir = "/etc/fish/conf.d";
     if fs::create_dir_all(fish_dir).is_ok() {
-        let fish_path = format!("{}/timekpr-terminal.fish", fish_dir);
+        let fish_path = format!("{}/guardian-terminal.fish", fish_dir);
         if let Err(e) = fs::write(&fish_path, fish_hook) {
             eprintln!("terminal_monitor: failed to write fish hook to {}: {}", fish_path, e);
         } else {
@@ -169,7 +169,7 @@ async fn run_journal_tailer(
             "--follow",
             "--no-pager",
             "-t",
-            "timekpr-terminal",
+            "guardian-terminal",
             "--output=cat",
             "--since=now",
         ])
@@ -185,7 +185,7 @@ async fn run_journal_tailer(
 
     let mut reader = BufReader::new(stdout).lines();
 
-    println!("terminal_monitor: tailing journalctl for timekpr-terminal logs");
+    println!("terminal_monitor: tailing journalctl for guardian-terminal logs");
 
     while let Ok(Some(line)) = reader.next_line().await {
         let trimmed = line.trim();

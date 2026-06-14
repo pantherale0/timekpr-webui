@@ -14,5 +14,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "TimeKprAgent"
+rootProject.name = "GuardianAgent"
 include(":app")

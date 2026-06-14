@@ -34,7 +34,8 @@ server/debug-agent.json
 # Gradle files
 .gradle/
 build/
-
+jniLibs
+uniffi
 # Local configuration file (sdk path, etc)
 local.properties
 

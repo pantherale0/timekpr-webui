@@ -12,8 +12,8 @@ mod exec;
 mod polkit;
 mod session;
 
-const STATE_DIR_PRIMARY: &str = "/var/lib/timekpr-agent";
-const STATE_DIR_FALLBACK: &str = "/etc/timekpr-agent";
+const STATE_DIR_PRIMARY: &str = "/var/lib/guardian-agent";
+const STATE_DIR_FALLBACK: &str = "/etc/guardian-agent";
 const STATE_FILENAME: &str = "linux-device-policy.json";
 
 static LINUX_DEVICE_POLICY_RUNTIME: OnceLock<Arc<Mutex<LinuxDevicePolicyRuntime>>> = OnceLock::new();

@@ -448,12 +448,12 @@ impl PendingDomainPolicySync {
 }
 
 fn policy_state_path() -> PathBuf {
-    let primary_dir = PathBuf::from("/var/lib/timekpr-agent");
+    let primary_dir = PathBuf::from("/var/lib/guardian-agent");
     if fs::create_dir_all(&primary_dir).is_ok() {
         return primary_dir.join("domain-policy.json");
     }
 
-    let fallback_dir = PathBuf::from("/etc/timekpr-agent");
+    let fallback_dir = PathBuf::from("/etc/guardian-agent");
     let _ = fs::create_dir_all(&fallback_dir);
     fallback_dir.join("domain-policy.json")
 }

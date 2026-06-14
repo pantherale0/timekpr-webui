@@ -80,7 +80,7 @@ use uuid::Uuid;
 use zbus::{Connection, Proxy};
 
 type HmacSha256 = Hmac<Sha256>;
-const AGENT_VERSION: &str = match option_env!("TIMEKPR_AGENT_VERSION") {
+const AGENT_VERSION: &str = match option_env!("GUARDIAN_AGENT_VERSION") {
     Some(v) => v,
     None => env!("CARGO_PKG_VERSION"),
 };
@@ -210,7 +210,7 @@ struct SessionSnapshot {
 fn get_config_path() -> String {
     #[cfg(target_os = "windows")]
     {
-        let primary_dir = "C:\\ProgramData\\TimeKpr";
+        let primary_dir = "C:\\ProgramData\\Guardian";
         let primary_path = format!("{}\\config.json", primary_dir);
         let fallback_path = "config.json";
 
@@ -226,7 +226,7 @@ fn get_config_path() -> String {
     }
     #[cfg(not(target_os = "windows"))]
     {
-        let primary_dir = "/etc/timekpr-agent";
+        let primary_dir = "/etc/guardian-agent";
         let primary_path = format!("{}/config.json", primary_dir);
         let fallback_path = "config.json";
 
@@ -932,7 +932,7 @@ async fn trigger_auto_update(target_version: &str, github_repo: &str) -> Result<
         other => return Err(format!("Unsupported architecture for auto-update: {}", other)),
     };
 
-    let asset_name = format!("timekpr-agent-{}.tar.gz", target);
+    let asset_name = format!("guardian-agent-{}.tar.gz", target);
     let checksum_name = format!("{asset_name}.sha256");
     let download_url = format!(
         "https://github.com/{github_repo}/releases/download/{target_version}/{asset_name}"
@@ -974,7 +974,7 @@ async fn trigger_auto_update(target_version: &str, github_repo: &str) -> Result<
             .map_err(|e| format!("Failed to get entry path: {}", e))?
             .to_path_buf();
             
-        if path.file_name().and_then(|f| f.to_str()) == Some("timekpr-agent") {
+        if path.file_name().and_then(|f| f.to_str()) == Some("guardian-agent") {
             use std::io::Read;
             let mut buf = Vec::new();
             entry
@@ -985,7 +985,7 @@ async fn trigger_auto_update(target_version: &str, github_repo: &str) -> Result<
         }
     }
     
-    let binary_bytes = binary_bytes.ok_or_else(|| "Archive did not contain 'timekpr-agent' binary".to_string())?;
+    let binary_bytes = binary_bytes.ok_or_else(|| "Archive did not contain 'guardian-agent' binary".to_string())?;
     println!("Extracted new binary ({} bytes). Performing self-replace...", binary_bytes.len());
     
     let current_bin = std::env::current_exe()
@@ -994,7 +994,7 @@ async fn trigger_auto_update(target_version: &str, github_repo: &str) -> Result<
         .parent()
         .ok_or_else(|| "Failed to get current executable directory".to_string())?;
         
-    let temp_bin = bin_dir.join("timekpr-agent.tmp");
+    let temp_bin = bin_dir.join("guardian-agent.tmp");
     
     std::fs::write(&temp_bin, &binary_bytes)
         .map_err(|e| format!("Failed to write temporary binary file: {}", e))?;
@@ -1433,7 +1433,7 @@ fn spawn_logind_listeners(
 
 #[cfg(target_os = "linux")]
 async fn run_linux_main() {
-    println!("Starting Timekpr Client Agent...");
+    println!("Starting Guardian Client Agent...");
     if let Err(message) = domain_policy::initialize_runtime().await {
         eprintln!("Failed to restore persisted domain policy: {}", message);
     }

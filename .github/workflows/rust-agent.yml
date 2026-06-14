@@ -100,10 +100,39 @@ jobs:
         with:
           packages: tools platform-tools build-tools;35.0.0
 
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
         with:
-          gradle-version: 8.9
+          targets: aarch64-linux-android, armv7-linux-androideabi, x86_64-linux-android
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "agent -> target"
+
+      - name: Install cargo-ndk
+        run: cargo install cargo-ndk
+
+      - name: Build Android Rust targets
+        run: |
+          cargo ndk --target aarch64-linux-android build --lib --release
+          cargo ndk --target armv7-linux-androideabi build --lib --release
+          cargo ndk --target x86_64 build --lib --release
+        working-directory: agent
+
+      - name: Copy native libraries to Android project
+        run: |
+          mkdir -p android-agent/app/src/main/jniLibs/arm64-v8a
+          mkdir -p android-agent/app/src/main/jniLibs/armeabi-v7a
+          mkdir -p android-agent/app/src/main/jniLibs/x86_64
+          cp agent/target/aarch64-linux-android/release/libguardian_agent.so android-agent/app/src/main/jniLibs/arm64-v8a/
+          cp agent/target/armv7-linux-androideabi/release/libguardian_agent.so android-agent/app/src/main/jniLibs/armeabi-v7a/
+          cp agent/target/x86_64-linux-android/release/libguardian_agent.so android-agent/app/src/main/jniLibs/x86_64/
+
+      - name: Generate UniFFI Kotlin bindings
+        run: |
+          cargo run --features=uniffi/cli --bin uniffi-bindgen generate --language kotlin --library --out-dir ../android-agent/app/src/main/java/ target/aarch64-linux-android/release/libguardian_agent.so
+        working-directory: agent
 
       - name: Build debug APK
         working-directory: android-agent
@@ -159,27 +188,27 @@ jobs:
           if [ "${{ matrix.target }}" = "aarch64-unknown-linux-gnu" ]; then
             export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc
           fi
-          export TIMEKPR_AGENT_VERSION="${{ github.ref_name }}"
+          export GUARDIAN_AGENT_VERSION="${{ github.ref_name }}"
           cargo build --release --manifest-path agent/Cargo.toml --target "${{ matrix.target }}"
 
       - name: Package release asset
         run: |
           mkdir -p dist
-          tar -czf "dist/timekpr-agent-${{ matrix.target }}.tar.gz" \
+          tar -czf "dist/guardian-agent-${{ matrix.target }}.tar.gz" \
             -C "agent/target/${{ matrix.target }}/release" \
-            timekpr-agent
+            guardian-agent
 
       - name: Generate SHA-256 checksum
         run: |
-          sha256sum "dist/timekpr-agent-${{ matrix.target }}.tar.gz" | awk '{print $1}' > "dist/timekpr-agent-${{ matrix.target }}.tar.gz.sha256"
+          sha256sum "dist/guardian-agent-${{ matrix.target }}.tar.gz" | awk '{print $1}' > "dist/guardian-agent-${{ matrix.target }}.tar.gz.sha256"
 
       - name: Upload packaged asset
         uses: actions/upload-artifact@v4
         with:
-          name: linux-agent-${{ matrix.target }}
+          name: guardian-linux-agent-${{ matrix.target }}
           path: |
-            dist/timekpr-agent-${{ matrix.target }}.tar.gz
-            dist/timekpr-agent-${{ matrix.target }}.tar.gz.sha256
+            dist/guardian-agent-${{ matrix.target }}.tar.gz
+            dist/guardian-agent-${{ matrix.target }}.tar.gz.sha256
 
   windows-release-build:
     needs: windows-check
@@ -202,7 +231,7 @@ jobs:
       - name: Build release binary
         shell: bash
         run: |
-          export TIMEKPR_AGENT_VERSION="${{ github.ref_name }}"
+          export GUARDIAN_AGENT_VERSION="${{ github.ref_name }}"
           cargo build --release --manifest-path agent/Cargo.toml --target x86_64-pc-windows-msvc
 
       - name: Compile MSI installer
@@ -222,26 +251,26 @@ jobs:
           "$WIX_BIN_UNIX/candle.exe" \
             -dVersion="$VERSION" \
             -dSourceDir="agent/target/x86_64-pc-windows-msvc/release" \
-            -o "agent/timekpr-agent.wixobj" \
-            "agent/timekpr-agent.wxs"
+            -o "agent/guardian-agent.wixobj" \
+            "agent/guardian-agent.wxs"
             
           "$WIX_BIN_UNIX/light.exe" \
             -ext WixUIExtension \
-            -o "dist/timekpr-agent-x86_64-pc-windows-msvc.msi" \
-            "agent/timekpr-agent.wixobj"
+            -o "dist/guardian-agent-x86_64-pc-windows-msvc.msi" \
+            "agent/guardian-agent.wixobj"
 
       - name: Generate SHA-256 checksum
         shell: bash
         run: |
-          sha256sum "dist/timekpr-agent-x86_64-pc-windows-msvc.msi" | awk '{print $1}' > "dist/timekpr-agent-x86_64-pc-windows-msvc.msi.sha256"
+          sha256sum "dist/guardian-agent-x86_64-pc-windows-msvc.msi" | awk '{print $1}' > "dist/guardian-agent-x86_64-pc-windows-msvc.msi.sha256"
 
       - name: Upload packaged asset
         uses: actions/upload-artifact@v4
         with:
-          name: windows-agent-msi
+          name: guardian-windows-agent-msi
           path: |
-            dist/timekpr-agent-x86_64-pc-windows-msvc.msi
-            dist/timekpr-agent-x86_64-pc-windows-msvc.msi.sha256
+            dist/guardian-agent-x86_64-pc-windows-msvc.msi
+            dist/guardian-agent-x86_64-pc-windows-msvc.msi.sha256
 
   android-release-build:
     needs: android-check
@@ -267,6 +296,40 @@ jobs:
         with:
           gradle-version: 8.9
 
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android, armv7-linux-androideabi, x86_64-linux-android
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "agent -> target"
+
+      - name: Install cargo-ndk
+        run: cargo install cargo-ndk
+
+      - name: Build Android Rust targets
+        run: |
+          cargo ndk --target aarch64-linux-android build --lib --release
+          cargo ndk --target armv7-linux-androideabi build --lib --release
+          cargo ndk --target x86_64 build --lib --release
+        working-directory: agent
+
+      - name: Copy native libraries to Android project
+        run: |
+          mkdir -p android-agent/app/src/main/jniLibs/arm64-v8a
+          mkdir -p android-agent/app/src/main/jniLibs/armeabi-v7a
+          mkdir -p android-agent/app/src/main/jniLibs/x86_64
+          cp agent/target/aarch64-linux-android/release/libguardian_agent.so android-agent/app/src/main/jniLibs/arm64-v8a/
+          cp agent/target/armv7-linux-androideabi/release/libguardian_agent.so android-agent/app/src/main/jniLibs/armeabi-v7a/
+          cp agent/target/x86_64-linux-android/release/libguardian_agent.so android-agent/app/src/main/jniLibs/x86_64/
+
+      - name: Generate UniFFI Kotlin bindings
+        run: |
+          cargo run --features=uniffi/cli --bin uniffi-bindgen generate --language kotlin --library --out-dir ../android-agent/app/src/main/java/ target/aarch64-linux-android/release/libguardian_agent.so
+        working-directory: agent
+
       - name: Decode release keystore
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
@@ -285,7 +348,7 @@ jobs:
       - name: Build release APK
         working-directory: android-agent
         env:
-          TIMEKPR_AGENT_VERSION: ${{ github.ref_name }}
+          GUARDIAN_AGENT_VERSION: ${{ github.ref_name }}
           ANDROID_KEYSTORE_PATH: ${{ github.workspace }}/android-agent/release.keystore
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
@@ -313,13 +376,13 @@ jobs:
             find "$release_dir" -type f -name '*.apk' -ls >&2 || true
             exit 1
           fi
-          cp "$apk_path" "dist/timekpr-android-agent-${{ github.ref_name }}.apk"
+          cp "$apk_path" "dist/guardian-android-agent-${{ github.ref_name }}.apk"
 
       - name: Compute APK signature checksum
         run: |
           chmod +x scripts/android-signature-checksum.sh
-          apk="dist/timekpr-android-agent-${{ github.ref_name }}.apk"
-          checksum_file="dist/timekpr-android-agent-${{ github.ref_name }}.signature-checksum"
+          apk="dist/guardian-android-agent-${{ github.ref_name }}.apk"
+          checksum_file="dist/guardian-android-agent-${{ github.ref_name }}.signature-checksum"
           ./scripts/android-signature-checksum.sh "$apk" > "$checksum_file"
           if [[ "$(tr -d '[:space:]' < "$checksum_file")" == "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU" ]]; then
             echo "Refusing to publish the empty SHA-256 checksum; apksigner is required for v2/v3-signed APKs." >&2
@@ -329,10 +392,10 @@ jobs:
       - name: Upload packaged asset
         uses: actions/upload-artifact@v4
         with:
-          name: android-agent-apk
+          name: guardian-android-agent-apk
           path: |
-            dist/timekpr-android-agent-${{ github.ref_name }}.apk
-            dist/timekpr-android-agent-${{ github.ref_name }}.signature-checksum
+            dist/guardian-android-agent-${{ github.ref_name }}.apk
+            dist/guardian-android-agent-${{ github.ref_name }}.signature-checksum
 
   publish-release:
     needs: [linux-release-build, android-release-build, windows-release-build]

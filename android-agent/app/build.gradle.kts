@@ -23,14 +23,14 @@ fun versionCodeFromTag(tag: String): Int {
     return major * 1_000_000 + minor * 1_000 + patch
 }
 
-val releaseAgentVersion = normalizedAgentVersion(System.getenv("TIMEKPR_AGENT_VERSION"))
+val releaseAgentVersion = normalizedAgentVersion(System.getenv("GUARDIAN_AGENT_VERSION"))
 
 android {
-    namespace = "com.timekpr.agent"
+    namespace = "com.guardian.agent"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.timekpr.agent"
+        applicationId = "com.guardian.agent"
         minSdk = 24
         targetSdk = 35
         versionCode = versionCodeFromTag(releaseAgentVersion)
@@ -95,5 +95,6 @@ dependencies {
     implementation(platform("com.google.firebase:firebase-bom:33.7.0"))
     implementation("com.google.firebase:firebase-messaging-ktx")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.9.0")
+    implementation("net.java.dev.jna:jna:5.14.0@aar")
     testImplementation("junit:junit:4.13.2")
 }
