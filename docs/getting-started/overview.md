@@ -2,6 +2,8 @@
 
 Guardian manages child accounts, devices, and policies from a single web dashboard. Each **managed user** (child profile) can be linked to one or more **device mappings**—local OS usernames on Linux/Windows, Android user profiles, or cloud player IDs on Nintendo/Xbox.
 
+Wondering how this compares to Google Family Link, Microsoft Family Safety, Bark, or other subscription apps? See [Guardian vs commercial parental controls](comparison.md).
+
 ## Components
 
 | Component | Role |

@@ -44,6 +44,7 @@ graph TD
 
 | I want to… | Start here |
 |------------|------------|
+| Compare vs Family Link, Bark, Qustodio, etc. | [vs commercial parental controls](getting-started/comparison.md) |
 | Deploy the server | [Server deployment](getting-started/server-deployment.md) |
 | Pair a Linux PC | [Linux agent](platforms/linux-agent.md) · [Pairing workflow](workflows/pairing-and-approval.md) |
 | Pair an Android device | [Android agent](platforms/android-agent.md) |

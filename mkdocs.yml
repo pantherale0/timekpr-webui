@@ -70,6 +70,7 @@ nav:
   - Home: index.md
   - Getting started:
       - Overview: getting-started/overview.md
+      - vs commercial parental controls: getting-started/comparison.md
       - Server deployment: getting-started/server-deployment.md
       - Configuration: getting-started/configuration.md
       - Security: getting-started/security.md

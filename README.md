@@ -11,6 +11,7 @@ Guardian is a cross-platform parental control system with a secure **server–ag
 | Topic | Guide |
 |-------|--------|
 | Deploy the server | [Server deployment](https://pantherale0.github.io/timekpr-webui/getting-started/server-deployment/) |
+| Compare vs Family Link, Bark, etc. | [vs commercial parental controls](https://pantherale0.github.io/timekpr-webui/getting-started/comparison/) |
 | Linux agent | [Linux agent](https://pantherale0.github.io/timekpr-webui/platforms/linux-agent/) |
 | Android agent | [Android agent](https://pantherale0.github.io/timekpr-webui/platforms/android-agent/) |
 | Windows agent | [Windows agent](https://pantherale0.github.io/timekpr-webui/platforms/windows-agent/) |
