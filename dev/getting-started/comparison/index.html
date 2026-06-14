@@ -2946,8 +2946,8 @@
 <td style="text-align: center;">Vendor</td>
 </tr>
 <tr>
-<td>HTTPS / DNS-bypass resistant filtering</td>
-<td style="text-align: center;">Partial</td>
+<td>DNS-bypass resistant filtering (on managed device)</td>
+<td style="text-align: center;">Yes</td>
 <td style="text-align: center;">Partial</td>
 <td style="text-align: center;">Partial</td>
 <td style="text-align: center;">Partial</td>
@@ -3100,7 +3100,7 @@
 <p><strong>Guardian partial notes:</strong></p>
 <ul>
 <li><strong>Per-app limits</strong> — policy presets and lockout suspend/block apps; not identical to vendor “30 minutes per app per day” UIs.</li>
-<li><strong>HTTPS filtering</strong> — DNS-level (Linux/Windows) or VPN DNS (Android); determined kids can still use alternate networks or VPNs, same as PCMag notes for commercial filters.</li>
+<li><strong>DNS-bypass resistant filtering</strong> — blocklists are enforced <strong>locally on each managed device</strong> (Linux/Windows per-user DNS sinkhole; Android local DNS VPN with always-on VPN when Device Owner), so switching Wi‑Fi or cellular does <strong>not</strong> bypass filtering the way router or account-level DNS products can. Residual bypass vectors are narrower: another unmanaged device, disabling the agent (requires admin access), direct IP connections, or a third-party VPN app if not blocked by policy—Guardian can suspend non-allowlisted apps on Android Device Owner, but does not auto-block all VPN clients today.</li>
 <li><strong>Remote lock</strong> — time lockout and app suspension, not always a full device PIN lock.</li>
 <li><strong>Factory reset</strong> — Android Device Owner only.</li>
 </ul>
@@ -3590,7 +3590,7 @@
 </table>
 <p>Many households use <strong>Guardian for PCs, Linux, and consoles</strong> plus <strong>Family Link or Screen Time on phones</strong>, and optionally <strong>Bark or Aura</strong> for message/gaming monitoring.</p>
 <h2 id="philosophy">Philosophy<a class="headerlink" href="#philosophy" title="Permanent link">&para;</a></h2>
-<p>PCMag’s 2026 guide and <a href="https://allaboutcookies.org/best-parental-control-apps">All About Cookies’ testing methodology</a> both note that invasive spyware can be counterproductive and that determined children often bypass filters (VPN, alternate browsers, alternate devices). Guardian leans toward:</p>
+<p>PCMag’s 2026 guide and <a href="https://allaboutcookies.org/best-parental-control-apps">All About Cookies’ testing methodology</a> both note that invasive spyware can be counterproductive and that determined children often bypass <strong>browser- or account-level</strong> filters (VPN, alternate browsers, alternate devices). On devices you fully manage, Guardian’s local agents reduce the “just join another Wi‑Fi” bypass common to router DNS and some mobile filter apps. Guardian leans toward:</p>
 <ul>
 <li><strong>Enforcement</strong> on devices you administer (block, suspend, DNS filter, polkit)</li>
 <li><strong>Transparent access requests</strong> instead of covert message reading</li>
