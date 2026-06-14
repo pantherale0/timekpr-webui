@@ -48,8 +48,8 @@ Published to `ghcr.io/<owner>/<repo>-server:nightly` on `master` and `:vX.Y.Z` o
 ## Documentation (GitHub Pages)
 
 1. **Settings → Pages → Source:** branch `gh-pages`, folder `/ (root)`
-2. Push to `master` → mike deploys **`dev`** alias
-3. Push tag `v*` → mike deploys version and updates **`latest`** alias
+2. Push to `master` → mike deploys version **`dev`** (rolling docs from `master`)
+3. Push tag `v*` → mike deploys that tag and updates the **`latest`** alias
 
 Site URL configured in `mkdocs.yml` as `site_url`.
 

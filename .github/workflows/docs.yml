@@ -64,7 +64,7 @@ jobs:
         if: github.ref == 'refs/heads/master'
         env:
           DISABLE_MKDOCS_2_WARNING: "true"
-        run: mike deploy dev --push --update-aliases dev
+        run: mike deploy dev --push
 
       - name: Deploy release docs
         if: startsWith(github.ref, 'refs/tags/v')
