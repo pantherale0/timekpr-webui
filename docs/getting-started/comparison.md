@@ -264,8 +264,6 @@ Threads such as [r/software — best parental control 2025](https://www.reddit.c
 | **Shared Android tablet**, can’t set Device Owner | Family Link on child profile, or Guardian on child profile only (limited)—see [troubleshooting](../troubleshooting/index.md) |
 | Child’s PC gaming toxicity is top concern | Consider Aura Safe Gaming **plus** Guardian for time/app rules |
 
-Many households use **Guardian for PCs, Linux, and consoles** plus **Family Link or Screen Time on phones**, and optionally **Bark or Aura** for message/gaming monitoring.
-
 ## Philosophy
 
 PCMag’s 2026 guide and [All About Cookies’ testing methodology](https://allaboutcookies.org/best-parental-control-apps) both note that invasive spyware can be counterproductive and that determined children often bypass **browser- or account-level** filters (VPN, alternate browsers, alternate devices). On devices you fully manage, Guardian’s local agents reduce the “just join another Wi‑Fi” bypass common to router DNS and some mobile filter apps. Guardian leans toward:
