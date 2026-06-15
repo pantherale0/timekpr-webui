@@ -31,6 +31,8 @@ tar = "0.4"
 base64 = "0.22"
 minisign-verify = "0.2.5"
 image = { version = "0.25", default-features = false, features = ["jpeg", "png"] }
+sentry = { version = "0.34.0", default-features = false, features = ["backtrace", "contexts", "panic", "reqwest", "rustls"] }
+
 
 [target.'cfg(target_os = "linux")'.dependencies]
 zbus = { version = "5.15.0", default-features = false, features = ["tokio"] }

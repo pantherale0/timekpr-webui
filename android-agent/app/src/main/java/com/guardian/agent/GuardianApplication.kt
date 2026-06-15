@@ -1,6 +1,7 @@
 package com.guardian.agent
 
 import android.app.Application
+import io.sentry.android.core.SentryAndroid
 import com.guardian.agent.admin.DeviceOwnerProvisioner
 import com.guardian.agent.config.AgentConfigStore
 import com.guardian.agent.policy.AppPolicyStore
@@ -22,6 +23,17 @@ class GuardianApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        val sentryDsn = BuildConfig.SENTRY_DSN
+        if (sentryDsn.isNotEmpty()) {
+            SentryAndroid.init(this) { options ->
+                options.dsn = sentryDsn
+            }
+            try {
+                uniffi.guardian_agent.initNativeSentry()
+            } catch (e: Exception) {
+                android.util.Log.e("GuardianApplication", "Failed to initialize native Sentry", e)
+            }
+        }
         com.google.android.material.color.DynamicColors.applyToActivitiesIfAvailable(this)
         configStore = AgentConfigStore(this)
 

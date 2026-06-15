@@ -84,6 +84,23 @@ const AGENT_VERSION: &str = match option_env!("GUARDIAN_AGENT_VERSION") {
     Some(v) => v,
     None => env!("CARGO_PKG_VERSION"),
 };
+
+fn init_sentry() -> Option<sentry::ClientInitGuard> {
+    if let Some(dsn) = option_env!("SENTRY_DSN") {
+        if !dsn.is_empty() {
+            let options = sentry::ClientOptions {
+                release: Some(AGENT_VERSION.into()),
+                ..Default::default()
+            };
+            let guard = sentry::init((dsn, options));
+            if guard.is_enabled() {
+                return Some(guard);
+            }
+        }
+    }
+    None
+}
+
 const POLICY_SYNC_INTERVAL_SECS: u64 = 4 * 60 * 60;
 const INSTALLED_APPS_SYNC_INTERVAL_SECS: u64 = 24 * 60 * 60;
 const DEFAULT_SCREENSHOT_INTERVAL_SECS: u64 = 300;
@@ -1433,6 +1450,7 @@ fn spawn_logind_listeners(
 
 #[cfg(target_os = "linux")]
 async fn run_linux_main() {
+    let _sentry_guard = init_sentry();
     println!("Starting Guardian Client Agent...");
     if let Err(message) = domain_policy::initialize_runtime().await {
         eprintln!("Failed to restore persisted domain policy: {}", message);
@@ -1864,6 +1882,7 @@ async fn main() {
 #[cfg(target_os = "windows")]
 #[tokio::main]
 async fn main() {
+    let _sentry_guard = init_sentry();
     let args: Vec<String> = std::env::args().collect();
     if args.iter().any(|arg| arg == "--user-agent") {
         windows_user_agent::run_user_agent().await;

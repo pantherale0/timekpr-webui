@@ -7,6 +7,8 @@ from datetime import datetime, timezone
 import pytz
 from flask import Flask, url_for
 from flask_wtf.csrf import CSRFProtect
+import sentry_sdk
+from sentry_sdk.integrations.flask import FlaskIntegration
 
 # Initialize WebSocket support
 from flask_sock import Sock
@@ -59,6 +61,18 @@ def _load_secret_key(flask_app):
     except OSError:
         pass
     return secret_key
+
+
+# Initialize Sentry if a DSN is provided
+sentry_dsn = os.environ.get("SENTRY_DSN")
+if sentry_dsn:
+    sentry_sdk.init(
+        dsn=sentry_dsn,
+        integrations=[FlaskIntegration()],
+        traces_sample_rate=1.0,
+        profiles_sample_rate=1.0,
+        release=os.environ.get("TIMEKPR_SERVER_VERSION", "v0.0.0-dev"),
+    )
 
 
 # Initialize Flask app

@@ -24,6 +24,8 @@ services:
       - TIMEKPR_TASKS_DELIVER_ALERTS=0
       # - DATABASE_URL=postgresql+psycopg2://postgres:postgres@db:5432/postgres
       - DATABASE_URL=sqlite:///../instance/timekpr.db
+      # Sentry DSN configuration
+      # - SENTRY_DSN=https://your-public-key@sentry.io/project-id
     restart: unless-stopped
 
   tasks:
@@ -46,6 +48,8 @@ services:
       - TIMEKPR_TASKS_DELIVER_ALERTS=1
       # - DATABASE_URL=postgresql+psycopg2://postgres:postgres@db:5432/postgres
       - DATABASE_URL=sqlite:///../instance/timekpr.db
+      # Sentry DSN configuration
+      # - SENTRY_DSN=https://your-public-key@sentry.io/project-id
     restart: unless-stopped
 
 volumes:

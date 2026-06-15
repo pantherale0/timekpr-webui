@@ -36,6 +36,7 @@ android {
         versionCode = versionCodeFromTag(releaseAgentVersion)
         versionName = versionNameFromTag(releaseAgentVersion)
         buildConfigField("String", "DEFAULT_AGENT_VERSION", "\"$releaseAgentVersion\"")
+        buildConfigField("String", "SENTRY_DSN", "\"${System.getenv("SENTRY_DSN").orEmpty()}\"")
     }
 
     signingConfigs {
@@ -96,5 +97,6 @@ dependencies {
     implementation("com.google.firebase:firebase-messaging-ktx")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.9.0")
     implementation("net.java.dev.jna:jna:5.14.0@aar")
+    implementation("io.sentry:sentry-android:8.1.0")
     testImplementation("junit:junit:4.13.2")
 }
