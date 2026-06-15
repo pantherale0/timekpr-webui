@@ -90,6 +90,7 @@ fn init_sentry() -> Option<sentry::ClientInitGuard> {
         if !dsn.is_empty() {
             let options = sentry::ClientOptions {
                 release: Some(AGENT_VERSION.into()),
+                auto_session_tracking: true,
                 ..Default::default()
             };
             let guard = sentry::init((dsn, options));
