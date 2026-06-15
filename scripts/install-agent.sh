@@ -126,24 +126,24 @@ detect_package_manager() {
 install_security_stack_packages() {
     local package_manager
     package_manager="$(detect_package_manager)" || die \
-        "Could not detect a supported package manager for installing AppArmor/auditd"
+        "Could not detect a supported package manager for installing AppArmor/auditd/screenshots"
 
-    log "Installing AppArmor and auditd dependencies via ${package_manager}"
+    log "Installing AppArmor, auditd, and screenshot dependencies via ${package_manager}"
     case "$package_manager" in
         apt-get)
             DEBIAN_FRONTEND=noninteractive apt-get update
             DEBIAN_FRONTEND=noninteractive apt-get install -y \
-                apparmor apparmor-utils auditd
+                apparmor apparmor-utils auditd grim scrot
             ;;
         pacman)
-            pacman -Sy --noconfirm --needed apparmor audit
+            pacman -Sy --noconfirm --needed apparmor audit grim scrot
             ;;
         dnf)
-            dnf install -y apparmor apparmor-utils audit
+            dnf install -y apparmor apparmor-utils audit grim scrot
             ;;
         zypper)
             zypper --non-interactive install --no-confirm \
-                apparmor-parser apparmor-utils audit
+                apparmor-parser apparmor-utils audit grim scrot
             ;;
         *)
             die "Unsupported package manager: ${package_manager}"

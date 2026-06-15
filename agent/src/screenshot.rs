@@ -215,6 +215,15 @@ fn active_window_title(username: &str, uid: u32) -> Option<String> {
 }
 
 #[cfg(target_os = "linux")]
+fn parse_loginctl_line(line: &str) -> Option<(&str, String)> {
+    let parts: Vec<&str> = line.split_whitespace().collect();
+    if parts.len() < 3 {
+        return None;
+    }
+    Some((parts[0], parts[2].to_string()))
+}
+
+#[cfg(target_os = "linux")]
 fn discover_active_usernames() -> Vec<String> {
     let output = match Command::new("loginctl").args(["list-sessions", "--no-legend"]).output() {
         Ok(output) if output.status.success() => output,
@@ -224,14 +233,8 @@ fn discover_active_usernames() -> Vec<String> {
     let mut usernames = Vec::new();
     let session_text = String::from_utf8_lossy(&output.stdout);
     for line in session_text.lines() {
-        let mut parts = line.split_whitespace();
-        let session_id = match parts.next() {
-            Some(value) => value,
-            None => continue,
-        };
-        let username = match parts.nth(2) {
-            Some(value) => value.to_string(),
-            None => continue,
+        let Some((session_id, username)) = parse_loginctl_line(line) else {
+            continue;
         };
         if username == "root" || usernames.iter().any(|existing| existing == &username) {
             continue;
@@ -581,6 +584,23 @@ pub fn capture_screenshots(_linux_username: Option<&str>) -> Vec<CapturedScreens
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    #[cfg(target_os = "linux")]
+    fn test_parse_loginctl_line() {
+        let line_with_seat = " 8 1000 jordanh seat0 19819 user       tty3  no   -";
+        let parsed = parse_loginctl_line(line_with_seat).unwrap();
+        assert_eq!(parsed.0, "8");
+        assert_eq!(parsed.1, "jordanh");
+
+        let line_without_seat = "     15 1000 jordanh -     22698  user       -     no   -";
+        let parsed2 = parse_loginctl_line(line_without_seat).unwrap();
+        assert_eq!(parsed2.0, "15");
+        assert_eq!(parsed2.1, "jordanh");
+
+        let invalid_line = " 12 1000";
+        assert!(parse_loginctl_line(invalid_line).is_none());
+    }
 
     #[test]
     fn apply_screenshot_policy_updates_shared_state() {
