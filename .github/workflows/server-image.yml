@@ -4,6 +4,8 @@ on:
   pull_request:
     paths:
       - "server/**"
+      - "extension/**"
+      - "scripts/package-extension.py"
       - "docker-compose.yaml"
       - ".github/workflows/server-image.yml"
   push:
@@ -32,6 +34,8 @@ jobs:
           filters: |
             server:
               - "server/**"
+              - "extension/**"
+              - "scripts/package-extension.py"
               - "docker-compose.yaml"
               - ".github/workflows/server-image.yml"
 
@@ -62,10 +66,38 @@ jobs:
           if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
             version="${GITHUB_REF#refs/tags/}"
             echo "value=${version}" >> "$GITHUB_OUTPUT"
+            echo "extension_version=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
           elif [[ "${GITHUB_REF}" == "refs/heads/master" ]]; then
             echo "value=nightly" >> "$GITHUB_OUTPUT"
+            echo "extension_version=0.0.0" >> "$GITHUB_OUTPUT"
           else
             echo "value=nightly" >> "$GITHUB_OUTPUT"
+            echo "extension_version=0.0.0" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Package Chrome extension
+        env:
+          EXTENSION_SIGNING_KEY_PEM: ${{ secrets.EXTENSION_SIGNING_KEY_PEM }}
+        run: |
+          set -euo pipefail
+
+          if [[ -n "${EXTENSION_SIGNING_KEY_PEM}" ]]; then
+            mkdir -p server/static/extensions
+            printf '%s' "${EXTENSION_SIGNING_KEY_PEM}" > server/static/extensions/key.pem
+            python -m pip install --disable-pip-version-check crx3 cryptography
+            python3 scripts/package-extension.py \
+              --version "${{ steps.tag.outputs.extension_version }}" \
+              --require-existing-key
+          elif [[ -f server/static/extensions/youtube_monitor.crx ]]; then
+            echo "EXTENSION_SIGNING_KEY_PEM not configured; using committed CRX artifact."
+          else
+            echo "No extension signing key and no committed CRX artifact available." >&2
+            exit 1
           fi
 
       - name: Log in to GHCR

@@ -114,6 +114,21 @@ def test_get_extension_update_manifest(client):
     xml_text = response.data.decode('utf-8')
     assert 'updatecheck' in xml_text
 
+
+def test_get_extension_update_manifest_uses_packaged_version(client, tmp_path, monkeypatch):
+    extensions_dir = tmp_path / "extensions"
+    extensions_dir.mkdir()
+    (extensions_dir / "extension_version.txt").write_text("2.3.4\n", encoding="utf-8")
+
+    monkeypatch.setattr(
+        "src.blueprints.api.youtube.current_app.static_folder",
+        str(tmp_path),
+    )
+
+    response = client.get('/api/extensions/update')
+    assert response.status_code == 200
+    assert "version='2.3.4'" in response.data.decode('utf-8')
+
 @patch('src.blueprints.api.youtube.os.path.exists', return_value=False)
 def test_download_extension_missing(mock_exists, client):
     response = client.get('/api/extensions/download')

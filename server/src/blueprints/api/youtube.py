@@ -12,6 +12,7 @@ api_youtube_bp = Blueprint('api_youtube', __name__)
 # Default hardcoded Extension ID generated from our private key.
 # This can be customized if needed, but a stable default is required.
 DEFAULT_EXTENSION_ID = "kpaecpjkfljdgbhmlndgfgjdbobmpeoc"
+DEFAULT_EXTENSION_VERSION = "0.0.0"
 
 def _get_extension_id():
     """Dynamically read the generated extension ID from extension_id.txt or fallback."""
@@ -25,6 +26,20 @@ def _get_extension_id():
     except Exception:
         pass
     return DEFAULT_EXTENSION_ID
+
+
+def _get_extension_version():
+    """Read packaged extension version written during CI/local packaging."""
+    try:
+        version_path = os.path.join(current_app.static_folder, 'extensions', 'extension_version.txt')
+        if os.path.exists(version_path):
+            with open(version_path, 'r') as f:
+                val = f.read().strip()
+                if val:
+                    return val
+    except Exception:
+        pass
+    return DEFAULT_EXTENSION_VERSION
 
 @api_youtube_bp.route('/api/youtube/log', methods=['POST'])
 def log_youtube_history():
@@ -121,12 +136,13 @@ def get_extension_update_manifest():
     Instructs Chrome where to download the CRX package.
     """
     extension_id = getattr(current_app, 'extension_id', None) or _get_extension_id()
+    extension_version = getattr(current_app, 'extension_version', None) or _get_extension_version()
     base_url = request.url_root.rstrip('/')
     
     xml_content = f"""<?xml version='1.0' encoding='UTF-8'?>
 <gupdate xmlns='http://www.google.com/update2/response' protocol='2.0'>
   <app appid='{extension_id}'>
-    <updatecheck codebase='{base_url}/api/extensions/download' version='1.0.2' />
+    <updatecheck codebase='{base_url}/api/extensions/download' version='{extension_version}' />
   </app>
 </gupdate>"""
 

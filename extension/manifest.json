@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Guardian",
-  "version": "1.0.2",
+  "version": "0.0.0",
   "description": "Guardian browser extension.",
   "permissions": [
     "storage",

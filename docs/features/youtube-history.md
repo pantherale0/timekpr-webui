@@ -20,6 +20,23 @@ Enforced using a custom, lightweight **Chrome browser extension** force-installe
 3. **Identity Resolution**: Agents write the current user mapping profile to the policy directory. The extension reads this mapped child identity using the secure `chrome.storage.managed` API to authenticate logs.
 4. **Self-Hosting**: The extension is signed using a private RSA key and hosted directly on the Guardian server. The server serves the package as a signed `.crx` file and dynamically generates the update XML manifest.
 
+### Building the extension
+
+The CRX is built in CI as part of the server image workflow:
+
+- **Release tags** (`v1.2.3`): extension version is `1.2.3` (the `v` prefix is stripped).
+- **Nightly builds** (`master`): extension version is `0.0.0`.
+- The signing key is supplied via the `EXTENSION_SIGNING_KEY_PEM` GitHub Actions secret (contents of `server/static/extensions/key.pem`). The key must remain stable so the Chrome extension ID does not change.
+
+Local build:
+
+```bash
+pip install crx3 cryptography
+python3 scripts/package-extension.py --version 1.2.3
+```
+
+The packaged version is written to `server/static/extensions/extension_version.txt` and served in the Chrome update manifest at `/api/extensions/update`.
+
 ---
 
 ## Server Configuration
