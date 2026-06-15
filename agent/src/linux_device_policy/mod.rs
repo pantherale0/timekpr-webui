@@ -50,21 +50,7 @@ pub struct ExecPolicy {
     pub terminal_access_disabled: bool,
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ChromePolicy {
-    #[serde(default, rename = "incognitoDisabled")]
-    pub incognito_disabled: bool,
-    #[serde(default, rename = "safeBrowsingEnforced")]
-    pub safe_browsing_enforced: bool,
-    #[serde(default, rename = "youtubeRestrict")]
-    pub youtube_restrict: u32,
-    #[serde(default, rename = "blockOtherExtensions")]
-    pub block_other_extensions: bool,
-    #[serde(default, rename = "blockGenaiFeatures")]
-    pub block_genai_features: bool,
-    #[serde(default, rename = "allowedExtensionIds")]
-    pub allowed_extension_ids: Vec<String>,
-}
+pub use crate::extension_policy::ChromePolicy;
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DevicePolicyPayload {

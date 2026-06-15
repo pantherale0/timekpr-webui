@@ -21,7 +21,7 @@ pub async fn start_process_monitor() {
     loop {
         let active_username = crate::windows_service::dns_proxy::get_active_session_username();
         if active_username != last_reconciled_user || force_reconcile {
-            let _ = crate::extension_policy::run_reconcile(active_username.as_deref());
+            let _ = crate::extension_policy::run_reconcile(active_username.as_deref(), None);
             last_reconciled_user = active_username;
             force_reconcile = false;
         }

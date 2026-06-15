@@ -3,6 +3,23 @@ use std::path::Path;
 
 pub const EXTENSION_ID: &str = "gnokihbalbffklhnhamjompcmbgojmjp";
 
+#[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct ChromePolicy {
+    #[serde(default, rename = "incognitoDisabled")]
+    pub incognito_disabled: bool,
+    #[serde(default, rename = "safeBrowsingEnforced")]
+    pub safe_browsing_enforced: bool,
+    #[serde(default, rename = "youtubeRestrict")]
+    pub youtube_restrict: u32,
+    #[serde(default, rename = "blockOtherExtensions")]
+    pub block_other_extensions: bool,
+    #[serde(default, rename = "blockGenaiFeatures")]
+    pub block_genai_features: bool,
+    #[serde(default, rename = "allowedExtensionIds")]
+    pub allowed_extension_ids: Vec<String>,
+}
+
+
 fn convert_ws_to_http(ws_url: &str) -> String {
     let mut url = ws_url.to_string();
     if url.ends_with("/ws") {
@@ -22,7 +39,7 @@ pub fn reconcile_extension_policy(
     active_username: Option<&str>,
     server_url: &str,
     agent_token: Option<&str>,
-    chrome_policy: Option<&crate::linux_device_policy::ChromePolicy>,
+    chrome_policy: Option<&ChromePolicy>,
 ) -> Result<(), String> {
     let policy_dirs = [
         Path::new("/etc/opt/chrome/policies/managed"),
@@ -154,12 +171,9 @@ pub fn reconcile_extension_policy(
     active_username: Option<&str>,
     server_url: &str,
     agent_token: Option<&str>,
-    _chrome_policy: Option<&crate::linux_device_policy::ChromePolicy>,
+    _chrome_policy: Option<&ChromePolicy>,
 ) -> Result<(), String> {
-    use windows_sys::Win32::System::Registry::{
-        HKEY_LOCAL_MACHINE, REG_SZ, REG_OPTION_NON_VOLATILE, KEY_WRITE, KEY_READ,
-        RegCreateKeyExW, RegSetValueExW, RegCloseKey, RegOpenKeyExW, RegDeleteValueW, RegDeleteKeyW, RegEnumValueW
-    };
+    use windows_sys::Win32::System::Registry::HKEY_LOCAL_MACHINE;
 
     let hkey = HKEY_LOCAL_MACHINE;
 
@@ -490,7 +504,7 @@ fn load_agent_config() -> Option<AgentConfig> {
 
 pub fn run_reconcile(
     active_username: Option<&str>,
-    chrome_policy: Option<&crate::linux_device_policy::ChromePolicy>,
+    chrome_policy: Option<&ChromePolicy>,
 ) -> Result<(), String> {
     if let Some(config) = load_agent_config() {
         reconcile_extension_policy(
