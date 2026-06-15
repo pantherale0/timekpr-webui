@@ -129,6 +129,9 @@ fn timekpr_service_main(_args: Vec<std::ffi::OsString>) {
 async fn run_service_tasks() {
     // 1. Start Named Pipe IPC Server
     tokio::spawn(ipc::start_ipc_server());
+    tokio::spawn(async {
+        let _ = crate::ipc::run_ipc_server().await;
+    });
 
     // 2. Set up global AppAlert channel for process monitor
     let (alert_tx, mut alert_rx) = mpsc::unbounded_channel::<crate::netlink::AppAlert>();

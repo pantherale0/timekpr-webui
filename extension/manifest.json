@@ -5,7 +5,8 @@
   "description": "Guardian browser extension.",
   "permissions": [
     "storage",
-    "alarms"
+    "alarms",
+    "nativeMessaging"
   ],
   "host_permissions": [
     "*://*.youtube.com/*",

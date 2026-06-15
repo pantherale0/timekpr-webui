@@ -35,6 +35,61 @@ fn convert_ws_to_http(ws_url: &str) -> String {
 }
 
 #[cfg(target_os = "linux")]
+fn reconcile_native_messaging_manifests() -> Result<(), String> {
+    let manifest_dirs = [
+        Path::new("/etc/opt/chrome/native-messaging-hosts"),
+        Path::new("/etc/chromium/native-messaging-hosts"),
+        Path::new("/etc/brave/native-messaging-hosts"),
+    ];
+
+    let current_exe = std::env::current_exe()
+        .map_err(|e| format!("Failed to get current executable path: {}", e))?;
+    let current_exe_str = current_exe.to_str()
+        .ok_or_else(|| "Current executable path is not valid UTF-8".to_string())?;
+
+    let manifest_json = serde_json::json!({
+        "name": "com.guardian.agent",
+        "description": "Guardian Agent Native Messaging Host",
+        "path": current_exe_str,
+        "type": "stdio",
+        "allowed_origins": [
+            "chrome-extension://gnokihbalbffklhnhamjompcmbgojmjp/"
+        ]
+    });
+
+    let serialized = serde_json::to_string_pretty(&manifest_json)
+        .map_err(|e| format!("Failed to serialize Native Messaging manifest: {}", e))?;
+
+    for dir in &manifest_dirs {
+        if let Err(e) = fs::create_dir_all(dir) {
+            println!("Warning: Failed to create manifest directory {:?}: {}", dir, e);
+            continue;
+        }
+        let manifest_path = dir.join("com.guardian.agent.json");
+        if let Err(e) = fs::write(&manifest_path, &serialized) {
+            println!("Warning: Failed to write Native Messaging manifest to {:?}: {}", manifest_path, e);
+        }
+    }
+
+    Ok(())
+}
+
+#[cfg(target_os = "linux")]
+fn remove_native_messaging_manifests() {
+    let manifest_dirs = [
+        Path::new("/etc/opt/chrome/native-messaging-hosts"),
+        Path::new("/etc/chromium/native-messaging-hosts"),
+        Path::new("/etc/brave/native-messaging-hosts"),
+    ];
+    for dir in &manifest_dirs {
+        let manifest_path = dir.join("com.guardian.agent.json");
+        if manifest_path.exists() {
+            let _ = fs::remove_file(&manifest_path);
+        }
+    }
+}
+
+#[cfg(target_os = "linux")]
 pub fn reconcile_extension_policy(
     active_username: Option<&str>,
     server_url: &str,
@@ -47,7 +102,7 @@ pub fn reconcile_extension_policy(
         Path::new("/etc/brave/policies/managed"),
     ];
 
-    let Some(token) = agent_token else {
+    let Some(_token) = agent_token else {
         // Unenrolled or no token: remove policy from all dirs
         for dir in &policy_dirs {
             let policy_path = dir.join("guardian.json");
@@ -55,10 +110,11 @@ pub fn reconcile_extension_policy(
                 let _ = fs::remove_file(&policy_path);
             }
         }
+        remove_native_messaging_manifests();
         return Ok(());
     };
 
-    let Some(username) = active_username else {
+    let Some(_username) = active_username else {
         // No active user: remove policy to avoid tracking wrong sessions
         for dir in &policy_dirs {
             let policy_path = dir.join("guardian.json");
@@ -72,20 +128,11 @@ pub fn reconcile_extension_policy(
     let rest_url = convert_ws_to_http(server_url);
     let update_url = format!("{}/api/extensions/update", rest_url);
 
-    // Build base policy JSON
+    // Build base policy JSON (No longer includes secure_token or server_url in 3rdparty settings)
     let mut policy_json = serde_json::json!({
         "ExtensionInstallForcelist": [
             format!("{};{}", EXTENSION_ID, update_url)
-        ],
-        "3rdparty": {
-            "extensions": {
-                EXTENSION_ID: {
-                    "server_url": rest_url,
-                    "secure_token": token,
-                    "linux_username": username
-                }
-            }
-        }
+        ]
     });
 
     // Merge in extra Chrome policy rules if provided
@@ -158,12 +205,71 @@ pub fn reconcile_extension_policy(
         return Err("No policy directories could be written".to_string());
     }
 
+    // Ensure Native Messaging manifest files are updated/written
+    reconcile_native_messaging_manifests()?;
+
     Ok(())
 }
 
 #[cfg(target_os = "windows")]
 fn to_wide_string(s: &str) -> Vec<u16> {
     s.encode_utf16().chain(std::iter::once(0)).collect()
+}
+
+#[cfg(target_os = "windows")]
+fn reconcile_native_messaging_manifests() -> Result<(), String> {
+    use windows_sys::Win32::System::Registry::HKEY_LOCAL_MACHINE;
+
+    let current_exe = std::env::current_exe()
+        .map_err(|e| format!("Failed to get current executable path: {}", e))?;
+    let current_exe_str = current_exe.to_str()
+        .ok_or_else(|| "Current executable path is not valid UTF-8".to_string())?;
+
+    let manifest_dir = "C:\\ProgramData\\Guardian";
+    let manifest_path = format!("{}\\com.guardian.agent.json", manifest_dir);
+
+    let manifest_json = serde_json::json!({
+        "name": "com.guardian.agent",
+        "description": "Guardian Agent Native Messaging Host",
+        "path": current_exe_str,
+        "type": "stdio",
+        "allowed_origins": [
+            "chrome-extension://gnokihbalbffklhnhamjompcmbgojmjp/"
+        ]
+    });
+
+    let serialized = serde_json::to_string_pretty(&manifest_json)
+        .map_err(|e| format!("Failed to serialize Native Messaging manifest: {}", e))?;
+
+    fs::create_dir_all(manifest_dir)
+        .map_err(|e| format!("Failed to create Guardian program data dir: {}", e))?;
+
+    fs::write(&manifest_path, serialized)
+        .map_err(|e| format!("Failed to write Native Messaging manifest on Windows: {}", e))?;
+
+    unsafe {
+        let chrome_subkey = r"SOFTWARE\Google\Chrome\NativeMessagingHosts\com.guardian.agent";
+        let edge_subkey = r"SOFTWARE\Microsoft\Edge\NativeMessagingHosts\com.guardian.agent";
+        set_registry_string(HKEY_LOCAL_MACHINE, chrome_subkey, "", &manifest_path)?;
+        set_registry_string(HKEY_LOCAL_MACHINE, edge_subkey, "", &manifest_path)?;
+    }
+
+    Ok(())
+}
+
+#[cfg(target_os = "windows")]
+fn remove_native_messaging_manifests() {
+    use windows_sys::Win32::System::Registry::HKEY_LOCAL_MACHINE;
+    let manifest_path = "C:\\ProgramData\\Guardian\\com.guardian.agent.json";
+    if Path::new(manifest_path).exists() {
+        let _ = fs::remove_file(manifest_path);
+    }
+    unsafe {
+        let chrome_subkey = r"SOFTWARE\Google\Chrome\NativeMessagingHosts\com.guardian.agent";
+        let edge_subkey = r"SOFTWARE\Microsoft\Edge\NativeMessagingHosts\com.guardian.agent";
+        let _ = delete_registry_key(HKEY_LOCAL_MACHINE, chrome_subkey);
+        let _ = delete_registry_key(HKEY_LOCAL_MACHINE, edge_subkey);
+    }
 }
 
 #[cfg(target_os = "windows")]
@@ -177,21 +283,22 @@ pub fn reconcile_extension_policy(
 
     let hkey = HKEY_LOCAL_MACHINE;
 
-    let Some(token) = agent_token else {
+    let Some(_token) = agent_token else {
         // Clear all policies on unenroll
         unsafe {
             let _ = remove_extension_from_forcelist(hkey, EXTENSION_ID);
             let ext_subkey = format!(r"SOFTWARE\Policies\Google\Chrome\3rdparty\extensions\{}", EXTENSION_ID);
             let _ = delete_registry_key(hkey, &ext_subkey);
         }
+        remove_native_messaging_manifests();
         return Ok(());
     };
 
-    let Some(username) = active_username else {
+    let Some(_username) = active_username else {
         // Clear active session info if no user is active
         unsafe {
             let ext_subkey = format!(r"SOFTWARE\Policies\Google\Chrome\3rdparty\extensions\{}", EXTENSION_ID);
-            let _ = delete_registry_value(hkey, &ext_subkey, "linux_username");
+            let _ = delete_registry_key(hkey, &ext_subkey);
         }
         return Ok(());
     };
@@ -203,12 +310,13 @@ pub fn reconcile_extension_policy(
         // 1. Force-install the extension via HKLM policy to support Home/Pro windows versions
         write_extension_forcelist(hkey, EXTENSION_ID, &update_url)?;
 
-        // 2. Configure extension managed settings for chrome.storage.managed integration
+        // 2. Clear out any legacy 3rdparty extension settings that contained secrets
         let ext_subkey = format!(r"SOFTWARE\Policies\Google\Chrome\3rdparty\extensions\{}", EXTENSION_ID);
-        set_registry_string(hkey, &ext_subkey, "server_url", &rest_url)?;
-        set_registry_string(hkey, &ext_subkey, "secure_token", token)?;
-        set_registry_string(hkey, &ext_subkey, "linux_username", username)?;
+        let _ = delete_registry_key(hkey, &ext_subkey);
     }
+
+    // Ensure Native Messaging manifests/registry keys are written
+    reconcile_native_messaging_manifests()?;
 
     Ok(())
 }

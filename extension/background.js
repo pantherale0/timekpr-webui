@@ -37,65 +37,45 @@ function queueLog(logEntry) {
     });
 }
 
-// Flush buffered queue to TimeKpr/Guardian server
+// Flush buffered queue to TimeKpr/Guardian server via Native Messaging Host
 function flushBufferQueue() {
-    // 1. Get policies from managed storage (configured by OS administrative policies)
-    chrome.storage.managed.get(['server_url', 'secure_token', 'linux_username'], (policy) => {
-        const serverUrl = (policy.server_url || "").trim().replace(/\/$/, "");
-        const secureToken = (policy.secure_token || "").trim();
-        const linuxUsername = (policy.linux_username || "").trim();
+    // Get queued logs from local storage
+    chrome.storage.local.get({ log_queue: [] }, (result) => {
+        const queue = result.log_queue;
+        if (queue.length === 0) return;
 
-        if (!serverUrl || !secureToken || !linuxUsername) {
-            console.warn("Guardian YouTube Monitor: Managed policy settings missing. Skipping flush.", policy);
-            return;
-        }
+        // Make a copy of logs to send
+        const logsToSend = [...queue];
 
-        // 2. Get queued logs from local storage
-        chrome.storage.local.get({ log_queue: [] }, (result) => {
-            const queue = result.log_queue;
-            if (queue.length === 0) return;
+        const payload = {
+            type: 'YOUTUBE_LOG',
+            logs: logsToSend
+        };
 
-            // Make a copy of logs to send
-            const logsToSend = [...queue];
+        chrome.runtime.sendNativeMessage('com.guardian.agent', payload, (response) => {
+            if (chrome.runtime.lastError) {
+                console.warn("Guardian YouTube Monitor: Failed to connect to Native Messaging Host. Keeping logs in buffer.", chrome.runtime.lastError.message);
+                return;
+            }
 
-            const payload = {
-                linux_username: linuxUsername,
-                logs: logsToSend
-            };
-
-            const targetUrl = `${serverUrl}/api/youtube/log`;
-
-            fetch(targetUrl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${secureToken}`
-                },
-                body: JSON.stringify(payload)
-            })
-            .then(response => {
-                if (response.status === 200) {
-                    // Success! Remove sent logs from queue
-                    chrome.storage.local.get({ log_queue: [] }, (currentResult) => {
-                        const currentQueue = currentResult.log_queue;
-                        // Filter out the items we successfully sent
-                        const remainingQueue = currentQueue.filter(item => {
-                            // Match by video_id and watched_at timestamp
-                            return !logsToSend.some(sentItem => 
-                                sentItem.video_id === item.video_id && 
-                                sentItem.watched_at === item.watched_at
-                            );
-                        });
-                        chrome.storage.local.set({ log_queue: remainingQueue });
-                        console.log(`Guardian YouTube Monitor: Successfully flushed ${logsToSend.length} log(s).`);
+            if (response && response.success) {
+                // Success! Remove sent logs from queue
+                chrome.storage.local.get({ log_queue: [] }, (currentResult) => {
+                    const currentQueue = currentResult.log_queue;
+                    // Filter out the items we successfully sent
+                    const remainingQueue = currentQueue.filter(item => {
+                        // Match by video_id and watched_at timestamp
+                        return !logsToSend.some(sentItem => 
+                            sentItem.video_id === item.video_id && 
+                            sentItem.watched_at === item.watched_at
+                        );
                     });
-                } else {
-                    console.error(`Guardian YouTube Monitor: Server returned HTTP ${response.status} during flush.`);
-                }
-            })
-            .catch(error => {
-                console.error("Guardian YouTube Monitor: Network error during flush.", error);
-            });
+                    chrome.storage.local.set({ log_queue: remainingQueue });
+                    console.log(`Guardian YouTube Monitor: Successfully flushed ${logsToSend.length} log(s) via Native Messaging.`);
+                });
+            } else {
+                console.error("Guardian YouTube Monitor: Agent failed to log YouTube history:", response ? response.message : "No response");
+            }
         });
     });
 }

@@ -22,6 +22,7 @@ mod update_verify;
 #[cfg(target_os = "linux")]
 mod terminal_monitor;
 mod extension_policy;
+mod ipc;
 
 #[cfg(target_os = "windows")]
 pub mod windows_service;
@@ -1533,6 +1534,13 @@ async fn run_linux_main() {
         }
     });
 
+    // Spawn local Unix Socket IPC Server for Chrome Extension communications
+    tokio::spawn(async {
+        if let Err(e) = ipc::run_ipc_server().await {
+            eprintln!("Fatal error running local IPC server: {}", e);
+        }
+    });
+
     start_agent_reconnect_loop(active_client_tx).await;
 }
 
@@ -1922,6 +1930,10 @@ pub(crate) async fn start_agent_reconnect_loop(
 #[tokio::main]
 async fn main() {
     let args: Vec<String> = std::env::args().collect();
+    if args.len() >= 2 && args.iter().any(|arg| arg.starts_with("chrome-extension://")) {
+        ipc::run_native_messaging_proxy().await;
+        return;
+    }
     if args.iter().any(|arg| arg == "--active-window-helper") {
         match kdotool::get_active_window_info() {
             Ok(info) => {
@@ -1942,6 +1954,10 @@ async fn main() {
 async fn main() {
     let _sentry_guard = init_sentry();
     let args: Vec<String> = std::env::args().collect();
+    if args.len() >= 2 && args.iter().any(|arg| arg.starts_with("chrome-extension://")) {
+        ipc::run_native_messaging_proxy().await;
+        return;
+    }
     if args.iter().any(|arg| arg == "--user-agent") {
         windows_user_agent::run_user_agent().await;
         return;
