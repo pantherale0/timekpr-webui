@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Guardian YouTube Monitor",
-  "version": "1.0.0",
-  "description": "Monitors watched YouTube videos for parental controls.",
+  "name": "Guardian",
+  "version": "1.0.1",
+  "description": "Guardian browser extension.",
   "permissions": [
     "storage"
   ],
@@ -14,8 +14,12 @@
   },
   "content_scripts": [
     {
-      "matches": ["*://*.youtube.com/watch*"],
-      "js": ["content.js"],
+      "matches": [
+        "*://*.youtube.com/watch*"
+      ],
+      "js": [
+        "content.js"
+      ],
       "run_at": "document_end"
     }
   ]

@@ -50,7 +50,7 @@ pub fn reconcile_extension_policy(
     let Some(token) = agent_token else {
         // Unenrolled or no token: remove policy from all dirs
         for dir in &policy_dirs {
-            let policy_path = dir.join("timekpr_youtube.json");
+            let policy_path = dir.join("guardian.json");
             if policy_path.exists() {
                 let _ = fs::remove_file(&policy_path);
             }
@@ -61,7 +61,7 @@ pub fn reconcile_extension_policy(
     let Some(username) = active_username else {
         // No active user: remove policy to avoid tracking wrong sessions
         for dir in &policy_dirs {
-            let policy_path = dir.join("timekpr_youtube.json");
+            let policy_path = dir.join("guardian.json");
             if policy_path.exists() {
                 let _ = fs::remove_file(&policy_path);
             }
@@ -93,7 +93,7 @@ pub fn reconcile_extension_policy(
         if let Some(obj) = policy_json.as_object_mut() {
             // 1. Incognito Mode
             if cp.incognito_disabled {
-                obj.insert("IncognitoModeAvailability".to_string(), serde_json::json!(2));
+                obj.insert("IncognitoModeAvailability".to_string(), serde_json::json!(1));
             } else {
                 obj.insert("IncognitoModeAvailability".to_string(), serde_json::json!(0));
             }
@@ -123,7 +123,7 @@ pub fn reconcile_extension_policy(
 
             // 5. Block GenAI features
             if cp.block_genai_features {
-                obj.insert("GenAILocalFoundationalModelSettings".to_string(), serde_json::json!(2));
+                obj.insert("GenAiDefaultSettings".to_string(), serde_json::json!(2));
                 obj.insert("CreateThemesSettings".to_string(), serde_json::json!(2));
                 obj.insert("HelpMeWriteSettings".to_string(), serde_json::json!(2));
                 obj.insert("HistorySearchSettings".to_string(), serde_json::json!(2));
@@ -143,7 +143,7 @@ pub fn reconcile_extension_policy(
             last_err = Some(format!("Failed to create policy directory {:?}: {}", dir, e));
             continue;
         }
-        let policy_path = dir.join("timekpr_youtube.json");
+        let policy_path = dir.join("guardian.json");
         if let Err(e) = fs::write(&policy_path, &serialized) {
             last_err = Some(format!("Failed to write Chrome policy to {:?}: {}", policy_path, e));
             continue;
