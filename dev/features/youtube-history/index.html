@@ -2090,6 +2090,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#building-the-extension" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Building the extension
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -2169,6 +2180,18 @@
 2. <strong>Windows</strong>: Writes policy registry keys to <code>HKLM\SOFTWARE\Policies\Google\Chrome\ExtensionInstallForcelist</code> (using Local Machine scope to bypass non-domain Active Directory limitations on standard Windows PCs).
 3. <strong>Identity Resolution</strong>: Agents write the current user mapping profile to the policy directory. The extension reads this mapped child identity using the secure <code>chrome.storage.managed</code> API to authenticate logs.
 4. <strong>Self-Hosting</strong>: The extension is signed using a private RSA key and hosted directly on the Guardian server. The server serves the package as a signed <code>.crx</code> file and dynamically generates the update XML manifest.</p>
+<h3 id="building-the-extension">Building the extension<a class="headerlink" href="#building-the-extension" title="Permanent link">&para;</a></h3>
+<p>The CRX is built in CI as part of the server image workflow:</p>
+<ul>
+<li><strong>Release tags</strong> (<code>v1.2.3</code>): extension version is <code>1.2.3</code> (the <code>v</code> prefix is stripped).</li>
+<li><strong>Nightly builds</strong> (<code>master</code>): extension version is <code>0.0.0</code>.</li>
+<li>The signing key is supplied via the <code>EXTENSION_SIGNING_KEY_PEM</code> GitHub Actions secret (contents of <code>server/static/extensions/key.pem</code>). The key must remain stable so the Chrome extension ID does not change.</li>
+</ul>
+<p>Local build:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>pip<span class="w"> </span>install<span class="w"> </span>crx3<span class="w"> </span>cryptography
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>python3<span class="w"> </span>scripts/package-extension.py<span class="w"> </span>--version<span class="w"> </span><span class="m">1</span>.2.3
+</code></pre></div>
+<p>The packaged version is written to <code>server/static/extensions/extension_version.txt</code> and served in the Chrome update manifest at <code>/api/extensions/update</code>.</p>
 <hr />
 <h2 id="server-configuration">Server Configuration<a class="headerlink" href="#server-configuration" title="Permanent link">&para;</a></h2>
 <p>Configure settings in <strong>Settings</strong>:</p>
