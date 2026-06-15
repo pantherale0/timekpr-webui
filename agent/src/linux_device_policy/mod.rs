@@ -201,6 +201,7 @@ impl LinuxDevicePolicyRuntime {
             return Err("username must not be empty".to_string());
         }
 
+        println!("linux_device_policy: updating device policy for user '{}'", normalized_username);
         self.current_state
             .users
             .insert(normalized_username.to_string(), payload);
@@ -209,6 +210,7 @@ impl LinuxDevicePolicyRuntime {
     }
 
     fn reconcile_enforcement(&mut self) -> Result<(), String> {
+        println!("linux_device_policy: reconciling rules. Active session username: {:?}", self.active_session_username);
         polkit::remove_all_managed_rules()?;
         bluetooth::reconcile(false)?;
 
@@ -216,6 +218,7 @@ impl LinuxDevicePolicyRuntime {
             self.active_session_username.as_deref(),
             &self.current_state.users,
         ) else {
+            println!("linux_device_policy: no managed active user found; enforcement cleared.");
             self.enforced_username = None;
             let _ = crate::extension_policy::run_reconcile(None, None);
             return Ok(());
@@ -226,6 +229,11 @@ impl LinuxDevicePolicyRuntime {
             let _ = crate::extension_policy::run_reconcile(None, None);
             return Ok(());
         };
+
+        println!(
+            "linux_device_policy: applying policy rules for active user '{}' (bluetooth_disabled={}, terminal_access_disabled={})",
+            active_user, payload.connectivity.bluetooth_disabled, payload.exec.terminal_access_disabled
+        );
 
         polkit::reconcile(active_user, &payload)?;
         bluetooth::reconcile(payload.connectivity.bluetooth_disabled)?;

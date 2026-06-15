@@ -236,6 +236,8 @@ impl AppArmorRuntime {
         policies: Vec<AppArmorPolicy>,
         approval_policy: Option<ApprovalPolicy>,
     ) -> Result<String, String> {
+        println!("apparmor: updating user policy for '{}' (received {} rules, approval_policy={})", 
+            username, policies.len(), approval_policy.is_some());
         let mut restrictive = Vec::new();
         for policy in policies.into_iter().filter(|p| {
             p.preset == "no_internet" || p.preset == "blocked" || p.preset == "complain"

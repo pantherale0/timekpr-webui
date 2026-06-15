@@ -117,7 +117,7 @@ mod linux_impl {
         what: u32,
     }
 
-    #[repr(C)]
+    #[repr(C, packed(4))]
     struct ProcEventExec {
         cpu: u32,
         timestamp_ns: u64,
@@ -125,7 +125,7 @@ mod linux_impl {
         process_tgid: u32,
     }
 
-    #[repr(C)]
+    #[repr(C, packed(4))]
     struct ProcEventExit {
         cpu: u32,
         timestamp_ns: u64,
@@ -403,12 +403,21 @@ mod linux_impl {
                     let cwd = pid_to_cwd(pid);
                     let transient = username.is_none() || exe_path.is_empty();
 
+                    if let Some(ref uname) = username {
+                        if exe_path.is_empty() {
+                            println!("netlink: detected exec event for monitored user '{}' (PID {}), but failed to read executable path (process likely exited immediately)", uname, pid);
+                        } else {
+                            println!("netlink: process launch: user='{}', pid={}, comm='{}', exe='{}'", uname, pid, comm, exe_path);
+                        }
+                    }
+
                     // 1. Approval overlay enforcement (allowlist/blocklist)
                     if let Some(ref username) = username {
                         if !exe_path.is_empty() {
                             if let Some(_blocked_path) =
                                 apparmor::check_approval_launch_block(username, &exe_path).await
                             {
+                                println!("netlink: blocking app launch via approval overlay: user='{}', pid={}, comm='{}', exe='{}'", username, pid, comm, exe_path);
                                 let has_overlay = apparmor::approval_policy_for_user(username)
                                     .await
                                     .is_some();
@@ -450,6 +459,7 @@ mod linux_impl {
                         if !exe_path.is_empty()
                             && linux_device_policy::check_terminal_exec_block(username, &exe_path).await
                         {
+                            println!("netlink: blocking terminal execution: user='{}', pid={}, comm='{}', exe='{}'", username, pid, comm, exe_path);
                             let _ = alert_tx.send(AppAlert {
                                 event_type: "app_blocked".to_string(),
                                 linux_username: username.clone(),
@@ -480,6 +490,13 @@ mod linux_impl {
                         None
                     } {
                         let blocked = decision.preset == "blocked";
+                        if blocked {
+                            println!("netlink: blocking app launch via AppArmor rule: user='{}', pid={}, comm='{}', exe='{}', rule='{}'", 
+                                username.as_ref().unwrap(), pid, comm, exe_path, decision.rule_name);
+                        } else {
+                            println!("netlink: evaluated AppArmor rule: user='{}', pid={}, comm='{}', exe='{}', disposition='{}', rule='{}'", 
+                                username.as_ref().unwrap(), pid, comm, exe_path, decision.preset, decision.rule_name);
+                        }
                         let _ = alert_tx.send(AppAlert {
                             event_type: "app_blocked".to_string(),
                             linux_username: username
@@ -546,6 +563,7 @@ mod linux_impl {
                     if let Some(process) = tracked.remove(&pid) {
                         let duration = process.started.elapsed();
                         let duration_secs = duration.as_secs();
+                        println!("netlink: process exit: user='{}', pid={}, comm='{}', duration={}s", process.username, pid, process.comm, duration_secs);
 
                         // Only report usage for processes that ran >1 second
                         if duration_secs >= 1 && !process.exe_path.is_empty() {
