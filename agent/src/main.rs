@@ -1921,6 +1921,19 @@ pub(crate) async fn start_agent_reconnect_loop(
 #[cfg(target_os = "linux")]
 #[tokio::main]
 async fn main() {
+    let args: Vec<String> = std::env::args().collect();
+    if args.iter().any(|arg| arg == "--active-window-helper") {
+        match kdotool::get_active_window_info() {
+            Ok(info) => {
+                print!("{}", info.title);
+            }
+            Err(e) => {
+                eprintln!("Error: {}", e);
+                std::process::exit(1);
+            }
+        }
+        return;
+    }
     run_linux_main().await;
 }
 

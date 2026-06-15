@@ -168,25 +168,7 @@ fn run_as_user(username: &str, uid: u32, env_pairs: &[(&str, &str)], program: &s
     command.output().ok()
 }
 
-#[cfg(target_os = "linux")]
-fn spawn_as_user(username: &str, uid: u32, env_pairs: &[(&str, &str)], program: &str, args: &[&str]) -> Option<std::process::Child> {
-    let runtime_dir = format!("/run/user/{uid}");
-    if !Path::new(&runtime_dir).exists() {
-        return None;
-    }
 
-    let mut command = Command::new("runuser");
-    command.arg("-u").arg(username).arg("--").arg("env");
-    command.arg(format!("XDG_RUNTIME_DIR={runtime_dir}"));
-    for (key, value) in env_pairs {
-        command.arg(format!("{key}={value}"));
-    }
-    command.arg(program);
-    command.args(args);
-    command.stdout(std::process::Stdio::piped());
-    command.stderr(std::process::Stdio::null());
-    command.spawn().ok()
-}
 
 #[cfg(target_os = "linux")]
 fn capture_raw_image(username: &str, uid: u32) -> Option<Vec<u8>> {
@@ -298,181 +280,46 @@ fn capture_raw_image(username: &str, uid: u32) -> Option<Vec<u8>> {
 
 #[cfg(target_os = "linux")]
 fn active_window_title_kwin(username: &str, uid: u32) -> Option<String> {
-    let uuid = Uuid::new_v4().to_string();
-    let script_name = format!("active_window_{}", uuid);
-    let script_file = format!("/tmp/{}.js", script_name);
-
-    let script_content = format!(
-        "var win = workspace.activeWindow;\n\
-         var title = win ? win.caption : 'No active window';\n\
-         callDBus('org.dummy.Service', '/Dummy', 'org.dummy.Interface', 'ReportTitle', '{}', title);\n",
-        uuid
-    );
-
-    println!("active_window_title_kwin: writing script to {}", script_file);
-    if let Err(e) = std::fs::write(&script_file, script_content) {
-        println!("active_window_title_kwin: failed to write script file: {}", e);
-        return None;
-    }
-
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        let _ = std::fs::set_permissions(&script_file, std::fs::Permissions::from_mode(0o644));
-    }
-
     let dbus_addr = format!("unix:path=/run/user/{}/bus", uid);
+    
+    let current_exe = match std::env::current_exe() {
+        Ok(path) => path.to_string_lossy().into_owned(),
+        Err(e) => {
+            println!("active_window_title_kwin: failed to get current exe path: {}", e);
+            "guardian-agent".to_string()
+        }
+    };
 
-    // Spawn dbus-monitor to sniff the session bus for our call
-    println!("active_window_title_kwin: spawning dbus-monitor...");
-    let monitor_child = spawn_as_user(
+    println!("active_window_title_kwin: invoking active window helper for user '{}' (UID {})", username, uid);
+    
+    // Execute our own binary as the target user, with the --active-window-helper flag
+    if let Some(output) = run_as_user(
         username,
         uid,
-        &[("DBUS_SESSION_BUS_ADDRESS", &dbus_addr)],
-        "dbus-monitor",
-        &[],
-    );
-
-    // Wait a brief moment to let dbus-monitor start up
-    std::thread::sleep(std::time::Duration::from_millis(50));
-
-    println!("active_window_title_kwin: loading script into KWin...");
-    let load_output = run_as_user(
-        username,
-        uid,
-        &[("DBUS_SESSION_BUS_ADDRESS", &dbus_addr)],
-        "dbus-send",
         &[
-            "--print-reply",
-            "--dest=org.kde.KWin",
-            "/Scripting",
-            "org.kde.kwin.Scripting.loadScript",
-            &format!("string:{}", script_file),
-            &format!("string:{}", script_name),
+            ("DBUS_SESSION_BUS_ADDRESS", &dbus_addr),
+            ("KDE_SESSION_VERSION", "6"),
         ],
-    );
-
-    let mut object_path = None;
-    if let Some(ref output) = load_output {
-        let stdout_str = String::from_utf8_lossy(&output.stdout);
-        let stderr_str = String::from_utf8_lossy(&output.stderr);
-        println!(
-            "active_window_title_kwin: loadScript exit code: {:?}, stdout: '{}', stderr: '{}'",
-            output.status.code(),
-            stdout_str.trim(),
-            stderr_str.trim()
-        );
+        &current_exe,
+        &["--active-window-helper"],
+    ) {
         if output.status.success() {
-            for line in stdout_str.lines() {
-                if line.contains("object path") {
-                    if let Some(start) = line.find('"') {
-                        if let Some(end) = line[start + 1..].find('"') {
-                            object_path = Some(line[start + 1..start + 1 + end].to_string());
-                            break;
-                        }
-                    }
-                } else if line.contains("int32") {
-                    if let Some(pos) = line.find("int32") {
-                        let num_str = line[pos + 5..].trim();
-                        if let Ok(num) = num_str.parse::<i32>() {
-                            if num >= 0 {
-                                object_path = Some(format!("/Scripting/Script{}", num));
-                                break;
-                            }
-                        }
-                    }
-                }
+            let title = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            if !title.is_empty() {
+                println!("active_window_title_kwin: helper succeeded, title: '{}'", title);
+                return Some(title);
             }
+        } else {
+            println!(
+                "active_window_title_kwin: helper failed (exit code: {:?}, stderr: '{}')",
+                output.status.code(),
+                String::from_utf8_lossy(&output.stderr).trim()
+            );
         }
     } else {
-        println!("active_window_title_kwin: dbus-send loadScript run_as_user returned None");
+        println!("active_window_title_kwin: failed to run helper as user {}", username);
     }
-
-    println!("active_window_title_kwin: parsed object_path: {:?}", object_path);
-
-    let mut title = None;
-
-    if let Some(ref path) = object_path {
-        // Run script
-        println!("active_window_title_kwin: running script {}...", path);
-        let run_output = run_as_user(
-            username,
-            uid,
-            &[("DBUS_SESSION_BUS_ADDRESS", &dbus_addr)],
-            "dbus-send",
-            &[
-                "--dest=org.kde.KWin",
-                path,
-                "org.kde.kwin.Script.run",
-            ],
-        );
-        if let Some(ref output) = run_output {
-            println!(
-                "active_window_title_kwin: run script exit code: {:?}",
-                output.status.code()
-            );
-        }
-
-        // Sleep to let the script call callDBus and transmit the message
-        std::thread::sleep(std::time::Duration::from_millis(150));
-
-        // Unload script using script_name (pluginName)
-        println!("active_window_title_kwin: unloading script {}...", script_name);
-        let unload_output = run_as_user(
-            username,
-            uid,
-            &[("DBUS_SESSION_BUS_ADDRESS", &dbus_addr)],
-            "dbus-send",
-            &[
-                "--dest=org.kde.KWin",
-                "/Scripting",
-                "org.kde.kwin.Scripting.unloadScript",
-                &format!("string:{}", script_name),
-            ],
-        );
-        if let Some(ref output) = unload_output {
-            println!(
-                "active_window_title_kwin: unload script exit code: {:?}",
-                output.status.code()
-            );
-        }
-    }
-
-    // Kill dbus-monitor and read its stdout
-    if let Some(mut child) = monitor_child {
-        let _ = child.kill();
-        let _ = child.wait(); // Prevent zombie processes
-        if let Some(mut stdout) = child.stdout {
-            let mut monitor_output = String::new();
-            use std::io::Read;
-            if stdout.read_to_string(&mut monitor_output).is_ok() {
-                let lines: Vec<&str> = monitor_output.lines().collect();
-                for i in 0..lines.len() {
-                    if lines[i].contains("string") && lines[i].contains(&uuid) {
-                        // The next line containing string is our active window title
-                        for j in (i + 1)..lines.len() {
-                            let line = lines[j];
-                            if line.contains("string") {
-                                if let Some(start) = line.find('"') {
-                                    if let Some(end) = line[start + 1..].find('"') {
-                                        let parsed = line[start + 1..start + 1 + end].trim().to_string();
-                                        if !parsed.is_empty() && parsed != "No active window" {
-                                            title = Some(parsed);
-                                        }
-                                    }
-                                }
-                                break;
-                            }
-                        }
-                        break;
-                    }
-                }
-            }
-        }
-    }
-
-    let _ = std::fs::remove_file(&script_file);
-    title
+    None
 }
 
 #[cfg(target_os = "linux")]
