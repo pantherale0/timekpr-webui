@@ -14,7 +14,7 @@ If an agent config file leaks, **revoke the device** in the admin UI rather than
 
 ## File permissions (Linux agent)
 
-Keep `/etc/timekpr-agent/config.json` owned by `root:root` with mode `0600`.
+Keep `/etc/guardian-agent/config.json` owned by `root:root` with mode `0600`.
 
 ## Registration firewall
 

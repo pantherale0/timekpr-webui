@@ -34,7 +34,7 @@ Copy `android-agent/app/google-services.json.example` → `google-services.json`
 | AppArmor profiles (`apparmor.rs`) | `AppPolicyStore` + Device Admin `setPackagesSuspended` |
 | iptables + local DNS (`firewall.rs`, `local_dns.rs`) | `DomainBlockVpnService` (VPN tunnel with DNS filtering) |
 | Netlink process monitor (`netlink.rs`) | `UsageStatsManager` event stream |
-| `/etc/timekpr-agent/config.json` | `AgentConfigStore` (EncryptedSharedPreferences-ready SharedPreferences) |
+| `/etc/guardian-agent/config.json` | `AgentConfigStore` (EncryptedSharedPreferences-ready SharedPreferences) |
 | logind session alerts | `user_signed_in` / `app_usage` alerts via usage events (secondary profiles forward alerts to user 0) |
 | Persistent WebSocket loop | FCM wake + ephemeral `AgentWebSocketClient` sessions |
 
@@ -350,7 +350,7 @@ Admins can remove devices from family management from the device detail page or 
 
 If a factory reset is requested while the device is offline, the server sets `pending_factory_reset` on the `AgentDevice` row, revokes management trust, and retries delivery on the next WebSocket connection (FCM `factory_reset` is also sent when an FCM token is available).
 
-Linux agents handle `unenroll` by clearing `/etc/timekpr-agent/config.json` agent token and stopping the reconnect loop. Linux has no remote factory reset.
+Linux agents handle `unenroll` by clearing `/etc/guardian-agent/config.json` agent token and stopping the reconnect loop. Linux has no remote factory reset.
 
 ## App policies on Android
 

@@ -84,7 +84,7 @@ Payload shape:
 
 The agent keeps two layers of state:
 
-1. **Policy catalog** — one entry per managed Linux username, updated whenever the server sends `sync_linux_device_policy`. Stored in `/var/lib/timekpr-agent/linux-device-policy.json` (fallback `/etc/timekpr-agent/`).
+1. **Policy catalog** — one entry per managed Linux username, updated whenever the server sends `sync_linux_device_policy`. Stored in `/var/lib/guardian-agent/linux-device-policy.json` (fallback `/etc/guardian-agent/`).
 2. **Active-session enforcement** — polkit rules, Bluetooth rfkill, and terminal exec blocking are applied only for the user signed into the **primary desktop session** (logind seat0 active session). When that session changes, the agent reconciles: remove all `50-timekpr-*.rules`, unblock Bluetooth, then apply restrictions for the new active user if they have a catalog entry.
 
 This mirrors AppArmor’s logind session hooks: syncing policy does not immediately lock down every mapped user on the device.

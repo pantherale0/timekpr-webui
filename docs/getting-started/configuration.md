@@ -47,7 +47,7 @@ See [Auth & OIDC](../reference/auth-and-oidc.md) for `OIDC_*` and `ALLOWED_OIDC_
 
 | Platform | Location |
 |----------|----------|
-| Linux | `/etc/timekpr-agent/config.json` (root `0600`) |
+| Linux | `/etc/guardian-agent/config.json` (root `0600`) |
 | Windows | Service + per-user agent config via installer |
 | Android | `AgentConfigStore` (SharedPreferences) |
 | Debug agent | `server/debug-agent.json` |

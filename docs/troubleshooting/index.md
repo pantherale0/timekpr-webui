@@ -5,7 +5,7 @@
 1. Check agent logs:
 
    ```bash
-   journalctl -u timekpr-agent.service -n 50 --no-pager
+   journalctl -u guardian-agent.service -n 50 --no-pager
    ```
 
 2. Verify WebSocket reachability from client network (`wss://your-server/ws`).
@@ -75,6 +75,28 @@ Verify `ANDROID_KEYSTORE_BASE64` and password/alias secrets match the release ke
 1. Enable webhook in Settings with valid URL.
 2. Confirm `TIMEKPR_TASKS_DELIVER_ALERTS` is not disabled.
 3. Verify receiver accepts POST JSON and optional HMAC signature.
+
+## AppArmor profile loading errors / service failure
+
+### Symptom
+`apparmor.service` fails to start or reload, reporting errors in system logs such as:
+* `Found reference to variable HOMEDIRS, but is never declared`
+* `Could not open 'abstractions/base'` or `Could not open 'abi/3.0'`
+
+### Causes
+1. **Stale Profiles**: Upgrading from the old `timekpr` agent to `guardian` can leave outdated profiles (e.g. starting with `timekpr-`) in `/etc/apparmor.d/` that do not properly include `<tunables/global>` at the top.
+2. **Missing Base Abstractions**: On some Linux distributions (such as Arch or CachyOS), the system abstractions package might be incomplete or missing base files.
+3. **No Traversable Permissions**: Running commands like `ls -la /etc/apparmor.d/...` as a non-root user may falsely return `No such file or directory` (instead of `Permission denied`) if the parent directory has root-only permissions.
+
+### Solutions
+* **Run the Installer**: The updated `install-agent.sh` script automatically unloads and purges all old `timekpr-*` profiles.
+* **Verify Abstraction Files (as root)**: Check if the base files actually exist on disk:
+  ```bash
+  sudo ls -la /etc/apparmor.d/abstractions/base /etc/apparmor.d/abi/3.0
+  ```
+* **Reinstall AppArmor package**: If the files are missing, reinstall the base package to restore them:
+  * On Arch/CachyOS: `sudo pacman -S apparmor`
+  * On Debian/Ubuntu: `sudo apt-get install --reinstall apparmor`
 
 ## Related
 

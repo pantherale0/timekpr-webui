@@ -8,7 +8,7 @@ Remove family management from devices from **Admin → Devices** or device detai
 |--------|----------------|--------|
 | **Unenroll** | Clears token; stops enforcement | Device status `rejected` |
 
-Linux: clears `/etc/timekpr-agent/config.json` token. Android: `AgentConfigStore.clearEnrollmentState()`. Windows: service removes policies and disconnects.
+Linux: clears `/etc/guardian-agent/config.json` token. Android: `AgentConfigStore.clearEnrollmentState()`. Windows: service removes policies and disconnects.
 
 API: `POST /api/device/<system_id>/unenroll`
 
