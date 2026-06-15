@@ -1750,13 +1750,21 @@ pub(crate) async fn start_agent_reconnect_loop(
                         Ok(Message::Text(text)) => match serde_json::from_str::<ServerMessage>(&text) {
                             Ok(ServerMessage::CommandRequest { correlation_id, action, username, args }) => {
                                 println!(
-                                    "Received command: {} for user {} (correlation ID: {})",
+                                    "Received command: {} for user {} (correlation ID: {}), args: {}",
                                     action,
                                     username,
-                                    correlation_id
+                                    correlation_id,
+                                    args
                                 );
 
                                 let (success, message, data) = handle_command(&action, &username, &args).await;
+                                println!(
+                                    "Command result: success = {}, message = \"{}\", data = {} (correlation ID: {})",
+                                    success,
+                                    message,
+                                    data,
+                                    correlation_id
+                                );
                                 let response = ClientMessage::CommandResponse {
                                     correlation_id,
                                     success,
