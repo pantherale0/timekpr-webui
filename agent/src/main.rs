@@ -503,6 +503,28 @@ fn clear_screenshot_trigger_tx() {
     }
 }
 
+static SCREENSHOT_SCHEDULER_WAKE_TX: Mutex<Option<mpsc::UnboundedSender<()>>> = Mutex::new(None);
+
+fn set_screenshot_scheduler_wake_tx(sender: mpsc::UnboundedSender<()>) {
+    if let Ok(mut guard) = SCREENSHOT_SCHEDULER_WAKE_TX.lock() {
+        *guard = Some(sender);
+    }
+}
+
+fn clear_screenshot_scheduler_wake_tx() {
+    if let Ok(mut guard) = SCREENSHOT_SCHEDULER_WAKE_TX.lock() {
+        *guard = None;
+    }
+}
+
+fn wake_screenshot_scheduler() {
+    if let Ok(guard) = SCREENSHOT_SCHEDULER_WAKE_TX.lock() {
+        if let Some(sender) = guard.as_ref() {
+            let _ = sender.send(());
+        }
+    }
+}
+
 fn push_screenshot_reports(report_tx: &mpsc::UnboundedSender<String>, linux_username: Option<&str>) {
     let captures = screenshot::capture_screenshots(linux_username);
     for capture in captures {
@@ -551,6 +573,9 @@ fn spawn_screenshot_scheduler(
     policy: screenshot::SharedScreenshotPolicy,
     mut shutdown: watch::Receiver<bool>,
 ) -> JoinHandle<()> {
+    let (wake_tx, mut wake_rx) = mpsc::unbounded_channel::<()>();
+    set_screenshot_scheduler_wake_tx(wake_tx);
+
     tokio::spawn(async move {
         loop {
             let sleep_secs = {
@@ -567,6 +592,9 @@ fn spawn_screenshot_scheduler(
                     if changed.is_err() || *shutdown.borrow() {
                         break;
                     }
+                }
+                _ = wake_rx.recv() => {
+                    // Woke up due to policy change, immediately recalculate sleep_secs
                 }
                 _ = sleep(Duration::from_secs(sleep_secs)) => {
                     let enabled = policy
@@ -848,11 +876,14 @@ async fn handle_command(action: &str, username: &str, args: &serde_json::Value) 
         ),
         "sync_screenshot_policy" => {
             match screenshot::apply_screenshot_policy(get_screenshot_policy_handle(), args) {
-                Ok(()) => (
-                    true,
-                    "Screenshot policy synchronized".to_string(),
-                    serde_json::json!({}),
-                ),
+                Ok(()) => {
+                    wake_screenshot_scheduler();
+                    (
+                        true,
+                        "Screenshot policy synchronized".to_string(),
+                        serde_json::json!({}),
+                    )
+                }
                 Err(message) => (false, message, serde_json::json!({})),
             }
         }
@@ -888,11 +919,14 @@ async fn handle_command(action: &str, username: &str, args: &serde_json::Value) 
 async fn handle_command(action: &str, username: &str, args: &serde_json::Value) -> (bool, String, serde_json::Value) {
     match action {
         "sync_screenshot_policy" => match screenshot::apply_screenshot_policy(get_screenshot_policy_handle(), args) {
-            Ok(()) => (
-                true,
-                "Screenshot policy synchronized".to_string(),
-                serde_json::json!({}),
-            ),
+            Ok(()) => {
+                wake_screenshot_scheduler();
+                (
+                    true,
+                    "Screenshot policy synchronized".to_string(),
+                    serde_json::json!({}),
+                )
+            }
             Err(message) => (false, message, serde_json::json!({})),
         },
         "capture_screenshot" => (
@@ -1854,6 +1888,7 @@ pub(crate) async fn start_agent_reconnect_loop(
                     *guard = None;
                 }
                 clear_screenshot_trigger_tx();
+                clear_screenshot_scheduler_wake_tx();
 
                 let _ = shutdown_tx.send(true);
                 drop(client_tx);

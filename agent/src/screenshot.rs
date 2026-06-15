@@ -128,6 +128,24 @@ fn encode_image_bytes(image_bytes: &[u8]) -> Option<(Vec<u8>, u32, u32)> {
 }
 
 #[cfg(target_os = "linux")]
+fn find_xauthority(uid: u32, username: &str) -> Option<String> {
+    let path = format!("/home/{username}/.Xauthority");
+    if Path::new(&path).exists() {
+        return Some(path);
+    }
+    let run_dir = format!("/run/user/{uid}");
+    if let Ok(entries) = std::fs::read_dir(run_dir) {
+        for entry in entries.flatten() {
+            let name = entry.file_name().to_string_lossy().into_owned();
+            if name.starts_with("xauth") {
+                return Some(entry.path().to_string_lossy().into_owned());
+            }
+        }
+    }
+    None
+}
+
+#[cfg(target_os = "linux")]
 fn uid_for_username(username: &str) -> Option<u32> {
     users::get_user_by_name(username).map(|user| user.uid())
 }
@@ -151,8 +169,30 @@ fn run_as_user(username: &str, uid: u32, env_pairs: &[(&str, &str)], program: &s
 }
 
 #[cfg(target_os = "linux")]
+fn spawn_as_user(username: &str, uid: u32, env_pairs: &[(&str, &str)], program: &str, args: &[&str]) -> Option<std::process::Child> {
+    let runtime_dir = format!("/run/user/{uid}");
+    if !Path::new(&runtime_dir).exists() {
+        return None;
+    }
+
+    let mut command = Command::new("runuser");
+    command.arg("-u").arg(username).arg("--").arg("env");
+    command.arg(format!("XDG_RUNTIME_DIR={runtime_dir}"));
+    for (key, value) in env_pairs {
+        command.arg(format!("{key}={value}"));
+    }
+    command.arg(program);
+    command.args(args);
+    command.stdout(std::process::Stdio::piped());
+    command.stderr(std::process::Stdio::null());
+    command.spawn().ok()
+}
+
+#[cfg(target_os = "linux")]
 fn capture_raw_image(username: &str, uid: u32) -> Option<Vec<u8>> {
+    println!("capture_raw_image: attempting Wayland capture for user {}", username);
     for wayland_display in ["wayland-0", "wayland-1"] {
+        println!("capture_raw_image: trying wayland display {}", wayland_display);
         if let Some(output) = run_as_user(
             username,
             uid,
@@ -161,31 +201,94 @@ fn capture_raw_image(username: &str, uid: u32) -> Option<Vec<u8>> {
             &["-"],
         ) {
             if output.status.success() && !output.stdout.is_empty() {
+                println!("capture_raw_image: wayland capture succeeded for {}", wayland_display);
                 return Some(output.stdout);
+            } else {
+                println!(
+                    "capture_raw_image: wayland capture failed for {} (exit code: {:?}, stdout len: {}, stderr: \"{}\")",
+                    wayland_display,
+                    output.status.code(),
+                    output.stdout.len(),
+                    String::from_utf8_lossy(&output.stderr).trim()
+                );
+            }
+        } else {
+            println!("capture_raw_image: run_as_user returned None for wayland display {}", wayland_display);
+        }
+
+        // Fallback: try spectacle (KDE Wayland tool)
+        println!("capture_raw_image: trying spectacle fallback for wayland display {}", wayland_display);
+        let temp_path = format!("/tmp/guardian-shot-{username}.png");
+        let _ = std::fs::remove_file(&temp_path);
+        if let Some(output) = run_as_user(
+            username,
+            uid,
+            &[
+                ("WAYLAND_DISPLAY", wayland_display),
+                ("QT_QPA_PLATFORM", "wayland"),
+            ],
+            "spectacle",
+            &["-b", "-n", "-o", &temp_path],
+        ) {
+            if output.status.success() && Path::new(&temp_path).exists() {
+                if let Ok(bytes) = std::fs::read(&temp_path) {
+                    let _ = std::fs::remove_file(&temp_path);
+                    println!("capture_raw_image: spectacle capture succeeded for display {}", wayland_display);
+                    return Some(bytes);
+                }
+            } else {
+                println!(
+                    "capture_raw_image: spectacle capture failed for {} (exit code: {:?}, stderr: \"{}\")",
+                    wayland_display,
+                    output.status.code(),
+                    String::from_utf8_lossy(&output.stderr).trim()
+                );
             }
         }
+        let _ = std::fs::remove_file(&temp_path);
     }
 
+    println!("capture_raw_image: attempting X11 capture for user {}", username);
+    let xauth_file = find_xauthority(uid, username);
     for display in [":0", ":1"] {
-        if let Some(output) = run_as_user(username, uid, &[("DISPLAY", display)], "grim", &["-"]) {
-            if output.status.success() && !output.stdout.is_empty() {
-                return Some(output.stdout);
-            }
+        println!("capture_raw_image: trying display {}", display);
+        let mut env_vars = vec![("DISPLAY", display)];
+        if let Some(ref xauth) = xauth_file {
+            env_vars.push(("XAUTHORITY", xauth));
         }
-        if let Some(output) = run_as_user(username, uid, &[("DISPLAY", display)], "scrot", &["-p", "-"]) {
+
+        if let Some(output) = run_as_user(username, uid, &env_vars, "scrot", &["-p", "-"]) {
             if output.status.success() && !output.stdout.is_empty() {
+                println!("capture_raw_image: scrot capture succeeded for display {}", display);
                 return Some(output.stdout);
+            } else {
+                println!(
+                    "capture_raw_image: scrot capture failed for display {} (exit code: {:?}, stdout len: {}, stderr: \"{}\")",
+                    display,
+                    output.status.code(),
+                    output.stdout.len(),
+                    String::from_utf8_lossy(&output.stderr).trim()
+                );
             }
         }
         if let Some(output) = run_as_user(
             username,
             uid,
-            &[("DISPLAY", display)],
+            &env_vars,
             "import",
             &["-window", "root", "png:-"],
         ) {
             if output.status.success() && !output.stdout.is_empty() {
+                println!("capture_raw_image: import capture succeeded for display {}", display);
                 return Some(output.stdout);
+            } else {
+                println!(
+                    "capture_raw_image: import capture failed for display {} (exit code: {:?}, stdout len: {}, stderr: \"{}\")",
+                    display,
+                    output.status.code(),
+                    output.stdout.len(),
+                    String::from_utf8_lossy(&output.stderr).trim()
+                );
             }
         }
     }
@@ -194,30 +297,263 @@ fn capture_raw_image(username: &str, uid: u32) -> Option<Vec<u8>> {
 }
 
 #[cfg(target_os = "linux")]
+fn active_window_title_kwin(username: &str, uid: u32) -> Option<String> {
+    let uuid = Uuid::new_v4().to_string();
+    let script_name = format!("active_window_{}", uuid);
+    let script_file = format!("/tmp/{}.js", script_name);
+
+    let script_content = format!(
+        "var win = workspace.activeWindow;\n\
+         var title = win ? win.caption : 'No active window';\n\
+         callDBus('org.dummy.Service', '/Dummy', 'org.dummy.Interface', 'ReportTitle', '{}', title);\n",
+        uuid
+    );
+
+    println!("active_window_title_kwin: writing script to {}", script_file);
+    if let Err(e) = std::fs::write(&script_file, script_content) {
+        println!("active_window_title_kwin: failed to write script file: {}", e);
+        return None;
+    }
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let _ = std::fs::set_permissions(&script_file, std::fs::Permissions::from_mode(0o644));
+    }
+
+    let dbus_addr = format!("unix:path=/run/user/{}/bus", uid);
+
+    // Spawn dbus-monitor to sniff the session bus for our call
+    println!("active_window_title_kwin: spawning dbus-monitor...");
+    let monitor_child = spawn_as_user(
+        username,
+        uid,
+        &[("DBUS_SESSION_BUS_ADDRESS", &dbus_addr)],
+        "dbus-monitor",
+        &[],
+    );
+
+    // Wait a brief moment to let dbus-monitor start up
+    std::thread::sleep(std::time::Duration::from_millis(50));
+
+    println!("active_window_title_kwin: loading script into KWin...");
+    let load_output = run_as_user(
+        username,
+        uid,
+        &[("DBUS_SESSION_BUS_ADDRESS", &dbus_addr)],
+        "dbus-send",
+        &[
+            "--print-reply",
+            "--dest=org.kde.KWin",
+            "/Scripting",
+            "org.kde.kwin.Scripting.loadScript",
+            &format!("string:{}", script_file),
+            &format!("string:{}", script_name),
+        ],
+    );
+
+    let mut object_path = None;
+    if let Some(ref output) = load_output {
+        let stdout_str = String::from_utf8_lossy(&output.stdout);
+        let stderr_str = String::from_utf8_lossy(&output.stderr);
+        println!(
+            "active_window_title_kwin: loadScript exit code: {:?}, stdout: '{}', stderr: '{}'",
+            output.status.code(),
+            stdout_str.trim(),
+            stderr_str.trim()
+        );
+        if output.status.success() {
+            for line in stdout_str.lines() {
+                if line.contains("object path") {
+                    if let Some(start) = line.find('"') {
+                        if let Some(end) = line[start + 1..].find('"') {
+                            object_path = Some(line[start + 1..start + 1 + end].to_string());
+                            break;
+                        }
+                    }
+                } else if line.contains("int32") {
+                    if let Some(pos) = line.find("int32") {
+                        let num_str = line[pos + 5..].trim();
+                        if let Ok(num) = num_str.parse::<i32>() {
+                            if num >= 0 {
+                                object_path = Some(format!("/Scripting/Script{}", num));
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    } else {
+        println!("active_window_title_kwin: dbus-send loadScript run_as_user returned None");
+    }
+
+    println!("active_window_title_kwin: parsed object_path: {:?}", object_path);
+
+    let mut title = None;
+
+    if let Some(ref path) = object_path {
+        // Run script
+        println!("active_window_title_kwin: running script {}...", path);
+        let run_output = run_as_user(
+            username,
+            uid,
+            &[("DBUS_SESSION_BUS_ADDRESS", &dbus_addr)],
+            "dbus-send",
+            &[
+                "--dest=org.kde.KWin",
+                path,
+                "org.kde.kwin.Script.run",
+            ],
+        );
+        if let Some(ref output) = run_output {
+            println!(
+                "active_window_title_kwin: run script exit code: {:?}",
+                output.status.code()
+            );
+        }
+
+        // Sleep to let the script call callDBus and transmit the message
+        std::thread::sleep(std::time::Duration::from_millis(150));
+
+        // Unload script using script_name (pluginName)
+        println!("active_window_title_kwin: unloading script {}...", script_name);
+        let unload_output = run_as_user(
+            username,
+            uid,
+            &[("DBUS_SESSION_BUS_ADDRESS", &dbus_addr)],
+            "dbus-send",
+            &[
+                "--dest=org.kde.KWin",
+                "/Scripting",
+                "org.kde.kwin.Scripting.unloadScript",
+                &format!("string:{}", script_name),
+            ],
+        );
+        if let Some(ref output) = unload_output {
+            println!(
+                "active_window_title_kwin: unload script exit code: {:?}",
+                output.status.code()
+            );
+        }
+    }
+
+    // Kill dbus-monitor and read its stdout
+    if let Some(mut child) = monitor_child {
+        let _ = child.kill();
+        let _ = child.wait(); // Prevent zombie processes
+        if let Some(mut stdout) = child.stdout {
+            let mut monitor_output = String::new();
+            use std::io::Read;
+            if stdout.read_to_string(&mut monitor_output).is_ok() {
+                let lines: Vec<&str> = monitor_output.lines().collect();
+                for i in 0..lines.len() {
+                    if lines[i].contains("string") && lines[i].contains(&uuid) {
+                        // The next line containing string is our active window title
+                        for j in (i + 1)..lines.len() {
+                            let line = lines[j];
+                            if line.contains("string") {
+                                if let Some(start) = line.find('"') {
+                                    if let Some(end) = line[start + 1..].find('"') {
+                                        let parsed = line[start + 1..start + 1 + end].trim().to_string();
+                                        if !parsed.is_empty() && parsed != "No active window" {
+                                            title = Some(parsed);
+                                        }
+                                    }
+                                }
+                                break;
+                            }
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    let _ = std::fs::remove_file(&script_file);
+    title
+}
+
+#[cfg(target_os = "linux")]
+fn active_window_title_gnome(username: &str, uid: u32) -> Option<String> {
+    let eval_string = "global.get_window_actors().find(a => a.meta_window.has_focus()).meta_window.get_title()";
+    let output = run_as_user(
+        username,
+        uid,
+        &[("DBUS_SESSION_BUS_ADDRESS", &format!("unix:path=/run/user/{}/bus", uid))],
+        "gdbus",
+        &[
+            "call",
+            "--session",
+            "--dest",
+            "org.gnome.Shell",
+            "--object-path",
+            "/org/gnome/Shell",
+            "--method",
+            "org.gnome.Shell.Eval",
+            eval_string,
+        ],
+    )?;
+    if output.status.success() {
+        let stdout_str = String::from_utf8_lossy(&output.stdout);
+        if let Some(start) = stdout_str.find('"') {
+            if let Some(end) = stdout_str[start + 1..].find('"') {
+                let parsed = stdout_str[start + 1..start + 1 + end].trim().to_string();
+                if !parsed.is_empty() && parsed != "null" && parsed != "undefined" {
+                    return Some(parsed);
+                }
+            }
+        }
+    }
+    None
+}
+
+#[cfg(target_os = "linux")]
 fn active_window_title(username: &str, uid: u32) -> Option<String> {
+    // 1. Try KWin (KDE Plasma) Wayland scripting D-Bus method
+    if let Some(title) = active_window_title_kwin(username, uid) {
+        println!("active_window_title: found active window via KWin: '{}'", title);
+        return Some(title);
+    }
+
+    // 2. Try GNOME Shell Eval D-Bus method
+    if let Some(title) = active_window_title_gnome(username, uid) {
+        println!("active_window_title: found active window via GNOME: '{}'", title);
+        return Some(title);
+    }
+
+    // 3. Fallback: xdotool (for X11/XWayland)
     for display in [":0", ":1"] {
-        let output = run_as_user(
+        if let Some(output) = run_as_user(
             username,
             uid,
             &[("DISPLAY", display)],
             "xdotool",
             &["getactivewindow", "getwindowname"],
-        )?;
-        if !output.status.success() {
-            continue;
-        }
-        let title = String::from_utf8_lossy(&output.stdout).trim().to_string();
-        if !title.is_empty() {
-            return Some(title);
+        ) {
+            if output.status.success() {
+                let title = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                if !title.is_empty() {
+                    println!("active_window_title: found active window via xdotool: '{}'", title);
+                    return Some(title);
+                }
+            }
         }
     }
+
+    println!("active_window_title: could not resolve active window title for {}", username);
     None
 }
 
 #[cfg(target_os = "linux")]
 fn parse_loginctl_line(line: &str) -> Option<(&str, String)> {
     let parts: Vec<&str> = line.split_whitespace().collect();
-    if parts.len() < 3 {
+    if parts.len() < 4 {
+        return None;
+    }
+    let seat = parts[3];
+    if seat == "-" || !seat.starts_with("seat") {
         return None;
     }
     Some((parts[0], parts[2].to_string()))
@@ -227,11 +563,15 @@ fn parse_loginctl_line(line: &str) -> Option<(&str, String)> {
 fn discover_active_usernames() -> Vec<String> {
     let output = match Command::new("loginctl").args(["list-sessions", "--no-legend"]).output() {
         Ok(output) if output.status.success() => output,
-        _ => return Vec::new(),
+        _ => {
+            println!("discover_active_usernames: loginctl execution failed or returned non-zero status");
+            return Vec::new();
+        }
     };
 
     let mut usernames = Vec::new();
     let session_text = String::from_utf8_lossy(&output.stdout);
+    println!("discover_active_usernames: raw session list:\n{}", session_text);
     for line in session_text.lines() {
         let Some((session_id, username)) = parse_loginctl_line(line) else {
             continue;
@@ -244,23 +584,50 @@ fn discover_active_usernames() -> Vec<String> {
             .output();
         if let Ok(detail) = detail {
             let detail_text = String::from_utf8_lossy(&detail.stdout).to_lowercase();
+            println!("discover_active_usernames: session {} details:\n{}", session_id, detail_text);
             let is_graphical = detail_text.contains("type=x11")
                 || detail_text.contains("type=wayland")
                 || detail_text.contains("class=user");
             let is_active = detail_text.contains("state=active") || detail_text.contains("state=online");
             if is_graphical && is_active {
+                println!("discover_active_usernames: session {} (user {}) is graphical and active", session_id, username);
                 usernames.push(username);
+            } else {
+                println!("discover_active_usernames: session {} (user {}) is not graphical/active: is_graphical={}, is_active={}", session_id, username, is_graphical, is_active);
             }
+        } else {
+            println!("discover_active_usernames: failed to show details for session {}", session_id);
         }
     }
+    println!("discover_active_usernames: discovered usernames: {:?}", usernames);
     usernames
 }
 
 #[cfg(target_os = "linux")]
 fn capture_for_username(username: &str) -> Option<CapturedScreenshot> {
-    let uid = uid_for_username(username)?;
-    let raw = capture_raw_image(username, uid)?;
-    let (jpeg_bytes, width, height) = encode_image_bytes(&raw)?;
+    println!("capture_for_username: attempting capture for '{}'", username);
+    let uid = match uid_for_username(username) {
+        Some(uid) => uid,
+        None => {
+            println!("capture_for_username: user '{}' UID lookup failed", username);
+            return None;
+        }
+    };
+    let raw = match capture_raw_image(username, uid) {
+        Some(raw) => raw,
+        None => {
+            println!("capture_for_username: raw capture failed (no image bytes returned) for '{}' (UID {})", username, uid);
+            return None;
+        }
+    };
+    let (jpeg_bytes, width, height) = match encode_image_bytes(&raw) {
+        Some(res) => res,
+        None => {
+            println!("capture_for_username: image encoding/resizing failed for '{}'", username);
+            return None;
+        }
+    };
+    println!("capture_for_username: screenshot successfully captured for '{}' ({}x{}, {} bytes)", username, width, height, jpeg_bytes.len());
     Some(CapturedScreenshot {
         linux_username: username.to_string(),
         jpeg_bytes,
@@ -556,18 +923,21 @@ mod win32 {
 
 #[cfg(target_os = "linux")]
 pub fn capture_screenshots(linux_username: Option<&str>) -> Vec<CapturedScreenshot> {
+    println!("capture_screenshots: requested for user: {:?}", linux_username);
     let targets = if let Some(username) = linux_username {
         vec![username.to_string()]
     } else {
         discover_active_usernames()
     };
 
+    println!("capture_screenshots: final target list for screenshot: {:?}", targets);
     let mut captures = Vec::new();
     for username in targets {
         if let Some(capture) = capture_for_username(&username) {
             captures.push(capture);
         }
     }
+    println!("capture_screenshots: finished capture, total screenshots: {}", captures.len());
     captures
 }
 
@@ -594,9 +964,7 @@ mod tests {
         assert_eq!(parsed.1, "jordanh");
 
         let line_without_seat = "     15 1000 jordanh -     22698  user       -     no   -";
-        let parsed2 = parse_loginctl_line(line_without_seat).unwrap();
-        assert_eq!(parsed2.0, "15");
-        assert_eq!(parsed2.1, "jordanh");
+        assert!(parse_loginctl_line(line_without_seat).is_none());
 
         let invalid_line = " 12 1000";
         assert!(parse_loginctl_line(invalid_line).is_none());
