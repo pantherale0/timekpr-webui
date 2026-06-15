@@ -86,8 +86,44 @@ pub fn get_active_session_user_rid() -> Option<u32> {
     None
 }
 
+#[cfg(target_os = "windows")]
+pub fn get_active_session_username() -> Option<String> {
+    unsafe {
+        let active_session_id = windows_sys::Win32::System::RemoteDesktop::WTSGetActiveConsoleSessionId();
+        if active_session_id == u32::MAX {
+            return None;
+        }
+
+        let mut buffer: *mut u16 = std::ptr::null_mut();
+        let mut bytes_returned = 0;
+
+        let success = windows_sys::Win32::System::RemoteDesktop::WTSQuerySessionInformationW(
+            0, // WTS_CURRENT_SERVER_HANDLE
+            active_session_id,
+            windows_sys::Win32::System::RemoteDesktop::WTSUserName,
+            &mut buffer,
+            &mut bytes_returned,
+        );
+
+        if success != 0 && !buffer.is_null() {
+            let username = read_wide_string(buffer);
+            windows_sys::Win32::System::RemoteDesktop::WTSFreeMemory(buffer as *mut std::ffi::c_void);
+
+            if !username.trim().is_empty() {
+                return Some(username);
+            }
+        }
+    }
+    None
+}
+
 #[cfg(not(target_os = "windows"))]
 pub fn get_active_session_user_rid() -> Option<u32> {
+    None
+}
+
+#[cfg(not(target_os = "windows"))]
+pub fn get_active_session_username() -> Option<String> {
     None
 }
 

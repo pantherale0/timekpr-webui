@@ -32,6 +32,7 @@ from src.database import (
     coerce_time_left_day,
     coerce_time_spent_day,
     get_mapping_time_spent_for_day,
+    YoutubeHistory,
 )
 from pynintendoparental import Authenticator, NintendoParental
 from pyfamilysafety import FamilySafety, Authenticator as XboxAuthenticator
@@ -330,6 +331,10 @@ class BackgroundTaskManager:
             
         # Automatic alert pruning
         self._prune_old_alerts()
+
+        # YouTube background tasks
+        self._fetch_youtube_categories()
+        self._prune_youtube_history()
     
     def _prune_old_alerts(self):
         """Automatically prune alerts older than the configured threshold."""
@@ -348,6 +353,113 @@ class BackgroundTaskManager:
         except Exception as exc:
             logger.warning("Failed to automatically prune alerts: %s", exc)
             db.session.rollback()
+
+    def _fetch_youtube_categories(self):
+        """Fetch YouTube categories/genres for newly logged videos in the background."""
+        try:
+            from src.settings_manager import _get_youtube_api_key
+            api_key = _get_youtube_api_key()
+            if not api_key:
+                return
+
+            # Find distinct video IDs that have category == 'Unknown'
+            # Limit to 50 because that's the max allowed in a single YouTube API call
+            pending = db.session.query(YoutubeHistory.video_id).filter_by(category='Unknown').distinct().limit(50).all()
+            if not pending:
+                return
+
+            video_ids = [row.video_id for row in pending]
+            logger.info("Fetching YouTube categories for %d video(s)", len(video_ids))
+
+            # Hardcoded standard YouTube category mapping (categoryId -> human-readable name)
+            youtube_category_map = {
+                '1': 'Film & Animation',
+                '2': 'Autos & Vehicles',
+                '10': 'Music',
+                '15': 'Pets & Animals',
+                '17': 'Sports',
+                '18': 'Short Movies',
+                '19': 'Travel & Events',
+                '20': 'Gaming',
+                '21': 'Videoblogging',
+                '22': 'People & Blogs',
+                '23': 'Comedy',
+                '24': 'Entertainment',
+                '25': 'News & Politics',
+                '26': 'Howto & Style',
+                '27': 'Education',
+                '28': 'Science & Technology',
+                '29': 'Nonprofits & Activism',
+                '30': 'Movies',
+                '31': 'Anime/Animation',
+                '32': 'Action/Adventure',
+                '33': 'Classics',
+                '34': 'Comedy',
+                '35': 'Documentary',
+                '36': 'Drama',
+                '37': 'Family',
+                '38': 'Foreign',
+                '39': 'Horror',
+                '40': 'Sci-Fi/Fantasy',
+                '41': 'Thriller',
+                '42': 'Shorts',
+                '43': 'Shows',
+                '44': 'Trailers'
+            }
+
+            ids_param = ','.join(video_ids)
+            url = f"https://www.googleapis.com/youtube/v3/videos?part=snippet&id={ids_param}&key={api_key}"
+            
+            response = requests.get(url, timeout=10)
+            if response.status_code != 200:
+                logger.warning("YouTube API returned HTTP %d while fetching categories.", response.status_code)
+                return
+
+            data = response.json()
+            items = data.get('items', [])
+            
+            resolved_categories = {}
+            for item in items:
+                v_id = item.get('id')
+                snippet = item.get('snippet', {})
+                cat_id = snippet.get('categoryId')
+                cat_name = youtube_category_map.get(cat_id, 'Unknown')
+                resolved_categories[v_id] = cat_name
+
+            # Update database records for each video ID
+            for v_id in video_ids:
+                category = resolved_categories.get(v_id, 'Unavailable') # Set Unavailable if video not returned (private/deleted)
+                # Bulk update all rows with this video ID
+                YoutubeHistory.query.filter_by(video_id=v_id, category='Unknown').update(
+                    {YoutubeHistory.category: category},
+                    synchronize_session=False
+                )
+            
+            db.session.commit()
+            logger.info("Successfully updated YouTube video categories.")
+        except Exception as exc:
+            logger.exception("Failed to fetch YouTube categories in background task.")
+            db.session.rollback()
+
+    def _prune_youtube_history(self):
+        """Automatically prune YouTube history older than the configured threshold."""
+        try:
+            from src.settings_manager import _get_youtube_history_retention_days
+            retention_days = _get_youtube_history_retention_days()
+            if retention_days > 0:
+                cutoff_date = datetime.now(timezone.utc) - timedelta(days=retention_days)
+                
+                deleted_count = YoutubeHistory.query.filter(
+                    YoutubeHistory.watched_at < cutoff_date
+                ).delete(synchronize_session=False)
+                
+                if deleted_count > 0:
+                    db.session.commit()
+                    logger.info("Automatically pruned %d YouTube history entries older than %d days", deleted_count, retention_days)
+        except Exception as exc:
+            logger.warning("Failed to automatically prune YouTube history: %s", exc)
+            db.session.rollback()
+
 
     def _update_user_data(self):
         """Update data for all managed users and their device mappings."""

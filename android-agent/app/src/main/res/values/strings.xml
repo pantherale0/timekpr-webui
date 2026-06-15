@@ -37,4 +37,5 @@
     <string name="parental_access_notification_action">Enter Access Code</string>
     <string name="owner_lockdown_title">Parent access required</string>
     <string name="owner_lockdown_body">This owner profile is locked. Enter the parental access code from the dashboard to unlock it.</string>
+    <string name="youtube_accessibility_description">Monitors watched YouTube videos for parental controls.</string>
 </resources>

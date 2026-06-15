@@ -213,17 +213,21 @@ impl LinuxDevicePolicyRuntime {
             &self.current_state.users,
         ) else {
             self.enforced_username = None;
+            let _ = crate::extension_policy::run_reconcile(None);
             return Ok(());
         };
 
         let Some(payload) = self.current_state.users.get(active_user).cloned() else {
             self.enforced_username = None;
+            let _ = crate::extension_policy::run_reconcile(None);
             return Ok(());
         };
 
         polkit::reconcile(active_user, &payload)?;
         bluetooth::reconcile(payload.connectivity.bluetooth_disabled)?;
         self.enforced_username = Some(active_user.to_string());
+
+        let _ = crate::extension_policy::run_reconcile(Some(active_user));
         Ok(())
     }
 

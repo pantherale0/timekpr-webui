@@ -20,6 +20,8 @@ from src.settings_manager import (
     _get_android_agent_apk_filename,
     _get_android_agent_signature_checksum,
     encrypt_setting,
+    _get_youtube_api_key_encrypted,
+    _get_youtube_history_retention_days,
 )
 from src.nintendo_sync import build_nintendo_console_view_context
 from src.blueprints.api.nintendo import get_nintendo_account_summary
@@ -373,6 +375,22 @@ def settings():
                     return redirect(url_for('ui_dashboard.settings'))
             except (TypeError, ValueError):
                 flash('Invalid setting values provided', 'danger')
+        elif form_name == 'youtube_settings':
+            youtube_api_key = request.form.get('youtube_api_key') or ''
+            retention = request.form.get('youtube_history_retention_days')
+            try:
+                retention_val = int(retention)
+                if retention_val < 0:
+                    flash('YouTube retention period must be a non-negative number of days', 'danger')
+                else:
+                    Settings.set_value('youtube_history_retention_days', str(retention_val))
+                    if youtube_api_key:
+                        encrypted_key = encrypt_setting(youtube_api_key)
+                        Settings.set_value('youtube_api_key', encrypted_key)
+                    flash('YouTube Settings updated successfully', 'success')
+                    return redirect(url_for('ui_dashboard.settings'))
+            except (TypeError, ValueError):
+                flash('Invalid settings values provided', 'danger')
         else:
             current_password = request.form.get('current_password')
             new_password = request.form.get('new_password')
@@ -431,6 +449,8 @@ def settings():
         server_version=get_server_version(),
         nintendo_account=nintendo_account,
         xbox_account=xbox_account,
+        youtube_api_key_set=bool(_get_youtube_api_key_encrypted()),
+        youtube_history_retention_days=_get_youtube_history_retention_days(),
     )
 
 
@@ -591,3 +611,14 @@ def refresh_device_installed_apps_ui(system_id):
         flash(str(exc), 'danger')
 
     return redirect(url_for('ui_dashboard.device_detail', system_id=system_id))
+
+
+@ui_dashboard_bp.route('/dashboard/user/<int:user_id>/youtube')
+def user_youtube_history(user_id):
+    """Render the YouTube history tracking dashboard for a user."""
+    if not session.get('logged_in'):
+        flash('Please login first', 'warning')
+        return redirect(url_for('ui_auth.login'))
+    
+    user = ManagedUser.query.get_or_404(user_id)
+    return render_template('youtube_history.html', user=user)

@@ -186,6 +186,11 @@
             {{ user.device_mappings|length }} linked mapping(s) &bull; Usage statistics and alerts
         </p>
     </div>
+    <div>
+        <a href="{{ url_for('ui_dashboard.user_youtube_history', user_id=user.id) }}" class="btn btn-danger fw-bold d-flex align-items-center gap-2">
+            <i class="fab fa-youtube"></i> YouTube History
+        </a>
+    </div>
 </div>
 
 <div class="stats-main">
@@ -361,7 +366,7 @@
     let trendChart = null;
     let appDoughnutChart = null;
 
-    // HSL harmonized theme colors (Purple Ban compliant)
+    // HSL harmonized theme colors (design-compliant)
     const chartPalette = [
         'rgba(16, 185, 129, 0.75)',  // Emerald Green
         'rgba(245, 158, 11, 0.75)',   // Signal Orange

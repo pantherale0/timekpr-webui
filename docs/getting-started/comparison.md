@@ -84,7 +84,7 @@ Historical **Circle Home Plus** hardware is a different model (LAN DNS/filter). 
 | App blocking / allowlists | Yes | Vendor | Partial | Vendor | Vendor | Vendor | Vendor |
 | Web / domain filtering | Yes | Vendor | Vendor | Partial | Vendor | Partial | Vendor |
 | DNS-bypass resistant filtering (on managed device) | Yes | Partial | Partial | Partial | Partial | Partial | Partial |
-| YouTube history monitoring | No | Partial | Partial | Partial | Vendor | Vendor | Partial (Kaspersky, Norton) |
+| YouTube history monitoring | Yes | Partial | Partial | Partial | Vendor | Vendor | Partial (Kaspersky, Norton) |
 | Geofencing / GPS tracking | No | Vendor | Vendor | Vendor | Vendor | Partial | Vendor |
 | Location / panic button | No | Vendor | Partial | Partial | Vendor (Qustodio) | Partial | Vendor |
 | SMS / call logging | No | No | No | No | Partial (Android) | Partial | Partial (Bark, FamiSafe tiers) |
@@ -170,10 +170,9 @@ Guardian is **not** a drop-in replacement for every feature in a paid suite. Ven
 Products like **Bark**, **Qustodio Complete**, and **Boomerang (Android)** focus on:
 
 - AI or keyword scanning of texts, email, and social posts
-- YouTube watch history
 - Call/SMS logs (often Android-only, sometimes sideloaded)
 
-Guardian emits **usage and access-request alerts** (`app_launched`, `access_requested`, etc.) but does **not** ingest message content or social feeds. See [Alerts & webhooks](../features/alerts-and-webhooks.md).
+Guardian supports native YouTube history monitoring on Android, Linux, and Windows (see [YouTube History](../features/youtube-history.md)), but does **not** ingest message content or social feeds. See [Alerts & webhooks](../features/alerts-and-webhooks.md).
 
 ### Location and safety
 

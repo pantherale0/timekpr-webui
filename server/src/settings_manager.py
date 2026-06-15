@@ -148,3 +148,24 @@ def _get_android_provisioning_wifi_password() -> str:
     encrypted = _get_android_provisioning_wifi_password_encrypted()
     return decrypt_setting(encrypted)
 
+
+def _get_youtube_api_key_encrypted() -> str:
+    """Get the raw encrypted YouTube API key cipher text from settings."""
+    return (_safe_get_setting_value('youtube_api_key', '') or '').strip()
+
+
+def _get_youtube_api_key() -> str:
+    """Get the decrypted plain-text YouTube API key."""
+    encrypted = _get_youtube_api_key_encrypted()
+    return decrypt_setting(encrypted)
+
+
+def _get_youtube_history_retention_days() -> int:
+    """Get the YouTube history retention period in days (default: 0 / indefinite)."""
+    raw_value = _safe_get_setting_value('youtube_history_retention_days', '0')
+    try:
+        return max(0, int(raw_value))
+    except (TypeError, ValueError):
+        return 0
+
+

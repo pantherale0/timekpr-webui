@@ -1759,3 +1759,54 @@ class DeviceScreenshot(db.Model):
             'content_hash': self.content_hash,
             'active_window_title': self.active_window_title,
         }
+
+
+class YoutubeHistory(db.Model):
+    __tablename__ = 'youtube_history'
+
+    id = db.Column(db.Integer, primary_key=True)
+    device_id = db.Column(db.String(50), db.ForeignKey('agent_device.system_id'), nullable=False)
+    managed_user_id = db.Column(db.Integer, db.ForeignKey('managed_user.id'), nullable=False)
+    video_id = db.Column(db.String(20), nullable=False)
+    title = db.Column(db.String(255), nullable=False)
+    channel_name = db.Column(db.String(255), nullable=True)
+    channel_id = db.Column(db.String(100), nullable=True)
+    category = db.Column(db.String(100), nullable=False, default='Unknown')
+    duration_seconds = db.Column(db.Integer, nullable=False, default=0)
+    watched_at = db.Column(db.DateTime(timezone=True), nullable=False)
+    created_at = db.Column(
+        db.DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+    device = db.relationship(
+        'AgentDevice',
+        backref=db.backref('youtube_history', cascade='all, delete-orphan'),
+    )
+    managed_user = db.relationship(
+        'ManagedUser',
+        backref=db.backref('youtube_history', cascade='all, delete-orphan'),
+    )
+
+    __table_args__ = (
+        db.Index('youtube_history_user_watched_idx', 'managed_user_id', 'watched_at'),
+    )
+
+    def __repr__(self):
+        return f'<YoutubeHistory {self.managed_user_id} watched {self.video_id} at {self.watched_at}>'
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'device_id': self.device_id,
+            'managed_user_id': self.managed_user_id,
+            'video_id': self.video_id,
+            'title': self.title,
+            'channel_name': self.channel_name,
+            'channel_id': self.channel_id,
+            'category': self.category,
+            'duration_seconds': self.duration_seconds,
+            'watched_at': self.watched_at.isoformat() if self.watched_at else None,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+        }

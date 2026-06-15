@@ -54,6 +54,7 @@ Uses the same `/ws` handshake as Linux: `hello` → approval → `pairing_approv
 | Domain blocklists | Local DNS proxy (same manifest sync as Linux) |
 | Device policy | Linux-style mapping restrictions where applicable |
 | Screenshots | Supported on device detail page when enabled |
+| YouTube history | Chrome extension force-installed via HKLM Registry |
 
 App policy UI currently emphasizes Linux and Android; Windows uses the same underlying sync commands.
 

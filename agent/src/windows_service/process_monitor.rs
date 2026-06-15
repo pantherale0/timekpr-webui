@@ -15,8 +15,17 @@ use windows_sys::Win32::System::Threading::{OpenProcess, TerminateProcess, PROCE
 pub async fn start_process_monitor() {
     println!("Starting Windows Process Monitor...");
     let mut blocked_notified: HashSet<String> = HashSet::new();
+    let mut last_reconciled_user: Option<String> = None;
+    let mut force_reconcile = true;
 
     loop {
+        let active_username = crate::windows_service::dns_proxy::get_active_session_username();
+        if active_username != last_reconciled_user || force_reconcile {
+            let _ = crate::extension_policy::run_reconcile(active_username.as_deref());
+            last_reconciled_user = active_username;
+            force_reconcile = false;
+        }
+
         let active_rid = crate::windows_service::dns_proxy::get_active_session_user_rid();
         
         if let Some(rid) = active_rid {

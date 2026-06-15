@@ -21,6 +21,7 @@ mod timekpr_dbus;
 mod update_verify;
 #[cfg(target_os = "linux")]
 mod terminal_monitor;
+mod extension_policy;
 
 #[cfg(target_os = "windows")]
 pub mod windows_service;
