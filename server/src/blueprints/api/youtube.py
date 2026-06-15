@@ -126,7 +126,7 @@ def get_extension_update_manifest():
     xml_content = f"""<?xml version='1.0' encoding='UTF-8'?>
 <gupdate xmlns='http://www.google.com/update2/response' protocol='2.0'>
   <app appid='{extension_id}'>
-    <updatecheck codebase='{base_url}/api/extensions/download' version='1.0.0' />
+    <updatecheck codebase='{base_url}/api/extensions/download' version='1.0.2' />
   </app>
 </gupdate>"""
 

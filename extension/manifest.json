@@ -1,13 +1,16 @@
 {
   "manifest_version": 3,
   "name": "Guardian",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Guardian browser extension.",
   "permissions": [
-    "storage"
+    "storage",
+    "alarms"
   ],
   "host_permissions": [
-    "*://*.youtube.com/watch*"
+    "*://*.youtube.com/*",
+    "http://*/*",
+    "https://*/*"
   ],
   "background": {
     "service_worker": "background.js"
@@ -15,7 +18,7 @@
   "content_scripts": [
     {
       "matches": [
-        "*://*.youtube.com/watch*"
+        "*://*.youtube.com/*"
       ],
       "js": [
         "content.js"

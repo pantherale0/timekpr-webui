@@ -94,12 +94,12 @@ function checkState() {
     }
 }
 
-function init() {
-    if (monitorInterval) clearInterval(monitorInterval);
-    lastTick = Date.now();
-    monitorInterval = setInterval(checkState, 1000);
+function bindPageListeners() {
+    if (bindPageListeners.bound) {
+        return;
+    }
+    bindPageListeners.bound = true;
 
-    // Event listeners to flush on unload or visibility change
     window.addEventListener('beforeunload', flush);
     document.addEventListener('visibilitychange', () => {
         if (document.visibilityState !== 'visible') {
@@ -107,7 +107,19 @@ function init() {
         }
         lastTick = Date.now();
     });
+    // YouTube SPA navigations (playlist, related videos, home -> watch) reuse the same document.
+    document.addEventListener('yt-navigate-finish', () => {
+        lastTick = Date.now();
+    });
 }
 
-// Start monitoring
-init();
+function startMonitoring() {
+    bindPageListeners();
+    if (monitorInterval) {
+        return;
+    }
+    lastTick = Date.now();
+    monitorInterval = setInterval(checkState, 1000);
+}
+
+startMonitoring();
