@@ -2960,7 +2960,7 @@
 <td><code>UsageStatsManager</code> event stream</td>
 </tr>
 <tr>
-<td><code>/etc/timekpr-agent/config.json</code></td>
+<td><code>/etc/guardian-agent/config.json</code></td>
 <td><code>AgentConfigStore</code> (EncryptedSharedPreferences-ready SharedPreferences)</td>
 </tr>
 <tr>
@@ -3273,7 +3273,7 @@
 </table>
 <p><code>device_admin.xml</code> declares <code>&lt;wipe-data /&gt;</code> so device-owner agents can perform remote wipes.</p>
 <p>If a factory reset is requested while the device is offline, the server sets <code>pending_factory_reset</code> on the <code>AgentDevice</code> row, revokes management trust, and retries delivery on the next WebSocket connection (FCM <code>factory_reset</code> is also sent when an FCM token is available).</p>
-<p>Linux agents handle <code>unenroll</code> by clearing <code>/etc/timekpr-agent/config.json</code> agent token and stopping the reconnect loop. Linux has no remote factory reset.</p>
+<p>Linux agents handle <code>unenroll</code> by clearing <code>/etc/guardian-agent/config.json</code> agent token and stopping the reconnect loop. Linux has no remote factory reset.</p>
 <h2 id="app-policies-on-android">App policies on Android<a class="headerlink" href="#app-policies-on-android" title="Permanent link">&para;</a></h2>
 <p>Server AppArmor rules sync to the agent via <code>sync_apparmor_policy</code>. Use either:</p>
 <ul>

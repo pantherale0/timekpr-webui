@@ -2426,7 +2426,7 @@
 <h3 id="catalog-vs-active-session-enforcement">Catalog vs active-session enforcement<a class="headerlink" href="#catalog-vs-active-session-enforcement" title="Permanent link">&para;</a></h3>
 <p>The agent keeps two layers of state:</p>
 <ol>
-<li><strong>Policy catalog</strong> — one entry per managed Linux username, updated whenever the server sends <code>sync_linux_device_policy</code>. Stored in <code>/var/lib/timekpr-agent/linux-device-policy.json</code> (fallback <code>/etc/timekpr-agent/</code>).</li>
+<li><strong>Policy catalog</strong> — one entry per managed Linux username, updated whenever the server sends <code>sync_linux_device_policy</code>. Stored in <code>/var/lib/guardian-agent/linux-device-policy.json</code> (fallback <code>/etc/guardian-agent/</code>).</li>
 <li><strong>Active-session enforcement</strong> — polkit rules, Bluetooth rfkill, and terminal exec blocking are applied only for the user signed into the <strong>primary desktop session</strong> (logind seat0 active session). When that session changes, the agent reconciles: remove all <code>50-timekpr-*.rules</code>, unblock Bluetooth, then apply restrictions for the new active user if they have a catalog entry.</li>
 </ol>
 <p>This mirrors AppArmor’s logind session hooks: syncing policy does not immediately lock down every mapped user on the device.</p>
