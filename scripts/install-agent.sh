@@ -3,14 +3,18 @@ set -euo pipefail
 
 REPO="pantherale0/timekpr-webui"
 INSTALL_DIR="/usr/local/bin"
-CONFIG_DIR="/etc/timekpr-agent"
+CONFIG_DIR="/etc/guardian-agent"
 CONFIG_PATH="${CONFIG_DIR}/config.json"
-SERVICE_NAME="timekpr-agent.service"
+SERVICE_NAME="guardian-agent.service"
 SERVICE_PATH="/etc/systemd/system/${SERVICE_NAME}"
+OLD_CONFIG_DIR="/etc/timekpr-agent"
+OLD_SERVICE_NAME="timekpr-agent.service"
+OLD_SERVICE_PATH="/etc/systemd/system/${OLD_SERVICE_NAME}"
+OLD_BINARY_NAME="timekpr-agent"
 RELEASE_TAG=""
-SERVER_URL="${TIMEKPR_SERVER_URL:-}"
-AGENT_TOKEN="${TIMEKPR_AGENT_TOKEN:-}"
-REGISTRATION_TOKEN="${TIMEKPR_REGISTRATION_TOKEN:-}"
+SERVER_URL="${GUARDIAN_SERVER_URL:-${TIMEKPR_SERVER_URL:-}}"
+AGENT_TOKEN="${GUARDIAN_AGENT_TOKEN:-${TIMEKPR_AGENT_TOKEN:-}}"
+REGISTRATION_TOKEN="${GUARDIAN_REGISTRATION_TOKEN:-${TIMEKPR_REGISTRATION_TOKEN:-}}"
 AGENT_TOKEN_FILE=""
 REGISTRATION_TOKEN_FILE=""
 DOWNLOAD_ONLY=0
@@ -21,13 +25,14 @@ SECURITY_STACK_KERNEL_BUG_DETECTED=0
 
 usage() {
     cat <<'EOF'
-Install or update the TimeKpr agent from the latest GitHub release.
+Install or update the Guardian agent from the latest GitHub release.
 
 Usage:
   install-agent.sh [options]
 
 Options:
   --server-url URL                 WebSocket URL for the server, preferably wss://.../ws
+  --url URL                       Alias for --server-url
   --agent-token TOKEN             Initial bootstrap token (matches server AGENT_TOKEN)
   --agent-token-file PATH         Read the bootstrap token from a file
   --registration-token TOKEN      Optional pairing firewall token
@@ -42,9 +47,9 @@ Options:
   --help                          Show this help message
 
 Environment:
-  TIMEKPR_SERVER_URL
-  TIMEKPR_AGENT_TOKEN
-  TIMEKPR_REGISTRATION_TOKEN
+  GUARDIAN_SERVER_URL (or TIMEKPR_SERVER_URL)
+  GUARDIAN_AGENT_TOKEN (or TIMEKPR_AGENT_TOKEN)
+  GUARDIAN_REGISTRATION_TOKEN (or TIMEKPR_REGISTRATION_TOKEN)
 
 Notes:
   - On first install, the script prompts for missing secrets if they were not supplied.
@@ -53,8 +58,8 @@ Notes:
   - On full installs, the script attempts to install and enable AppArmor plus auditd so
     application monitoring works with minimal manual setup.
   - The script expects release assets named:
-      timekpr-agent-x86_64-unknown-linux-gnu.tar.gz
-      timekpr-agent-aarch64-unknown-linux-gnu.tar.gz
+      guardian-agent-x86_64-unknown-linux-gnu.tar.gz
+      guardian-agent-aarch64-unknown-linux-gnu.tar.gz
 EOF
 }
 
@@ -290,7 +295,7 @@ PY
 write_service() {
     cat > "$SERVICE_PATH" <<EOF
 [Unit]
-Description=Timekpr WebSocket Client Agent
+Description=Guardian WebSocket Client Agent
 After=network-online.target
 Wants=network-online.target
 
@@ -299,7 +304,7 @@ Type=simple
 User=root
 Group=root
 UMask=0077
-ExecStart=${INSTALL_DIR}/timekpr-agent
+ExecStart=${INSTALL_DIR}/guardian-agent
 Restart=always
 RestartSec=5
 
@@ -312,13 +317,13 @@ EOF
 
 if [[ ${EUID} -ne 0 ]]; then
     need_cmd sudo
-    exec sudo --preserve-env=TIMEKPR_SERVER_URL,TIMEKPR_AGENT_TOKEN,TIMEKPR_REGISTRATION_TOKEN,GITHUB_TOKEN bash "$0" "$@"
+    exec sudo --preserve-env=GUARDIAN_SERVER_URL,GUARDIAN_AGENT_TOKEN,GUARDIAN_REGISTRATION_TOKEN,TIMEKPR_SERVER_URL,TIMEKPR_AGENT_TOKEN,TIMEKPR_REGISTRATION_TOKEN,GITHUB_TOKEN bash "$0" "$@"
 fi
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --server-url)
-            [[ $# -ge 2 ]] || die "Missing value for --server-url"
+        --server-url|--url)
+            [[ $# -ge 2 ]] || die "Missing value for $1"
             SERVER_URL="$2"
             shift 2
             ;;
@@ -401,7 +406,7 @@ if [[ -n "$REGISTRATION_TOKEN_FILE" ]]; then
 fi
 
 TARGET="$(detect_target)"
-ASSET_NAME="timekpr-agent-${TARGET}.tar.gz"
+ASSET_NAME="guardian-agent-${TARGET}.tar.gz"
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
 RELEASE_JSON="${TMP_DIR}/release.json"
@@ -428,6 +433,39 @@ with open(sys.argv[1], encoding="utf-8") as handle:
 print(data.get("tag_name", ""))
 PY
 )"
+
+log "Verifying release version is at least v0.55"
+if ! python3 - "$RELEASE_TAG_RESOLVED" <<'PY'
+import sys
+
+tag = sys.argv[1]
+if not tag:
+    print("Error: Could not resolve release version tag.", file=sys.stderr)
+    sys.exit(1)
+
+if tag.startswith('v'):
+    tag = tag[1:]
+
+parts = []
+for part in tag.split('-')[0].split('+')[0].split('.'):
+    try:
+        parts.append(int(part))
+    except ValueError:
+        parts.append(0)
+
+while len(parts) < 3:
+    parts.append(0)
+
+version = tuple(parts[:3])
+min_version = (0, 55, 0)
+
+if version < min_version:
+    print(f"Error: Resolved version {sys.argv[1]} is below the minimum required version v0.55", file=sys.stderr)
+    sys.exit(1)
+PY
+then
+    die "Version check failed. Script requires v0.55 or higher."
+fi
 
 DOWNLOAD_URL="$(python3 - "$RELEASE_JSON" "$ASSET_NAME" <<'PY'
 import json
@@ -456,11 +494,11 @@ curl -fsSL "$DOWNLOAD_URL" -o "$ARCHIVE_PATH"
 
 log "Extracting release archive"
 tar -xzf "$ARCHIVE_PATH" -C "$EXTRACT_DIR"
-[[ -f "${EXTRACT_DIR}/timekpr-agent" ]] || die "Archive did not contain the timekpr-agent binary"
+[[ -f "${EXTRACT_DIR}/guardian-agent" ]] || die "Archive did not contain the guardian-agent binary"
 
 install -d -m 0755 "$INSTALL_DIR"
-install -m 0755 "${EXTRACT_DIR}/timekpr-agent" "${INSTALL_DIR}/timekpr-agent"
-log "Installed binary to ${INSTALL_DIR}/timekpr-agent"
+install -m 0755 "${EXTRACT_DIR}/guardian-agent" "${INSTALL_DIR}/guardian-agent"
+log "Installed binary to ${INSTALL_DIR}/guardian-agent"
 
 if [[ "$DOWNLOAD_ONLY" -eq 1 ]]; then
     log "Download-only mode requested; skipping config and systemd service setup"
@@ -470,6 +508,36 @@ fi
 need_cmd systemctl
 
 ensure_security_stack
+
+# Migrate existing timekpr-agent installation to guardian-agent if present
+if systemd_unit_exists "${OLD_SERVICE_NAME}"; then
+    log "Existing ${OLD_SERVICE_NAME} detected. Stopping and disabling it..."
+    systemctl stop "${OLD_SERVICE_NAME}" || true
+    systemctl disable "${OLD_SERVICE_NAME}" || true
+    if [[ -f "${OLD_SERVICE_PATH}" ]]; then
+        log "Removing old service file ${OLD_SERVICE_PATH}"
+        rm -f "${OLD_SERVICE_PATH}"
+    fi
+    systemctl daemon-reload
+fi
+
+if [[ -f "${INSTALL_DIR}/${OLD_BINARY_NAME}" ]]; then
+    log "Removing old ${OLD_BINARY_NAME} binary from ${INSTALL_DIR}/${OLD_BINARY_NAME}"
+    rm -f "${INSTALL_DIR}/${OLD_BINARY_NAME}"
+fi
+
+if [[ -d "${OLD_CONFIG_DIR}" ]]; then
+    if [[ ! -d "${CONFIG_DIR}" ]]; then
+        log "Migrating config directory ${OLD_CONFIG_DIR} to ${CONFIG_DIR}"
+        mv "${OLD_CONFIG_DIR}" "${CONFIG_DIR}"
+    else
+        if [[ -f "${OLD_CONFIG_DIR}/config.json" && ! -f "${CONFIG_PATH}" ]]; then
+            log "Migrating config.json from ${OLD_CONFIG_DIR} to ${CONFIG_DIR}"
+            mv "${OLD_CONFIG_DIR}/config.json" "${CONFIG_PATH}"
+        fi
+        rmdir "${OLD_CONFIG_DIR}" 2>/dev/null || true
+    fi
+fi
 
 EXISTING_SERVER_URL="$(get_existing_config_value "server_url" || true)"
 EXISTING_AGENT_TOKEN="$(get_existing_config_value "agent_token" || true)"
@@ -521,7 +589,7 @@ fi
 
 cat <<EOF
 
-Installed TimeKpr agent release ${RELEASE_TAG_RESOLVED}.
+Installed Guardian agent release ${RELEASE_TAG_RESOLVED}.
 
 Next steps:
   - Review ${CONFIG_PATH} permissions: ls -l ${CONFIG_PATH}
@@ -539,7 +607,7 @@ Important:
   - AppArmor was installed, but the running kernel does not currently have it active.
   - Reboot after enabling AppArmor in the bootloader/kernel command line, then re-run:
       aa-status
-      systemctl status apparmor auditd timekpr-agent
+      systemctl status apparmor auditd guardian-agent
 EOF
 fi
 
@@ -549,7 +617,7 @@ if [[ "$SECURITY_STACK_KERNEL_BUG_DETECTED" -eq 1 ]]; then
 Important:
   - The running kernel is logging audit/AppArmor context errors such as:
       audit: error in audit_log_subj_ctx
-  - This is typically a kernel bug in audit/LSM context handling, not a bad TimeKpr install.
+  - This is typically a kernel bug in audit/LSM context handling, not a bad Guardian install.
   - Recommended action:
       1. Update the host to a newer kernel build.
       2. Reboot.
