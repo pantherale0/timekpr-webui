@@ -72,6 +72,7 @@ if sentry_dsn:
         traces_sample_rate=1.0,
         profiles_sample_rate=1.0,
         release=os.environ.get("TIMEKPR_SERVER_VERSION", "v0.0.0-dev"),
+        ignore_errors=[StopIteration],
     )
 
 
