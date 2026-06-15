@@ -526,6 +526,20 @@ if [[ -f "${INSTALL_DIR}/${OLD_BINARY_NAME}" ]]; then
     rm -f "${INSTALL_DIR}/${OLD_BINARY_NAME}"
 fi
 
+# Clean up old AppArmor profiles if present
+if [[ -d "/etc/apparmor.d" ]]; then
+    log "Checking for old timekpr AppArmor profiles..."
+    for profile in /etc/apparmor.d/timekpr-*; do
+        if [[ -f "$profile" ]]; then
+            log "Removing and unloading AppArmor profile: $profile"
+            if has_cmd apparmor_parser; then
+                apparmor_parser -R "$profile" || true
+            fi
+            rm -f "$profile"
+        fi
+    done
+fi
+
 if [[ -d "${OLD_CONFIG_DIR}" ]]; then
     if [[ ! -d "${CONFIG_DIR}" ]]; then
         log "Migrating config directory ${OLD_CONFIG_DIR} to ${CONFIG_DIR}"

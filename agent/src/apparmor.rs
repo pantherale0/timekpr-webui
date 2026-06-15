@@ -757,7 +757,9 @@ fn generate_global_exec_profile(
     path_rules: &[ResolvedPathRule],
 ) -> String {
     format!(
-        r#"# Guardian managed global path-exec baseline
+        r#"#include <tunables/global>
+
+# Guardian managed global path-exec baseline
 profile {profile_name} {attachment_path} flags=(default_allow) {{
 #include <abstractions/base>
 {path_rule_lines}}}
@@ -777,7 +779,9 @@ fn generate_profile(
     match preset {
         "complain" => String::new(),
         "blocked" => format!(
-            r#"# Guardian managed profile – BLOCK execution
+            r#"#include <tunables/global>
+
+# Guardian managed profile – BLOCK execution
 profile {profile_name} {executable_path} {{
   # Deny everything
   deny /** rwlkx,
@@ -789,7 +793,9 @@ profile {profile_name} {executable_path} {{
             executable_path = executable_path,
         ),
         "no_internet" => format!(
-            r#"# Guardian managed profile – NO INTERNET
+            r#"#include <tunables/global>
+
+# Guardian managed profile – NO INTERNET
 profile {profile_name} {executable_path} {{
   # Allow standard file access
 #include <abstractions/base>
