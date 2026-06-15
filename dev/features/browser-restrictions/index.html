@@ -10,13 +10,13 @@
       
       
       
-        <link rel="canonical" href="https://pantherale0.github.io/timekpr-webui/dev/development/ci-release/">
+        <link rel="canonical" href="https://pantherale0.github.io/timekpr-webui/dev/features/browser-restrictions/">
       
       
-        <link rel="prev" href="../local-dev/">
+        <link rel="prev" href="../device-restrictions/">
       
       
-        <link rel="next" href="../../assets/images/">
+        <link rel="next" href="../alerts-and-webhooks/">
       
       
         
@@ -27,7 +27,7 @@
     
     
       
-        <title>CI & releases - Guardian Documentation</title>
+        <title>Browser restrictions - Guardian Documentation</title>
       
     
     
@@ -78,7 +78,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#ci-and-releases" class="md-skip">
+        <a href="#browser-restrictions" class="md-skip">
           Skip to content
         </a>
       
@@ -116,7 +116,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              CI & releases
+              Browser restrictions
             
           </span>
         </div>
@@ -334,11 +334,13 @@
   
   
   
+    
+  
   
     
     
-      <li class="md-tabs__item">
-        <a href="../../features/app-discovery/" class="md-tabs__link">
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../app-discovery/" class="md-tabs__link">
           
   
   
@@ -397,13 +399,11 @@
   
   
   
-    
-  
   
     
     
-      <li class="md-tabs__item md-tabs__item--active">
-        <a href="../contributing/" class="md-tabs__link">
+      <li class="md-tabs__item">
+        <a href="../../development/contributing/" class="md-tabs__link">
           
   
   
@@ -1427,8 +1427,10 @@
       
   
   
+    
   
   
+  
     
     
       
@@ -1446,19 +1448,22 @@
     
     
       
+        
+        
+      
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
         
           
-          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
             
   
   
@@ -1476,7 +1481,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_6">
             <span class="md-nav__icon md-icon"></span>
             
@@ -1494,7 +1499,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../features/app-discovery/" class="md-nav__link">
+      <a href="../app-discovery/" class="md-nav__link">
         
   
   
@@ -1522,7 +1527,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../features/screenshots/" class="md-nav__link">
+      <a href="../screenshots/" class="md-nav__link">
         
   
   
@@ -1550,7 +1555,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../features/device-restrictions/" class="md-nav__link">
+      <a href="../device-restrictions/" class="md-nav__link">
         
   
   
@@ -1575,10 +1580,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../../features/browser-restrictions/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Browser restrictions
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -1594,6 +1626,131 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#supported-browsers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Supported Browsers
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#available-restrictions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Available Restrictions
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Available Restrictions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-disable-incognito-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Disable Incognito Mode
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-enforce-google-safesearch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Enforce Google SafeSearch
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-youtube-restricted-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. YouTube Restricted Mode
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-block-other-extensions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Block Other Extensions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#5-disable-browser-native-generative-ai" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Disable Browser-Native Generative AI
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#technical-details" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Technical Details
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#related-guides" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Related Guides
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -1606,7 +1763,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../features/alerts-and-webhooks/" class="md-nav__link">
+      <a href="../alerts-and-webhooks/" class="md-nav__link">
         
   
   
@@ -1876,8 +2033,6 @@
       
   
   
-    
-  
   
   
     
@@ -1897,19 +2052,16 @@
     
     
       
-        
-        
-      
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
         
           
           <div class="md-nav__link md-nav__container">
@@ -1931,13 +2083,13 @@
             </a>
             
               
-              <label class="md-nav__link " for="__nav_9" id="__nav_9_label" tabindex="">
+              <label class="md-nav__link " for="__nav_9" id="__nav_9_label" tabindex="0">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
           </div>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_9">
             <span class="md-nav__icon md-icon"></span>
             
@@ -1955,7 +2107,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../contributing/" class="md-nav__link">
+      <a href="../../development/contributing/" class="md-nav__link">
         
   
   
@@ -1983,7 +2135,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../local-dev/" class="md-nav__link">
+      <a href="../../development/local-dev/" class="md-nav__link">
         
   
   
@@ -2008,37 +2160,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    CI & releases
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../../development/ci-release/" class="md-nav__link">
         
   
   
@@ -2054,92 +2179,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#workflows" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Workflows
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#agent-release-assets-tags-v" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Agent release assets (tags v*)
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#android-signing-secrets" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Android signing secrets
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#server-image" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Server image
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#documentation-github-pages" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Documentation (GitHub Pages)
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#related" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Related
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -2181,10 +2220,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#workflows" class="md-nav__link">
+  <a href="#supported-browsers" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Workflows
+        Supported Browsers
       
     </span>
   </a>
@@ -2192,10 +2231,82 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#agent-release-assets-tags-v" class="md-nav__link">
+  <a href="#available-restrictions" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Agent release assets (tags v*)
+        Available Restrictions
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Available Restrictions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-disable-incognito-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Disable Incognito Mode
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-enforce-google-safesearch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Enforce Google SafeSearch
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-youtube-restricted-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. YouTube Restricted Mode
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-block-other-extensions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Block Other Extensions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#5-disable-browser-native-generative-ai" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Disable Browser-Native Generative AI
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#technical-details" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Technical Details
       
     </span>
   </a>
@@ -2203,43 +2314,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#android-signing-secrets" class="md-nav__link">
+  <a href="#related-guides" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Android signing secrets
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#server-image" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Server image
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#documentation-github-pages" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Documentation (GitHub Pages)
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#related" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Related
+        Related Guides
       
     </span>
   </a>
@@ -2263,7 +2341,7 @@
 
 
   
-    <a href="https://github.com/pantherale0/timekpr-webui/edit/master/docs/development/ci-release.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+    <a href="https://github.com/pantherale0/timekpr-webui/edit/master/docs/features/browser-restrictions.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
       
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
     </a>
@@ -2271,107 +2349,68 @@
   
 
 
-<h1 id="ci-and-releases">CI and releases<a class="headerlink" href="#ci-and-releases" title="Permanent link">&para;</a></h1>
-<p>GitHub Actions workflows publish server Docker images, agent binaries, and documentation.</p>
-<h2 id="workflows">Workflows<a class="headerlink" href="#workflows" title="Permanent link">&para;</a></h2>
-<table>
-<thead>
-<tr>
-<th>Workflow</th>
-<th>File</th>
-<th>Triggers</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Server image</td>
-<td><code>.github/workflows/server-image.yml</code></td>
-<td><code>server/**</code>, push <code>master</code>, tags <code>v*</code></td>
-</tr>
-<tr>
-<td>Agent CI</td>
-<td><code>.github/workflows/rust-agent.yml</code></td>
-<td><code>agent/**</code>, <code>android-agent/**</code>, tags</td>
-</tr>
-<tr>
-<td>Documentation</td>
-<td><code>.github/workflows/docs.yml</code></td>
-<td><code>docs/**</code>, <code>mkdocs.yml</code>, push <code>master</code>, tags <code>v*</code></td>
-</tr>
-</tbody>
-</table>
-<h2 id="agent-release-assets-tags-v">Agent release assets (tags <code>v*</code>)<a class="headerlink" href="#agent-release-assets-tags-v" title="Permanent link">&para;</a></h2>
-<table>
-<thead>
-<tr>
-<th>Asset</th>
-<th>Platform</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>guardian-agent-&lt;target&gt;.tar.gz</code> + <code>.sha256</code></td>
-<td>Linux x86_64, aarch64</td>
-</tr>
-<tr>
-<td><code>guardian-agent-x86_64-pc-windows-msvc.msi</code> + <code>.sha256</code></td>
-<td>Windows</td>
-</tr>
-<tr>
-<td><code>guardian-android-agent-&lt;tag&gt;.apk</code> + <code>.signature-checksum</code></td>
-<td>Android</td>
-</tr>
-</tbody>
-</table>
-<p>Set <code>GUARDIAN_AGENT_VERSION</code> / tag name at build time. Server reads <code>TIMEKPR_SERVER_VERSION</code> for handshake matching.</p>
-<h2 id="android-signing-secrets">Android signing secrets<a class="headerlink" href="#android-signing-secrets" title="Permanent link">&para;</a></h2>
-<p>Configure in GitHub repository secrets:</p>
-<table>
-<thead>
-<tr>
-<th>Secret</th>
-<th>Purpose</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>ANDROID_KEYSTORE_BASE64</code></td>
-<td>Base64-encoded <code>.keystore</code></td>
-</tr>
-<tr>
-<td><code>ANDROID_KEYSTORE_PASSWORD</code></td>
-<td>Keystore password</td>
-</tr>
-<tr>
-<td><code>ANDROID_KEY_ALIAS</code></td>
-<td>Key alias</td>
-</tr>
-<tr>
-<td><code>ANDROID_KEY_PASSWORD</code></td>
-<td>Key password</td>
-</tr>
-</tbody>
-</table>
-<p>Generate keystore:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>keytool<span class="w"> </span>-genkeypair<span class="w"> </span>-v<span class="w"> </span>-keystore<span class="w"> </span>release.keystore<span class="w"> </span>-alias<span class="w"> </span>guardian-alias<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span>-keyalg<span class="w"> </span>RSA<span class="w"> </span>-keysize<span class="w"> </span><span class="m">2048</span><span class="w"> </span>-validity<span class="w"> </span><span class="m">10000</span>
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>base64<span class="w"> </span>-w<span class="w"> </span><span class="m">0</span><span class="w"> </span>release.keystore<span class="w"> </span>&gt;<span class="w"> </span>keystore_base64.txt
-</code></pre></div>
-<p>See <a href="../../platforms/android-agent/#generating-and-encoding-the-keystore-for-cicd">Android agent — keystore</a>.</p>
-<h2 id="server-image">Server image<a class="headerlink" href="#server-image" title="Permanent link">&para;</a></h2>
-<p>Published to <code>ghcr.io/&lt;owner&gt;/&lt;repo&gt;-server:nightly</code> on <code>master</code> and <code>:vX.Y.Z</code> on tags.</p>
-<h2 id="documentation-github-pages">Documentation (GitHub Pages)<a class="headerlink" href="#documentation-github-pages" title="Permanent link">&para;</a></h2>
-<ol>
-<li><strong>Settings → Pages → Source:</strong> branch <code>gh-pages</code>, folder <code>/ (root)</code></li>
-<li>Push to <code>master</code> → mike deploys version <strong><code>dev</code></strong> (rolling docs from <code>master</code>)</li>
-<li>Push tag <code>v*</code> → mike deploys that tag and updates the <strong><code>latest</code></strong> alias</li>
-</ol>
-<p>Site URL configured in <code>mkdocs.yml</code> as <code>site_url</code>.</p>
-<p>First deploy creates the <code>gh-pages</code> branch automatically.</p>
-<h2 id="related">Related<a class="headerlink" href="#related" title="Permanent link">&para;</a></h2>
+<h1 id="browser-restrictions">Browser Restrictions<a class="headerlink" href="#browser-restrictions" title="Permanent link">&para;</a></h1>
+<p>Guardian allows you to enforce browser-level safety policies directly on your child's web browsers. By using OS-level policy enforcement, these restrictions apply system-wide, preventing children from bypassing them or turning them off.</p>
+<p>Currently, browser restrictions are supported on <strong>Linux</strong> client devices.</p>
+<hr />
+<h2 id="supported-browsers">Supported Browsers<a class="headerlink" href="#supported-browsers" title="Permanent link">&para;</a></h2>
+<p>Guardian applies browser restrictions to the following web browsers on Linux:
+- <strong>Google Chrome</strong>
+- <strong>Chromium</strong>
+- <strong>Brave Browser</strong></p>
+<hr />
+<h2 id="available-restrictions">Available Restrictions<a class="headerlink" href="#available-restrictions" title="Permanent link">&para;</a></h2>
+<p>You can configure the following safety settings in the parent dashboard under the child's profile settings:</p>
+<h3 id="1-disable-incognito-mode">1. Disable Incognito Mode<a class="headerlink" href="#1-disable-incognito-mode" title="Permanent link">&para;</a></h3>
 <ul>
-<li><a href="../../getting-started/configuration/">Configuration reference</a></li>
-<li><a href="../../troubleshooting/#ci-android-signing-failures">Troubleshooting — signing</a></li>
+<li><strong>What it does:</strong> Disables the browser's "Incognito" (private browsing) window option.</li>
+<li><strong>Why use it:</strong> Ensures all web traffic, history, and active usage are visible to filtering and monitoring. The option to open an Incognito window is greyed out/unavailable in the browser menu.</li>
+</ul>
+<h3 id="2-enforce-google-safesearch">2. Enforce Google SafeSearch<a class="headerlink" href="#2-enforce-google-safesearch" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>What it does:</strong> Forces Google Search to filter out explicit content (such as pornography and graphic violence) from search results.</li>
+<li><strong>Why use it:</strong> Provides an extra layer of search filtering directly at the search engine level. This setting cannot be toggled off by the user within Google's settings page.</li>
+</ul>
+<h3 id="3-youtube-restricted-mode">3. YouTube Restricted Mode<a class="headerlink" href="#3-youtube-restricted-mode" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>What it does:</strong> Restricts mature or potentially inappropriate video content on YouTube.</li>
+<li><strong>Available Levels:</strong><ul>
+<li><strong>Off:</strong> No YouTube content restrictions.</li>
+<li><strong>Moderate:</strong> Filters out many mature videos while keeping most content accessible.</li>
+<li><strong>Strict (Recommended):</strong> Maximizes filtering of mature, violent, or age-restricted content.</li>
+</ul>
+</li>
+<li><strong>Why use it:</strong> Helps keep the YouTube feed age-appropriate without blocking the website entirely.</li>
+</ul>
+<h3 id="4-block-other-extensions">4. Block Other Extensions<a class="headerlink" href="#4-block-other-extensions" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>What it does:</strong> Blocks your child from installing any third-party browser extensions, except for the <strong>Guardian monitor extension</strong>.</li>
+<li><strong>Allowed Extension IDs:</strong> You can specify additional, trusted extension IDs (comma or space separated) if your child needs them for school or utility purposes (e.g., Google Translate or password managers).</li>
+<li><strong>Why use it:</strong> Prevents children from installing unauthorized VPN extensions, proxies, or ad blockers designed to bypass parental controls.</li>
+</ul>
+<h3 id="5-disable-browser-native-generative-ai">5. Disable Browser-Native Generative AI<a class="headerlink" href="#5-disable-browser-native-generative-ai" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>What it does:</strong> Blocks native AI features built directly into modern browsers.</li>
+<li><strong>Affected Features:</strong> Disables features like foundational model settings, "Help Me Write" text generation, AI history search, AI tab organization, and AI theme creators.</li>
+<li><strong>Why use it:</strong> Keeps the browsing experience focused and prevents unchecked interaction with browser-level Generative AI models.</li>
+</ul>
+<hr />
+<h2 id="technical-details">Technical Details<a class="headerlink" href="#technical-details" title="Permanent link">&para;</a></h2>
+<p>Browser restrictions are pushed to the client device using <strong>Chrome Enterprise Policies</strong>. </p>
+<ol>
+<li>When you save restrictions in the Web UI, the server prepares a secure policy payload.</li>
+<li>The local Guardian agent retrieves the payload and writes it directly to the system-managed policy directories:</li>
+<li><code>/etc/opt/chrome/policies/managed/timekpr_youtube.json</code></li>
+<li><code>/etc/chromium/policies/managed/timekpr_youtube.json</code></li>
+<li><code>/etc/brave/policies/managed/timekpr_youtube.json</code></li>
+<li>Because these files are managed by the root system administrator, they take precedence over user settings and cannot be deleted or modified by a standard user account.</li>
+</ol>
+<hr />
+<h2 id="related-guides">Related Guides<a class="headerlink" href="#related-guides" title="Permanent link">&para;</a></h2>
+<ul>
+<li><a href="../device-restrictions/">Device restrictions</a></li>
+<li><a href="../youtube-history/">YouTube History Monitoring</a></li>
+<li><a href="../../web-ui/web-filters/">Web content filtering</a></li>
 </ul>
 
 
