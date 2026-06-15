@@ -54,9 +54,36 @@ def _normalize_support_message(value) -> str:
     return normalized
 
 
+def _clean_allowed_extensions(value) -> list[str]:
+    if value is None:
+        return []
+    
+    raw_list = []
+    if isinstance(value, list):
+        for item in value:
+            if isinstance(item, str):
+                raw_list.append(item)
+            else:
+                raise ValueError('Extension ID must be a string')
+    elif isinstance(value, str):
+        raw_list = value.replace(',', ' ').split()
+    else:
+        raise ValueError('allowed_extension_ids must be a string or a list of strings')
+        
+    cleaned = []
+    for ext_id in raw_list:
+        trimmed = ext_id.strip()
+        if not trimmed:
+            continue
+        if len(trimmed) != 32 or not all(c in 'abcdefghijklmnop' for c in trimmed):
+            raise ValueError(f'Invalid Chrome Extension ID: "{trimmed}". Extension IDs must be exactly 32 alphabetical characters (a-p).')
+        cleaned.append(trimmed)
+    return cleaned
+
 def build_device_policy_payload(policy: MappingLinuxDevicePolicy) -> dict:
     """Build canonical device policy JSON for Linux agent sync."""
     support_message = policy.support_message or MappingLinuxDevicePolicy.DEFAULT_SUPPORT_MESSAGE
+    chrome_config = policy.chrome_policies
     return {
         'polkit': {
             'installSoftwareDisabled': bool(policy.install_software_disabled),
@@ -73,6 +100,14 @@ def build_device_policy_payload(policy: MappingLinuxDevicePolicy) -> dict:
         },
         'exec': {
             'terminalAccessDisabled': bool(policy.terminal_access_disabled),
+        },
+        'chrome': {
+            'incognitoDisabled': bool(chrome_config.get('incognito_disabled', True)),
+            'safeBrowsingEnforced': bool(chrome_config.get('safesearch_enforced', True)),
+            'youtubeRestrict': int(chrome_config.get('youtube_restrict', 2)),
+            'blockOtherExtensions': bool(chrome_config.get('block_other_extensions', False)),
+            'blockGenaiFeatures': bool(chrome_config.get('block_genai_features', False)),
+            'allowedExtensionIds': list(chrome_config.get('allowed_extension_ids', [])),
         },
         'supportMessage': support_message,
     }
@@ -121,6 +156,7 @@ def build_policy_summary(policy: MappingLinuxDevicePolicy, mapping: ManagedUserD
         'flatpak_install_disabled': policy.flatpak_install_disabled,
         'snap_install_disabled': policy.snap_install_disabled,
         'terminal_access_disabled': policy.terminal_access_disabled,
+        'chrome_policies': policy.chrome_policies,
         'support_message': (
             policy.support_message or MappingLinuxDevicePolicy.DEFAULT_SUPPORT_MESSAGE
         ),
@@ -159,6 +195,45 @@ def upsert_policy(mapping: ManagedUserDeviceMap, body: dict) -> MappingLinuxDevi
             )
     if 'support_message' in body:
         policy.support_message = _normalize_support_message(body.get('support_message'))
+
+    if 'chrome_policies' in body:
+        chrome_req = body.get('chrome_policies') or {}
+        if not isinstance(chrome_req, dict):
+            raise ValueError('chrome_policies must be a JSON object')
+
+        current = policy.chrome_policies
+
+        incognito = chrome_req.get('incognito_disabled')
+        if incognito is not None:
+            current['incognito_disabled'] = _coerce_bool(incognito, 'incognito_disabled')
+
+        safesearch = chrome_req.get('safesearch_enforced')
+        if safesearch is not None:
+            current['safesearch_enforced'] = _coerce_bool(safesearch, 'safesearch_enforced')
+
+        youtube = chrome_req.get('youtube_restrict')
+        if youtube is not None:
+            try:
+                youtube_val = int(youtube)
+                if youtube_val not in (0, 1, 2):
+                    raise ValueError
+                current['youtube_restrict'] = youtube_val
+            except (TypeError, ValueError):
+                raise ValueError('youtube_restrict must be 0, 1, or 2')
+
+        block_ext = chrome_req.get('block_other_extensions')
+        if block_ext is not None:
+            current['block_other_extensions'] = _coerce_bool(block_ext, 'block_other_extensions')
+
+        block_genai = chrome_req.get('block_genai_features')
+        if block_genai is not None:
+            current['block_genai_features'] = _coerce_bool(block_genai, 'block_genai_features')
+
+        allowed_exts = chrome_req.get('allowed_extension_ids')
+        if allowed_exts is not None:
+            current['allowed_extension_ids'] = _clean_allowed_extensions(allowed_exts)
+
+        policy.chrome_policies = current
 
     payload = build_device_policy_payload(policy)
     policy.revision = compute_revision(payload)

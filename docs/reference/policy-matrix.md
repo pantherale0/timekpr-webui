@@ -11,6 +11,7 @@ How Guardian policies map to each platform enforcement layer.
 | **Domain blocklists** | Local DNS sinkhole | DNS VPN service | DNS proxy | Not supported | Not supported |
 | **Hardware restrictions** | Polkit, rfkill, terminal block | Camera, mic, USB, BT, etc. | Limited | Not supported | Not supported |
 | **System restrictions** | Package managers (apt/snap/flatpak) | Install/uninstall, dev settings | Service-level | Not supported | Not supported |
+| **Browser restrictions** | Chrome Enterprise policies | Not supported | Not supported | Not supported | Not supported |
 | **Bedtime / sleep** | Schedule intervals | Schedule windows | Schedule windows | Bedtime alarm push | Device limits schedule |
 | **Screenshots** | Supported | Not supported | Supported | Not supported | Not supported |
 | **YouTube history** | Browser extension (Chrome) | Accessibility Service | Browser extension (Chrome) | Not supported | Not supported |

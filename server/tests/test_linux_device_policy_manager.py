@@ -70,7 +70,46 @@ def test_build_device_policy_payload_defaults(linux_mapping):
         'exec': {
             'terminalAccessDisabled': False,
         },
+        'chrome': {
+            'incognitoDisabled': True,
+            'safeBrowsingEnforced': True,
+            'youtubeRestrict': 2,
+            'blockOtherExtensions': False,
+            'blockGenaiFeatures': False,
+            'allowedExtensionIds': [],
+        },
         'supportMessage': MappingLinuxDevicePolicy.DEFAULT_SUPPORT_MESSAGE,
+    }
+
+
+def test_upsert_policy_chrome(linux_mapping, monkeypatch):
+    monkeypatch.setattr(
+        'src.linux_device_policy_manager.push_mapping_device_policy',
+        lambda mapping: (True, 'ok'),
+    )
+    policy = upsert_policy(linux_mapping, {
+        'chrome_policies': {
+            'incognito_disabled': False,
+            'safesearch_enforced': False,
+            'youtube_restrict': 1,
+            'block_other_extensions': True,
+            'block_genai_features': True,
+        }
+    })
+    assert policy.chrome_policies['incognito_disabled'] is False
+    assert policy.chrome_policies['safesearch_enforced'] is False
+    assert policy.chrome_policies['youtube_restrict'] == 1
+    assert policy.chrome_policies['block_other_extensions'] is True
+    assert policy.chrome_policies['block_genai_features'] is True
+    
+    payload = build_device_policy_payload(policy)
+    assert payload['chrome'] == {
+        'incognitoDisabled': False,
+        'safeBrowsingEnforced': False,
+        'youtubeRestrict': 1,
+        'blockOtherExtensions': True,
+        'blockGenaiFeatures': True,
+        'allowedExtensionIds': [],
     }
 
 
@@ -131,3 +170,47 @@ def test_upsert_rejects_empty_support_message(linux_mapping, monkeypatch):
     )
     with pytest.raises(ValueError, match='support_message'):
         upsert_policy(linux_mapping, {'support_message': '   '})
+
+
+def test_upsert_policy_chrome_extensions(linux_mapping, monkeypatch):
+    monkeypatch.setattr(
+        'src.linux_device_policy_manager.push_mapping_device_policy',
+        lambda mapping: (True, 'ok'),
+    )
+    
+    # 1. Test valid allowed extension IDs as list
+    policy = upsert_policy(linux_mapping, {
+        'chrome_policies': {
+            'allowed_extension_ids': ['gnokihbalbffklhnhamjompcmbgojmjp', 'gcbomnkjlpaaappabaakgddmghngejim']
+        }
+    })
+    assert policy.chrome_policies['allowed_extension_ids'] == [
+        'gnokihbalbffklhnhamjompcmbgojmjp',
+        'gcbomnkjlpaaappabaakgddmghngejim'
+    ]
+    
+    payload = build_device_policy_payload(policy)
+    assert payload['chrome']['allowedExtensionIds'] == [
+        'gnokihbalbffklhnhamjompcmbgojmjp',
+        'gcbomnkjlpaaappabaakgddmghngejim'
+    ]
+    
+    # 2. Test valid allowed extension IDs as comma/space-separated string
+    policy2 = upsert_policy(linux_mapping, {
+        'chrome_policies': {
+            'allowed_extension_ids': 'gnokihbalbffklhnhamjompcmbgojmjp, gcbomnkjlpaaappabaakgddmghngejim'
+        }
+    })
+    assert policy2.chrome_policies['allowed_extension_ids'] == [
+        'gnokihbalbffklhnhamjompcmbgojmjp',
+        'gcbomnkjlpaaappabaakgddmghngejim'
+    ]
+    
+    # 3. Test invalid extension ID raises ValueError
+    import pytest
+    with pytest.raises(ValueError, match='Invalid Chrome Extension ID'):
+        upsert_policy(linux_mapping, {
+            'chrome_policies': {
+                'allowed_extension_ids': ['invalid_id_123']
+            }
+        })

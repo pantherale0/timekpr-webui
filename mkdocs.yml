@@ -99,6 +99,7 @@ nav:
       - App discovery: features/app-discovery.md
       - Screenshots: features/screenshots.md
       - Device restrictions: features/device-restrictions.md
+      - Browser restrictions: features/browser-restrictions.md
       - Alerts & webhooks: features/alerts-and-webhooks.md
   - Reference:
       - Policy matrix: reference/policy-matrix.md

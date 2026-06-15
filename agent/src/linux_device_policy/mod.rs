@@ -51,6 +51,22 @@ pub struct ExecPolicy {
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ChromePolicy {
+    #[serde(default, rename = "incognitoDisabled")]
+    pub incognito_disabled: bool,
+    #[serde(default, rename = "safeBrowsingEnforced")]
+    pub safe_browsing_enforced: bool,
+    #[serde(default, rename = "youtubeRestrict")]
+    pub youtube_restrict: u32,
+    #[serde(default, rename = "blockOtherExtensions")]
+    pub block_other_extensions: bool,
+    #[serde(default, rename = "blockGenaiFeatures")]
+    pub block_genai_features: bool,
+    #[serde(default, rename = "allowedExtensionIds")]
+    pub allowed_extension_ids: Vec<String>,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DevicePolicyPayload {
     #[serde(default)]
     pub polkit: PolkitPolicy,
@@ -58,6 +74,8 @@ pub struct DevicePolicyPayload {
     pub connectivity: ConnectivityPolicy,
     #[serde(default)]
     pub exec: ExecPolicy,
+    #[serde(default)]
+    pub chrome: ChromePolicy,
     #[serde(default, rename = "supportMessage")]
     pub support_message: String,
 }
@@ -213,13 +231,13 @@ impl LinuxDevicePolicyRuntime {
             &self.current_state.users,
         ) else {
             self.enforced_username = None;
-            let _ = crate::extension_policy::run_reconcile(None);
+            let _ = crate::extension_policy::run_reconcile(None, None);
             return Ok(());
         };
 
         let Some(payload) = self.current_state.users.get(active_user).cloned() else {
             self.enforced_username = None;
-            let _ = crate::extension_policy::run_reconcile(None);
+            let _ = crate::extension_policy::run_reconcile(None, None);
             return Ok(());
         };
 
@@ -227,7 +245,7 @@ impl LinuxDevicePolicyRuntime {
         bluetooth::reconcile(payload.connectivity.bluetooth_disabled)?;
         self.enforced_username = Some(active_user.to_string());
 
-        let _ = crate::extension_policy::run_reconcile(Some(active_user));
+        let _ = crate::extension_policy::run_reconcile(Some(active_user), Some(&payload.chrome));
         Ok(())
     }
 

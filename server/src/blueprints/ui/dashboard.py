@@ -143,6 +143,7 @@ def edit_user_profile(user_id):
                     'flatpak_install_disabled': linux_policy.flatpak_install_disabled,
                     'snap_install_disabled': linux_policy.snap_install_disabled,
                     'terminal_access_disabled': linux_policy.terminal_access_disabled,
+                    'chrome_policies': linux_policy.chrome_policies,
                     'support_message': (
                         linux_policy.support_message
                         or MappingLinuxDevicePolicy.DEFAULT_SUPPORT_MESSAGE

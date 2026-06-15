@@ -12,7 +12,7 @@ Polkit rules, Bluetooth rfkill, and terminal exec blocking for the **active seat
 | Connectivity | Bluetooth disabled |
 | Exec | Terminal/shell blocking via process monitor |
 
-Catalog stored in `/var/lib/timekpr-agent/linux-device-policy.json`. See [Linux agent](../platforms/linux-agent.md).
+Catalog stored in `/var/lib/timekpr-agent/linux-device-policy.json`. See [Linux agent](../platforms/linux-agent.md). For browser-specific security policies (like Incognito blocking and YouTube restricted mode), see [Browser restrictions](browser-restrictions.md).
 
 ## Android (`sync_android_device_policy`)
 
@@ -38,5 +38,6 @@ No hardware restriction sync for Nintendo/Xbox.
 
 ## Related
 
+- [Browser restrictions](browser-restrictions.md)
 - [Policy matrix](../reference/policy-matrix.md)
 - [Policy assignment](../workflows/policy-assignment.md)

@@ -1519,6 +1519,7 @@ class MappingLinuxDevicePolicy(db.Model):
         nullable=False,
         default=DEFAULT_SUPPORT_MESSAGE,
     )
+    chrome_policies_json = db.Column(db.Text, nullable=True)
     revision = db.Column(db.String(64), nullable=False, default='')
     is_synced = db.Column(db.Boolean, nullable=False, default=False)
     last_synced_at = db.Column(db.DateTime(timezone=True), nullable=True)
@@ -1534,6 +1535,36 @@ class MappingLinuxDevicePolicy(db.Model):
         onupdate=lambda: datetime.now(timezone.utc),
         nullable=False,
     )
+
+    DEFAULT_CHROME_POLICIES = {
+        'incognito_disabled': True,
+        'safesearch_enforced': True,
+        'youtube_restrict': 2,            # 2 = Strict, 1 = Moderate, 0 = Off
+        'block_other_extensions': False,  # Only allow our Guardian extension
+        'block_genai_features': False,     # Disable browser-native Gen AI
+        'allowed_extension_ids': [],      # Additional allowed extension IDs
+    }
+
+    @property
+    def chrome_policies(self) -> dict:
+        if not self.chrome_policies_json:
+            return self.DEFAULT_CHROME_POLICIES.copy()
+        try:
+            val = json.loads(self.chrome_policies_json)
+            if not isinstance(val, dict):
+                return self.DEFAULT_CHROME_POLICIES.copy()
+            # Ensure any missing keys are filled with defaults
+            res = self.DEFAULT_CHROME_POLICIES.copy()
+            res.update(val)
+            return res
+        except (TypeError, ValueError, json.JSONDecodeError):
+            return self.DEFAULT_CHROME_POLICIES.copy()
+
+    @chrome_policies.setter
+    def chrome_policies(self, val: dict) -> None:
+        if not isinstance(val, dict):
+            val = {}
+        self.chrome_policies_json = json.dumps(val)
 
     device_map = db.relationship(
         'ManagedUserDeviceMap',

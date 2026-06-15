@@ -22,22 +22,32 @@ pub fn reconcile_extension_policy(
     active_username: Option<&str>,
     server_url: &str,
     agent_token: Option<&str>,
+    chrome_policy: Option<&crate::linux_device_policy::ChromePolicy>,
 ) -> Result<(), String> {
-    let policy_dir = Path::new("/etc/opt/chrome/policies/managed");
-    let policy_path = policy_dir.join("timekpr_youtube.json");
+    let policy_dirs = [
+        Path::new("/etc/opt/chrome/policies/managed"),
+        Path::new("/etc/chromium/policies/managed"),
+        Path::new("/etc/brave/policies/managed"),
+    ];
 
     let Some(token) = agent_token else {
-        // Unenrolled or no token: remove policy
-        if policy_path.exists() {
-            let _ = fs::remove_file(&policy_path);
+        // Unenrolled or no token: remove policy from all dirs
+        for dir in &policy_dirs {
+            let policy_path = dir.join("timekpr_youtube.json");
+            if policy_path.exists() {
+                let _ = fs::remove_file(&policy_path);
+            }
         }
         return Ok(());
     };
 
     let Some(username) = active_username else {
         // No active user: remove policy to avoid tracking wrong sessions
-        if policy_path.exists() {
-            let _ = fs::remove_file(&policy_path);
+        for dir in &policy_dirs {
+            let policy_path = dir.join("timekpr_youtube.json");
+            if policy_path.exists() {
+                let _ = fs::remove_file(&policy_path);
+            }
         }
         return Ok(());
     };
@@ -45,12 +55,8 @@ pub fn reconcile_extension_policy(
     let rest_url = convert_ws_to_http(server_url);
     let update_url = format!("{}/api/extensions/update", rest_url);
 
-    // Create the directory if it doesn't exist
-    if let Err(e) = fs::create_dir_all(policy_dir) {
-        return Err(format!("Failed to create policy directory: {}", e));
-    }
-
-    let policy_json = serde_json::json!({
+    // Build base policy JSON
+    let mut policy_json = serde_json::json!({
         "ExtensionInstallForcelist": [
             format!("{};{}", EXTENSION_ID, update_url)
         ],
@@ -65,11 +71,75 @@ pub fn reconcile_extension_policy(
         }
     });
 
+    // Merge in extra Chrome policy rules if provided
+    if let Some(cp) = chrome_policy {
+        if let Some(obj) = policy_json.as_object_mut() {
+            // 1. Incognito Mode
+            if cp.incognito_disabled {
+                obj.insert("IncognitoModeAvailability".to_string(), serde_json::json!(2));
+            } else {
+                obj.insert("IncognitoModeAvailability".to_string(), serde_json::json!(0));
+            }
+
+            // 2. SafeSearch
+            if cp.safe_browsing_enforced {
+                obj.insert("ForceGoogleSafeSearch".to_string(), serde_json::json!(true));
+            } else {
+                obj.insert("ForceGoogleSafeSearch".to_string(), serde_json::json!(false));
+            }
+
+            // 3. YouTube Restricted Mode
+            obj.insert("ForceYouTubeRestrict".to_string(), serde_json::json!(cp.youtube_restrict));
+
+            // 4. Block other extensions
+            if cp.block_other_extensions {
+                let mut allowlist = vec![EXTENSION_ID.to_string()];
+                for ext_id in &cp.allowed_extension_ids {
+                    let trimmed = ext_id.trim();
+                    if !trimmed.is_empty() {
+                        allowlist.push(trimmed.to_string());
+                    }
+                }
+                obj.insert("ExtensionInstallBlocklist".to_string(), serde_json::json!(["*"]));
+                obj.insert("ExtensionInstallAllowlist".to_string(), serde_json::json!(allowlist));
+            }
+
+            // 5. Block GenAI features
+            if cp.block_genai_features {
+                obj.insert("GenAILocalFoundationalModelSettings".to_string(), serde_json::json!(2));
+                obj.insert("CreateThemesSettings".to_string(), serde_json::json!(2));
+                obj.insert("HelpMeWriteSettings".to_string(), serde_json::json!(2));
+                obj.insert("HistorySearchSettings".to_string(), serde_json::json!(2));
+                obj.insert("TabOrganizerSettings".to_string(), serde_json::json!(2));
+            }
+        }
+    }
+
     let serialized = serde_json::to_string_pretty(&policy_json)
         .map_err(|e| format!("Failed to serialize Chrome policy: {}", e))?;
 
-    fs::write(&policy_path, serialized)
-        .map_err(|e| format!("Failed to write Chrome policy to {:?}: {}", policy_path, e))?;
+    let mut written_any = false;
+    let mut last_err = None;
+
+    for dir in &policy_dirs {
+        if let Err(e) = fs::create_dir_all(dir) {
+            last_err = Some(format!("Failed to create policy directory {:?}: {}", dir, e));
+            continue;
+        }
+        let policy_path = dir.join("timekpr_youtube.json");
+        if let Err(e) = fs::write(&policy_path, &serialized) {
+            last_err = Some(format!("Failed to write Chrome policy to {:?}: {}", policy_path, e));
+            continue;
+        }
+        written_any = true;
+    }
+
+    if !written_any {
+        if let Some(err) = last_err {
+            return Err(err);
+        }
+        return Err("No policy directories could be written".to_string());
+    }
 
     Ok(())
 }
@@ -84,6 +154,7 @@ pub fn reconcile_extension_policy(
     active_username: Option<&str>,
     server_url: &str,
     agent_token: Option<&str>,
+    _chrome_policy: Option<&crate::linux_device_policy::ChromePolicy>,
 ) -> Result<(), String> {
     use windows_sys::Win32::System::Registry::{
         HKEY_LOCAL_MACHINE, REG_SZ, REG_OPTION_NON_VOLATILE, KEY_WRITE, KEY_READ,
@@ -417,14 +488,18 @@ fn load_agent_config() -> Option<AgentConfig> {
     None
 }
 
-pub fn run_reconcile(active_username: Option<&str>) -> Result<(), String> {
+pub fn run_reconcile(
+    active_username: Option<&str>,
+    chrome_policy: Option<&crate::linux_device_policy::ChromePolicy>,
+) -> Result<(), String> {
     if let Some(config) = load_agent_config() {
         reconcile_extension_policy(
             active_username,
             &config.server_url,
             config.agent_token.as_deref(),
+            chrome_policy,
         )
     } else {
-        reconcile_extension_policy(None, "", None)
+        reconcile_extension_policy(None, "", None, None)
     }
 }

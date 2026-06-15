@@ -217,6 +217,62 @@
             </div>
         </div>
 
+        <!-- Chrome Browser Restrictions -->
+        <div class="card border shadow-sm mb-4">
+            <div class="card-header bg-dark text-white py-3">
+                <h5 class="mb-0 fw-bold"><i class="fab fa-chrome text-info me-2"></i>Chrome Browser Restrictions</h5>
+            </div>
+            <div class="card-body p-4">
+                <p class="text-secondary small fw-medium mb-3">Enforce browser restrictions across Google Chrome, Chromium, and Brave browsers.</p>
+                {% if linux_device_policy_by_mapping %}
+                    <div class="d-flex flex-column gap-3">
+                        {% for mapping in user.device_mappings %}
+                            {% set linux_policy = linux_device_policy_by_mapping.get(mapping.id) %}
+                            {% if linux_policy %}
+                            {% set chrome_opts = linux_policy.chrome_policies %}
+                            <div class="border rounded p-3 bg-body-tertiary chrome-device-policy-card" data-mapping-id="{{ mapping.id }}">
+                                <div class="d-flex justify-content-between align-items-start gap-2 mb-2 flex-wrap">
+                                    <strong class="text-body">{{ mapping.linux_username }}@{{ linux_policy.device_label or mapping.system_id }}</strong>
+                                </div>
+                                <div class="form-check form-switch mb-2">
+                                    <input class="form-check-input chrome-incognito" type="checkbox" data-mapping-id="{{ mapping.id }}" id="chrome-incognito-{{ mapping.id }}" {% if chrome_opts.incognito_disabled %}checked{% endif %}>
+                                    <label class="form-check-label small" for="chrome-incognito-{{ mapping.id }}">Disable Incognito Mode</label>
+                                </div>
+                                <div class="form-check form-switch mb-2">
+                                    <input class="form-check-input chrome-safesearch" type="checkbox" data-mapping-id="{{ mapping.id }}" id="chrome-safesearch-{{ mapping.id }}" {% if chrome_opts.safesearch_enforced %}checked{% endif %}>
+                                    <label class="form-check-label small" for="chrome-safesearch-{{ mapping.id }}">Enforce Google SafeSearch</label>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold small text-muted text-uppercase mb-1" style="font-size: 0.7rem;" for="chrome-youtube-{{ mapping.id }}">YouTube Restricted Mode</label>
+                                    <select class="form-select form-select-sm chrome-youtube" data-mapping-id="{{ mapping.id }}" id="chrome-youtube-{{ mapping.id }}">
+                                        <option value="0" {% if chrome_opts.youtube_restrict == 0 %}selected{% endif %}>Off</option>
+                                        <option value="1" {% if chrome_opts.youtube_restrict == 1 %}selected{% endif %}>Moderate</option>
+                                        <option value="2" {% if chrome_opts.youtube_restrict == 2 %}selected{% endif %}>Strict (Recommended)</option>
+                                    </select>
+                                </div>
+                                <div class="form-check form-switch mb-2">
+                                    <input class="form-check-input chrome-block-ext" type="checkbox" data-mapping-id="{{ mapping.id }}" id="chrome-block-ext-{{ mapping.id }}" {% if chrome_opts.block_other_extensions %}checked{% endif %} onchange="toggleChromeAllowedExtsVisibility('{{ mapping.id }}')">
+                                    <label class="form-check-label small" for="chrome-block-ext-{{ mapping.id }}">Block all other extensions (only allow Guardian monitor)</label>
+                                </div>
+                                <div class="ms-4 mb-3 {% if not chrome_opts.block_other_extensions %}d-none{% endif %}" id="chrome-allowed-exts-container-{{ mapping.id }}">
+                                    <label class="form-label fw-bold small text-muted text-uppercase mb-1" style="font-size: 0.7rem;" for="chrome-allowed-exts-{{ mapping.id }}">Allowed Extension IDs (comma or space separated)</label>
+                                    <input class="form-control form-control-sm chrome-allowed-exts" type="text" data-mapping-id="{{ mapping.id }}" id="chrome-allowed-exts-{{ mapping.id }}" value="{{ chrome_opts.allowed_extension_ids | join(', ') }}" placeholder="e.g. gcbomnkjlpa..., googletranslateid...">
+                                </div>
+                                <div class="form-check form-switch mb-0">
+                                    <input class="form-check-input chrome-block-genai" type="checkbox" data-mapping-id="{{ mapping.id }}" id="chrome-block-genai-{{ mapping.id }}" {% if chrome_opts.block_genai_features %}checked{% endif %}>
+                                    <label class="form-check-label small" for="chrome-block-genai-{{ mapping.id }}">Disable browser-native Generative AI features</label>
+                                </div>
+                            </div>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                    <button type="button" class="btn btn-primary btn-sm fw-bold mt-3" onclick="saveLinuxDevicePolicies()">Save Browser Restrictions</button>
+                {% else %}
+                    <p class="text-secondary small mb-0">Link a Linux device mapping to configure browser restrictions.</p>
+                {% endif %}
+            </div>
+        </div>
+
     </div>
 
     <!-- Right Sidebar Content: App Locks & Installed Apps -->
@@ -424,9 +480,21 @@
         badge.textContent = isSynced ? 'Synced' : 'Sync pending';
     }
 
+    function toggleChromeAllowedExtsVisibility(mappingId) {
+        const checkbox = document.querySelector(`.chrome-block-ext[data-mapping-id="${mappingId}"]`);
+        const container = document.getElementById(`chrome-allowed-exts-container-${mappingId}`);
+        if (checkbox && container) {
+            if (checkbox.checked) {
+                container.classList.remove('d-none');
+            } else {
+                container.classList.add('d-none');
+            }
+        }
+    }
+
     function saveLinuxDevicePolicies() {
         const mappingIds = new Set();
-        document.querySelectorAll('.linux-device-policy-card').forEach(card => mappingIds.add(card.dataset.mappingId));
+        document.querySelectorAll('.linux-device-policy-card, .chrome-device-policy-card').forEach(card => mappingIds.add(card.dataset.mappingId));
         const requests = Array.from(mappingIds).map(mappingId => {
             const installSoftware = document.querySelector(`.linux-install-software[data-mapping-id="${mappingId}"]`);
             const uninstallSoftware = document.querySelector(`.linux-uninstall-software[data-mapping-id="${mappingId}"]`);
@@ -439,6 +507,14 @@
             const bluetooth = document.querySelector(`.linux-bluetooth[data-mapping-id="${mappingId}"]`);
             const terminalAccess = document.querySelector(`.linux-terminal-access[data-mapping-id="${mappingId}"]`);
             const supportMessage = document.querySelector(`.linux-support-message[data-mapping-id="${mappingId}"]`);
+            
+            const chromeIncognito = document.querySelector(`.chrome-incognito[data-mapping-id="${mappingId}"]`);
+            const chromeSafesearch = document.querySelector(`.chrome-safesearch[data-mapping-id="${mappingId}"]`);
+            const chromeYoutube = document.querySelector(`.chrome-youtube[data-mapping-id="${mappingId}"]`);
+            const chromeBlockExt = document.querySelector(`.chrome-block-ext[data-mapping-id="${mappingId}"]`);
+            const chromeBlockGenai = document.querySelector(`.chrome-block-genai[data-mapping-id="${mappingId}"]`);
+            const chromeAllowedExts = document.querySelector(`.chrome-allowed-exts[data-mapping-id="${mappingId}"]`);
+            
             return fetch(`/api/mappings/${mappingId}/linux-device-policy`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
@@ -454,6 +530,14 @@
                     bluetooth_disabled: bluetooth ? bluetooth.checked : false,
                     terminal_access_disabled: terminalAccess ? terminalAccess.checked : false,
                     support_message: supportMessage ? supportMessage.value.trim() : '',
+                    chrome_policies: {
+                        incognito_disabled: chromeIncognito ? chromeIncognito.checked : true,
+                        safesearch_enforced: chromeSafesearch ? chromeSafesearch.checked : true,
+                        youtube_restrict: chromeYoutube ? parseInt(chromeYoutube.value) : 2,
+                        block_other_extensions: chromeBlockExt ? chromeBlockExt.checked : false,
+                        block_genai_features: chromeBlockGenai ? chromeBlockGenai.checked : false,
+                        allowed_extension_ids: chromeAllowedExts ? chromeAllowedExts.value : ''
+                    }
                 }),
             }).then(response => response.json().then(payload => ({ mappingId, payload })));
         });
@@ -462,7 +546,7 @@
             .then(results => {
                 const failed = results.find(item => !item.payload.success);
                 if (failed) {
-                    showNotification(failed.payload.message || 'Failed to save Linux device restrictions', 'error');
+                    showNotification(failed.payload.message || 'Failed to save restrictions', 'error');
                     return;
                 }
                 results.forEach(({ mappingId, payload }) => {
@@ -471,11 +555,11 @@
                 const pending = results.some(({ payload }) => !payload.policy?.is_synced);
                 showNotification(
                     pending
-                        ? 'Linux device restrictions saved; sync pending until the agent reconnects'
-                        : 'Linux device restrictions saved and synced',
+                        ? 'Browser and device restrictions saved; sync pending until the agent reconnects'
+                        : 'Browser and device restrictions saved and synced',
                 );
             })
-            .catch(() => showNotification('Failed to save Linux device restrictions', 'error'));
+            .catch(() => showNotification('Failed to save restrictions', 'error'));
     }
 
     function saveApprovalSettings() {
