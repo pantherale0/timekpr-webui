@@ -11,10 +11,13 @@ Guardian can detect when a managed child attempts to **sign up for a new online 
 
 ### 1. Signup detection
 
-When the Guardian browser extension loads on any web page, it runs a lightweight detection pass:
+When the Guardian browser extension loads on any web page, it runs a detection pass across five complementary signal layers, stopping as soon as any layer matches:
 
-- **URL heuristics** — paths containing `/signup`, `/register`, `/join`, `/create-account`, and similar patterns are flagged.
-- **DOM analysis** — the page's form structure is inspected: multiple password fields (password + confirm) or a single password field alongside buttons labelled *Sign Up*, *Create Account*, or *Get Started* indicate a registration form.
+1. **URL heuristics** — paths containing `/signup`, `/register`, `/join`, `/create-account`, etc. are flagged immediately without inspecting the DOM.
+2. **`autocomplete="new-password"`** — the most reliable single signal. The HTML spec requires registration forms to set this attribute on new-password fields (and `current-password` on login fields). All major services follow this convention: Google, GitHub, Facebook, DigitalOcean, and more.
+3. **Multiple password fields** — a password field alongside a confirm-password field is a clear registration indicator.
+4. **Registration-specific form fields** — fields for first/last name, phone number, or date of birth (`autocomplete="given-name"`, `autocomplete="bday"`, `input[type="tel"]`, etc.) are essentially never present on login forms.
+5. **Page-level text** — headings (`h1`–`h3`), submit buttons, and navigation links are scanned for text such as *Sign Up*, *Create Account*, *Join*, or *Register*.
 
 If the page matches, the extension immediately asks the native agent (`com.guardian.agent`) whether registration on that domain is currently allowed for this user.
 
