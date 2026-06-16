@@ -21,12 +21,19 @@
   "content_scripts": [
     {
       "matches": [
-        "*://*.youtube.com/*"
+        "http://*/*",
+        "https://*/*"
       ],
       "js": [
         "content.js"
       ],
       "run_at": "document_end"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["blocked.html"],
+      "matches": ["<all_urls>"]
     }
   ]
 }

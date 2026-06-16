@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Approval Required — Guardian</title>
+    <style>
+        :root {
+            --bg: #0d1117;
+            --surface: #161b22;
+            --surface-2: #1f2937;
+            --border: #30363d;
+            --text-primary: #e6edf3;
+            --text-secondary: #8b949e;
+            --text-muted: #6e7681;
+            --accent: #1f6feb;
+            --accent-hover: #388bfd;
+            --accent-glow: rgba(31, 111, 235, 0.18);
+            --success: #238636;
+            --success-bg: #0d2d17;
+            --warning: #d29922;
+            --warning-bg: #2d1f0d;
+            --danger: #da3633;
+            --radius: 8px;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background: var(--bg);
+            color: var(--text-primary);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+        }
+
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            max-width: 540px;
+            width: 100%;
+            overflow: hidden;
+        }
+
+        /* Header bar */
+        .card-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 18px 24px;
+            background: var(--surface-2);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .shield-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: var(--accent-glow);
+            border: 1.5px solid var(--accent);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .shield-icon svg {
+            width: 18px;
+            height: 18px;
+            fill: var(--accent-hover);
+        }
+
+        .header-text h1 {
+            font-size: 1rem;
+            font-weight: 600;
+            letter-spacing: -0.01em;
+        }
+
+        .header-text span {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        /* Body */
+        .card-body {
+            padding: 28px 24px 24px;
+        }
+
+        .blocked-heading {
+            font-size: 1.35rem;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            margin-bottom: 6px;
+        }
+
+        .blocked-sub {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            line-height: 1.5;
+            margin-bottom: 22px;
+        }
+
+        /* Domain pill */
+        .domain-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: var(--surface-2);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 5px 10px;
+            font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+            font-size: 0.82rem;
+            color: var(--text-primary);
+            margin-bottom: 22px;
+            max-width: 100%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .domain-pill svg {
+            width: 12px;
+            height: 12px;
+            fill: var(--text-secondary);
+            flex-shrink: 0;
+        }
+
+        /* Status banner */
+        .status-banner {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            border-radius: 6px;
+            padding: 12px 14px;
+            font-size: 0.85rem;
+            margin-bottom: 22px;
+            border-width: 1px;
+            border-style: solid;
+        }
+
+        .status-banner.idle {
+            background: var(--warning-bg);
+            border-color: rgba(210, 153, 34, 0.35);
+            color: var(--warning);
+        }
+
+        .status-banner.pending {
+            background: #0d1f3d;
+            border-color: rgba(31, 111, 235, 0.35);
+            color: #79b8ff;
+        }
+
+        .status-banner.approved {
+            background: var(--success-bg);
+            border-color: rgba(35, 134, 54, 0.35);
+            color: #3fb950;
+        }
+
+        .status-banner.denied {
+            background: #2d0d0d;
+            border-color: rgba(218, 54, 51, 0.35);
+            color: #f85149;
+        }
+
+        .status-banner .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            flex-shrink: 0;
+            background: currentColor;
+        }
+
+        .status-banner.pending .dot {
+            animation: pulse 1.6s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.35; }
+        }
+
+        /* Divider */
+        .divider {
+            height: 1px;
+            background: var(--border);
+            margin-bottom: 22px;
+        }
+
+        /* Button group */
+        .btn-group {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            width: 100%;
+            padding: 10px 18px;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            border: 1px solid transparent;
+            transition: background 0.15s, border-color 0.15s, opacity 0.15s;
+            text-decoration: none;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: #fff;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            background: var(--accent-hover);
+            border-color: var(--accent-hover);
+        }
+
+        .btn-secondary {
+            background: transparent;
+            border-color: var(--border);
+            color: var(--text-secondary);
+        }
+
+        .btn-secondary:hover:not(:disabled) {
+            border-color: var(--text-muted);
+            color: var(--text-primary);
+        }
+
+        .btn svg {
+            width: 15px;
+            height: 15px;
+            fill: currentColor;
+            flex-shrink: 0;
+        }
+
+        /* Footer */
+        .card-footer {
+            padding: 12px 24px;
+            border-top: 1px solid var(--border);
+            background: var(--bg);
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .card-footer svg {
+            width: 12px;
+            height: 12px;
+            fill: var(--text-muted);
+        }
+
+        /* Spinner inline */
+        .spinner {
+            display: inline-block;
+            width: 14px;
+            height: 14px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-top-color: #fff;
+            border-radius: 50%;
+            animation: spin 0.7s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <!-- Header -->
+        <div class="card-header">
+            <div class="shield-icon">
+                <!-- Shield icon -->
+                <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 1L3 5v6c0 5.25 3.75 10.15 9 11.35C17.25 21.15 21 16.25 21 11V5L12 1z"/>
+                </svg>
+            </div>
+            <div class="header-text">
+                <h1>Guardian Parental Controls</h1>
+                <span>Managed by your parent or guardian</span>
+            </div>
+        </div>
+
+        <!-- Body -->
+        <div class="card-body">
+            <p class="blocked-heading">Approval required to sign up</p>
+            <p class="blocked-sub">
+                Creating an account on this website requires your parent or guardian's approval.
+                Request approval below and wait for it to be granted before continuing.
+            </p>
+
+            <div class="domain-pill" id="domain-pill">
+                <!-- Globe icon -->
+                <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 2a10 10 0 1 0 0 20A10 10 0 0 0 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13v5l4.25 2.52.77-1.28L12 11.25V7h-1z"/>
+                </svg>
+                <span id="domain-text">Loading…</span>
+            </div>
+
+            <!-- Status banner -->
+            <div class="status-banner idle" id="status-banner">
+                <div class="dot"></div>
+                <span id="status-text">No approval request has been sent yet.</span>
+            </div>
+
+            <div class="divider"></div>
+
+            <div class="btn-group">
+                <button class="btn btn-primary" id="btn-request" onclick="requestApproval()">
+                    <!-- Bell icon -->
+                    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/>
+                    </svg>
+                    <span id="btn-request-label">Request Approval</span>
+                </button>
+
+                <button class="btn btn-secondary" id="btn-check" onclick="checkStatus()">
+                    <!-- Refresh icon -->
+                    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
+                    </svg>
+                    Check Approval Status
+                </button>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="card-footer">
+            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
+            </svg>
+            Status is automatically checked every 10 seconds. Page will redirect on approval.
+        </div>
+    </div>
+
+    <script src="blocked.js"></script>
+</body>
+</html>

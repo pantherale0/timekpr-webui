@@ -86,6 +86,19 @@ enum IpcRequest {
     BrowserLog {
         logs: serde_json::Value,
     },
+    #[serde(rename = "CHECK_REGISTRATION")]
+    CheckRegistration {
+        domain: String,
+    },
+    #[serde(rename = "REQUEST_REGISTRATION")]
+    RequestRegistration {
+        domain: String,
+    },
+    #[serde(rename = "LOGIN_DETECTED")]
+    LoginDetected {
+        domain: String,
+        username: String,
+    },
 }
 
 #[cfg(target_os = "linux")]
@@ -158,6 +171,33 @@ async fn process_ipc_messages<R: tokio::io::AsyncReadExt + Unpin, W: tokio::io::
             }
             IpcRequest::BrowserLog { logs } => {
                 let response = handle_browser_log(username, logs).await;
+                if let Ok(res_bytes) = serde_json::to_vec(&response) {
+                    if let Err(e) = write_framed_message(writer, &res_bytes).await {
+                        eprintln!("IPC error writing response: {}", e);
+                        break;
+                    }
+                }
+            }
+            IpcRequest::CheckRegistration { domain } => {
+                let response = handle_check_registration(username, domain).await;
+                if let Ok(res_bytes) = serde_json::to_vec(&response) {
+                    if let Err(e) = write_framed_message(writer, &res_bytes).await {
+                        eprintln!("IPC error writing response: {}", e);
+                        break;
+                    }
+                }
+            }
+            IpcRequest::RequestRegistration { domain } => {
+                let response = handle_request_registration(username, domain).await;
+                if let Ok(res_bytes) = serde_json::to_vec(&response) {
+                    if let Err(e) = write_framed_message(writer, &res_bytes).await {
+                        eprintln!("IPC error writing response: {}", e);
+                        break;
+                    }
+                }
+            }
+            IpcRequest::LoginDetected { domain, username: login_username } => {
+                let response = handle_login_detected(username, domain, login_username).await;
                 if let Ok(res_bytes) = serde_json::to_vec(&response) {
                     if let Err(e) = write_framed_message(writer, &res_bytes).await {
                         eprintln!("IPC error writing response: {}", e);
@@ -253,6 +293,160 @@ async fn handle_browser_log(username: &str, logs: serde_json::Value) -> serde_js
                 let text = res.text().await.unwrap_or_default();
                 serde_json::from_str::<serde_json::Value>(&text).unwrap_or_else(|_| {
                     serde_json::json!({ "success": true, "message": "Logs accepted" })
+                })
+            } else {
+                let err_msg = res.text().await.unwrap_or_default();
+                serde_json::json!({
+                    "success": false,
+                    "message": format!("Server returned HTTP {}: {}", status.as_u16(), err_msg)
+                })
+            }
+        }
+        Err(e) => {
+            serde_json::json!({
+                "success": false,
+                "message": format!("Failed to route request to backend: {}", e)
+            })
+        }
+    }
+}
+
+async fn handle_check_registration(username: &str, domain: String) -> serde_json::Value {
+    let Some(config) = load_agent_config() else {
+        return serde_json::json!({
+            "success": false,
+            "message": "Local agent config missing or unreadable"
+        });
+    };
+
+    let rest_url = convert_ws_to_http(&config.server_url);
+    let target_url = format!("{}/api/registration/check", rest_url);
+    let token = config.agent_token.as_deref().unwrap_or("");
+
+    let payload = serde_json::json!({
+        "linux_username": username,
+        "domain": domain,
+    });
+
+    let payload_str = serde_json::to_string(&payload).unwrap_or_default();
+
+    let client = reqwest::Client::new();
+    match client.post(&target_url)
+        .header("Authorization", format!("Bearer {}", token))
+        .header("Content-Type", "application/json")
+        .body(payload_str)
+        .send()
+        .await
+    {
+        Ok(res) => {
+            let status = res.status();
+            if status.is_success() {
+                let text = res.text().await.unwrap_or_default();
+                serde_json::from_str::<serde_json::Value>(&text).unwrap_or_else(|_| {
+                    serde_json::json!({ "success": true, "allowed": true })
+                })
+            } else {
+                let err_msg = res.text().await.unwrap_or_default();
+                serde_json::json!({
+                    "success": false,
+                    "message": format!("Server returned HTTP {}: {}", status.as_u16(), err_msg)
+                })
+            }
+        }
+        Err(e) => {
+            serde_json::json!({
+                "success": false,
+                "message": format!("Failed to route request to backend: {}", e)
+            })
+        }
+    }
+}
+
+async fn handle_request_registration(username: &str, domain: String) -> serde_json::Value {
+    let Some(config) = load_agent_config() else {
+        return serde_json::json!({
+            "success": false,
+            "message": "Local agent config missing or unreadable"
+        });
+    };
+
+    let rest_url = convert_ws_to_http(&config.server_url);
+    let target_url = format!("{}/api/registration/request", rest_url);
+    let token = config.agent_token.as_deref().unwrap_or("");
+
+    let payload = serde_json::json!({
+        "linux_username": username,
+        "domain": domain,
+    });
+
+    let payload_str = serde_json::to_string(&payload).unwrap_or_default();
+
+    let client = reqwest::Client::new();
+    match client.post(&target_url)
+        .header("Authorization", format!("Bearer {}", token))
+        .header("Content-Type", "application/json")
+        .body(payload_str)
+        .send()
+        .await
+    {
+        Ok(res) => {
+            let status = res.status();
+            if status.is_success() {
+                let text = res.text().await.unwrap_or_default();
+                serde_json::from_str::<serde_json::Value>(&text).unwrap_or_else(|_| {
+                    serde_json::json!({ "success": true, "message": "Request logged" })
+                })
+            } else {
+                let err_msg = res.text().await.unwrap_or_default();
+                serde_json::json!({
+                    "success": false,
+                    "message": format!("Server returned HTTP {}: {}", status.as_u16(), err_msg)
+                })
+            }
+        }
+        Err(e) => {
+            serde_json::json!({
+                "success": false,
+                "message": format!("Failed to route request to backend: {}", e)
+            })
+        }
+    }
+}
+
+async fn handle_login_detected(username: &str, domain: String, login_username: String) -> serde_json::Value {
+    let Some(config) = load_agent_config() else {
+        return serde_json::json!({
+            "success": false,
+            "message": "Local agent config missing or unreadable"
+        });
+    };
+
+    let rest_url = convert_ws_to_http(&config.server_url);
+    let target_url = format!("{}/api/registration/log-login", rest_url);
+    let token = config.agent_token.as_deref().unwrap_or("");
+
+    let payload = serde_json::json!({
+        "linux_username": username,
+        "domain": domain,
+        "username": login_username,
+    });
+
+    let payload_str = serde_json::to_string(&payload).unwrap_or_default();
+
+    let client = reqwest::Client::new();
+    match client.post(&target_url)
+        .header("Authorization", format!("Bearer {}", token))
+        .header("Content-Type", "application/json")
+        .body(payload_str)
+        .send()
+        .await
+    {
+        Ok(res) => {
+            let status = res.status();
+            if status.is_success() {
+                let text = res.text().await.unwrap_or_default();
+                serde_json::from_str::<serde_json::Value>(&text).unwrap_or_else(|_| {
+                    serde_json::json!({ "success": true, "message": "Login logged" })
                 })
             } else {
                 let err_msg = res.text().await.unwrap_or_default();

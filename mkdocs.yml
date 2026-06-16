@@ -102,6 +102,7 @@ nav:
       - Browser restrictions: features/browser-restrictions.md
       - Web & video history: features/web-video-history.md
       - Alerts & webhooks: features/alerts-and-webhooks.md
+      - Site registration approvals: features/registration-approvals.md
   - Reference:
       - Policy matrix: reference/policy-matrix.md
       - WebSocket protocol: reference/websocket-protocol.md

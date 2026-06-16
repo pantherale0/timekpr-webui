@@ -1,5 +1,6 @@
 """REST API for access approval requests and grants."""
 
+from datetime import datetime, timezone
 import logging
 
 from flask import Blueprint, jsonify, request, session
@@ -17,7 +18,7 @@ from src.approvals_manager import (
     revoke_grant,
     upsert_settings,
 )
-from src.database import ApprovalRequest, ManagedUserDeviceMap, PolicyApprovalGrant
+from src.database import db, ApprovalRequest, ManagedUserDeviceMap, PolicyApprovalGrant, AgentDevice, UserOnlineAccount
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -267,4 +268,181 @@ def revoke_approval_grant(grant_id):
         'success': True,
         'message': 'Grant revoked',
         'grant': build_grant_summary(grant),
+    })
+
+
+def _require_agent_auth(linux_username):
+    auth_header = request.headers.get('Authorization')
+    if not auth_header or not auth_header.startswith('Bearer '):
+        return None, None, (jsonify({'success': False, 'message': 'Missing or invalid authorization header'}), 401)
+    
+    token = auth_header.split(' ')[1].strip()
+    device = AgentDevice.query.filter_by(secure_token=token).first()
+    if not device:
+        return None, None, (jsonify({'success': False, 'message': 'Invalid token'}), 401)
+        
+    if not linux_username:
+        return device, None, (jsonify({'success': False, 'message': 'Missing linux_username'}), 400)
+        
+    mapping = ManagedUserDeviceMap.query.filter_by(
+        system_id=device.system_id,
+        linux_username=linux_username
+    ).first()
+    if not mapping:
+        return device, None, (jsonify({'success': False, 'message': f'No user mapping for user {linux_username} on this device'}), 400)
+        
+    return device, mapping, None
+
+
+@api_approvals_bp.route('/api/registration/check', methods=['POST'])
+def check_registration_status():
+    body = request.get_json(silent=True) or {}
+    linux_username = body.get('linux_username')
+    domain = body.get('domain')
+    
+    if not domain:
+        return jsonify({'success': False, 'message': 'Missing domain'}), 400
+        
+    device, mapping, error_response = _require_agent_auth(linux_username)
+    if error_response is not None:
+        return error_response
+        
+    settings = get_or_create_settings(mapping)
+    if not settings.registration_approval_enabled:
+        return jsonify({'success': True, 'allowed': True})
+        
+    # Check if there is an approved grant for registration on this domain
+    grant = PolicyApprovalGrant.query.filter_by(
+        device_map_id=mapping.id,
+        grant_type='registration',
+        target_value=domain,
+        status='active'
+    ).first()
+    
+    if grant:
+        return jsonify({'success': True, 'allowed': True})
+        
+    # Check if there is a pending approval request for registration on this domain
+    pending_request = ApprovalRequest.query.filter_by(
+        device_map_id=mapping.id,
+        request_type='registration',
+        target_value=domain,
+        status='pending'
+    ).first()
+    
+    if pending_request:
+        return jsonify({'success': True, 'allowed': False, 'pending': True})
+        
+    return jsonify({'success': True, 'allowed': False, 'pending': False})
+
+
+@api_approvals_bp.route('/api/registration/request', methods=['POST'])
+def request_registration_approval():
+    body = request.get_json(silent=True) or {}
+    linux_username = body.get('linux_username')
+    domain = body.get('domain')
+    
+    if not domain:
+        return jsonify({'success': False, 'message': 'Missing domain'}), 400
+        
+    device, mapping, error_response = _require_agent_auth(linux_username)
+    if error_response is not None:
+        return error_response
+        
+    now = datetime.now(timezone.utc)
+    
+    # Check if there is already a pending approval request
+    existing = ApprovalRequest.query.filter_by(
+        device_map_id=mapping.id,
+        request_type='registration',
+        target_value=domain,
+        status='pending'
+    ).first()
+    
+    if existing:
+        existing.requested_at = now
+        db.session.commit()
+        request_row = existing
+    else:
+        request_row = ApprovalRequest(
+            device_map_id=mapping.id,
+            request_type='registration',
+            target_kind='domain',
+            target_value=domain,
+            display_label=domain,
+            status='pending',
+            requested_at=now
+        )
+        db.session.add(request_row)
+        db.session.commit()
+        
+    from src.dashboard_events import notify_dashboard_changed
+    notify_dashboard_changed('approval_requested')
+    
+    return jsonify({
+        'success': True,
+        'message': 'Approval request raised successfully',
+        'request': build_request_summary(request_row)
+    })
+
+
+@api_approvals_bp.route('/api/registration/log-login', methods=['POST'])
+def log_user_login():
+    body = request.get_json(silent=True) or {}
+    linux_username = body.get('linux_username')
+    domain = body.get('domain')
+    username = body.get('username')
+    
+    if not domain or not username:
+        return jsonify({'success': False, 'message': 'Missing domain or username'}), 400
+        
+    device, mapping, error_response = _require_agent_auth(linux_username)
+    if error_response is not None:
+        return error_response
+        
+    now = datetime.now(timezone.utc)
+    
+    # Find existing or create new
+    existing = UserOnlineAccount.query.filter_by(
+        managed_user_id=mapping.managed_user_id,
+        domain=domain,
+        username=username
+    ).first()
+    
+    if existing:
+        existing.last_seen_at = now
+        db.session.commit()
+        account = existing
+    else:
+        account = UserOnlineAccount(
+            managed_user_id=mapping.managed_user_id,
+            domain=domain,
+            username=username,
+            first_seen_at=now,
+            last_seen_at=now
+        )
+        db.session.add(account)
+        db.session.commit()
+        
+    return jsonify({
+        'success': True,
+        'message': 'Login logged successfully',
+        'account': account.to_dict()
+    })
+
+
+@api_approvals_bp.route('/api/user/<int:user_id>/online-accounts', methods=['GET'])
+def get_user_online_accounts(user_id):
+    if not session.get('logged_in'):
+        return jsonify({'success': False, 'message': 'Not authenticated'}), 401
+        
+    from src.database import ManagedUser, UserOnlineAccount
+    user = ManagedUser.query.get_or_404(user_id)
+    
+    # Query all online accounts for this user
+    accounts = UserOnlineAccount.query.filter_by(managed_user_id=user.id).order_by(UserOnlineAccount.last_seen_at.desc()).all()
+    
+    return jsonify({
+        'success': True,
+        'accounts': [acc.to_dict() for acc in accounts]
     })

@@ -1291,6 +1291,11 @@ class MappingApprovalSettings(db.Model):
         nullable=False,
         default=DOMAIN_BLOCKLIST_ONLY,
     )
+    registration_approval_enabled = db.Column(
+        db.Boolean,
+        nullable=False,
+        default=False,
+    )
     created_at = db.Column(
         db.DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
@@ -1580,7 +1585,8 @@ class ApprovalRequest(db.Model):
 
     REQUEST_APP_LAUNCH = 'app_launch'
     REQUEST_DOMAIN_ACCESS = 'domain_access'
-    VALID_REQUEST_TYPES = {REQUEST_APP_LAUNCH, REQUEST_DOMAIN_ACCESS}
+    REQUEST_REGISTRATION = 'registration'
+    VALID_REQUEST_TYPES = {REQUEST_APP_LAUNCH, REQUEST_DOMAIN_ACCESS, REQUEST_REGISTRATION}
 
     TARGET_PACKAGE = 'package'
     TARGET_EXECUTABLE = 'executable'
@@ -1645,7 +1651,8 @@ class PolicyApprovalGrant(db.Model):
 
     GRANT_APP_LAUNCH = 'app_launch'
     GRANT_DOMAIN_ACCESS = 'domain_access'
-    VALID_GRANT_TYPES = {GRANT_APP_LAUNCH, GRANT_DOMAIN_ACCESS}
+    GRANT_REGISTRATION = 'registration'
+    VALID_GRANT_TYPES = {GRANT_APP_LAUNCH, GRANT_DOMAIN_ACCESS, GRANT_REGISTRATION}
 
     TARGET_PACKAGE = 'package'
     TARGET_EXECUTABLE = 'executable'
@@ -1885,4 +1892,36 @@ class WebHistory(db.Model):
             'domain': self.domain,
             'visited_at': self.visited_at.isoformat() if self.visited_at else None,
             'created_at': self.created_at.isoformat() if self.created_at else None,
+        }
+
+
+class UserOnlineAccount(db.Model):
+    __tablename__ = 'user_online_account'
+
+    id = db.Column(db.Integer, primary_key=True)
+    managed_user_id = db.Column(db.Integer, db.ForeignKey('managed_user.id'), nullable=False)
+    domain = db.Column(db.String(255), nullable=False)
+    username = db.Column(db.String(255), nullable=False)
+    first_seen_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+    last_seen_at = db.Column(
+        db.DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+    managed_user = db.relationship('ManagedUser', backref=db.backref('online_accounts', cascade='all, delete-orphan'))
+
+    __table_args__ = (
+        db.UniqueConstraint('managed_user_id', 'domain', 'username', name='user_online_account_uc'),
+    )
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'managed_user_id': self.managed_user_id,
+            'domain': self.domain,
+            'username': self.username,
+            'first_seen_at': self.first_seen_at.isoformat() if self.first_seen_at else None,
+            'last_seen_at': self.last_seen_at.isoformat() if self.last_seen_at else None,
         }

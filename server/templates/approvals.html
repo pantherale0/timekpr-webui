@@ -58,6 +58,8 @@
                                         <td>
                                             {% if item.request_type == 'app_launch' %}
                                                 <span class="badge bg-info text-dark">App Launch</span>
+                                            {% elif item.request_type == 'registration' %}
+                                                <span class="badge bg-warning text-dark">Site Sign-Up</span>
                                             {% else %}
                                                 <span class="badge bg-primary">Website</span>
                                             {% endif %}

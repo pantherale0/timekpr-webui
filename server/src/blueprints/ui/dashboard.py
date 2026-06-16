@@ -126,6 +126,7 @@ def edit_user_profile(user_id):
         approval_settings_by_mapping[mapping.id] = {
             'app_launch_mode': settings.app_launch_mode,
             'domain_access_mode': settings.domain_access_mode,
+            'registration_approval_enabled': settings.registration_approval_enabled,
             'device_label': device_labels.get(mapping.system_id, mapping.system_id),
         }
         mapping_platform = (mapping.device.platform if mapping.device else None) or AppPolicy.PLATFORM_LINUX
@@ -637,4 +638,15 @@ def user_combined_history(user_id):
     
     user = ManagedUser.query.get_or_404(user_id)
     return render_template('web_video_history.html', user=user)
+
+
+@ui_dashboard_bp.route('/dashboard/user/<int:user_id>/online-accounts')
+def user_online_accounts(user_id):
+    """Render the online accounts report dashboard for a user."""
+    if not session.get('logged_in'):
+        flash('Please login first', 'warning')
+        return redirect(url_for('ui_auth.login'))
+    
+    user = ManagedUser.query.get_or_404(user_id)
+    return render_template('online_accounts.html', user=user)
 

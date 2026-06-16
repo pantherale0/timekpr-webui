@@ -86,6 +86,8 @@ Historical **Circle Home Plus** hardware is a different model (LAN DNS/filter). 
 | DNS-bypass resistant filtering (on managed device) | Yes | Partial | Partial | Partial | Partial | Partial | Partial |
 | YouTube history monitoring | Yes | Partial | Partial | Partial | Vendor | Vendor | Partial (Kaspersky, Norton) |
 | Web browsing history collection | Yes | Partial | Partial | Partial | Vendor | Partial | Vendor |
+| **Site registration approval** (block new account sign-ups until parent approves) | **Yes** (Chrome/Brave/Edge + Linux agent) | No | No | No | Partial (Qustodio block categories) | No | Partial |
+| **Online account audit** (catalogue of sites the child has logged into) | **Yes** (Chrome/Brave/Edge + Linux agent) | No | No | No | Partial (Qustodio activity reports) | Partial | Partial |
 | Geofencing / GPS tracking | No | Vendor | Vendor | Vendor | Vendor | Partial | Vendor |
 | Location / panic button | No | Vendor | Partial | Partial | Vendor (Qustodio) | Partial | Vendor |
 | SMS / call logging | No | No | No | No | Partial (Android) | Partial | Partial (Bark, FamiSafe tiers) |
@@ -247,6 +249,8 @@ Threads such as [r/software — best parental control 2025](https://www.reddit.c
 - You want **one dashboard** for Linux, Windows, Android, Switch, and Xbox without per-device SaaS fees.
 - You prefer **data on your own server** (home NAS, VPS, Docker) with optional OIDC.
 - You want **approval workflows** (child requests app/domain access; parent grants in UI).
+- You want to **gate new account sign-ups** on any website — the Guardian extension can block registration pages until you explicitly approve them (see [Site Registration Approvals](../features/registration-approvals.md)).
+- You want a passive **online account inventory** of sites and services your child already has accounts on, without reading messages or passwords.
 - You need **Android Device Owner**-class control on family tablets (with acceptable provisioning constraints).
 
 ## When to use something else (or combine)

@@ -305,6 +305,14 @@
                                         <option value="approval_on_block" {% if settings.domain_access_mode == 'approval_on_block' %}selected{% endif %}>Allow requests when blocked</option>
                                     </select>
                                 </div>
+                                {% set mapping_platform = ((mapping.device.platform if mapping.device else None) or 'linux') | lower %}
+                                {% if mapping_platform in ('linux', 'windows') %}
+                                <div class="form-check form-switch mt-2 mb-0">
+                                    <input class="form-check-input approval-registration" type="checkbox" data-mapping-id="{{ mapping.id }}" id="approval-registration-{{ mapping.id }}" {% if settings.registration_approval_enabled %}checked{% endif %}>
+                                    <label class="form-check-label small fw-semibold" for="approval-registration-{{ mapping.id }}">Enforce Sign-up Approvals</label>
+                                    <span class="text-secondary d-block mt-0" style="font-size: 0.65rem;">Require approval before signing up on any website.</span>
+                                </div>
+                                {% endif %}
                             </div>
                         {% endfor %}
                     </div>
@@ -568,12 +576,14 @@
         const requests = Array.from(mappingIds).map(mappingId => {
             const appMode = document.querySelector(`.approval-app-mode[data-mapping-id="${mappingId}"]`);
             const domainMode = document.querySelector(`.approval-domain-mode[data-mapping-id="${mappingId}"]`);
+            const registrationMode = document.querySelector(`.approval-registration[data-mapping-id="${mappingId}"]`);
             return fetch(`/api/mappings/${mappingId}/approval-settings`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     app_launch_mode: appMode ? appMode.value : 'open',
                     domain_access_mode: domainMode ? domainMode.value : 'blocklist_only',
+                    registration_approval_enabled: registrationMode ? registrationMode.checked : false,
                 }),
             }).then(response => response.json());
         });
