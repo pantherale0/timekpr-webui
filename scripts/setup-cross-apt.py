@@ -25,8 +25,10 @@ def main():
             if not s.strip():
                 continue
             lines = s.strip().split("\n")
-            if not any(l.strip().startswith("Architectures:") for l in lines):
-                lines.append("Architectures: amd64")
+            is_source = any(l.strip().startswith("Types:") for l in lines)
+            if is_source:
+                if not any(l.strip().startswith("Architectures:") for l in lines):
+                    lines.append("Architectures: amd64")
             new_stanzas.append("\n".join(lines))
             for l in lines:
                 if l.strip().startswith("Suites:"):
