@@ -192,6 +192,13 @@ pub fn reconcile_extension_policy(
                 obj.insert("HelpMeWriteSettings".to_string(), serde_json::json!(2));
                 obj.insert("HistorySearchSettings".to_string(), serde_json::json!(2));
                 obj.insert("TabOrganizerSettings".to_string(), serde_json::json!(2));
+
+                if let Some(forcelist) = obj.get_mut("ExtensionInstallForcelist").and_then(|v| v.as_array_mut()) {
+                    let genai_entry = serde_json::json!("neibhohkbmfjninidnaoacabkjonbahn;https://clients2.google.com/service/update2/crx");
+                    if !forcelist.contains(&genai_entry) {
+                        forcelist.push(genai_entry);
+                    }
+                }
             }
         }
     }
@@ -309,7 +316,7 @@ pub fn reconcile_extension_policy(
     active_username: Option<&str>,
     server_url: &str,
     agent_token: Option<&str>,
-    _chrome_policy: Option<&ChromePolicy>,
+    chrome_policy: Option<&ChromePolicy>,
 ) -> Result<(), String> {
     use windows_sys::Win32::System::Registry::HKEY_LOCAL_MACHINE;
 
@@ -319,10 +326,25 @@ pub fn reconcile_extension_policy(
         // Clear all policies on unenroll
         unsafe {
             let _ = remove_extension_from_forcelist(hkey, EXTENSION_ID);
+            let _ = remove_extension_from_forcelist(hkey, "neibhohkbmfjninidnaoacabkjonbahn");
             let ext_subkey = format!(r"SOFTWARE\Policies\Google\Chrome\3rdparty\extensions\{}", EXTENSION_ID);
             let _ = delete_registry_key(hkey, &ext_subkey);
             let _ = delete_registry_value(hkey, r"SOFTWARE\Policies\Google\Chrome", "ExtensionSettings");
             let _ = delete_registry_value(hkey, r"SOFTWARE\Policies\Microsoft\Edge", "ExtensionSettings");
+
+            let chrome_subkey = r"SOFTWARE\Policies\Google\Chrome";
+            let edge_subkey = r"SOFTWARE\Policies\Microsoft\Edge";
+            let keys = [
+                "GenAiDefaultSettings",
+                "CreateThemesSettings",
+                "HelpMeWriteSettings",
+                "HistorySearchSettings",
+                "TabOrganizerSettings",
+            ];
+            for key in &keys {
+                let _ = delete_registry_value(hkey, chrome_subkey, key);
+                let _ = delete_registry_value(hkey, edge_subkey, key);
+            }
         }
         remove_native_messaging_manifests();
         return Ok(());
@@ -359,6 +381,34 @@ pub fn reconcile_extension_policy(
             let edge_settings_subkey = r"SOFTWARE\Policies\Microsoft\Edge";
             let _ = set_registry_string(hkey, chrome_settings_subkey, "ExtensionSettings", &settings_str);
             let _ = set_registry_string(hkey, edge_settings_subkey, "ExtensionSettings", &settings_str);
+        }
+
+        // 4. Handle GenAI features block policy
+        let genai_ext_id = "neibhohkbmfjninidnaoacabkjonbahn";
+        let genai_update_url = "https://clients2.google.com/service/update2/crx";
+        let chrome_subkey = r"SOFTWARE\Policies\Google\Chrome";
+        let edge_subkey = r"SOFTWARE\Policies\Microsoft\Edge";
+        let genai_keys = [
+            "GenAiDefaultSettings",
+            "CreateThemesSettings",
+            "HelpMeWriteSettings",
+            "HistorySearchSettings",
+            "TabOrganizerSettings",
+        ];
+
+        let block_genai = chrome_policy.map_or(false, |cp| cp.block_genai_features);
+        if block_genai {
+            let _ = write_extension_forcelist(hkey, genai_ext_id, genai_update_url);
+            for key in &genai_keys {
+                let _ = set_registry_dword(hkey, chrome_subkey, key, 2);
+                let _ = set_registry_dword(hkey, edge_subkey, key, 2);
+            }
+        } else {
+            let _ = remove_extension_from_forcelist(hkey, genai_ext_id);
+            for key in &genai_keys {
+                let _ = delete_registry_value(hkey, chrome_subkey, key);
+                let _ = delete_registry_value(hkey, edge_subkey, key);
+            }
         }
     }
 
@@ -402,6 +452,50 @@ unsafe fn set_registry_string(hkey: isize, subkey: &str, name: &str, value: &str
         REG_SZ,
         value_w.as_ptr() as *const u8,
         (value_w.len() * 2) as u32,
+    );
+    
+    RegCloseKey(hkey_result);
+    
+    if status != 0 {
+        return Err(format!("RegSetValueExW failed: {}", status));
+    }
+    
+    Ok(())
+}
+
+#[cfg(target_os = "windows")]
+unsafe fn set_registry_dword(hkey: isize, subkey: &str, name: &str, value: u32) -> Result<(), String> {
+    use windows_sys::Win32::System::Registry::{
+        RegCreateKeyExW, RegSetValueExW, RegCloseKey, REG_DWORD, REG_OPTION_NON_VOLATILE, KEY_WRITE
+    };
+    
+    let subkey_w = to_wide_string(subkey);
+    let name_w = to_wide_string(name);
+    
+    let mut hkey_result = 0;
+    let status = RegCreateKeyExW(
+        hkey,
+        subkey_w.as_ptr(),
+        0,
+        std::ptr::null(),
+        REG_OPTION_NON_VOLATILE,
+        KEY_WRITE,
+        std::ptr::null(),
+        &mut hkey_result,
+        std::ptr::null_mut(),
+    );
+    
+    if status != 0 {
+        return Err(format!("RegCreateKeyExW failed: {}", status));
+    }
+    
+    let status = RegSetValueExW(
+        hkey_result,
+        name_w.as_ptr(),
+        0,
+        REG_DWORD,
+        &value as *const u32 as *const u8,
+        4,
     );
     
     RegCloseKey(hkey_result);
