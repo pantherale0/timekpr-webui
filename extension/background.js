@@ -54,7 +54,9 @@ function flushBufferQueue() {
 
         chrome.runtime.sendNativeMessage('com.guardian.agent', payload, (response) => {
             if (chrome.runtime.lastError) {
-                console.warn("Guardian YouTube Monitor: Failed to connect to Native Messaging Host. Keeping logs in buffer.", chrome.runtime.lastError.message);
+                const errMsg = chrome.runtime.lastError.message;
+                console.warn("Guardian YouTube Monitor: Failed to connect to Native Messaging Host. Keeping logs in buffer.", errMsg);
+                chrome.storage.local.set({ last_native_error: "Connection failed: " + errMsg });
                 return;
             }
 
@@ -70,11 +72,13 @@ function flushBufferQueue() {
                             sentItem.watched_at === item.watched_at
                         );
                     });
-                    chrome.storage.local.set({ log_queue: remainingQueue });
+                    chrome.storage.local.set({ log_queue: remainingQueue, last_native_error: "None" });
                     console.log(`Guardian YouTube Monitor: Successfully flushed ${logsToSend.length} log(s) via Native Messaging.`);
                 });
             } else {
-                console.error("Guardian YouTube Monitor: Agent failed to log YouTube history:", response ? response.message : "No response");
+                const errMsg = response ? response.message : "No response";
+                console.error("Guardian YouTube Monitor: Agent failed to log YouTube history:", errMsg);
+                chrome.storage.local.set({ last_native_error: "Agent error: " + errMsg });
             }
         });
     });

@@ -80,7 +80,7 @@ if sentry_dsn:
 app = Flask(__name__)
 app.secret_key = _load_secret_key(app)
 app.config.setdefault('WTF_CSRF_TIME_LIMIT', None)
-CSRFProtect(app)
+csrf = CSRFProtect(app)
 _default_db_uri = 'sqlite:///:memory:' if os.environ.get('TESTING') else 'sqlite:///timekpr.db'
 app.config['SQLALCHEMY_DATABASE_URI'] = (
     os.environ.get('DATABASE_URL')
@@ -195,6 +195,7 @@ app.register_blueprint(api_nintendo_bp)
 app.register_blueprint(api_xbox_bp)
 app.register_blueprint(api_screenshots_bp)
 app.register_blueprint(api_youtube_bp)
+csrf.exempt(api_youtube_bp)
 app.register_blueprint(websocket_bp)
 
 # Register WebSocket endpoint via Flask-Sock
