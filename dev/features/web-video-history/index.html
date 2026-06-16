@@ -10,9 +10,13 @@
       
       
       
-        <link rel="canonical" href="https://pantherale0.github.io/timekpr-webui/dev/features/youtube-history/">
+        <link rel="canonical" href="https://pantherale0.github.io/timekpr-webui/dev/features/web-video-history/">
       
       
+        <link rel="prev" href="../browser-restrictions/">
+      
+      
+        <link rel="next" href="../alerts-and-webhooks/">
       
       
         
@@ -23,7 +27,7 @@
     
     
       
-        <title>YouTube History Monitoring - Guardian Documentation</title>
+        <title>Web & video history - Guardian Documentation</title>
       
     
     
@@ -74,7 +78,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#youtube-history-monitoring" class="md-skip">
+        <a href="#web-video-history-monitoring" class="md-skip">
           Skip to content
         </a>
       
@@ -112,7 +116,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              YouTube History Monitoring
+              Web & video history
             
           </span>
         </div>
@@ -330,10 +334,12 @@
   
   
   
+    
+  
   
     
     
-      <li class="md-tabs__item">
+      <li class="md-tabs__item md-tabs__item--active">
         <a href="../app-discovery/" class="md-tabs__link">
           
   
@@ -1421,8 +1427,10 @@
       
   
   
+    
   
   
+  
     
     
       
@@ -1436,23 +1444,28 @@
       
         
       
+        
+      
     
     
     
+      
+        
+        
       
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
         
           
-          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
             
   
   
@@ -1470,7 +1483,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_6">
             <span class="md-nav__icon md-icon"></span>
             
@@ -1588,6 +1601,181 @@
   
 
       </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Web & video history
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Web & video history
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#mechanics-platform-integration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mechanics &amp; Platform Integration
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Mechanics &amp; Platform Integration">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#android-agent" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Android Agent
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#linux-windows-agents-chrome-extension" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Linux &amp; Windows Agents (Chrome Extension)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Linux &amp; Windows Agents (Chrome Extension)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#web-history-collection-details" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Web History Collection Details
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#building-the-extension" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Building the extension
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#server-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Server Configuration
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rest-api-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        REST API Reference
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#related" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Related
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -2080,13 +2268,30 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#linux-windows-agents" class="md-nav__link">
+  <a href="#linux-windows-agents-chrome-extension" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Linux &amp; Windows Agents
+        Linux &amp; Windows Agents (Chrome Extension)
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="Linux &amp; Windows Agents (Chrome Extension)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#web-history-collection-details" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Web History Collection Details
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
         
@@ -2156,7 +2361,7 @@
 
 
   
-    <a href="https://github.com/pantherale0/timekpr-webui/edit/master/docs/features/youtube-history.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+    <a href="https://github.com/pantherale0/timekpr-webui/edit/master/docs/features/web-video-history.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
       
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
     </a>
@@ -2164,29 +2369,35 @@
   
 
 
-<h1 id="youtube-history-monitoring">YouTube History Monitoring<a class="headerlink" href="#youtube-history-monitoring" title="Permanent link">&para;</a></h1>
-<p>Guardian supports logging watched YouTube videos across Android, Linux, and Windows. This feature tracks video titles, creators/channels, watch durations, categories, and timestamps, displaying them in a parent dashboard with aggregate analytics.</p>
+<h1 id="web-video-history-monitoring">Web &amp; Video History Monitoring<a class="headerlink" href="#web-video-history-monitoring" title="Permanent link">&para;</a></h1>
+<p>Guardian supports logging general web browsing history and watched YouTube videos across managed devices (Android, Linux, and Windows). This feature tracks URLs, page titles, domains, video details, watch durations, and timestamps, presenting them in a unified parent portal dashboard with chronological timelines and aggregate analytics.</p>
 <h2 id="mechanics-platform-integration">Mechanics &amp; Platform Integration<a class="headerlink" href="#mechanics-platform-integration" title="Permanent link">&para;</a></h2>
-<p>The feature runs on outbound logging directly from the client devices to the server's REST API.</p>
+<p>The history monitoring feature runs on outbound logging directly from client devices or client-side browser extensions to the server's REST API.</p>
 <h3 id="android-agent">Android Agent<a class="headerlink" href="#android-agent" title="Permanent link">&para;</a></h3>
 <p>Enforced using a native Android <strong>Accessibility Service</strong> (<code>YoutubeAccessibilityService</code>):
 1. Captures view layout updates inside the official native YouTube application.
 2. Extracts video IDs, titles, and channel details from foreground UI text elements.
 3. Automatically computes active watch durations and batches events.
-4. Authorizes and uploads entries to <code>/api/youtube/log</code> using the agent's secure device token.</p>
-<h3 id="linux-windows-agents">Linux &amp; Windows Agents<a class="headerlink" href="#linux-windows-agents" title="Permanent link">&para;</a></h3>
+4. Authorizes and uploads entries to <code>/api/youtube/log</code> using the agent's secure device token.
+<em>(Note: Android general web history is natively governed by web filter/VPN resolution logs, while Chrome desktop tracking is handled by browser policies below).</em></p>
+<h3 id="linux-windows-agents-chrome-extension">Linux &amp; Windows Agents (Chrome Extension)<a class="headerlink" href="#linux-windows-agents-chrome-extension" title="Permanent link">&para;</a></h3>
 <p>Enforced using a custom, lightweight <strong>Chrome browser extension</strong> force-installed by the agents via system policies:
 1. <strong>Linux</strong>: Writes Chrome policy JSON to <code>/etc/opt/chrome/policies/managed/guardian_chrome_policies.json</code>.
 2. <strong>Windows</strong>: Writes policy registry keys to <code>HKLM\SOFTWARE\Policies\Google\Chrome\ExtensionInstallForcelist</code> (using Local Machine scope to bypass non-domain Active Directory limitations on standard Windows PCs).
 3. <strong>Identity Resolution</strong>: Agents write the current user mapping profile to the policy directory. The extension reads this mapped child identity using the secure <code>chrome.storage.managed</code> API to authenticate logs.
 4. <strong>Self-Hosting</strong>: The extension is signed using a private RSA key and hosted directly on the Guardian server. The server serves the package as a signed <code>.crx</code> file and dynamically generates the update XML manifest.</p>
+<h4 id="web-history-collection-details">Web History Collection Details<a class="headerlink" href="#web-history-collection-details" title="Permanent link">&para;</a></h4>
+<p>The Chrome extension uses <code>chrome.tabs.onUpdated</code> and <code>chrome.webNavigation</code> APIs to track complete main-frame page navigations:
+- Captures page URLs, titles, and extracts root domains.
+- Deduplicates concurrent loads on the same tab index.
+- Filters out internal <code>chrome://</code> or local pages.
+- Ignores YouTube video watch pages (which are handled specifically by the content scripts to gather video analytics like duration).
+- Packs browsing logs as a <code>BROWSER_LOG</code> IPC payload and forwards them via Native Messaging to the Rust agent, which routes them to the server.</p>
 <h3 id="building-the-extension">Building the extension<a class="headerlink" href="#building-the-extension" title="Permanent link">&para;</a></h3>
-<p>The CRX is built in CI as part of the server image workflow:</p>
-<ul>
-<li><strong>Release tags</strong> (<code>v1.2.3</code>): extension version is <code>1.2.3</code> (the <code>v</code> prefix is stripped).</li>
-<li><strong>Nightly builds</strong> (<code>master</code>): extension version is <code>0.0.0</code>.</li>
-<li>The signing key is supplied via the <code>EXTENSION_SIGNING_KEY_PEM</code> GitHub Actions secret (contents of <code>server/static/extensions/key.pem</code>). The key must remain stable so the Chrome extension ID does not change.</li>
-</ul>
+<p>The CRX is built in CI as part of the server image workflow:
+- <strong>Release tags</strong> (<code>v1.2.3</code>): extension version is <code>1.2.3</code> (the <code>v</code> prefix is stripped).
+- <strong>Nightly builds</strong> (<code>master</code>): extension version is <code>0.0.0</code>.
+- The signing key is supplied via the <code>EXTENSION_SIGNING_KEY_PEM</code> GitHub Actions secret (contents of <code>server/static/extensions/key.pem</code>). The key must remain stable so the Chrome extension ID does not change.</p>
 <p>Local build:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>pip<span class="w"> </span>install<span class="w"> </span>crx3<span class="w"> </span>cryptography
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>python3<span class="w"> </span>scripts/package-extension.py<span class="w"> </span>--version<span class="w"> </span><span class="m">1</span>.2.3
@@ -2197,7 +2408,8 @@
 <p>Configure settings in <strong>Settings</strong>:</p>
 <ul>
 <li><strong>YouTube API Key</strong>: (Optional) A Google Developer API key. If provided, a background worker asynchronously resolves category metadata (e.g., <em>Gaming</em>, <em>Education</em>, <em>Music</em>) for watched videos. If not provided, category defaults to "Unknown".</li>
-<li><strong>YouTube History Retention (Days)</strong>: (Optional) Configures automatic pruning of logs older than the set threshold. If blank, history is kept indefinitely.</li>
+<li><strong>YouTube History Retention (Days)</strong>: (Optional) Configures automatic pruning of YouTube logs older than the set threshold. If blank, history is kept indefinitely.</li>
+<li><strong>Web History Retention (Days)</strong>: (Optional) Configures automatic pruning of web browsing logs. Defaults to 7 days to prevent SQLite database bloat.</li>
 </ul>
 <hr />
 <h2 id="rest-api-reference">REST API Reference<a class="headerlink" href="#rest-api-reference" title="Permanent link">&para;</a></h2>
@@ -2215,7 +2427,13 @@
 <td><code>/api/youtube/log</code></td>
 <td>POST</td>
 <td>Agent Secure Token (<code>Bearer</code>)</td>
-<td>Logs a batch of watched videos</td>
+<td>Logs a batch of watched YouTube videos</td>
+</tr>
+<tr>
+<td><code>/api/browser/log</code></td>
+<td>POST</td>
+<td>Agent Secure Token (<code>Bearer</code>)</td>
+<td>Logs a batch of visited web pages</td>
 </tr>
 <tr>
 <td><code>/api/extensions/update</code></td>
@@ -2230,10 +2448,10 @@
 <td>Download signed <code>.crx</code> extension</td>
 </tr>
 <tr>
-<td><code>/api/user/&lt;user_id&gt;/youtube</code></td>
+<td><code>/api/user/&lt;user_id&gt;/history</code></td>
 <td>GET</td>
 <td>Session Auth</td>
-<td>Query watched history feeds &amp; stats</td>
+<td>Query combined web and YouTube history feed &amp; analytics</td>
 </tr>
 </tbody>
 </table>
