@@ -130,7 +130,7 @@ jobs:
         uses: cargo-bins/cargo-binstall@main
 
       - name: Install cargo-ndk
-        run: cargo binstall -y cargo-ndk
+        run: cargo binstall -y --force cargo-ndk
 
       - name: Build Android Rust targets
         run: |
@@ -329,7 +329,7 @@ jobs:
         uses: cargo-bins/cargo-binstall@main
 
       - name: Install cargo-ndk
-        run: cargo binstall -y cargo-ndk
+        run: cargo binstall -y --force cargo-ndk
 
       - name: Build Android Rust target
         run: cargo ndk --target ${{ matrix.target_ndk }} build --lib --release
