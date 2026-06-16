@@ -130,6 +130,8 @@ jobs:
         uses: cargo-bins/cargo-binstall@main
 
       - name: Install cargo-ndk
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: cargo binstall -y --force cargo-ndk
 
       - name: Build Android Rust targets
@@ -329,6 +331,8 @@ jobs:
         uses: cargo-bins/cargo-binstall@main
 
       - name: Install cargo-ndk
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: cargo binstall -y --force cargo-ndk
 
       - name: Build Android Rust target
