@@ -144,7 +144,12 @@ pub fn reconcile_extension_policy(
     let mut policy_json = serde_json::json!({
         "ExtensionInstallForcelist": [
             format!("{};{}", EXTENSION_ID, update_url)
-        ]
+        ],
+        "ExtensionSettings": {
+            EXTENSION_ID: {
+                "override_update_url": true
+            }
+        }
     });
 
     // Merge in extra Chrome policy rules if provided
@@ -316,6 +321,8 @@ pub fn reconcile_extension_policy(
             let _ = remove_extension_from_forcelist(hkey, EXTENSION_ID);
             let ext_subkey = format!(r"SOFTWARE\Policies\Google\Chrome\3rdparty\extensions\{}", EXTENSION_ID);
             let _ = delete_registry_key(hkey, &ext_subkey);
+            let _ = delete_registry_value(hkey, r"SOFTWARE\Policies\Google\Chrome", "ExtensionSettings");
+            let _ = delete_registry_value(hkey, r"SOFTWARE\Policies\Microsoft\Edge", "ExtensionSettings");
         }
         remove_native_messaging_manifests();
         return Ok(());
@@ -340,6 +347,19 @@ pub fn reconcile_extension_policy(
         // 2. Clear out any legacy 3rdparty extension settings that contained secrets
         let ext_subkey = format!(r"SOFTWARE\Policies\Google\Chrome\3rdparty\extensions\{}", EXTENSION_ID);
         let _ = delete_registry_key(hkey, &ext_subkey);
+
+        // 3. Write ExtensionSettings to registry to override the update URL
+        let settings_json = serde_json::json!({
+            EXTENSION_ID: {
+                "override_update_url": true
+            }
+        });
+        if let Ok(settings_str) = serde_json::to_string(&settings_json) {
+            let chrome_settings_subkey = r"SOFTWARE\Policies\Google\Chrome";
+            let edge_settings_subkey = r"SOFTWARE\Policies\Microsoft\Edge";
+            let _ = set_registry_string(hkey, chrome_settings_subkey, "ExtensionSettings", &settings_str);
+            let _ = set_registry_string(hkey, edge_settings_subkey, "ExtensionSettings", &settings_str);
+        }
     }
 
     // Ensure Native Messaging manifests/registry keys are written
