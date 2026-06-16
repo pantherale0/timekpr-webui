@@ -138,6 +138,9 @@ def get_extension_update_manifest():
     extension_id = getattr(current_app, 'extension_id', None) or _get_extension_id()
     extension_version = getattr(current_app, 'extension_version', None) or _get_extension_version()
     base_url = request.url_root.rstrip('/')
+    if request.headers.get('X-Forwarded-Proto', '').lower() == 'https':
+        if base_url.startswith('http://'):
+            base_url = base_url.replace('http://', 'https://', 1)
     
     xml_content = f"""<?xml version='1.0' encoding='UTF-8'?>
 <gupdate xmlns='http://www.google.com/update2/response' protocol='2.0'>

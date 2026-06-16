@@ -114,6 +114,15 @@ def test_get_extension_update_manifest(client):
     xml_text = response.data.decode('utf-8')
     assert 'updatecheck' in xml_text
 
+def test_get_extension_update_manifest_respects_x_forwarded_proto(client):
+    response = client.get(
+        '/api/extensions/update',
+        headers={'X-Forwarded-Proto': 'https'}
+    )
+    assert response.status_code == 200
+    xml_text = response.data.decode('utf-8')
+    assert 'codebase=\'https://' in xml_text or 'codebase="https://' in xml_text
+
 
 def test_get_extension_update_manifest_uses_packaged_version(client, tmp_path, monkeypatch):
     extensions_dir = tmp_path / "extensions"

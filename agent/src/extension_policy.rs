@@ -65,9 +65,21 @@ fn reconcile_native_messaging_manifests() -> Result<(), String> {
             println!("Warning: Failed to create manifest directory {:?}: {}", dir, e);
             continue;
         }
+
+        use std::os::unix::fs::PermissionsExt;
+        if let Ok(metadata) = fs::metadata(dir) {
+            let mut permissions = metadata.permissions();
+            permissions.set_mode(0o755);
+            let _ = fs::set_permissions(dir, permissions);
+        }
+
         let manifest_path = dir.join("com.guardian.agent.json");
         if let Err(e) = fs::write(&manifest_path, &serialized) {
             println!("Warning: Failed to write Native Messaging manifest to {:?}: {}", manifest_path, e);
+        } else if let Ok(metadata) = fs::metadata(&manifest_path) {
+            let mut permissions = metadata.permissions();
+            permissions.set_mode(0o644);
+            let _ = fs::set_permissions(&manifest_path, permissions);
         }
     }
 
@@ -190,11 +202,26 @@ pub fn reconcile_extension_policy(
             last_err = Some(format!("Failed to create policy directory {:?}: {}", dir, e));
             continue;
         }
+
+        use std::os::unix::fs::PermissionsExt;
+        if let Ok(metadata) = fs::metadata(dir) {
+            let mut permissions = metadata.permissions();
+            permissions.set_mode(0o755);
+            let _ = fs::set_permissions(dir, permissions);
+        }
+
         let policy_path = dir.join("guardian.json");
         if let Err(e) = fs::write(&policy_path, &serialized) {
             last_err = Some(format!("Failed to write Chrome policy to {:?}: {}", policy_path, e));
             continue;
         }
+
+        if let Ok(metadata) = fs::metadata(&policy_path) {
+            let mut permissions = metadata.permissions();
+            permissions.set_mode(0o644);
+            let _ = fs::set_permissions(&policy_path, permissions);
+        }
+
         written_any = true;
     }
 

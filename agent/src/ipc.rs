@@ -216,6 +216,15 @@ pub async fn run_ipc_server() -> Result<(), String> {
         return Err(format!("Failed to create IPC socket directory: {}", e));
     }
 
+    use std::os::unix::fs::PermissionsExt;
+    if let Ok(metadata) = fs::metadata(socket_dir) {
+        let mut permissions = metadata.permissions();
+        permissions.set_mode(0o755);
+        if let Err(e) = fs::set_permissions(socket_dir, permissions) {
+            eprintln!("Warning: Failed to set IPC socket directory permissions: {}", e);
+        }
+    }
+
     if Path::new(socket_path).exists() {
         let _ = fs::remove_file(socket_path);
     }
@@ -224,7 +233,6 @@ pub async fn run_ipc_server() -> Result<(), String> {
         .map_err(|e| format!("Failed to bind to Unix socket: {}", e))?;
 
     // Enable read/write access for all local users (monitored users need to write to it)
-    use std::os::unix::fs::PermissionsExt;
     if let Ok(metadata) = fs::metadata(socket_path) {
         let mut permissions = metadata.permissions();
         permissions.set_mode(0o666);
