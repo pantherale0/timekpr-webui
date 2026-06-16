@@ -3,7 +3,7 @@ import json
 from datetime import datetime, timezone, timedelta
 from unittest.mock import patch, MagicMock
 import pytest
-from src.database import YoutubeHistory, ManagedUser, AgentDevice, ManagedUserDeviceMap
+from src.database import YoutubeHistory, WebHistory, ManagedUser, AgentDevice, ManagedUserDeviceMap
 
 @pytest.fixture
 def auth_client(client):
@@ -249,3 +249,174 @@ def test_prune_youtube_history_worker_task(yt_setup, db_session):
         db_session.expire_all()
         assert YoutubeHistory.query.filter_by(video_id='recent').first() is not None
         assert YoutubeHistory.query.filter_by(video_id='old').first() is None
+
+
+def test_log_web_history_requires_token(client):
+    response = client.post(
+        '/api/browser/log',
+        data=json.dumps({'linux_username': 'child_os_user', 'logs': []}),
+        content_type='application/json'
+    )
+    assert response.status_code == 401
+
+
+def test_log_web_history_invalid_token(client):
+    response = client.post(
+        '/api/browser/log',
+        headers={'Authorization': 'Bearer bad-token'},
+        data=json.dumps({'linux_username': 'child_os_user', 'logs': []}),
+        content_type='application/json'
+    )
+    assert response.status_code == 401
+
+
+def test_log_web_history_missing_username(client, yt_setup):
+    _, device, _ = yt_setup
+    response = client.post(
+        '/api/browser/log',
+        headers={'Authorization': f'Bearer {device.secure_token}'},
+        data=json.dumps({'logs': []}),
+        content_type='application/json'
+    )
+    assert response.status_code == 400
+
+
+def test_log_web_history_no_mapping(client, yt_setup):
+    _, device, _ = yt_setup
+    response = client.post(
+        '/api/browser/log',
+        headers={'Authorization': f'Bearer {device.secure_token}'},
+        data=json.dumps({'linux_username': 'unknown_user', 'logs': []}),
+        content_type='application/json'
+    )
+    assert response.status_code == 400
+
+
+def test_log_web_history_success(client, yt_setup, db_session):
+    user, device, _ = yt_setup
+    payload = {
+        'linux_username': 'child_os_user',
+        'logs': [
+            {
+                'url': 'https://google.com/search?q=test',
+                'title': 'Google Search',
+                'domain': 'google.com',
+                'visited_at': '2026-06-15T12:00:00Z'
+            }
+        ]
+    }
+    response = client.post(
+        '/api/browser/log',
+        headers={'Authorization': f'Bearer {device.secure_token}'},
+        data=json.dumps(payload),
+        content_type='application/json'
+    )
+    assert response.status_code == 200
+    res_data = response.get_json()
+    assert res_data['success'] is True
+    assert res_data['count'] == 1
+
+    records = WebHistory.query.filter_by(managed_user_id=user.id).all()
+    assert len(records) == 1
+    assert records[0].url == 'https://google.com/search?q=test'
+    assert records[0].title == 'Google Search'
+    assert records[0].domain == 'google.com'
+
+
+def test_get_user_combined_history_unauthorized(client, yt_setup):
+    user, _, _ = yt_setup
+    response = client.get(f'/api/user/{user.id}/history')
+    assert response.status_code == 401
+
+
+def test_get_user_combined_history_success(auth_client, yt_setup, db_session):
+    user, device, _ = yt_setup
+    
+    # 1. Add youtube history
+    h1 = YoutubeHistory(
+        device_id=device.system_id,
+        managed_user_id=user.id,
+        video_id='vid1',
+        title='Youtube Video Title',
+        channel_name='Channel A',
+        duration_seconds=120,
+        category='Gaming',
+        watched_at=datetime.now(timezone.utc) - timedelta(hours=1)
+    )
+    
+    # 2. Add web history
+    w1 = WebHistory(
+        device_id=device.system_id,
+        managed_user_id=user.id,
+        url='https://wikipedia.org/wiki/Special',
+        title='Wikipedia Page',
+        domain='wikipedia.org',
+        visited_at=datetime.now(timezone.utc)
+    )
+    
+    db_session.add_all([h1, w1])
+    db_session.commit()
+
+    # Query all
+    response = auth_client.get(f'/api/user/{user.id}/history')
+    assert response.status_code == 200
+    res_data = response.get_json()
+    assert res_data['success'] is True
+    
+    data = res_data['data']
+    assert len(data['history']) == 2
+    # w1 is newer, so it should be first
+    assert data['history'][0]['type'] == 'web'
+    assert data['history'][0]['domain'] == 'wikipedia.org'
+    assert data['history'][1]['type'] == 'youtube'
+    assert data['history'][1]['channel_name'] == 'Channel A'
+    
+    # Verify analytics fields are populated
+    analytics = data['analytics']
+    assert len(analytics['web_domains']) == 1
+    assert analytics['web_domains'][0]['domain'] == 'wikipedia.org'
+    assert analytics['web_domains'][0]['count'] == 1
+    assert analytics['total_web_visits'] == 1
+    
+    # Query only type 'web'
+    response_web = auth_client.get(f'/api/user/{user.id}/history?type=web')
+    assert response_web.status_code == 200
+    res_web_data = response_web.get_json()
+    assert len(res_web_data['data']['history']) == 1
+    assert res_web_data['data']['history'][0]['type'] == 'web'
+    
+    # Query search parameter
+    response_search = auth_client.get(f'/api/user/{user.id}/history?search=Wikipedia')
+    assert response_search.status_code == 200
+    res_search_data = response_search.get_json()
+    assert len(res_search_data['data']['history']) == 1
+    assert res_search_data['data']['history'][0]['title'] == 'Wikipedia Page'
+
+
+def test_prune_web_history_worker_task(yt_setup, db_session):
+    user, device, _ = yt_setup
+    with patch('src.settings_manager._get_web_history_retention_days', return_value=2):
+        w_recent = WebHistory(
+            device_id=device.system_id,
+            managed_user_id=user.id,
+            url='https://recent.com',
+            domain='recent.com',
+            visited_at=datetime.now(timezone.utc) - timedelta(hours=12)
+        )
+        w_old = WebHistory(
+            device_id=device.system_id,
+            managed_user_id=user.id,
+            url='https://old.com',
+            domain='old.com',
+            visited_at=datetime.now(timezone.utc) - timedelta(days=4)
+        )
+        db_session.add_all([w_recent, w_old])
+        db_session.commit()
+
+        from src.task_manager import BackgroundTaskManager
+        manager = BackgroundTaskManager()
+        manager._prune_web_history()
+
+        db_session.expire_all()
+        assert WebHistory.query.filter_by(domain='recent.com').first() is not None
+        assert WebHistory.query.filter_by(domain='old.com').first() is None

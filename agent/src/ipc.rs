@@ -82,6 +82,10 @@ enum IpcRequest {
     YoutubeLog {
         logs: serde_json::Value,
     },
+    #[serde(rename = "BROWSER_LOG")]
+    BrowserLog {
+        logs: serde_json::Value,
+    },
 }
 
 #[cfg(target_os = "linux")]
@@ -152,6 +156,15 @@ async fn process_ipc_messages<R: tokio::io::AsyncReadExt + Unpin, W: tokio::io::
                     }
                 }
             }
+            IpcRequest::BrowserLog { logs } => {
+                let response = handle_browser_log(username, logs).await;
+                if let Ok(res_bytes) = serde_json::to_vec(&response) {
+                    if let Err(e) = write_framed_message(writer, &res_bytes).await {
+                        eprintln!("IPC error writing response: {}", e);
+                        break;
+                    }
+                }
+            }
         }
     }
 }
@@ -166,6 +179,57 @@ async fn handle_youtube_log(username: &str, logs: serde_json::Value) -> serde_js
 
     let rest_url = convert_ws_to_http(&config.server_url);
     let target_url = format!("{}/api/youtube/log", rest_url);
+    let token = config.agent_token.as_deref().unwrap_or("");
+
+    let payload = serde_json::json!({
+        "linux_username": username,
+        "logs": logs,
+    });
+
+    let payload_str = serde_json::to_string(&payload).unwrap_or_default();
+
+    let client = reqwest::Client::new();
+    match client.post(&target_url)
+        .header("Authorization", format!("Bearer {}", token))
+        .header("Content-Type", "application/json")
+        .body(payload_str)
+        .send()
+        .await
+    {
+        Ok(res) => {
+            let status = res.status();
+            if status.is_success() {
+                let text = res.text().await.unwrap_or_default();
+                serde_json::from_str::<serde_json::Value>(&text).unwrap_or_else(|_| {
+                    serde_json::json!({ "success": true, "message": "Logs accepted" })
+                })
+            } else {
+                let err_msg = res.text().await.unwrap_or_default();
+                serde_json::json!({
+                    "success": false,
+                    "message": format!("Server returned HTTP {}: {}", status.as_u16(), err_msg)
+                })
+            }
+        }
+        Err(e) => {
+            serde_json::json!({
+                "success": false,
+                "message": format!("Failed to route request to backend: {}", e)
+            })
+        }
+    }
+}
+
+async fn handle_browser_log(username: &str, logs: serde_json::Value) -> serde_json::Value {
+    let Some(config) = load_agent_config() else {
+        return serde_json::json!({
+            "success": false,
+            "message": "Local agent config missing or unreadable"
+        });
+    };
+
+    let rest_url = convert_ws_to_http(&config.server_url);
+    let target_url = format!("{}/api/browser/log", rest_url);
     let token = config.agent_token.as_deref().unwrap_or("");
 
     let payload = serde_json::json!({

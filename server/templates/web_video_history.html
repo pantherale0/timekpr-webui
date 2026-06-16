@@ -1,0 +1,742 @@
+{% extends "base.html" %}
+
+{% block title %}Web & Video History - {{ user.username }} - Guardian{% endblock %}
+
+{% block extra_head %}
+<!-- Include Chart.js for analytics tab visualization -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+<style>
+    /* Premium visual tokens and styling */
+    .date-preset-btn {
+        border: none;
+        background: transparent;
+        color: var(--bs-body-color);
+        border-radius: 4px;
+        transition: all 0.15s ease;
+        text-align: left;
+    }
+    .date-preset-btn:hover {
+        background-color: var(--bs-secondary-bg);
+    }
+    .date-preset-btn.active {
+        background-color: var(--bs-primary);
+        color: #fff !important;
+    }
+
+    .video-thumbnail-container {
+        width: 120px;
+        height: 68px;
+        position: relative;
+        overflow: hidden;
+        border-radius: 6px;
+        background-color: #000;
+        flex-shrink: 0;
+    }
+    .video-thumbnail {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+    .video-duration-badge {
+        position: absolute;
+        bottom: 4px;
+        right: 4px;
+        background-color: rgba(0, 0, 0, 0.8);
+        color: #fff;
+        padding: 2px 4px;
+        font-size: 0.75rem;
+        font-weight: bold;
+        border-radius: 3px;
+        line-height: 1;
+    }
+
+    .history-feed-item {
+        transition: all 0.2s ease;
+        border-left: 4px solid transparent;
+    }
+    .history-feed-item:hover {
+        background-color: var(--bs-secondary-bg);
+        transform: translateX(2px);
+    }
+    
+    /* Sleek color signatures for the combined feed */
+    .border-youtube {
+        border-left-color: #de3b2c !important; /* Premium YouTube Red */
+    }
+    .border-web {
+        border-left-color: #0ea5e9 !important; /* Premium Web Blue */
+    }
+
+    .badge-activity-yt {
+        background-color: rgba(222, 59, 44, 0.1);
+        color: #de3b2c;
+        border: 1px solid rgba(222, 59, 44, 0.2);
+    }
+    .badge-activity-web {
+        background-color: rgba(14, 165, 233, 0.1);
+        color: #0ea5e9;
+        border: 1px solid rgba(14, 165, 233, 0.2);
+    }
+
+    /* Skeleton loading animation */
+    .skeleton-loader {
+        background: linear-gradient(90deg, var(--bs-secondary-bg) 25%, var(--bs-border-color) 50%, var(--bs-secondary-bg) 75%);
+        background-size: 200% 100%;
+        animation: loading-pulse 1.5s infinite;
+        border-radius: 4px;
+    }
+    @keyframes loading-pulse {
+        0% { background-position: 200% 0; }
+        100% { background-position: -200% 0; }
+    }
+</style>
+{% endblock %}
+
+{% block top_nav_extra %}
+<!-- Global Date Range Dropdown in top header -->
+<li class="nav-item dropdown me-2">
+    <button class="btn btn-sm btn-outline-secondary dropdown-toggle d-flex align-items-center gap-1 fw-bold" id="dateFilterDropdown" type="button" data-bs-toggle="dropdown" aria-expanded="false" data-bs-auto-close="outside">
+        <i class="fas fa-calendar-alt text-primary"></i> <span id="current-date-range-label">Last 7 Days</span>
+    </button>
+    <div class="dropdown-menu dropdown-menu-end p-3 shadow border" style="width: 280px; font-family: inherit; z-index: 1050;">
+        <h6 class="dropdown-header px-0 mb-2 fw-bold text-uppercase tracking-wider" style="font-size: 0.7rem; color: var(--bs-secondary-color);">Select Period</h6>
+        <div class="d-flex flex-column gap-1 mb-2">
+            <button class="btn btn-sm text-start py-1.5 px-2 fw-semibold date-preset-btn" data-preset="today">Today</button>
+            <button class="btn btn-sm text-start py-1.5 px-2 fw-semibold date-preset-btn" data-preset="yesterday">Yesterday</button>
+            <button class="btn btn-sm text-start py-1.5 px-2 fw-semibold date-preset-btn active" data-preset="7days">Last 7 Days</button>
+            <button class="btn btn-sm text-start py-1.5 px-2 fw-semibold date-preset-btn" data-preset="30days">Last 30 Days</button>
+            <button class="btn btn-sm text-start py-1.5 px-2 fw-semibold date-preset-btn" data-preset="thismonth">This Month</button>
+        </div>
+        <div class="dropdown-divider"></div>
+        <h6 class="dropdown-header px-0 my-2 fw-bold text-uppercase tracking-wider" style="font-size: 0.7rem; color: var(--bs-secondary-color);">Custom Range</h6>
+        <div class="mb-2">
+            <label class="form-label small fw-bold text-secondary mb-1">Start Date</label>
+            <input type="date" id="filter-start-date" class="form-control form-control-sm">
+        </div>
+        <div class="mb-3">
+            <label class="form-label small fw-bold text-secondary mb-1">End Date</label>
+            <input type="date" id="filter-end-date" class="form-control form-control-sm">
+        </div>
+        <button id="apply-custom-date" class="btn btn-sm btn-primary w-100 py-1.5 fw-bold">Apply Custom Range</button>
+    </div>
+</li>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+    <div>
+        <div class="d-flex align-items-center gap-2 mb-1">
+            <a href="{{ url_for('ui_dashboard.user_stats', user_id=user.id) }}" class="btn btn-sm btn-outline-secondary py-1 px-2">
+                <i class="fas fa-chevron-left me-1"></i> Back to Stats
+            </a>
+            <h1 class="fw-bold mb-0 d-inline-block" style="font-size: 2.25rem; font-weight: 800; letter-spacing: -0.025em;">
+                <i class="fas fa-history text-primary me-1"></i> {{ user.username }} &mdash; Web &amp; Video History
+            </h1>
+        </div>
+        <p class="text-secondary mb-0 fw-medium ms-1">
+            Consolidated timeline of visited websites and YouTube videos
+        </p>
+    </div>
+</div>
+
+<div class="history-main">
+    <!-- Stats Strip -->
+    <div class="row g-3 mb-4">
+        <div class="col-12 col-md-4">
+            <div class="card shadow-sm border text-center p-3 mb-0 h-100 border-web">
+                <span class="text-secondary small fw-bold text-uppercase d-block mb-1" style="font-size: 0.7rem; letter-spacing: 0.05em;">Web Pages Visited</span>
+                <strong class="fs-2 text-primary d-block lh-1 fw-bold" id="stat-web-count">—</strong>
+                <span class="small text-muted fw-bold mt-2 d-block">total visits</span>
+            </div>
+        </div>
+        <div class="col-12 col-md-4">
+            <div class="card shadow-sm border text-center p-3 mb-0 h-100 border-youtube">
+                <span class="text-secondary small fw-bold text-uppercase d-block mb-1" style="font-size: 0.7rem; letter-spacing: 0.05em;">Videos Watched</span>
+                <strong class="fs-2 text-danger d-block lh-1 fw-bold" id="stat-video-count">—</strong>
+                <span class="small text-muted fw-bold mt-2 d-block" id="stat-video-time">—</span>
+            </div>
+        </div>
+        <div class="col-12 col-md-4">
+            <div class="card shadow-sm border text-center p-3 mb-0 h-100">
+                <span class="text-secondary small fw-bold text-uppercase d-block mb-1" style="font-size: 0.7rem; letter-spacing: 0.05em;">Domains &amp; Creators</span>
+                <strong class="fs-2 text-warning d-block lh-1 fw-bold" id="stat-dest-count">—</strong>
+                <span class="small text-muted fw-bold mt-2 d-block">distinct destinations</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <!-- Left Column: Charts / Analytics -->
+        <div class="col-12 col-lg-5">
+            <!-- Web Domains Chart Card -->
+            <div class="card shadow-sm border mb-4">
+                <div class="card-header py-3 bg-body-secondary">
+                    <h6 class="mb-0 fw-bold text-secondary text-uppercase tracking-wider" style="font-size: 0.75rem; letter-spacing: 0.05em;">Top 10 Visited Domains</h6>
+                </div>
+                <div class="card-body">
+                    <div id="domains-chart-loading" class="text-center py-4">
+                        <div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div>
+                        <span class="small text-secondary fw-semibold">Loading domains...</span>
+                    </div>
+                    <div id="domains-chart-wrapper" style="height: 250px; position: relative; display: none;">
+                        <canvas id="chart-web-domains"></canvas>
+                    </div>
+                    <div id="domains-chart-empty" class="text-center py-5 text-muted small" style="display: none;">
+                        No browsing history available for this period.
+                    </div>
+                </div>
+            </div>
+
+            <!-- Top Channels Chart Card -->
+            <div class="card shadow-sm border mb-4">
+                <div class="card-header py-3 bg-body-secondary">
+                    <h6 class="mb-0 fw-bold text-secondary text-uppercase tracking-wider" style="font-size: 0.75rem; letter-spacing: 0.05em;">Top 10 YouTube Channels by Watch Time</h6>
+                </div>
+                <div class="card-body">
+                    <div id="channels-chart-loading" class="text-center py-4">
+                        <div class="spinner-border spinner-border-sm text-danger me-2" role="status"></div>
+                        <span class="small text-secondary fw-semibold">Loading channels...</span>
+                    </div>
+                    <div id="channels-chart-wrapper" style="height: 250px; position: relative; display: none;">
+                        <canvas id="chart-youtube-channels"></canvas>
+                    </div>
+                    <div id="channels-chart-empty" class="text-center py-5 text-muted small" style="display: none;">
+                        No channel data available for this period.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Column: List of history items -->
+        <div class="col-12 col-lg-7">
+            <div class="card shadow-sm border">
+                <div class="card-header py-3 bg-body-secondary d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <h5 class="mb-0 fw-bold">Combined Activity Timeline</h5>
+                    <span class="text-secondary small fw-medium" id="history-total-label">0 entries found</span>
+                </div>
+                <div class="card-body p-0">
+                    <!-- Filters toolbar -->
+                    <div class="p-3 border-bottom d-flex gap-2 flex-wrap align-items-center">
+                        <div class="flex-grow-1" style="min-width: 200px;">
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text bg-body-secondary border"><i class="fas fa-search"></i></span>
+                                <input type="text" id="history-search-input" class="form-control" placeholder="Search page titles, domains or videos...">
+                            </div>
+                        </div>
+                        <div style="min-width: 150px;">
+                            <select id="history-type-filter" class="form-select form-select-sm">
+                                <option value="all">All Activities</option>
+                                <option value="web">Web Pages Only</option>
+                                <option value="youtube">YouTube Videos Only</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Loader -->
+                    <div id="history-loading" class="p-5 text-center">
+                        <div class="spinner-border text-primary mb-3" role="status"></div>
+                        <p class="text-secondary small mb-0">Loading activity feed...</p>
+                    </div>
+
+                    <!-- Empty state -->
+                    <div id="history-empty" class="p-5 text-center text-secondary" style="display: none;">
+                        <i class="fas fa-history fs-1 text-muted mb-3"></i>
+                        <h5>No history logs found</h5>
+                        <p class="small mb-0">Logs will appear here once the child browses the web or watches videos on monitored devices.</p>
+                    </div>
+
+                    <!-- List feed -->
+                    <div id="history-list-container" class="divide-y" style="display: none;">
+                        <!-- JS injects history items here -->
+                    </div>
+                </div>
+
+                <!-- Footer / Pagination -->
+                <div class="card-footer bg-body-secondary p-3 d-flex justify-content-between align-items-center" id="pagination-container" style="display: none;">
+                    <button class="btn btn-sm btn-outline-secondary" id="btn-prev-page">
+                        <i class="fas fa-chevron-left me-1"></i> Previous
+                    </button>
+                    <span class="small text-secondary fw-semibold" id="page-indicator">Page 1 of 1</span>
+                    <button class="btn btn-sm btn-outline-secondary" id="btn-next-page">
+                        Next <i class="fas fa-chevron-right ms-1"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // State management
+    const state = {
+        userId: {{ user.id }},
+        preset: '7days',
+        startDate: '',
+        endDate: '',
+        search: '',
+        type: 'all',
+        page: 1,
+        perPage: 15,
+        history: [],
+        analytics: null,
+        domainsChart: null,
+        channelsChart: null
+    };
+
+    // Calculate default date ranges
+    function updateDateBounds() {
+        const today = new Date();
+        if (state.preset === 'today') {
+            state.startDate = formatDate(today);
+            state.endDate = formatDate(today);
+        } else if (state.preset === 'yesterday') {
+            const yesterday = new Date();
+            yesterday.setDate(today.getDate() - 1);
+            state.startDate = formatDate(yesterday);
+            state.endDate = formatDate(yesterday);
+        } else if (state.preset === '7days') {
+            const lastWeek = new Date();
+            lastWeek.setDate(today.getDate() - 6);
+            state.startDate = formatDate(lastWeek);
+            state.endDate = formatDate(today);
+        } else if (state.preset === '30days') {
+            const lastMonth = new Date();
+            lastMonth.setDate(today.getDate() - 29);
+            state.startDate = formatDate(lastMonth);
+            state.endDate = formatDate(today);
+        } else if (state.preset === 'thismonth') {
+            const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+            state.startDate = formatDate(firstDay);
+            state.endDate = formatDate(today);
+        }
+        
+        // Update input tags in dropdown UI
+        document.getElementById('filter-start-date').value = state.startDate;
+        document.getElementById('filter-end-date').value = state.endDate;
+    }
+
+    function formatDate(date) {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    }
+
+    // Format duration helper
+    function formatDuration(seconds) {
+        if (!seconds || seconds <= 0) return '0s';
+        const h = Math.floor(seconds / 3600);
+        const m = Math.floor((seconds % 3600) / 60);
+        const s = seconds % 60;
+        
+        let out = '';
+        if (h > 0) out += `${h}h `;
+        if (m > 0 || h > 0) out += `${m}m `;
+        out += `${s}s`;
+        return out;
+    }
+
+    // Format date string to local readable date/time
+    function formatDateTime(isoString) {
+        try {
+            const d = new Date(isoString);
+            return d.toLocaleString([], {
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+        } catch (e) {
+            return isoString;
+        }
+    }
+
+    // Load data from APIs
+    async function fetchHistory() {
+        showLoadingState(true);
+        
+        let url = `/api/user/${state.userId}/history?page=${state.page}&per_page=${state.perPage}`;
+        if (state.startDate) url += `&start_date=${state.startDate}`;
+        if (state.endDate) url += `&end_date=${state.endDate}`;
+        if (state.search) url += `&search=${encodeURIComponent(state.search)}`;
+        if (state.type !== 'all') url += `&type=${encodeURIComponent(state.type)}`;
+
+        try {
+            const response = await fetch(url);
+            const payload = await response.json();
+            if (payload.success && payload.data) {
+                state.history = payload.data.history || [];
+                state.analytics = payload.data.analytics || {};
+                
+                // Render view
+                renderStatsStrip();
+                renderCharts();
+                renderHistoryFeed(payload.data.pagination);
+            }
+        } catch (error) {
+            console.error('Failed to load history details', error);
+        } finally {
+            showLoadingState(false);
+        }
+    }
+
+    function showLoadingState(isLoading) {
+        const loading = document.getElementById('history-loading');
+        const empty = document.getElementById('history-empty');
+        const list = document.getElementById('history-list-container');
+        const pagination = document.getElementById('pagination-container');
+
+        if (isLoading) {
+            loading.style.display = 'block';
+            empty.style.display = 'none';
+            list.style.display = 'none';
+            pagination.style.display = 'none';
+            
+            document.getElementById('domains-chart-loading').style.display = 'block';
+            document.getElementById('domains-chart-wrapper').style.display = 'none';
+            document.getElementById('domains-chart-empty').style.display = 'none';
+            
+            document.getElementById('channels-chart-loading').style.display = 'block';
+            document.getElementById('channels-chart-wrapper').style.display = 'none';
+            document.getElementById('channels-chart-empty').style.display = 'none';
+        } else {
+            loading.style.display = 'none';
+        }
+    }
+
+    // Render Stats Strip
+    function renderStatsStrip() {
+        const analytics = state.analytics;
+        if (!analytics) return;
+
+        document.getElementById('stat-web-count').innerText = analytics.total_web_visits || 0;
+        document.getElementById('stat-video-count').innerText = analytics.total_youtube_videos || 0;
+        document.getElementById('stat-video-time').innerText = formatDuration(analytics.total_youtube_seconds) + ' watch time';
+        
+        const distinctDestinations = (analytics.web_domains ? analytics.web_domains.length : 0) + 
+                                     (analytics.youtube_channels ? analytics.youtube_channels.length : 0);
+        document.getElementById('stat-dest-count').innerText = distinctDestinations;
+    }
+
+    // Render History Feed
+    function renderHistoryFeed(pagination) {
+        const list = document.getElementById('history-list-container');
+        const empty = document.getElementById('history-empty');
+        const totalLabel = document.getElementById('history-total-label');
+        const paginationContainer = document.getElementById('pagination-container');
+
+        if (state.history.length === 0) {
+            list.style.display = 'none';
+            paginationContainer.style.display = 'none';
+            empty.style.display = 'block';
+            totalLabel.innerText = '0 entries found';
+            return;
+        }
+
+        empty.style.display = 'none';
+        list.style.display = 'block';
+        list.innerHTML = '';
+        totalLabel.innerText = `${pagination.total_items} item${pagination.total_items === 1 ? '' : 's'} found`;
+
+        state.history.forEach(item => {
+            const card = document.createElement('div');
+            
+            if (item.type === 'youtube') {
+                const durationFormatted = formatDuration(item.duration_seconds);
+                const watchedAtFormatted = formatDateTime(item.timestamp);
+                const thumbnailUrl = `https://img.youtube.com/vi/${item.video_id}/mqdefault.jpg`;
+
+                card.className = 'history-feed-item p-3 border-bottom d-flex gap-3 align-items-start border-youtube';
+                card.innerHTML = `
+                    <div class="video-thumbnail-container">
+                        <img class="video-thumbnail" src="${thumbnailUrl}" alt="Thumbnail" onerror="this.src='/static/img/video_placeholder.png'; this.onerror=null;">
+                        <span class="video-duration-badge">${durationFormatted}</span>
+                    </div>
+                    <div class="flex-grow-1 min-w-0">
+                        <h6 class="mb-1 fw-bold text-truncate-2">
+                            <a href="${item.url}" target="_blank" rel="noopener noreferrer" class="text-decoration-none text-body hover-underline">
+                                ${escapeHtml(item.title)}
+                            </a>
+                        </h6>
+                        <div class="d-flex align-items-center gap-2 flex-wrap small text-secondary">
+                            <span class="badge badge-activity-yt px-2 py-0.5 rounded-pill"><i class="fab fa-youtube me-1"></i>Video</span>
+                            <span class="fw-semibold text-dark-emphasis">${escapeHtml(item.channel_name)}</span>
+                            <span class="text-muted">&bull;</span>
+                            <span class="badge bg-secondary px-2 py-0.5 rounded-pill text-white">${escapeHtml(item.category)}</span>
+                            <span class="text-muted ms-auto">${watchedAtFormatted}</span>
+                        </div>
+                    </div>
+                `;
+            } else {
+                const visitedAtFormatted = formatDateTime(item.timestamp);
+                card.className = 'history-feed-item p-3 border-bottom d-flex gap-3 align-items-start border-web';
+                card.innerHTML = `
+                    <div class="d-flex align-items-center justify-content-center bg-body-secondary border rounded" style="width: 48px; height: 48px; flex-shrink: 0;">
+                        <i class="fas fa-globe text-primary fs-4"></i>
+                    </div>
+                    <div class="flex-grow-1 min-w-0">
+                        <h6 class="mb-1 fw-bold text-truncate-2">
+                            <a href="${item.url}" target="_blank" rel="noopener noreferrer" class="text-decoration-none text-body hover-underline">
+                                ${escapeHtml(item.title)}
+                            </a>
+                        </h6>
+                        <div class="d-flex align-items-center gap-2 flex-wrap small text-secondary">
+                            <span class="badge badge-activity-web px-2 py-0.5 rounded-pill"><i class="fas fa-globe me-1"></i>Web Page</span>
+                            <span class="fw-semibold text-dark-emphasis">${escapeHtml(item.domain)}</span>
+                            <span class="text-muted ms-auto">${visitedAtFormatted}</span>
+                        </div>
+                    </div>
+                `;
+            }
+            list.appendChild(card);
+        });
+
+        // Pagination indicators
+        if (pagination.total_pages > 1) {
+            paginationContainer.style.display = 'flex';
+            document.getElementById('page-indicator').innerText = `Page ${pagination.page} of ${pagination.total_pages}`;
+            
+            const btnPrev = document.getElementById('btn-prev-page');
+            const btnNext = document.getElementById('btn-next-page');
+            
+            btnPrev.disabled = !pagination.has_prev;
+            btnNext.disabled = !pagination.has_next;
+        } else {
+            paginationContainer.style.display = 'none';
+        }
+    }
+
+    function escapeHtml(str) {
+        if (!str) return '';
+        return str
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
+
+    // Chart.js rendering
+    function renderCharts() {
+        const domainsLoading = document.getElementById('domains-chart-loading');
+        const domainsWrapper = document.getElementById('domains-chart-wrapper');
+        const domainsEmpty = document.getElementById('domains-chart-empty');
+        
+        const chanLoading = document.getElementById('channels-chart-loading');
+        const chanWrapper = document.getElementById('channels-chart-wrapper');
+        const chanEmpty = document.getElementById('channels-chart-empty');
+
+        const analytics = state.analytics;
+
+        // 1. Domains Doughnut Chart
+        domainsLoading.style.display = 'none';
+        if (state.domainsChart) {
+            state.domainsChart.destroy();
+            state.domainsChart = null;
+        }
+
+        if (!analytics || !analytics.web_domains || analytics.web_domains.length === 0) {
+            domainsWrapper.style.display = 'none';
+            domainsEmpty.style.display = 'block';
+        } else {
+            domainsWrapper.style.display = 'block';
+            domainsEmpty.style.display = 'none';
+
+            const domLabels = analytics.web_domains.map(d => d.domain);
+            const domCounts = analytics.web_domains.map(d => d.count);
+
+            const ctxDom = document.getElementById('chart-web-domains').getContext('2d');
+            
+            const harmonyPalette = [
+                '#0ea5e9', // Sky Blue
+                '#10b981', // Emerald Green
+                '#e67e22', // Orange
+                '#f1c40f', // Yellow
+                '#14b8a6', // Teal
+                '#ec4899', // Pink
+                '#34495e', // Slate Gray
+                '#95a5a6', // Cool Gray
+                '#7f8c8d'  // Charcoal
+            ];
+
+            state.domainsChart = new Chart(ctxDom, {
+                type: 'doughnut',
+                data: {
+                    labels: domLabels,
+                    datasets: [{
+                        data: domCounts,
+                        backgroundColor: harmonyPalette.slice(0, domLabels.length),
+                        borderWidth: 1,
+                        borderColor: getComputedStyle(document.body).getPropertyValue('--bs-card-bg') || '#ffffff'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'right',
+                            labels: {
+                                color: getComputedStyle(document.body).getPropertyValue('--bs-body-color') || '#000000',
+                                boxWidth: 12,
+                                font: { size: 10 }
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return ` ${context.label}: ${context.raw} visits`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // 2. Channels Horizontal Bar Chart
+        chanLoading.style.display = 'none';
+        if (state.channelsChart) {
+            state.channelsChart.destroy();
+            state.channelsChart = null;
+        }
+
+        if (!analytics || !analytics.youtube_channels || analytics.youtube_channels.length === 0) {
+            chanWrapper.style.display = 'none';
+            chanEmpty.style.display = 'block';
+        } else {
+            chanWrapper.style.display = 'block';
+            chanEmpty.style.display = 'none';
+
+            const chanLabels = analytics.youtube_channels.map(c => c.channel_name);
+            const chanDurations = analytics.youtube_channels.map(c => Math.round(c.total_seconds / 60)); // in minutes
+
+            const ctxChan = document.getElementById('chart-youtube-channels').getContext('2d');
+            state.channelsChart = new Chart(ctxChan, {
+                type: 'bar',
+                data: {
+                    labels: chanLabels,
+                    datasets: [{
+                        label: 'Watch Time (minutes)',
+                        data: chanDurations,
+                        backgroundColor: 'rgba(222, 59, 44, 0.85)',
+                        borderColor: '#de3b2c',
+                        borderWidth: 1,
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            grid: { color: getComputedStyle(document.body).getPropertyValue('--bs-border-color') || 'rgba(0,0,0,0.1)' },
+                            ticks: { color: getComputedStyle(document.body).getPropertyValue('--bs-body-color') || '#000000', font: { size: 10 } }
+                        },
+                        y: {
+                            grid: { display: false },
+                            ticks: { color: getComputedStyle(document.body).getPropertyValue('--bs-body-color') || '#000000', font: { size: 10 } }
+                        }
+                    },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return ` Watch Time: ${context.raw} mins`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+    }
+
+    // Event Handlers
+    document.addEventListener('DOMContentLoaded', () => {
+        // Initialize date bounds
+        updateDateBounds();
+        
+        // Fetch first batch
+        fetchHistory();
+
+        // Preset buttons
+        document.querySelectorAll('.date-preset-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                document.querySelectorAll('.date-preset-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                
+                state.preset = btn.getAttribute('data-preset');
+                document.getElementById('current-date-range-label').innerText = btn.innerText;
+                
+                updateDateBounds();
+                state.page = 1;
+                fetchHistory();
+            });
+        });
+
+        // Apply custom range
+        document.getElementById('apply-custom-date').addEventListener('click', () => {
+            const startVal = document.getElementById('filter-start-date').value;
+            const endVal = document.getElementById('filter-end-date').value;
+            
+            if (startVal && endVal) {
+                state.preset = 'custom';
+                state.startDate = startVal;
+                state.endDate = endVal;
+                
+                document.getElementById('current-date-range-label').innerText = `${startVal} to ${endVal}`;
+                
+                // Remove active styling from preset buttons
+                document.querySelectorAll('.date-preset-btn').forEach(b => b.classList.remove('active'));
+                
+                state.page = 1;
+                fetchHistory();
+                
+                // Hide dropdown bootstrap menu
+                const dropdownBtn = document.getElementById('dateFilterDropdown');
+                const dropdownMenu = dropdownBtn.nextElementSibling;
+                bootstrap.Dropdown.getInstance(dropdownBtn).hide();
+            }
+        });
+
+        // Type Filter
+        document.getElementById('history-type-filter').addEventListener('change', (e) => {
+            state.type = e.target.value;
+            state.page = 1;
+            fetchHistory();
+        });
+
+        // Debounced Search Input
+        let searchTimeout;
+        document.getElementById('history-search-input').addEventListener('input', (e) => {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                state.search = e.target.value.trim();
+                state.page = 1;
+                fetchHistory();
+            }, 300);
+        });
+
+        // Pagination buttons
+        document.getElementById('btn-prev-page').addEventListener('click', () => {
+            if (state.page > 1) {
+                state.page--;
+                fetchHistory();
+                document.getElementById('history-list-container').scrollIntoView({ behavior: 'smooth' });
+            }
+        });
+
+        document.getElementById('btn-next-page').addEventListener('click', () => {
+            state.page++;
+            fetchHistory();
+            document.getElementById('history-list-container').scrollIntoView({ behavior: 'smooth' });
+        });
+    });
+</script>
+{% endblock %}

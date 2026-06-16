@@ -3,7 +3,7 @@ import logging
 from datetime import datetime, timezone
 from flask import Blueprint, request, jsonify, send_from_directory, current_app, session
 import dateutil.parser
-from src.database import db, AgentDevice, ManagedUserDeviceMap, YoutubeHistory, ManagedUser
+from src.database import db, AgentDevice, ManagedUserDeviceMap, YoutubeHistory, WebHistory, ManagedUser
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -126,6 +126,93 @@ def log_youtube_history():
     except Exception as e:
         db.session.rollback()
         _LOGGER.exception("Database error while committing YouTube history logs.")
+        return jsonify({'success': False, 'message': 'Database error'}), 500
+
+
+@api_youtube_bp.route('/api/browser/log', methods=['POST'])
+def log_web_history():
+    """
+    Endpoint for the Chrome Extension to upload web browsing history logs.
+    Protected by the Agent Device Secure Token.
+    """
+    auth_header = request.headers.get('Authorization')
+    if not auth_header or not auth_header.startswith('Bearer '):
+        _LOGGER.warning("Web history upload rejected: Missing or invalid Authorization header.")
+        return jsonify({'success': False, 'message': 'Missing or invalid authorization header'}), 401
+    
+    token = auth_header.split(' ')[1].strip()
+    
+    # Authenticate device
+    device = AgentDevice.query.filter_by(secure_token=token).first()
+    if not device:
+        _LOGGER.warning("Web history upload rejected: Invalid agent device token.")
+        return jsonify({'success': False, 'message': 'Invalid token'}), 401
+
+    payload = request.get_json() or {}
+    linux_username = payload.get('linux_username')
+    logs = payload.get('logs', [])
+
+    if not linux_username:
+        return jsonify({'success': False, 'message': 'Missing linux_username'}), 400
+
+    # Map the OS/device user to ManagedUser
+    mapping = ManagedUserDeviceMap.query.filter_by(
+        system_id=device.system_id,
+        linux_username=linux_username
+    ).first()
+
+    if not mapping:
+        _LOGGER.warning(
+            "Web history upload for device %s rejected: No mapping found for username '%s'.",
+            device.system_id,
+            linux_username
+        )
+        return jsonify({'success': False, 'message': f'No user mapping for user {linux_username} on this device'}), 400
+
+    managed_user_id = mapping.managed_user_id
+    success_count = 0
+
+    for entry in logs:
+        url = entry.get('url')
+        domain = entry.get('domain')
+        if not url or not domain:
+            continue
+
+        title = entry.get('title')
+        visited_at_str = entry.get('visited_at')
+        try:
+            visited_at = dateutil.parser.isoparse(visited_at_str)
+            if visited_at.tzinfo is None:
+                visited_at = visited_at.replace(tzinfo=timezone.utc)
+            else:
+                visited_at = visited_at.astimezone(timezone.utc)
+        except Exception:
+            visited_at = datetime.now(timezone.utc)
+
+        record = WebHistory(
+            device_id=device.system_id,
+            managed_user_id=managed_user_id,
+            url=url,
+            title=title[:255] if title else None,
+            domain=domain[:255],
+            visited_at=visited_at
+        )
+        db.session.add(record)
+        success_count += 1
+
+    try:
+        db.session.commit()
+        _LOGGER.info(
+            "Successfully logged %d web history entries for user %s (%d) on device %s.",
+            success_count,
+            linux_username,
+            managed_user_id,
+            device.system_id
+        )
+        return jsonify({'success': True, 'count': success_count})
+    except Exception as e:
+        db.session.rollback()
+        _LOGGER.exception("Database error while committing web history logs.")
         return jsonify({'success': False, 'message': 'Database error'}), 500
 
 
@@ -308,4 +395,230 @@ def get_user_youtube_history(user_id):
             'distinct_categories': distinct_categories
         }
     })
+
+
+@api_youtube_bp.route('/api/user/<int:user_id>/history', methods=['GET'])
+def get_user_combined_history(user_id):
+    """
+    Get combined browsing and YouTube history and analytics for a managed user.
+    Only accessible by logged-in parents.
+    """
+    if not session.get('logged_in'):
+        return jsonify({'success': False, 'message': 'Not authenticated'}), 401
+
+    # Verify user exists
+    user = ManagedUser.query.get_or_404(user_id)
+
+    # Query params
+    start_date_str = request.args.get('start_date')
+    end_date_str = request.args.get('end_date')
+    search = request.args.get('search', '').strip()
+    activity_type = request.args.get('type', 'all').strip() # 'all', 'youtube', 'web'
+    page = int(request.args.get('page', 1))
+    per_page = int(request.args.get('per_page', 20))
+
+    from sqlalchemy import literal_column, desc, or_
+
+    # 1. Build YoutubeHistory subquery
+    yt_query = db.session.query(
+        YoutubeHistory.id.label('id'),
+        literal_column("'youtube'").label('activity_type'),
+        YoutubeHistory.title.label('title'),
+        YoutubeHistory.video_id.label('url_or_id'),
+        YoutubeHistory.channel_name.label('domain_or_channel'),
+        YoutubeHistory.category.label('category'),
+        YoutubeHistory.duration_seconds.label('duration_seconds'),
+        YoutubeHistory.watched_at.label('timestamp')
+    ).filter(YoutubeHistory.managed_user_id == user.id)
+
+    # 2. Build WebHistory subquery
+    web_query = db.session.query(
+        WebHistory.id.label('id'),
+        literal_column("'web'").label('activity_type'),
+        WebHistory.title.label('title'),
+        WebHistory.url.label('url_or_id'),
+        WebHistory.domain.label('domain_or_channel'),
+        literal_column("'Web Page'").label('category'),
+        literal_column("0").label('duration_seconds'),
+        WebHistory.visited_at.label('timestamp')
+    ).filter(WebHistory.managed_user_id == user.id)
+
+    # Date filters
+    start_date = None
+    if start_date_str:
+        try:
+            start_date = datetime.strptime(start_date_str, '%Y-%m-%d').replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=timezone.utc)
+            yt_query = yt_query.filter(YoutubeHistory.watched_at >= start_date)
+            web_query = web_query.filter(WebHistory.visited_at >= start_date)
+        except ValueError:
+            pass
+
+    end_date = None
+    if end_date_str:
+        try:
+            end_date = datetime.strptime(end_date_str, '%Y-%m-%d').replace(hour=23, minute=59, second=59, microsecond=999999, tzinfo=timezone.utc)
+            yt_query = yt_query.filter(YoutubeHistory.watched_at <= end_date)
+            web_query = web_query.filter(WebHistory.visited_at <= end_date)
+        except ValueError:
+            pass
+
+    # Search filter
+    if search:
+        search_filter = f"%{search}%"
+        yt_query = yt_query.filter(
+            or_(
+                YoutubeHistory.title.ilike(search_filter),
+                YoutubeHistory.channel_name.ilike(search_filter)
+            )
+        )
+        web_query = web_query.filter(
+            or_(
+                WebHistory.title.ilike(search_filter),
+                WebHistory.url.ilike(search_filter),
+                WebHistory.domain.ilike(search_filter)
+            )
+        )
+
+    # Filter by type
+    if activity_type == 'youtube':
+        union_query = yt_query
+    elif activity_type == 'web':
+        union_query = web_query
+    else:
+        union_query = yt_query.union_all(web_query)
+
+    # Paginate and fetch history items
+    paginated = union_query.order_by(desc('timestamp')).paginate(page=page, per_page=per_page, error_out=False)
+    
+    history_list = []
+    for row in paginated.items:
+        item_dict = {
+            'id': row.id,
+            'type': row.activity_type,
+            'title': row.title or "Untitled Page",
+            'timestamp': row.timestamp.isoformat() if row.timestamp else None,
+        }
+        if row.activity_type == 'youtube':
+            item_dict.update({
+                'video_id': row.url_or_id,
+                'channel_name': row.domain_or_channel or "Unknown Channel",
+                'category': row.category or "Unknown",
+                'duration_seconds': int(row.duration_seconds or 0),
+                'url': f"https://www.youtube.com/watch?v={row.url_or_id}"
+            })
+        else:
+            item_dict.update({
+                'url': row.url_or_id,
+                'domain': row.domain_or_channel or "Unknown Domain",
+                'category': 'Web Page'
+            })
+        history_list.append(item_dict)
+
+    # Calculate YouTube Category analytics
+    yt_category_stats = db.session.query(
+        YoutubeHistory.category,
+        db.func.sum(YoutubeHistory.duration_seconds).label('total_duration'),
+        db.func.count(YoutubeHistory.id).label('video_count')
+    ).filter(YoutubeHistory.managed_user_id == user.id)
+
+    if start_date:
+        yt_category_stats = yt_category_stats.filter(YoutubeHistory.watched_at >= start_date)
+    if end_date:
+        yt_category_stats = yt_category_stats.filter(YoutubeHistory.watched_at <= end_date)
+    if search:
+        yt_category_stats = yt_category_stats.filter(
+            or_(
+                YoutubeHistory.title.ilike(search_filter),
+                YoutubeHistory.channel_name.ilike(search_filter)
+            )
+        )
+    yt_category_results = yt_category_stats.group_by(YoutubeHistory.category).all()
+    categories_data = [
+        {
+            'category': row.category,
+            'total_seconds': int(row.total_duration or 0),
+            'count': row.video_count
+        } for row in yt_category_results
+    ]
+
+    # Calculate YouTube Channel analytics (Top 10)
+    yt_channel_stats = db.session.query(
+        YoutubeHistory.channel_name,
+        db.func.sum(YoutubeHistory.duration_seconds).label('total_duration'),
+        db.func.count(YoutubeHistory.id).label('video_count')
+    ).filter(YoutubeHistory.managed_user_id == user.id)
+
+    if start_date:
+        yt_channel_stats = yt_channel_stats.filter(YoutubeHistory.watched_at >= start_date)
+    if end_date:
+        yt_channel_stats = yt_channel_stats.filter(YoutubeHistory.watched_at <= end_date)
+    if search:
+        yt_channel_stats = yt_channel_stats.filter(
+            or_(
+                YoutubeHistory.title.ilike(search_filter),
+                YoutubeHistory.channel_name.ilike(search_filter)
+            )
+        )
+    yt_channel_results = yt_channel_stats.group_by(YoutubeHistory.channel_name).order_by(desc('total_duration')).limit(10).all()
+    channels_data = [
+        {
+            'channel_name': row.channel_name or 'Unknown Channel',
+            'total_seconds': int(row.total_duration or 0),
+            'count': row.video_count
+        } for row in yt_channel_results
+    ]
+
+    # Calculate Web Domain analytics (Top 10)
+    web_domain_stats = db.session.query(
+        WebHistory.domain,
+        db.func.count(WebHistory.id).label('visit_count')
+    ).filter(WebHistory.managed_user_id == user.id)
+
+    if start_date:
+        web_domain_stats = web_domain_stats.filter(WebHistory.visited_at >= start_date)
+    if end_date:
+        web_domain_stats = web_domain_stats.filter(WebHistory.visited_at <= end_date)
+    if search:
+        web_domain_stats = web_domain_stats.filter(
+            or_(
+                WebHistory.title.ilike(search_filter),
+                WebHistory.url.ilike(search_filter),
+                WebHistory.domain.ilike(search_filter)
+            )
+        )
+    web_domain_results = web_domain_stats.group_by(WebHistory.domain).order_by(desc('visit_count')).limit(10).all()
+    domains_data = [
+        {
+            'domain': row.domain or 'Unknown Domain',
+            'count': row.visit_count
+        } for row in web_domain_results
+    ]
+
+    total_youtube_seconds = sum(cat['total_seconds'] for cat in categories_data)
+    total_youtube_videos = sum(cat['count'] for cat in categories_data)
+    total_web_visits = sum(dom['count'] for dom in domains_data)
+
+    return jsonify({
+        'success': True,
+        'data': {
+            'history': history_list,
+            'pagination': {
+                'page': paginated.page,
+                'per_page': paginated.per_page,
+                'total_items': paginated.total,
+                'total_pages': paginated.pages,
+                'has_next': paginated.has_next,
+                'has_prev': paginated.has_prev,
+            },
+            'analytics': {
+                'youtube_categories': categories_data,
+                'youtube_channels': channels_data,
+                'web_domains': domains_data,
+                'total_youtube_seconds': total_youtube_seconds,
+                'total_youtube_videos': total_youtube_videos,
+                'total_web_visits': total_web_visits,
+            }
+        }
+    })
+
 

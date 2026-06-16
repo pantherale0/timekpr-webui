@@ -33,6 +33,7 @@ from src.database import (
     coerce_time_spent_day,
     get_mapping_time_spent_for_day,
     YoutubeHistory,
+    WebHistory,
 )
 from pynintendoparental import Authenticator, NintendoParental
 from pyfamilysafety import FamilySafety, Authenticator as XboxAuthenticator
@@ -335,6 +336,9 @@ class BackgroundTaskManager:
         # YouTube background tasks
         self._fetch_youtube_categories()
         self._prune_youtube_history()
+
+        # Web history background tasks
+        self._prune_web_history()
     
     def _prune_old_alerts(self):
         """Automatically prune alerts older than the configured threshold."""
@@ -458,6 +462,25 @@ class BackgroundTaskManager:
                     logger.info("Automatically pruned %d YouTube history entries older than %d days", deleted_count, retention_days)
         except Exception as exc:
             logger.warning("Failed to automatically prune YouTube history: %s", exc)
+            db.session.rollback()
+
+    def _prune_web_history(self):
+        """Automatically prune web browsing history older than the configured threshold."""
+        try:
+            from src.settings_manager import _get_web_history_retention_days
+            retention_days = _get_web_history_retention_days()
+            if retention_days > 0:
+                cutoff_date = datetime.now(timezone.utc) - timedelta(days=retention_days)
+                
+                deleted_count = WebHistory.query.filter(
+                    WebHistory.visited_at < cutoff_date
+                ).delete(synchronize_session=False)
+                
+                if deleted_count > 0:
+                    db.session.commit()
+                    logger.info("Automatically pruned %d web history entries older than %d days", deleted_count, retention_days)
+        except Exception as exc:
+            logger.warning("Failed to automatically prune web history: %s", exc)
             db.session.rollback()
 
 

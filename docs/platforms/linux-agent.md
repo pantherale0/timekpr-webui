@@ -103,7 +103,7 @@ Terminal blocking covers common paths such as `/usr/bin/bash`, `/bin/sh`, `/usr/
 
 Because Bluetooth rfkill is device-wide, a parent session may still see Bluetooth disabled while a child’s session is active. The admin UI notes this limitation.
 
-**Browser managed policies** (Chromium extension force-installation) are supported to enforce the YouTube history monitoring extension. See [YouTube History](../features/youtube-history.md) for architecture.
+**Browser managed policies** (Chromium extension force-installation) are supported to enforce the combined Web & Video history monitoring extension. See [Web & Video History](../features/web-video-history.md) for architecture.
 
 ## Manual E2E checklist
 

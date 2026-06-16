@@ -22,6 +22,7 @@ from src.settings_manager import (
     encrypt_setting,
     _get_youtube_api_key_encrypted,
     _get_youtube_history_retention_days,
+    _get_web_history_retention_days,
 )
 from src.nintendo_sync import build_nintendo_console_view_context
 from src.blueprints.api.nintendo import get_nintendo_account_summary
@@ -379,16 +380,19 @@ def settings():
         elif form_name == 'youtube_settings':
             youtube_api_key = request.form.get('youtube_api_key') or ''
             retention = request.form.get('youtube_history_retention_days')
+            web_retention = request.form.get('web_history_retention_days') or '7'
             try:
                 retention_val = int(retention)
-                if retention_val < 0:
-                    flash('YouTube retention period must be a non-negative number of days', 'danger')
+                web_retention_val = int(web_retention)
+                if retention_val < 0 or web_retention_val < 0:
+                    flash('Retention periods must be non-negative numbers of days', 'danger')
                 else:
                     Settings.set_value('youtube_history_retention_days', str(retention_val))
+                    Settings.set_value('web_history_retention_days', str(web_retention_val))
                     if youtube_api_key:
                         encrypted_key = encrypt_setting(youtube_api_key)
                         Settings.set_value('youtube_api_key', encrypted_key)
-                    flash('YouTube Settings updated successfully', 'success')
+                    flash('Web & Video Settings updated successfully', 'success')
                     return redirect(url_for('ui_dashboard.settings'))
             except (TypeError, ValueError):
                 flash('Invalid settings values provided', 'danger')
@@ -452,6 +456,7 @@ def settings():
         xbox_account=xbox_account,
         youtube_api_key_set=bool(_get_youtube_api_key_encrypted()),
         youtube_history_retention_days=_get_youtube_history_retention_days(),
+        web_history_retention_days=_get_web_history_retention_days(),
     )
 
 
@@ -616,10 +621,20 @@ def refresh_device_installed_apps_ui(system_id):
 
 @ui_dashboard_bp.route('/dashboard/user/<int:user_id>/youtube')
 def user_youtube_history(user_id):
-    """Render the YouTube history tracking dashboard for a user."""
+    """Legacy redirect to the combined Web & Video history view."""
+    if not session.get('logged_in'):
+        flash('Please login first', 'warning')
+        return redirect(url_for('ui_auth.login'))
+    return redirect(url_for('ui_dashboard.user_combined_history', user_id=user_id))
+
+
+@ui_dashboard_bp.route('/dashboard/user/<int:user_id>/history')
+def user_combined_history(user_id):
+    """Render the unified Web & Video history tracking dashboard for a user."""
     if not session.get('logged_in'):
         flash('Please login first', 'warning')
         return redirect(url_for('ui_auth.login'))
     
     user = ManagedUser.query.get_or_404(user_id)
-    return render_template('youtube_history.html', user=user)
+    return render_template('web_video_history.html', user=user)
+

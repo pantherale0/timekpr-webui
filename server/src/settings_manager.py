@@ -169,3 +169,13 @@ def _get_youtube_history_retention_days() -> int:
         return 0
 
 
+def _get_web_history_retention_days() -> int:
+    """Get the Web history retention period in days (default: 7)."""
+    raw_value = _safe_get_setting_value('web_history_retention_days', '7')
+    try:
+        return max(0, int(raw_value))
+    except (TypeError, ValueError):
+        return 7
+
+
+

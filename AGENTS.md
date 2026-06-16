@@ -89,6 +89,7 @@ Environment (observed):
 - Database changes: update SQLAlchemy models in `server/src/database.py`, generate Alembic migration, and ensure tests cover upgrade paths.
 - Agent protocol: keep the `/ws` handshake and message schema backward‑compatible; update both Rust agent and the Python debug agent when changing message formats; enforce validation in `agent_helper.py`.
 - Background work: add toggles in `BackgroundTaskManager` and respect env flags similar to `TIMEKPR_TASKS_*` used in `app.py`.
+- When introducing new features, relevant documentation must be created for the documentation site. Updates should also be made to the feature comparison in `docs/getting-started/comparison.md`.
 
 ## Minimal local dev workflow
 

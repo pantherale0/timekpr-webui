@@ -6,7 +6,9 @@
   "permissions": [
     "storage",
     "alarms",
-    "nativeMessaging"
+    "nativeMessaging",
+    "webNavigation",
+    "tabs"
   ],
   "host_permissions": [
     "*://*.youtube.com/*",

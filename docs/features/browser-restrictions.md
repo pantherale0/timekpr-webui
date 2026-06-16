@@ -63,5 +63,5 @@ Browser restrictions are pushed to the client device using **Chrome Enterprise P
 ## Related Guides
 
 - [Device restrictions](device-restrictions.md)
-- [YouTube History Monitoring](youtube-history.md)
+- [Web & Video History Monitoring](web-video-history.md)
 - [Web content filtering](../web-ui/web-filters.md)

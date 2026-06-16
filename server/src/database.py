@@ -1841,3 +1841,48 @@ class YoutubeHistory(db.Model):
             'watched_at': self.watched_at.isoformat() if self.watched_at else None,
             'created_at': self.created_at.isoformat() if self.created_at else None,
         }
+
+
+class WebHistory(db.Model):
+    __tablename__ = 'web_history'
+
+    id = db.Column(db.Integer, primary_key=True)
+    device_id = db.Column(db.String(50), db.ForeignKey('agent_device.system_id'), nullable=False)
+    managed_user_id = db.Column(db.Integer, db.ForeignKey('managed_user.id'), nullable=False)
+    url = db.Column(db.Text, nullable=False)
+    title = db.Column(db.String(255), nullable=True)
+    domain = db.Column(db.String(255), nullable=False)
+    visited_at = db.Column(db.DateTime(timezone=True), nullable=False)
+    created_at = db.Column(
+        db.DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+    device = db.relationship(
+        'AgentDevice',
+        backref=db.backref('web_history', cascade='all, delete-orphan'),
+    )
+    managed_user = db.relationship(
+        'ManagedUser',
+        backref=db.backref('web_history', cascade='all, delete-orphan'),
+    )
+
+    __table_args__ = (
+        db.Index('web_history_user_visited_idx', 'managed_user_id', 'visited_at'),
+    )
+
+    def __repr__(self):
+        return f'<WebHistory {self.managed_user_id} visited {self.domain} at {self.visited_at}>'
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'device_id': self.device_id,
+            'managed_user_id': self.managed_user_id,
+            'url': self.url,
+            'title': self.title,
+            'domain': self.domain,
+            'visited_at': self.visited_at.isoformat() if self.visited_at else None,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+        }
