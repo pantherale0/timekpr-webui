@@ -3,7 +3,7 @@
 Guardian can detect when a managed child attempts to **sign up for a new online account** on any website and block the registration until a parent or guardian explicitly approves it. At the same time, the extension passively records **login events** to build an inventory of websites and services the child already has accounts on.
 
 !!! info "Platform availability"
-    Site Registration Approvals and Online Account Audit require the **Guardian browser extension** (Chrome, Brave, or Edge on Chromium) and the **Linux Rust agent** (or Python debug agent) running on the managed device. Android and console platforms are not covered by this feature.
+    Site Registration Approvals and Online Account Audit require the **Guardian browser extension** (Chrome, Brave, or Edge) and the **Linux or Windows agent** running on the managed device. Android and console platforms are not covered by this feature.
 
 ---
 
@@ -120,10 +120,10 @@ Guardian Server REST API
 
 | Component | Requirement |
 |-----------|-------------|
-| Browser extension | Guardian extension v0.0.0+ |
+| Browser extension | Guardian extension v0.57.0+ |
 | Supported browsers | Chrome, Brave, Edge (Chromium) |
-| Native agent | Guardian Linux Rust agent or Python debug agent |
-| Server | Guardian server with Alembic migration applied |
+| Native agent | Guardian Linux or Windows agent v0.57.0+ |
+| Server | Guardian server v0.57.0+ |
 
 ---
 
