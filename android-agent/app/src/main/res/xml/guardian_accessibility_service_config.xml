@@ -5,4 +5,4 @@
     android:accessibilityFlags="flagDefault|flagIncludeNotImportantViews|flagRetrieveInteractiveWindows"
     android:canRetrieveWindowContent="true"
     android:description="@string/youtube_accessibility_description"
-    android:packageNames="com.google.android.youtube" />
+    android:packageNames="com.google.android.youtube,com.android.chrome,org.mozilla.firefox,com.sec.android.app.sbrowser,com.brave.browser,com.opera.browser,org.chromium.chrome,com.microsoft.emmx" />
