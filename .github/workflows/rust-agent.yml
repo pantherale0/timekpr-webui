@@ -18,6 +18,8 @@ permissions:
 
 env:
   SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+  CARGO_INCREMENTAL: 0
+  CARGO_PROFILE_DEV_DEBUG: 0
 
 jobs:
   changes:
@@ -39,15 +41,21 @@ jobs:
               - ".github/workflows/rust-agent.yml"
             android_agent:
               - "android-agent/**"
+              - "agent/**"
               - ".github/workflows/rust-agent.yml"
 
   linux-check:
     needs: changes
-    if: startsWith(github.ref, 'refs/tags/v') || needs.changes.outputs.linux_agent_changed == 'true' || github.event_name == 'workflow_dispatch'
+    if: (!startsWith(github.ref, 'refs/tags/v')) && (needs.changes.outputs.linux_agent_changed == 'true' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libdbus-1-dev pkg-config
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -62,7 +70,7 @@ jobs:
 
   windows-check:
     needs: changes
-    if: startsWith(github.ref, 'refs/tags/v') || needs.changes.outputs.linux_agent_changed == 'true' || github.event_name == 'workflow_dispatch'
+    if: (!startsWith(github.ref, 'refs/tags/v')) && (needs.changes.outputs.linux_agent_changed == 'true' || github.event_name == 'workflow_dispatch')
     runs-on: windows-latest
     steps:
       - name: Check out repository
@@ -86,11 +94,16 @@ jobs:
 
   android-check:
     needs: changes
-    if: startsWith(github.ref, 'refs/tags/v') || needs.changes.outputs.android_agent_changed == 'true' || github.event_name == 'workflow_dispatch'
+    if: (!startsWith(github.ref, 'refs/tags/v')) && (needs.changes.outputs.android_agent_changed == 'true' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libdbus-1-dev pkg-config
 
       - name: Set up JDK
         uses: actions/setup-java@v4
@@ -113,16 +126,11 @@ jobs:
         with:
           workspaces: "agent -> target"
 
-      - name: Cache cargo-ndk
-        id: cache-cargo-ndk
-        uses: actions/cache@v4
-        with:
-          path: ~/.cargo/bin/cargo-ndk
-          key: ${{ runner.os }}-cargo-ndk-v3
+      - name: Install cargo-binstall
+        uses: cargo-bins/cargo-binstall@main
 
       - name: Install cargo-ndk
-        if: steps.cache-cargo-ndk.outputs.cache-hit != 'true'
-        run: cargo install cargo-ndk
+        run: cargo binstall -y cargo-ndk
 
       - name: Build Android Rust targets
         run: |
@@ -159,7 +167,6 @@ jobs:
           echo "APK signature checksum: $checksum"
 
   linux-release-build:
-    needs: linux-check
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     strategy:
@@ -177,11 +184,16 @@ jobs:
         with:
           targets: ${{ matrix.target }}
 
-      - name: Install aarch64 linker
-        if: matrix.target == 'aarch64-unknown-linux-gnu'
+      - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y gcc-aarch64-linux-gnu libc6-dev-arm64-cross
+          if [ "${{ matrix.target }}" = "aarch64-unknown-linux-gnu" ]; then
+            sudo dpkg --add-architecture arm64
+            sudo apt-get update
+            sudo apt-get install -y gcc-aarch64-linux-gnu libc6-dev-arm64-cross libdbus-1-dev:arm64 pkg-config
+          else
+            sudo apt-get install -y libdbus-1-dev pkg-config
+          fi
 
       - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@v2
@@ -192,6 +204,8 @@ jobs:
         run: |
           if [ "${{ matrix.target }}" = "aarch64-unknown-linux-gnu" ]; then
             export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc
+            export PKG_CONFIG_ALLOW_CROSS=1
+            export PKG_CONFIG_PATH=/usr/lib/aarch64-linux-gnu/pkgconfig
           fi
           export GUARDIAN_AGENT_VERSION="${{ github.ref_name }}"
           cargo build --release --manifest-path agent/Cargo.toml --target "${{ matrix.target }}"
@@ -216,7 +230,6 @@ jobs:
             dist/guardian-agent-${{ matrix.target }}.tar.gz.sha256
 
   windows-release-build:
-    needs: windows-check
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: windows-latest
     steps:
@@ -277,13 +290,69 @@ jobs:
             dist/guardian-agent-x86_64-pc-windows-msvc.msi
             dist/guardian-agent-x86_64-pc-windows-msvc.msi.sha256
 
+  android-rust-build:
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target_rust: aarch64-linux-android
+            target_ndk: aarch64-linux-android
+            jni_dir: arm64-v8a
+          - target_rust: armv7-linux-androideabi
+            target_ndk: armv7-linux-androideabi
+            jni_dir: armeabi-v7a
+          - target_rust: x86_64-linux-android
+            target_ndk: x86_64
+            jni_dir: x86_64
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libdbus-1-dev pkg-config
+
+      - name: Install Rust toolchain with target
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target_rust }}
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "agent -> target"
+
+      - name: Install cargo-binstall
+        uses: cargo-bins/cargo-binstall@main
+
+      - name: Install cargo-ndk
+        run: cargo binstall -y cargo-ndk
+
+      - name: Build Android Rust target
+        run: cargo ndk --target ${{ matrix.target_ndk }} build --lib --release
+        working-directory: agent
+
+      - name: Upload compiled library
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-lib-${{ matrix.jni_dir }}
+          path: agent/target/${{ matrix.target_rust }}/release/libguardian_agent.so
+
   android-release-build:
-    needs: android-check
+    needs: android-rust-build
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libdbus-1-dev pkg-config
 
       - name: Set up JDK
         uses: actions/setup-java@v4
@@ -301,46 +370,35 @@ jobs:
         with:
           gradle-version: 8.9
 
+      - name: Download arm64 library
+        uses: actions/download-artifact@v4
+        with:
+          name: android-lib-arm64-v8a
+          path: android-agent/app/src/main/jniLibs/arm64-v8a
+
+      - name: Download armeabi-v7a library
+        uses: actions/download-artifact@v4
+        with:
+          name: android-lib-armeabi-v7a
+          path: android-agent/app/src/main/jniLibs/armeabi-v7a
+
+      - name: Download x86_64 library
+        uses: actions/download-artifact@v4
+        with:
+          name: android-lib-x86_64
+          path: android-agent/app/src/main/jniLibs/x86_64
+
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: aarch64-linux-android, armv7-linux-androideabi, x86_64-linux-android
 
       - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: "agent -> target"
 
-      - name: Cache cargo-ndk
-        id: cache-cargo-ndk
-        uses: actions/cache@v4
-        with:
-          path: ~/.cargo/bin/cargo-ndk
-          key: ${{ runner.os }}-cargo-ndk-v3
-
-      - name: Install cargo-ndk
-        if: steps.cache-cargo-ndk.outputs.cache-hit != 'true'
-        run: cargo install cargo-ndk
-
-      - name: Build Android Rust targets
-        run: |
-          cargo ndk --target aarch64-linux-android build --lib --release
-          cargo ndk --target armv7-linux-androideabi build --lib --release
-          cargo ndk --target x86_64 build --lib --release
-        working-directory: agent
-
-      - name: Copy native libraries to Android project
-        run: |
-          mkdir -p android-agent/app/src/main/jniLibs/arm64-v8a
-          mkdir -p android-agent/app/src/main/jniLibs/armeabi-v7a
-          mkdir -p android-agent/app/src/main/jniLibs/x86_64
-          cp agent/target/aarch64-linux-android/release/libguardian_agent.so android-agent/app/src/main/jniLibs/arm64-v8a/
-          cp agent/target/armv7-linux-androideabi/release/libguardian_agent.so android-agent/app/src/main/jniLibs/armeabi-v7a/
-          cp agent/target/x86_64-linux-android/release/libguardian_agent.so android-agent/app/src/main/jniLibs/x86_64/
-
       - name: Generate UniFFI Kotlin bindings
         run: |
-          cargo run --features=uniffi/cli --bin uniffi-bindgen generate --language kotlin --library --no-format --out-dir ../android-agent/app/src/main/java/ target/aarch64-linux-android/release/libguardian_agent.so
+          cargo run --features=uniffi/cli --bin uniffi-bindgen generate --language kotlin --library --no-format --out-dir ../android-agent/app/src/main/java/ ../android-agent/app/src/main/jniLibs/arm64-v8a/libguardian_agent.so
         working-directory: agent
 
       - name: Decode release keystore
