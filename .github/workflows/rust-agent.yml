@@ -186,12 +186,36 @@ jobs:
 
       - name: Install system dependencies
         run: |
-          sudo apt-get update
           if [ "${{ matrix.target }}" = "aarch64-unknown-linux-gnu" ]; then
             sudo dpkg --add-architecture arm64
+            sudo python3 -c '
+            import pathlib
+            p = pathlib.Path("/etc/apt/sources.list.d/ubuntu.sources")
+            if p.exists():
+                content = p.read_text()
+                stanzas = content.split("\n\n")
+                new_stanzas = []
+                suites = set()
+                for s in stanzas:
+                    if not s.strip(): continue
+                    lines = s.strip().split("\n")
+                    if not any(l.strip().startswith("Architectures:") for l in lines):
+                        lines.append("Architectures: amd64")
+                    new_stanzas.append("\n".join(lines))
+                    for l in lines:
+                        if l.strip().startswith("Suites:"):
+                            for suite in l.split(":", 1)[1].strip().split():
+                                suites.add(suite)
+                p.write_text("\n\n".join(new_stanzas) + "\n")
+                if suites:
+                    suites_str = " ".join(sorted(suites))
+                    ports_content = f"Types: deb\nURIs: http://ports.ubuntu.com/ubuntu-ports/\nSuites: {suites_str}\nComponents: main restricted universe multiverse\nArchitectures: arm64\nSigned-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg\n"
+                    pathlib.Path("/etc/apt/sources.list.d/arm64-ports.sources").write_text(ports_content)
+            '
             sudo apt-get update
             sudo apt-get install -y gcc-aarch64-linux-gnu libc6-dev-arm64-cross libdbus-1-dev:arm64 pkg-config
           else
+            sudo apt-get update
             sudo apt-get install -y libdbus-1-dev pkg-config
           fi
 
