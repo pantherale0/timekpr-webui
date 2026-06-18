@@ -1,0 +1,332 @@
+/* Guardian Routine Blueprint — weekly schedule editor (v2.4 guided UX) */
+
+.guardian-metric-tile {
+  background: var(--guardian-ivory);
+  border: 1px solid var(--guardian-warm-border);
+  border-radius: 0.65rem;
+  padding: 1rem 0.85rem;
+}
+
+.guardian-metric-label {
+  display: block;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--guardian-text-nav-header);
+  margin-bottom: 0.35rem;
+}
+
+.guardian-metric-value {
+  display: block;
+  font-size: 1.75rem;
+  font-weight: 800;
+  line-height: 1.1;
+  color: var(--guardian-charcoal);
+}
+
+.guardian-metric-sub {
+  display: block;
+  font-size: 0.72rem;
+  color: var(--guardian-text-secondary);
+  margin-top: 0.25rem;
+}
+
+.guardian-person-routine-card .guardian-page-header {
+  margin-bottom: 0;
+}
+
+/* Routine wizard strip */
+.guardian-routine-wizard {
+  border-color: var(--guardian-warm-border);
+}
+
+.guardian-routine-wizard .card-header {
+  background: var(--guardian-ivory);
+  border-bottom: 1px solid var(--guardian-warm-border);
+}
+
+.guardian-wizard-section-title {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--guardian-text-nav-header);
+  margin-bottom: 0.75rem;
+}
+
+.guardian-hours-slider-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.guardian-hours-slider-row input[type="range"] {
+  flex: 1 1 12rem;
+  min-width: 10rem;
+  width: 100%;
+  height: 1.5rem;
+  cursor: pointer;
+  accent-color: var(--guardian-sage);
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  touch-action: none;
+}
+
+.guardian-hours-slider-row input[type="range"]::-webkit-slider-runnable-track {
+  height: 0.5rem;
+  background: var(--guardian-warm-border);
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.guardian-hours-slider-row input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 1.15rem;
+  height: 1.15rem;
+  margin-top: -0.33rem;
+  border-radius: 50%;
+  background: #fff;
+  border: 2px solid var(--guardian-sage);
+  box-shadow: 0 1px 4px rgba(30, 41, 59, 0.18);
+  cursor: grab;
+}
+
+.guardian-hours-slider-row input[type="range"]::-moz-range-track {
+  height: 0.5rem;
+  background: var(--guardian-warm-border);
+  border-radius: 999px;
+}
+
+.guardian-hours-slider-row input[type="range"]::-moz-range-thumb {
+  width: 1.15rem;
+  height: 1.15rem;
+  border-radius: 50%;
+  background: #fff;
+  border: 2px solid var(--guardian-sage);
+  cursor: grab;
+}
+
+.guardian-hours-display {
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: var(--guardian-sage);
+  min-width: 4.5rem;
+  text-align: center;
+}
+
+.guardian-milestone-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.guardian-milestone-pill {
+  border: 1px solid var(--guardian-warm-border);
+  background: var(--guardian-ivory);
+  color: var(--guardian-charcoal);
+  border-radius: 2rem;
+  padding: 0.3rem 0.85rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  transition: all 150ms ease;
+}
+
+.guardian-milestone-pill:hover {
+  border-color: var(--guardian-sage-light);
+  background: var(--guardian-sage-subtle);
+}
+
+.guardian-milestone-pill.active {
+  border-color: var(--guardian-sage);
+  background: var(--guardian-sage);
+  color: var(--guardian-text-inverse);
+}
+
+.guardian-target-toggle .segmented-tab-btn {
+  font-size: 0.72rem;
+  padding: 0.35rem 0.9rem;
+}
+
+/* Dual window range — custom draggable handles (native overlapped ranges break on desktop) */
+.guardian-dual-range-wrap {
+  position: relative;
+  padding: 0.25rem 0 0.5rem;
+}
+
+.guardian-dual-range-track {
+  position: relative;
+  height: 2rem;
+  margin: 0.5rem 0;
+  cursor: pointer;
+  touch-action: none;
+}
+
+.guardian-dual-range-track::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 0.55rem;
+  background: var(--guardian-charcoal);
+  border-radius: 999px;
+}
+
+.guardian-dual-range-fill {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 0.55rem;
+  background: var(--guardian-sage);
+  border-radius: 999px;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.guardian-dual-handle {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 1.25rem;
+  height: 1.25rem;
+  padding: 0;
+  border-radius: 50%;
+  background: #fff;
+  border: 2px solid var(--guardian-sage);
+  box-shadow: 0 1px 4px rgba(30, 41, 59, 0.2);
+  cursor: grab;
+  z-index: 2;
+  touch-action: none;
+}
+
+.guardian-dual-handle:active {
+  cursor: grabbing;
+  border-color: var(--guardian-sage-dark);
+  box-shadow: 0 0 0 4px rgba(74, 107, 93, 0.2);
+}
+
+.guardian-window-hint {
+  background: var(--guardian-sage-subtle);
+  border-left: 3px solid var(--guardian-sage);
+  border-radius: 0.5rem;
+  padding: 0.85rem 1rem;
+  font-size: 0.88rem;
+  line-height: 1.55;
+  color: var(--guardian-charcoal);
+}
+
+.guardian-window-hint strong {
+  color: var(--guardian-sage-dark);
+}
+
+/* Day row timeline */
+.guardian-day-row {
+  border-color: var(--guardian-warm-border);
+  overflow: hidden;
+}
+
+.guardian-day-row.is-weekend .card-header {
+  background: var(--guardian-attention-bg) !important;
+}
+
+.guardian-day-row__allowance {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.guardian-day-row__allowance input {
+  width: 4.5rem;
+  text-align: center;
+  font-weight: 700;
+}
+
+.guardian-timeline-block {
+  user-select: none;
+  touch-action: none;
+}
+
+.guardian-timeline-bar {
+  display: flex;
+  width: 100%;
+  height: 2.25rem;
+  border-radius: 0.5rem;
+  overflow: hidden;
+  border: 1px solid var(--guardian-warm-border);
+  cursor: crosshair;
+  touch-action: none;
+}
+
+.guardian-timeline-segment {
+  flex: 1 1 0;
+  min-width: 0;
+  background: var(--guardian-charcoal);
+  transition: background-color 80ms ease;
+}
+
+.guardian-timeline-segment.is-allowed {
+  background: var(--guardian-sage);
+}
+
+.guardian-timeline-segment.is-painting-allow {
+  background: var(--guardian-sage-light);
+}
+
+.guardian-timeline-segment.is-painting-block {
+  background: #64748b;
+}
+
+.guardian-timeline-ticks {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--guardian-text-nav-header);
+  margin-top: 0.45rem;
+  padding: 0 0.15rem;
+}
+
+.guardian-timeline-markers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.75rem;
+  margin-top: 0.5rem;
+  min-height: 1.25rem;
+}
+
+.guardian-timeline-marker {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--guardian-text-nav-header);
+  background: var(--guardian-sage-subtle);
+  border-radius: 2rem;
+  padding: 0.15rem 0.55rem;
+}
+
+.guardian-advanced-toggle summary {
+  list-style: none;
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--guardian-sage);
+}
+
+.guardian-advanced-toggle summary::-webkit-details-marker {
+  display: none;
+}
+
+/* Routine editor — page-specific nav overrides live in style.css (.app-header .btn-save-routine) */
+
+@media (max-width: 767.98px) {
+  .guardian-day-row__allowance {
+    width: 100%;
+    justify-content: flex-start;
+  }
+}

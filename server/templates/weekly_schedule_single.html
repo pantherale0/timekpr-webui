@@ -1,794 +1,210 @@
 {% extends "base.html" %}
 
 {% from '_macros.html' import csrf_field %}
-{% block title %}Routine for {{ user.username }} - Guardian{% endblock %}
+{% block title %}{{ user.username }} — Weekly Routine - Guardian{% endblock %}
 
-{% block top_nav_extra %}
-<span class="badge bg-warning text-dark sync-status-badge d-none align-items-center gap-1"
-    style="font-size: 0.75rem; padding: 0.25rem 0.5rem; height: fit-content; line-height: 1;">
-    <svg width="10" height="10" fill="currentColor" viewBox="0 0 16 16" style="flex-shrink: 0;">
-        <path class="sync-status-icon"
-            d="M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767L8.982 1.566zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5zm.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2z" />
-    </svg>
-    <span class="sync-status-text fw-bold" style="font-size: 0.7rem; line-height: 1;">Pending Sync</span>
-</span>
+{% block extra_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/guardian-routine.css') }}">
+{% endblock %}
+
+{% block top_nav_brand_status %}
+<span id="routine-sync-dot-mobile" class="guardian-status-dot guardian-status-dot--pulse is-unknown d-lg-none"
+    role="status" aria-label="Checking sync" title="Checking sync"></span>
+{% endblock %}
+
+{% block top_nav_center %}
+<div id="routine-sync-status" class="guardian-status-pill" role="status" aria-live="polite">
+    <span id="routine-sync-dot" class="guardian-status-dot guardian-status-dot--pulse is-unknown"></span>
+    <span id="routine-sync-label">Checking sync</span>
+</div>
+{% endblock %}
+
+{% block top_nav_secondary %}
+<li class="nav-item d-none d-lg-flex">
+    <button type="button" class="btn btn-sm btn-reset-routine guardian-nav-action-btn js-reset-routine">
+        <i class="fas fa-undo"></i>
+        <span>Reset</span>
+    </button>
+</li>
+{% endblock %}
+
+{% block top_nav_primary %}
+<li class="nav-item">
+    <button type="button" class="btn btn-sm btn-save-routine guardian-nav-action-btn" id="save-routine-btn">
+        <i class="fas fa-check"></i>
+        <span class="d-none d-sm-inline">Save</span>
+    </button>
+</li>
+{% endblock %}
+
+{% block top_nav_overflow %}
+<li>
+    <button type="button" class="dropdown-item js-reset-routine">
+        <i class="fas fa-undo me-2 text-secondary"></i>Reset to saved baseline
+    </button>
+</li>
 {% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
-    <div>
-        <h1 class="guardian-page-title mb-1">{{ user.username }} &mdash; Daily routine</h1>
-        <p class="guardian-page-lead mb-0">Shape when they can log in and how much screen time fits each day of the week.</p>
-    </div>
-    <div>
-        <a href="{{ url_for('weekly_schedule') }}" class="btn btn-secondary btn-sm fw-bold">
-            <i class="fas fa-arrow-left me-1"></i> Back to routines
-        </a>
-    </div>
-</div>
+{% set schedule = user.weekly_schedule.get_schedule_dict() if user.weekly_schedule else none %}
+{% if schedule %}
+    {% set weekday_total = schedule['monday'] + schedule['tuesday'] + schedule['wednesday'] + schedule['thursday'] + schedule['friday'] %}
+    {% set weekend_total = schedule['saturday'] + schedule['sunday'] %}
+    {% set week_total = weekday_total + weekend_total %}
+    {% set weekday_avg = (weekday_total / 5) | round(2) %}
+    {% set weekend_avg = (weekend_total / 2) | round(2) %}
+{% endif %}
 
-<div class="schedule-main">
-    <!-- Status Overview & Metrics -->
-    <div class="card shadow-sm border mb-4">
-        <div class="card-header py-3 bg-body-secondary">
-            <h5 class="mb-0 fw-bold">Schedule Summary</h5>
-            <span class="text-secondary small fw-semibold">{{ user.device_mappings|length }} active device mapping(s) configured</span>
+<div id="routine-blueprint-root" class="guardian-routine-main">
+    <input type="hidden" id="routine-user-id" value="{{ user.id }}">
+
+    <!-- 1. Unified Time Dashboard -->
+    <div class="guardian-page-header">
+        <div class="guardian-page-header__intro">
+            <h1 class="guardian-page-title mb-1">{{ user.username }} — Weekly routine settings</h1>
+            <p class="guardian-page-lead mb-0">Shape when they can log in and how much screen time fits each day of the week.</p>
         </div>
-        <div class="card-body">
-            {% if user.weekly_schedule %}
-            {% set schedule = user.weekly_schedule.get_schedule_dict() %}
-            {% set total_week = schedule['monday'] + schedule['tuesday'] + schedule['wednesday'] + schedule['thursday'] + schedule['friday'] %}
-            {% set total_weekend = schedule['saturday'] + schedule['sunday'] %}
-            {% set total_all = total_week + total_weekend %}
-            <div class="row g-3">
-                <div class="col-12 col-md-4">
-                    <div class="bg-body-secondary p-3 rounded text-center border">
-                        <span class="text-secondary small fw-bold text-uppercase d-block mb-1" style="font-size: 0.65rem; letter-spacing: 0.05em;">Total per week</span>
-                        <strong class="fs-2 text-primary d-block lh-1 fw-bold">{{ total_all }}h</strong>
-                    </div>
-                </div>
-                <div class="col-12 col-md-4">
-                    <div class="bg-body-secondary p-3 rounded text-center border">
-                        <span class="text-secondary small fw-bold text-uppercase d-block mb-1" style="font-size: 0.65rem; letter-spacing: 0.05em;">Weekdays (Mon-Fri)</span>
-                        <strong class="fs-2 text-body d-block lh-1 fw-bold">{{ total_week }}h</strong>
-                    </div>
-                </div>
-                <div class="col-12 col-md-4">
-                    <div class="bg-body-secondary p-3 rounded text-center border">
-                        <span class="text-secondary small fw-bold text-uppercase d-block mb-1" style="font-size: 0.65rem; letter-spacing: 0.05em;">Weekends (Sat-Sun)</span>
-                        <strong class="fs-2 text-warning d-block lh-1 fw-bold">{{ total_weekend }}h</strong>
-                    </div>
+        <div class="guardian-page-header__actions">
+            <a href="{{ url_for('ui_schedule.weekly_schedule') }}" class="btn btn-outline-secondary btn-sm fw-bold">
+                <i class="fas fa-arrow-left me-1"></i> All profiles
+            </a>
+        </div>
+    </div>
+
+    {% if schedule %}
+    <section class="mb-4" aria-label="Weekly summary metrics">
+        <h2 class="guardian-wizard-section-title mb-3">Weekly summary metrics</h2>
+        <div class="row g-3">
+            <div class="col-12 col-md-4">
+                <div class="guardian-metric-tile text-center h-100">
+                    <span class="guardian-metric-label">Total for week</span>
+                    <strong class="guardian-metric-value text-primary" id="summary-week-total">{{ week_total }} Hours allowed</strong>
                 </div>
             </div>
-            {% endif %}
-        </div>
-    </div>
-
-    <!-- Bulk/Quick Time Controls Panel -->
-    <div class="card shadow-sm border mb-4">
-        <div class="card-header py-3 bg-body-secondary">
-            <h5 class="mb-0 fw-bold">Quick Time &amp; Interval Actions</h5>
-        </div>
-        <div class="card-body">
-            <div class="row g-3">
-                <!-- Bulk Hours -->
-                <div class="col-12 col-md-6">
-                    <div class="bg-body-secondary p-3 rounded border h-100">
-                        <label class="form-label fw-bold small text-muted text-uppercase mb-2" style="font-size: 0.7rem; letter-spacing: 0.05em;">Bulk Set Daily Hours</label>
-                        <div class="d-flex align-items-center gap-2 mb-3">
-                            <button type="button" class="btn btn-outline-secondary btn-sm fw-bold" onclick="adjustBulkTime(-0.25)">-15m</button>
-                            <input type="number" id="bulk-hours" min="0" max="24" step="0.25" placeholder="2.0" class="form-control form-control-sm text-center fw-bold" style="width: 80px;">
-                            <button type="button" class="btn btn-outline-secondary btn-sm fw-bold" onclick="adjustBulkTime(0.25)">+15m</button>
-                        </div>
-                        <div class="d-flex gap-1 flex-wrap">
-                            <button type="button" class="btn btn-sm btn-secondary fw-bold" onclick="setWeekdays()">Weekdays</button>
-                            <button type="button" class="btn btn-sm btn-secondary fw-bold" onclick="setWeekends()">Weekends</button>
-                            <button type="button" class="btn btn-sm btn-secondary fw-bold" onclick="setAllDays()">All Days</button>
-                        </div>
-                    </div>
+            <div class="col-12 col-md-4">
+                <div class="guardian-metric-tile text-center h-100">
+                    <span class="guardian-metric-label">Weekdays (Mon–Fri)</span>
+                    <strong class="guardian-metric-value" id="summary-weekday-avg">{{ weekday_avg }} Hours / day</strong>
                 </div>
-
-                <!-- Bulk Intervals -->
-                <div class="col-12 col-md-6">
-                    <div class="bg-body-secondary p-3 rounded border h-100">
-                        <label class="form-label fw-bold small text-muted text-uppercase mb-2" style="font-size: 0.7rem; letter-spacing: 0.05em;">Bulk Set Allowed Timeline Interval</label>
-                        <div class="d-flex align-items-center gap-2 mb-3">
-                            <input type="time" id="bulk-start" class="form-control form-control-sm" style="width: 120px;" step="900" value="09:00">
-                            <span class="small fw-bold">to</span>
-                            <input type="time" id="bulk-end" class="form-control form-control-sm" style="width: 120px;" step="900" value="17:00">
-                        </div>
-                        <div class="d-flex gap-1 flex-wrap">
-                            <button type="button" class="btn btn-sm btn-secondary fw-bold" onclick="setWeekdayIntervals()">Weekdays</button>
-                            <button type="button" class="btn btn-sm btn-secondary fw-bold" onclick="setWeekendIntervals()">Weekends</button>
-                            <button type="button" class="btn btn-sm btn-secondary fw-bold" onclick="setAllIntervals()">All Days</button>
-                        </div>
-                    </div>
+            </div>
+            <div class="col-12 col-md-4">
+                <div class="guardian-metric-tile text-center h-100">
+                    <span class="guardian-metric-label">Weekends (Sat–Sun)</span>
+                    <strong class="guardian-metric-value text-warning" id="summary-weekend-avg">{{ weekend_avg }} Hours / day</strong>
                 </div>
             </div>
         </div>
-    </div>
+    </section>
+    {% endif %}
 
-    <!-- Main Scheduler Form -->
+    <!-- 2. Intent-Based Quick Batch Actions -->
+    <section class="card guardian-routine-wizard shadow-sm mb-4" aria-label="Routine wizard strip">
+        <div class="card-header py-3">
+            <h2 class="h5 fw-bold mb-0"><i class="fas fa-magic me-2 text-primary"></i>Routine wizard strip</h2>
+            <p class="small text-secondary mb-0 mt-1">Batch screen-time limits and allowed windows — then fine-tune individual days below.</p>
+        </div>
+        <div class="card-body p-4">
+            <div class="row g-4">
+                <div class="col-12 col-lg-6">
+                    <h3 class="guardian-wizard-section-title">Bulk screen time limits</h3>
+                    <div class="guardian-hours-slider-row mb-3">
+                        <span class="small fw-bold text-muted">0.0h</span>
+                        <input type="range" id="bulk-hours-slider" min="0" max="48" step="1"
+                            value="{% if schedule %}{{ (schedule['monday'] * 2) | int }}{% else %}4{% endif %}"
+                            aria-label="Bulk daily hours">
+                        <span class="small fw-bold text-muted">24h</span>
+                        <span class="guardian-hours-display" id="bulk-hours-display">2.0h</span>
+                    </div>
+                    <div class="guardian-milestone-pills mb-3">
+                        <button type="button" class="guardian-milestone-pill" data-hours="1">1.0h</button>
+                        <button type="button" class="guardian-milestone-pill" data-hours="1.5">1.5h</button>
+                        <button type="button" class="guardian-milestone-pill active" data-hours="2">2.0h guided default</button>
+                        <button type="button" class="guardian-milestone-pill" data-hours="3">3.0h</button>
+                        <button type="button" class="guardian-milestone-pill" data-hours="24">No limit</button>
+                    </div>
+                </div>
+                <div class="col-12 col-lg-6">
+                    <h3 class="guardian-wizard-section-title">Bulk allowed windows</h3>
+                    <div class="guardian-dual-range-wrap">
+                        <div class="guardian-dual-range-track" id="bulk-window-track">
+                            <div class="guardian-dual-range-fill" id="bulk-window-fill"></div>
+                            <button type="button" class="guardian-dual-handle" id="bulk-window-handle-start" aria-label="Allowed window start"></button>
+                            <button type="button" class="guardian-dual-handle" id="bulk-window-handle-end" aria-label="Allowed window end"></button>
+                        </div>
+                    </div>
+                    <p class="guardian-window-hint mb-3" id="bulk-window-hint"></p>
+                    <button type="button" class="btn btn-outline-primary btn-sm fw-bold" id="apply-bulk-window">
+                        Apply window to selected days
+                    </button>
+                </div>
+            </div>
+
+            <div class="mt-4 pt-3 border-top">
+                <span class="guardian-wizard-section-title d-block mb-2">Apply batch changes to</span>
+                <div class="segmented-control guardian-target-toggle">
+                    <button type="button" class="segmented-tab-btn active" data-bulk-target="weekdays">Mon – Fri</button>
+                    <button type="button" class="segmented-tab-btn" data-bulk-target="weekends">Sat – Sun</button>
+                    <button type="button" class="segmented-tab-btn" data-bulk-target="all">Every day</button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 3. Day-row timeline blueprint -->
     <form id="schedule-form" method="POST" action="{{ url_for('update_weekly_schedule') }}">
+        {{ csrf_field() }}
+        <input type="hidden" name="user_id" value="{{ user.id }}">
 
-    {{ csrf_field() }}        <input type="hidden" name="user_id" value="{{ user.id }}">
+        {% set days = [
+            ('monday', 'Monday', 1, false),
+            ('tuesday', 'Tuesday', 2, false),
+            ('wednesday', 'Wednesday', 3, false),
+            ('thursday', 'Thursday', 4, false),
+            ('friday', 'Friday', 5, false),
+            ('saturday', 'Saturday', 6, true),
+            ('sunday', 'Sunday', 7, true)
+        ] %}
 
-        <div class="days-schedules-container">
-            {% set days = [
-            ('monday', 'Monday', 1),
-            ('tuesday', 'Tuesday', 2),
-            ('wednesday', 'Wednesday', 3),
-            ('thursday', 'Thursday', 4),
-            ('friday', 'Friday', 5),
-            ('saturday', 'Saturday', 6),
-            ('sunday', 'Sunday', 7)
-            ] %}
-
-            {% for day_key, day_name, day_num in days %}
-            <div class="card shadow-sm border mb-4 {% if day_num >= 6 %}border-warning{% endif %}" id="day-card-{{ day_num }}">
-                <div class="card-header d-flex justify-content-between align-items-center py-3 {% if day_num >= 6 %}bg-warning-subtle{% else %}bg-body-secondary{% endif %}">
-                    <h5 class="mb-0 fw-bold {% if day_num >= 6 %}text-warning-emphasis{% endif %}">{{ day_name }}</h5>
-
-                    <!-- Daily Time Limit input in header -->
-                    <div class="d-flex align-items-center gap-2">
-                        <span class="small fw-bold text-muted">Daily Time Limit:</span>
-                        <div class="input-group input-group-sm" style="width: 140px;">
-                            <button type="button" class="btn btn-outline-secondary" onclick="adjustTime('{{ day_key }}', -0.25)">−</button>
-                            <input type="number" id="{{ day_key }}" name="{{ day_key }}" min="0" max="24" step="0.25"
-                                   value="{% if user.weekly_schedule %}{{ user.weekly_schedule.get_schedule_dict()[day_key] }}{% else %}0{% endif %}"
-                                   class="form-control text-center fw-bold">
-                            <button type="button" class="btn btn-outline-secondary" onclick="adjustTime('{{ day_key }}', 0.25)">+</button>
-                        </div>
+        <div class="d-flex flex-column gap-4">
+            {% for day_key, day_name, day_num, is_weekend in days %}
+            <article class="card guardian-day-row shadow-sm {% if is_weekend %}is-weekend{% endif %}" id="day-card-{{ day_num }}">
+                <div class="card-header py-3 d-flex justify-content-between align-items-center flex-wrap gap-2 bg-body-secondary">
+                    <h2 class="h5 fw-bold mb-0 {% if is_weekend %}text-warning-emphasis{% endif %}">{{ day_name }}</h2>
+                    <div class="guardian-day-row__allowance">
+                        <span class="small fw-bold text-muted text-uppercase" style="font-size: 0.68rem; letter-spacing: 0.05em;">Daily allowance</span>
+                        <input type="number"
+                            id="{{ day_key }}"
+                            name="{{ day_key }}"
+                            class="form-control form-control-sm day-hours-input"
+                            min="0"
+                            max="24"
+                            step="0.5"
+                            value="{% if schedule %}{{ schedule[day_key] }}{% else %}0{% endif %}"
+                            aria-label="{{ day_name }} daily hours">
                         <span class="small fw-bold text-muted">hours</span>
                     </div>
                 </div>
-                <div class="card-body">
-                    <!-- Interactive 24-Hour Visual Touch Grid -->
-                    <div class="timeline-outer">
-                        <div class="timeline-header-info">
-                            <span class="fw-bold">Visual Allowance Timeline</span>
-                            <span class="small text-muted fw-normal">Tap active blocks to block/allow login</span>
-                        </div>
-                        <div id="timeline-container-{{ day_num }}" class="timeline-container">
-                            <!-- Javascript will dynamically inject 24 blocks here -->
-                        </div>
-                        <div class="timeline-ticks">
-                            <span>12am</span>
-                            <span>3am</span>
-                            <span>6am</span>
-                            <span>9am</span>
-                            <span>12pm</span>
-                            <span>3pm</span>
-                            <span>6pm</span>
-                            <span>9pm</span>
-                            <span>12am</span>
-                        </div>
+                <div class="card-body guardian-timeline-block">
+                    <p class="small fw-bold text-muted mb-2">Visual timeline — drag across the bar to paint allowed (sage) or blocked (slate) hours.</p>
+                    <div class="guardian-timeline-bar" id="timeline-bar-{{ day_num }}" role="img" aria-label="{{ day_name }} allowed hours timeline"></div>
+                    <div class="guardian-timeline-ticks">
+                        <span>12am</span><span>3am</span><span>6am</span><span>9am</span>
+                        <span>12pm</span><span>3pm</span><span>6pm</span><span>9pm</span><span>12am</span>
                     </div>
+                    <div class="guardian-timeline-markers" id="timeline-markers-{{ day_num }}"></div>
 
-                    <!-- Precise Manual Editors below -->
-                    <details class="interval-details mt-3">
-                        <summary class="text-primary fw-bold small cursor-pointer" style="list-style: none;">
-                            <i class="fas fa-chevron-down me-1"></i> Show Precise Allowed Clock Ranges (<span id="interval-summary-{{ day_num }}">Unrestricted</span>)
-                        </summary>
-                        <div class="interval-editor mt-2 p-3 bg-body-secondary border rounded">
-                            <div id="interval-list-{{ day_num }}" class="interval-list d-flex flex-column gap-2 mb-3"></div>
-                            <div class="interval-actions">
-                                <button type="button" class="btn btn-outline-secondary btn-sm fw-bold" onclick="addInterval({{ day_num }})">
-                                    <i class="fas fa-plus me-1"></i> Add precise range
-                                </button>
-                            </div>
-                        </div>
+                    <details class="guardian-advanced-toggle mt-3">
+                        <summary><i class="fas fa-cog me-1"></i> Tweak advanced clock ranges (<span id="interval-summary-{{ day_num }}">Loading…</span>)</summary>
+                        <div class="mt-2 p-3 bg-body-secondary border rounded" id="interval-list-{{ day_num }}"></div>
                     </details>
                 </div>
-            </div>
+            </article>
             {% endfor %}
-        </div>
-
-        <!-- Action buttons container sticky at page bottom -->
-        <div class="actions-section position-sticky bottom-0 bg-body border rounded-pill p-2 shadow d-flex justify-content-center gap-2 z-3 mt-4 mx-auto" style="width: fit-content; max-width: 90%;">
-            <button type="button" class="btn btn-success rounded-pill px-4 py-2 fw-bold d-inline-flex align-items-center justify-content-center gap-2" onclick="saveAll()">
-                <i class="fas fa-check-circle"></i>
-                <span>Save all changes</span>
-            </button>
-            <button type="button" class="btn btn-secondary rounded-pill px-4 py-2 fw-bold d-inline-flex align-items-center justify-content-center gap-2" onclick="resetForm()">
-                <i class="fas fa-undo"></i>
-                <span>Reset to saved</span>
-            </button>
         </div>
     </form>
 </div>
-
-<!-- Notification Toast for feedback -->
-<div id="notification-toast" class="notification-toast">
-    <div class="toast-content">
-        <svg class="toast-icon" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-            <path
-                d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zm-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.061L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z" />
-        </svg>
-        <span class="toast-message">Changes saved successfully!</span>
-    </div>
-</div>
 {% endblock %}
 
-
 {% block extra_js %}
-<script>
-    const DAY_NUMBERS = [1, 2, 3, 4, 5, 6, 7];
-    const WEEKDAY_NUMBERS = [1, 2, 3, 4, 5];
-    const WEEKEND_NUMBERS = [6, 7];
-    const INTERVAL_STEP_MINUTES = 15;
-    const INTERVAL_STEP_SECONDS = INTERVAL_STEP_MINUTES * 60;
-    const MAX_TIME_VALUE = '23:45';
-    const DEFAULT_INTERVAL = Object.freeze({ start_time: '09:00', end_time: '17:00' });
-    const DAY_LABELS = {
-        1: 'Monday',
-        2: 'Tuesday',
-        3: 'Wednesday',
-        4: 'Thursday',
-        5: 'Friday',
-        6: 'Saturday',
-        7: 'Sunday',
-    };
-
-    let intervals = initializeIntervals();
-
-    function showNotification(message, type = 'success') {
-        const toast = document.getElementById('notification-toast');
-        const messageEl = toast.querySelector('.toast-message');
-        const iconEl = toast.querySelector('.toast-icon path');
-
-        messageEl.textContent = message;
-        toast.className = `notification-toast ${type}`;
-
-        if (type === 'success') {
-            iconEl.setAttribute('d', 'M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zm-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.061L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z');
-        } else if (type === 'error') {
-            iconEl.setAttribute('d', 'M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zM5.354 4.646a.5.5 0 1 0-.708.708L7.293 8l-2.647 2.646a.5.5 0 0 0 .708.708L8 8.707l2.646 2.647a.5.5 0 0 0 .708-.708L8.707 8l2.647-2.646a.5.5 0 0 0-.708-.708L8 7.293 5.354 4.646z');
-        }
-
-        toast.classList.add('show');
-        setTimeout(() => {
-            toast.classList.remove('show');
-        }, 2000);
-    }
-
-    function initializeIntervals() {
-        return DAY_NUMBERS.reduce((map, day) => {
-            map[day] = [];
-            return map;
-        }, {});
-    }
-
-    function cloneInterval(interval) {
-        return {
-            start_time: interval.start_time,
-            end_time: interval.end_time,
-        };
-    }
-
-    function pad(value) {
-        return String(value).padStart(2, '0');
-    }
-
-    function partsToTimeValue(hour, minute) {
-        return `${pad(hour)}:${pad(minute)}`;
-    }
-
-    function timeValueToMinutes(value) {
-        if (typeof value !== 'string' || !value.includes(':')) {
-            return NaN;
-        }
-
-        const [hours, minutes] = value.split(':').map(part => Number(part));
-        if (!Number.isInteger(hours) || !Number.isInteger(minutes)) {
-            return NaN;
-        }
-
-        return (hours * 60) + minutes;
-    }
-
-    function timeValueToParts(value) {
-        const totalMinutes = timeValueToMinutes(value);
-        return {
-            start_hour: Math.floor(totalMinutes / 60),
-            start_minute: totalMinutes % 60,
-        };
-    }
-
-    function createDefaultInterval(day) {
-        const dayIntervals = intervals[day] || [];
-        if (!dayIntervals.length) {
-            return cloneInterval(DEFAULT_INTERVAL);
-        }
-
-        const lastInterval = dayIntervals[dayIntervals.length - 1];
-        const nextStartMinutes = timeValueToMinutes(lastInterval.end_time);
-        if (!Number.isFinite(nextStartMinutes)) {
-            return cloneInterval(DEFAULT_INTERVAL);
-        }
-
-        const boundedStart = Math.min(nextStartMinutes, timeValueToMinutes(MAX_TIME_VALUE));
-        const boundedEnd = Math.min(boundedStart + 60, timeValueToMinutes(MAX_TIME_VALUE));
-        if (boundedEnd <= boundedStart) {
-            return cloneInterval(DEFAULT_INTERVAL);
-        }
-
-        return {
-            start_time: partsToTimeValue(Math.floor(boundedStart / 60), boundedStart % 60),
-            end_time: partsToTimeValue(Math.floor(boundedEnd / 60), boundedEnd % 60),
-        };
-    }
-
-    function getDayIntervals(day) {
-        if (!intervals[day]) {
-            intervals[day] = [];
-        }
-        return intervals[day];
-    }
-
-    /* Helper: Merges overlapping or touching intervals to keep list clean */
-    function mergeIntervals(dayIntervals) {
-        if (!dayIntervals.length) return [];
-
-        let ranges = dayIntervals.map(inter => ({
-            start: timeValueToMinutes(inter.start_time),
-            end: timeValueToMinutes(inter.end_time)
-        })).sort((a, b) => a.start - b.start);
-
-        let merged = [ranges[0]];
-        for (let i = 1; i < ranges.length; i++) {
-            let last = merged[merged.length - 1];
-            let curr = ranges[i];
-
-            if (curr.start <= last.end) {
-                last.end = Math.max(last.end, curr.end);
-            } else {
-                merged.push(curr);
-            }
-        }
-
-        return merged.map(r => ({
-            start_time: partsToTimeValue(Math.floor(r.start / 60), r.start % 60),
-            end_time: partsToTimeValue(Math.floor(r.end / 60), r.end % 60)
-        }));
-    }
-
-    /* Helper: Checks if specific hour has any allowed interval overlap */
-    function isHourAllowed(day, hour) {
-        const dayIntervals = getDayIntervals(day);
-        const slotMidpoint = (hour + 0.5) * 60; // test midpoint in minutes
-
-        for (const interval of dayIntervals) {
-            const start = timeValueToMinutes(interval.start_time);
-            const end = timeValueToMinutes(interval.end_time);
-            if (slotMidpoint >= start && slotMidpoint <= end) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /* Toggle allowance for visual block grid slot */
-    function toggleVisualHour(day, hour) {
-        const allowed = isHourAllowed(day, hour);
-        const dayIntervals = getDayIntervals(day);
-        const targetStart = hour * 60;
-        const targetEnd = (hour + 1) * 60;
-
-        if (allowed) {
-            // Subtract hour from allowed intervals
-            let nextIntervals = [];
-            for (const interval of dayIntervals) {
-                const start = timeValueToMinutes(interval.start_time);
-                const end = timeValueToMinutes(interval.end_time);
-
-                if (start >= targetEnd || end <= targetStart) {
-                    nextIntervals.push(interval);
-                } else {
-                    if (start < targetStart) {
-                        nextIntervals.push({
-                            start_time: partsToTimeValue(Math.floor(start / 60), start % 60),
-                            end_time: partsToTimeValue(Math.floor(targetStart / 60), targetStart % 60)
-                        });
-                    }
-                    if (end > targetEnd) {
-                        nextIntervals.push({
-                            start_time: partsToTimeValue(Math.floor(targetEnd / 60), targetEnd % 60),
-                            end_time: partsToTimeValue(Math.floor(end / 60), end % 60)
-                        });
-                    }
-                }
-            }
-            intervals[day] = nextIntervals;
-        } else {
-            // Add allowed hour and merge adjacent
-            dayIntervals.push({
-                start_time: partsToTimeValue(hour, 0),
-                end_time: partsToTimeValue(hour + 1, 0)
-            });
-            intervals[day] = mergeIntervals(dayIntervals);
-        }
-
-        renderIntervalsForDay(day);
-    }
-
-    /* Render the visual 24-hour block timeline */
-    function renderVisualTimeline(day) {
-        const container = document.getElementById(`timeline-container-${day}`);
-        if (!container) return;
-
-        container.innerHTML = '';
-
-        for (let hour = 0; hour < 24; hour++) {
-            const allowed = isHourAllowed(day, hour);
-            const slot = document.createElement('div');
-
-            // Format hour label elegantly (e.g. "09" or "18")
-            const displayHour = pad(hour);
-
-            slot.className = `timeline-slot ${allowed ? 'allowed' : 'blocked'}`;
-            slot.title = `${displayHour}:00 - ${displayHour}:59: ${allowed ? 'Allowed login window' : 'Blocked'}`;
-            slot.innerHTML = `
-                <span class="slot-label">${displayHour}</span>
-                <span class="slot-indicator"></span>
-            `;
-
-            slot.addEventListener('click', () => {
-                toggleVisualHour(day, hour);
-            });
-
-            container.appendChild(slot);
-        }
-    }
-
-    function renderAllIntervals() {
-        DAY_NUMBERS.forEach(day => renderIntervalsForDay(day));
-    }
-
-    function renderIntervalsForDay(day) {
-        // First render the precise form rows
-        const listEl = document.getElementById(`interval-list-${day}`);
-        const summaryEl = document.getElementById(`interval-summary-${day}`);
-        const dayIntervals = getDayIntervals(day);
-
-        listEl.innerHTML = '';
-
-        if (!dayIntervals.length) {
-            const emptyState = document.createElement('div');
-            emptyState.className = 'interval-empty';
-            emptyState.style.padding = '0.5rem';
-            emptyState.style.border = '1px dashed var(--pico-card-border-color)';
-            emptyState.style.borderRadius = '0.5rem';
-            emptyState.style.fontSize = '0.8rem';
-            emptyState.style.color = 'var(--pico-muted-color)';
-            emptyState.textContent = 'No restrictions configured. Online logins allowed 24/7.';
-            listEl.appendChild(emptyState);
-        } else {
-            dayIntervals.forEach((interval, index) => {
-                const row = document.createElement('div');
-                row.className = 'interval-row d-flex align-items-center gap-2 p-2 border rounded bg-body-tertiary mb-2 flex-wrap';
-
-                const controls = document.createElement('div');
-                controls.className = 'interval-row-controls d-flex align-items-center gap-2 flex-grow-1';
-                controls.innerHTML = `
-                    <span class="interval-row-index text-secondary fw-bold small">#${index + 1}</span>
-                    <input type="time" class="interval-time-input form-control form-control-sm" style="width: 110px;" step="${INTERVAL_STEP_SECONDS}" value="${interval.start_time}">
-                    <span class="fw-bold small text-muted">to</span>
-                    <input type="time" class="interval-time-input form-control form-control-sm" style="width: 110px;" step="${INTERVAL_STEP_SECONDS}" value="${interval.end_time}">
-                `;
-
-                const [startInput, endInput] = controls.querySelectorAll('input');
-                startInput.addEventListener('input', event => {
-                    dayIntervals[index].start_time = event.target.value;
-                    renderVisualTimeline(day); // sync visual
-                });
-                endInput.addEventListener('input', event => {
-                    dayIntervals[index].end_time = event.target.value;
-                    renderVisualTimeline(day); // sync visual
-                });
-
-                const removeButton = document.createElement('button');
-                removeButton.type = 'button';
-                removeButton.className = 'btn btn-sm btn-outline-danger';
-                removeButton.innerHTML = '<i class="fas fa-trash me-1"></i> Remove';
-                removeButton.addEventListener('click', () => removeInterval(day, index));
-
-                row.appendChild(controls);
-                row.appendChild(removeButton);
-                listEl.appendChild(row);
-            });
-        }
-
-        summaryEl.textContent = dayIntervals.length
-            ? `${dayIntervals.length} interval${dayIntervals.length === 1 ? '' : 's'} active`
-            : 'Unrestricted (24/7 allowed)';
-
-        // Second render the visual 24-hour blocks
-        renderVisualTimeline(day);
-    }
-
-    function addInterval(day) {
-        getDayIntervals(day).push(createDefaultInterval(day));
-        renderIntervalsForDay(day);
-    }
-
-    function removeInterval(day, index) {
-        getDayIntervals(day).splice(index, 1);
-        renderIntervalsForDay(day);
-    }
-
-    function validateDayIntervals(day, dayIntervals) {
-        let previousEnd = null;
-
-        for (const interval of dayIntervals) {
-            const startMinutes = timeValueToMinutes(interval.start_time);
-            const endMinutes = timeValueToMinutes(interval.end_time);
-
-            if (!Number.isFinite(startMinutes) || !Number.isFinite(endMinutes)) {
-                return `Invalid time value for ${DAY_LABELS[day]}.`;
-            }
-
-            if ((startMinutes % INTERVAL_STEP_MINUTES) !== 0 || (endMinutes % INTERVAL_STEP_MINUTES) !== 0) {
-                return `${DAY_LABELS[day]} intervals must use ${INTERVAL_STEP_MINUTES}-minute increments.`;
-            }
-
-            if (startMinutes >= endMinutes) {
-                return `${DAY_LABELS[day]} has an interval where the start time is not before the end time.`;
-            }
-
-            if (previousEnd !== null && startMinutes < previousEnd) {
-                return `${DAY_LABELS[day]} intervals cannot overlap.`;
-            }
-
-            previousEnd = endMinutes;
-        }
-
-        return null;
-    }
-
-    function buildIntervalsPayload() {
-        const intervalData = {};
-
-        for (const day of DAY_NUMBERS) {
-            const dayIntervals = getDayIntervals(day).map(cloneInterval);
-            const validationError = validateDayIntervals(day, dayIntervals);
-            if (validationError) {
-                throw new Error(validationError);
-            }
-
-            intervalData[day] = dayIntervals.map((interval, index) => {
-                const startMinutes = timeValueToMinutes(interval.start_time);
-                const endMinutes = timeValueToMinutes(interval.end_time);
-
-                return {
-                    sort_order: index,
-                    start_hour: Math.floor(startMinutes / 60),
-                    start_minute: startMinutes % 60,
-                    end_hour: Math.floor(endMinutes / 60),
-                    end_minute: endMinutes % 60,
-                    is_enabled: true,
-                };
-            });
-        }
-
-        return intervalData;
-    }
-
-    function normalizeServerIntervals(serverIntervals) {
-        const normalized = initializeIntervals();
-
-        for (const day of DAY_NUMBERS) {
-            const rawIntervals = serverIntervals?.[day] ?? serverIntervals?.[String(day)] ?? [];
-            const intervalList = Array.isArray(rawIntervals)
-                ? rawIntervals
-                : (rawIntervals ? [rawIntervals] : []);
-
-            normalized[day] = intervalList.map(interval => ({
-                start_time: partsToTimeValue(interval.start_hour, interval.start_minute),
-                end_time: partsToTimeValue(interval.end_hour, interval.end_minute),
-            }));
-        }
-
-        return normalized;
-    }
-
-    function applyBulkIntervals(dayNumbers) {
-        const startValue = document.getElementById('bulk-start').value;
-        const endValue = document.getElementById('bulk-end').value;
-        const bulkIntervals = [{ start_time: startValue, end_time: endValue }];
-
-        const validationError = validateDayIntervals(dayNumbers[0], bulkIntervals);
-        if (validationError) {
-            showNotification(validationError, 'error');
-            return;
-        }
-
-        dayNumbers.forEach(day => {
-            intervals[day] = bulkIntervals.map(cloneInterval);
-            renderIntervalsForDay(day);
-        });
-    }
-
-    function adjustTime(dayId, change) {
-        const input = document.getElementById(dayId);
-        const currentValue = parseFloat(input.value) || 0;
-        const nextValue = Math.max(0, Math.min(24, currentValue + change));
-        input.value = (Math.round(nextValue * 100) / 100).toString();
-    }
-
-    function adjustBulkTime(change) {
-        const input = document.getElementById('bulk-hours');
-        const currentValue = parseFloat(input.value) || 0;
-        const nextValue = Math.max(0, Math.min(24, currentValue + change));
-        input.value = (Math.round(nextValue * 100) / 100).toString();
-    }
-
-    function setWeekdays() {
-        const hours = document.getElementById('bulk-hours').value;
-        if (!hours) return;
-        ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'].forEach(day => {
-            document.getElementById(day).value = hours;
-        });
-    }
-
-    function setWeekends() {
-        const hours = document.getElementById('bulk-hours').value;
-        if (!hours) return;
-        ['saturday', 'sunday'].forEach(day => {
-            document.getElementById(day).value = hours;
-        });
-    }
-
-    function setAllDays() {
-        const hours = document.getElementById('bulk-hours').value;
-        if (!hours) return;
-        ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].forEach(day => {
-            document.getElementById(day).value = hours;
-        });
-    }
-
-    function setWeekdayIntervals() {
-        applyBulkIntervals(WEEKDAY_NUMBERS);
-    }
-
-    function setWeekendIntervals() {
-        applyBulkIntervals(WEEKEND_NUMBERS);
-    }
-
-    function setAllIntervals() {
-        applyBulkIntervals(DAY_NUMBERS);
-    }
-
-    function loadIntervals() {
-        return fetch(`/api/user/{{ user.id }}/intervals`)
-            .then(response => response.json())
-            .then(data => {
-                if (!data.success) {
-                    throw new Error(data.message || 'Failed to load time intervals');
-                }
-
-                intervals = normalizeServerIntervals(data.intervals);
-                renderAllIntervals();
-            })
-            .catch(error => {
-                showNotification(`Error loading intervals: ${error.message}`, 'error');
-                throw error;
-            });
-    }
-
-    function saveAll() {
-        const form = document.getElementById('schedule-form');
-        const formData = new FormData(form);
-
-        fetch(form.action, {
-            method: 'POST',
-            body: formData
-        })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error('Failed to save schedule');
-                }
-                return saveIntervals(false);
-            })
-            .then(() => {
-                showNotification('All schedule changes saved successfully!');
-                setTimeout(() => {
-                    updateSyncStatus();
-                }, 1000);
-            })
-            .catch(error => {
-                showNotification(`Error saving changes: ${error.message}`, 'error');
-            });
-    }
-
-    function saveIntervals(showAlert = true) {
-        return new Promise((resolve, reject) => {
-            let intervalData;
-            try {
-                intervalData = buildIntervalsPayload();
-            } catch (error) {
-                if (showAlert) {
-                    showNotification(error.message, 'error');
-                }
-                reject(error);
-                return;
-            }
-
-            fetch(`/api/user/{{ user.id }}/intervals/update`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ intervals: intervalData })
-            })
-                .then(async response => {
-                    const data = await response.json();
-                    if (!response.ok || !data.success) {
-                        throw new Error(data.message || 'Failed to save intervals');
-                    }
-
-                    if (showAlert) {
-                        showNotification('Time intervals saved successfully!');
-                    }
-                    return loadIntervals();
-                })
-                .then(() => resolve())
-                .catch(error => {
-                    if (showAlert) {
-                        showNotification(`Error: ${error.message}`, 'error');
-                    }
-                    reject(error);
-                });
-        });
-    }
-
-    function resetForm() {
-        if (confirm('Reset to last saved values?')) {
-            location.reload();
-        }
-    }
-
-    function updateSyncStatus() {
-        const statusBadges = document.querySelectorAll('.sync-status-badge');
-        const statusIcons = document.querySelectorAll('.sync-status-icon');
-        const statusTexts = document.querySelectorAll('.sync-status-text');
-
-        Promise.all([
-            fetch('/api/schedule-sync-status/{{ user.id }}').then(response => response.json()),
-            fetch('/api/user/{{ user.id }}/intervals/sync-status').then(response => response.json()),
-        ])
-            .then(([scheduleData, intervalData]) => {
-                const hasSchedule = Boolean(scheduleData?.schedule);
-                const hasIntervals = (intervalData?.total_intervals || 0) > 0;
-                const hasConfig = hasSchedule || hasIntervals;
-                const needsSync = (
-                    (hasSchedule && scheduleData.success && !scheduleData.is_synced) ||
-                    (intervalData.success && intervalData.needs_sync)
-                );
-
-                if (!hasConfig) {
-                    statusBadges.forEach(badge => badge.style.display = 'none');
-                } else {
-                    statusBadges.forEach(badge => badge.style.display = 'inline-flex');
-                    if (needsSync) {
-                        statusBadges.forEach(badge => badge.className = 'badge badge-warning sync-status-badge');
-                        statusIcons.forEach(icon => icon.setAttribute('d', 'M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767L8.982 1.566zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5zm.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2z'));
-                        statusTexts.forEach(text => text.textContent = 'Pending Sync');
-                    } else {
-                        statusBadges.forEach(badge => badge.className = 'badge badge-success sync-status-badge');
-                        statusIcons.forEach(icon => icon.setAttribute('d', 'M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zm-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.061L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z'));
-                        statusTexts.forEach(text => text.textContent = 'Synchronized');
-                    }
-                }
-            })
-            .catch(error => {
-                console.error('Error fetching sync status:', error);
-            });
-    }
-
-    document.addEventListener('DOMContentLoaded', function () {
-        renderAllIntervals();
-        loadIntervals().catch(() => { });
-        updateSyncStatus();
-        setInterval(updateSyncStatus, 15000);
-    });
-</script>
+<script src="{{ url_for('static', filename='js/guardian-routine.js') }}"></script>
 {% endblock %}

@@ -50,28 +50,6 @@
     </script>
 
     <style>
-        .app-sidebar .sidebar-brand {
-            height: 60px;
-            display: flex;
-            align-items: center;
-            padding: 0 1.5rem;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-        }
-
-        .brand-link {
-            text-decoration: none;
-            color: #fff;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            font-weight: 700;
-        }
-
-        .brand-icon-shield {
-            font-size: 1.5rem;
-            color: #a8c4b8;
-        }
-
         .sidebar-footer .btn-xs {
             padding: 0.25rem 0.5rem;
             font-size: 0.75rem;
@@ -122,14 +100,14 @@
         .step-node.active {
             background-color: var(--guardian-sage);
             border-color: var(--guardian-sage);
-            color: #fff;
+            color: var(--guardian-text-inverse);
             box-shadow: 0 0 0 3px rgba(74, 107, 93, 0.22);
         }
 
         .step-node.completed {
             background-color: var(--guardian-sage-light);
             border-color: var(--guardian-sage-light);
-            color: #fff;
+            color: var(--guardian-text-inverse);
         }
 
         .platform-card {
@@ -163,74 +141,114 @@
     {% block extra_head %}{% endblock %}
 </head>
 
-<body class="layout-fixed sidebar-expand-lg">
+<body class="layout-fixed sidebar-expand-lg sidebar-mini bg-body-tertiary">
     <div class="app-wrapper">
         <!-- Top Navbar Header -->
-        <nav class="app-header navbar navbar-expand bg-body shadow-sm">
-            <div class="container-fluid">
-                <!-- Start Left Links -->
-                <ul class="navbar-nav">
-                    <li class="nav-item">
-                        <a class="nav-link" data-lte-toggle="sidebar" href="#" role="button">
-                            <i class="fas fa-bars"></i>
-                        </a>
-                    </li>
-                    {% block top_nav_left %}
-                    <li class="nav-item d-none d-md-inline-block">
-                        <span class="navbar-text fw-bold text-secondary text-uppercase tracking-wide"
-                            style="font-size: 0.85rem; letter-spacing: 0.05em; color: var(--guardian-charcoal-muted) !important;">Family Home</span>
-                    </li>
-                    {% endblock %}
-                </ul>
-                <!-- End Left Links -->
+        <nav class="app-header navbar navbar-expand bg-body shadow-sm" aria-label="Main navigation">
+            <div class="container-fluid guardian-nav-shell">
+                <!-- Brand context (left) -->
+                <div class="guardian-nav-brand">
+                    <ul class="navbar-nav flex-row align-items-center">
+                        <li class="nav-item">
+                            <a class="nav-link guardian-nav-toggle" data-lte-toggle="sidebar" href="#" role="button"
+                                aria-label="Toggle sidebar">
+                                <i class="fas fa-bars"></i>
+                            </a>
+                        </li>
+                        {% block top_nav_left %}
+                        <li class="nav-item d-none d-md-inline-block">
+                            <span class="navbar-text guardian-nav-workspace-label">Family Home</span>
+                        </li>
+                        {% endblock %}
+                        {% block top_nav_brand_status %}{% endblock %}
+                    </ul>
+                </div>
 
-                <!-- Start Right Links -->
-                <ul class="navbar-nav ms-auto align-items-center">
-                    <li class="nav-item">
-                        <button class="btn btn-sm guardian-btn-sage me-3 d-flex align-items-center gap-1"
-                            onclick="openOnboardingWizard()">
-                            <i class="fas fa-plus"></i> <span>Add Device</span>
-                        </button>
-                    </li>
-                    <li class="nav-item">
-                        <span class="badge rounded-pill bg-warning text-dark me-2" id="navbar-approvals-badge"
-                            style="display: none; cursor: pointer;" aria-live="polite"
-                            onclick="location.href='{{ url_for('ui_dashboard.admin_approvals') }}'">
-                            <i class="fas fa-clipboard-check me-1"></i>
-                            <span id="navbar-approvals-count">0</span> Dialogue
-                        </span>
-                    </li>
-                    <li class="nav-item">
-                        <!-- Background Task Dot/Indicator -->
-                        <span class="badge rounded-pill bg-danger text-white me-2" id="navbar-task-badge"
-                            style="display: none; cursor: pointer;" onclick="location.href='{{ url_for('settings') }}'">
-                            <span class="task-status-indicator-dot danger me-1"></span> Tasks Offline
-                        </span>
-                    </li>
-                    {% block top_nav_extra %}{% endblock %}
-                </ul>
-                <!-- End Right Links -->
+                <!-- System status (center, desktop) -->
+                <div class="guardian-nav-center d-none d-lg-flex align-items-center">
+                    {% block top_nav_center %}{% endblock %}
+                    <span class="guardian-nav-alert-badge badge rounded-pill bg-warning text-dark"
+                        id="navbar-approvals-badge" style="display: none; cursor: pointer;" aria-live="polite"
+                        onclick="location.href='{{ url_for('ui_dashboard.admin_approvals') }}'">
+                        <i class="fas fa-clipboard-check"></i>
+                        <span class="guardian-nav-alert-text"><span id="navbar-approvals-count">0</span> Dialogue</span>
+                    </span>
+                    <span class="guardian-nav-alert-badge badge rounded-pill bg-danger text-white"
+                        id="navbar-task-badge" style="display: none; cursor: pointer;"
+                        onclick="location.href='{{ url_for('settings') }}'">
+                        <span class="task-status-indicator-dot danger"></span>
+                        <span class="guardian-nav-alert-text">Tasks Offline</span>
+                    </span>
+                </div>
+
+                <!-- Form & utility actions (right) -->
+                <div class="guardian-nav-actions">
+                    <ul class="navbar-nav flex-row align-items-center">
+                        <li class="nav-item d-lg-none">
+                            <span class="guardian-nav-alert-badge badge rounded-pill bg-warning text-dark"
+                                id="navbar-approvals-badge-mobile" style="display: none; cursor: pointer;"
+                                aria-live="polite"
+                                onclick="location.href='{{ url_for('ui_dashboard.admin_approvals') }}'"
+                                title="Pending dialogue">
+                                <i class="fas fa-clipboard-check"></i>
+                            </span>
+                        </li>
+                        <li class="nav-item d-lg-none">
+                            <span class="guardian-nav-alert-badge badge rounded-pill bg-danger text-white"
+                                id="navbar-task-badge-mobile" style="display: none; cursor: pointer;"
+                                onclick="location.href='{{ url_for('settings') }}'" title="Tasks offline">
+                                <span class="task-status-indicator-dot danger"></span>
+                            </span>
+                        </li>
+                        <li class="nav-item d-none d-lg-flex">
+                            <button type="button" class="btn btn-sm guardian-btn-sage guardian-nav-action-btn"
+                                onclick="openOnboardingWizard()">
+                                <i class="fas fa-plus"></i>
+                                <span>Add Device</span>
+                            </button>
+                        </li>
+                        {% block top_nav_secondary %}
+                        {% block top_nav_extra %}{% endblock %}
+                        {% endblock %}
+                        {% block top_nav_primary %}{% endblock %}
+                        <li class="nav-item dropdown guardian-nav-actions-menu d-lg-none">
+                            <button type="button"
+                                class="btn btn-sm btn-outline-secondary guardian-nav-action-btn guardian-nav-actions-trigger"
+                                data-bs-toggle="dropdown" aria-expanded="false" aria-label="Open actions menu">
+                                <i class="fas fa-ellipsis-v"></i>
+                                <span class="guardian-nav-actions-trigger-label">Actions</span>
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end guardian-nav-actions-dropdown shadow border">
+                                <li>
+                                    <button type="button" class="dropdown-item" onclick="openOnboardingWizard()">
+                                        <i class="fas fa-plus me-2 text-secondary"></i>Add Device
+                                    </button>
+                                </li>
+                                {% block top_nav_overflow %}{% endblock %}
+                            </ul>
+                        </li>
+                    </ul>
+                </div>
             </div>
         </nav>
 
         <!-- Sidebar Navigation Drawer -->
-        <aside class="app-sidebar guardian-sidebar shadow" data-bs-theme="dark">
+        <aside class="app-sidebar guardian-sidebar shadow" data-bs-theme="dark" data-enable-persistence="true">
             <div class="sidebar-brand">
                 <a href="{{ url_for('dashboard') }}" class="brand-link">
-                    <i class="fas fa-shield-alt brand-icon-shield"></i>
-                    <div class="d-flex flex-column text-start">
-                        <span class="brand-text fw-bold lh-1">Guardian</span>
-                        <span class="text-muted small fw-bold text-uppercase tracking-wider"
-                            style="font-size: 0.65rem; letter-spacing: 0.05em;">Family Safety</span>
-                    </div>
+                    <i class="fas fa-shield-alt brand-icon-shield flex-shrink-0" aria-hidden="true"></i>
+                    <span class="brand-text">
+                        <span class="d-block fw-bold lh-1">Guardian</span>
+                        <span class="d-block guardian-brand-subtitle">Family Safety</span>
+                    </span>
                 </a>
             </div>
 
-            <div class="sidebar-wrapper d-flex flex-column justify-content-between" style="height: calc(100% - 60px); overflow-y: auto;">
-                <nav class="mt-3">
+            <div class="sidebar-wrapper d-flex flex-column justify-content-between">
+                <nav>
                     <ul class="nav sidebar-menu flex-column" data-lte-toggle="treeview" role="menu"
                         data-accordion="false">
-                        <li class="nav-header text-muted fw-bold" style="font-size: 0.75rem;">MAIN</li>
+                        <li class="nav-header guardian-nav-section-header">MAIN</li>
                         <li class="nav-item">
                             <a href="{{ url_for('dashboard') }}"
                                 class="nav-link {% if request.path == '/' or request.path == url_for('dashboard') %}active{% endif %}">
@@ -239,7 +257,7 @@
                             </a>
                         </li>
 
-                        <li class="nav-header text-muted fw-bold mt-2" style="font-size: 0.75rem;">SAFETY &amp; ROUTINES
+                        <li class="nav-header guardian-nav-section-header mt-2">SAFETY &amp; ROUTINES
                         </li>
                         <li class="nav-item">
                             <a href="{{ url_for('weekly_schedule') }}"
@@ -274,7 +292,7 @@
                             </a>
                         </li>
 
-                        <li class="nav-header text-muted fw-bold mt-2" style="font-size: 0.75rem;">YOUR FAMILY</li>
+                        <li class="nav-header guardian-nav-section-header mt-2">YOUR FAMILY</li>
                         <li class="nav-item">
                             <a href="{{ url_for('ui_dashboard.admin_devices') }}"
                                 class="nav-link {% if request.path.startswith('/admin/devices') %}active{% endif %}">
@@ -290,7 +308,7 @@
                             </a>
                         </li>
 
-                        <li class="nav-header text-muted fw-bold mt-2" style="font-size: 0.75rem;">SYSTEM</li>
+                        <li class="nav-header guardian-nav-section-header mt-2">SYSTEM</li>
                         <li class="nav-item">
                             <a href="{{ url_for('settings') }}"
                                 class="nav-link {% if request.path.startswith('/settings') %}active{% endif %}">
@@ -301,58 +319,92 @@
                     </ul>
                 </nav>
 
-                <!-- Sidebar Footer Actions -->
-                <div class="sidebar-footer p-3 border-top mt-auto"
-                    style="border-color: rgba(255, 255, 255, 0.1) !important;">
-                    {% if oidc_enabled and session_user %}
-                    <div class="text-muted small mb-2 text-truncate text-center">
-                        <i class="fas fa-user-circle me-1"></i> {{ session_user.username }}
+                <!-- User Control Hub -->
+                {% set profile_username = session_user.username if session_user else 'admin' %}
+                {% set profile_email = session_user.email if session_user and session_user.email else profile_username %}
+                {% set profile_subtitle = session_user.name if session_user and session_user.name else 'Primary Account' %}
+                {% set profile_initial = profile_username[:1]|upper %}
+                <div class="guardian-profile-hub">
+                    <button type="button" class="guardian-profile-node" id="guardian-profile-node-trigger"
+                        aria-haspopup="true" aria-expanded="false" aria-controls="guardian-profile-popout">
+                        <span class="guardian-profile-avatar" aria-hidden="true">{{ profile_initial }}</span>
+                        <span class="guardian-profile-node-copy">
+                            <span class="guardian-profile-email">{{ profile_email }}</span>
+                            <span class="guardian-profile-subtitle">{{ profile_subtitle }}</span>
+                        </span>
+                        <i class="fas fa-chevron-up guardian-profile-node-chevron" aria-hidden="true"></i>
+                    </button>
+
+                    <div class="guardian-profile-popout" id="guardian-profile-popout" role="menu"
+                        aria-label="Account and session controls" hidden>
+                        <div class="guardian-profile-popout-header">
+                            <p class="guardian-profile-popout-kicker">User settings overlay</p>
+                            <p class="guardian-profile-popout-title">
+                                <i class="fas fa-user-circle me-1" aria-hidden="true"></i>Admin account profile
+                            </p>
+                            <p class="guardian-profile-popout-meta">{{ profile_email }}</p>
+                            <p class="guardian-profile-popout-meta">Workspace: Family Home</p>
+                        </div>
+                        <div class="guardian-profile-popout-actions">
+                            <a href="{{ url_for('settings') }}" class="guardian-profile-popout-link" role="menuitem">
+                                <i class="fas fa-cog" aria-hidden="true"></i>
+                                <span>Manage account preferences</span>
+                            </a>
+                            <a href="{{ url_for('settings') }}#admin-credentials" class="guardian-profile-popout-link"
+                                role="menuitem">
+                                <i class="fas fa-key" aria-hidden="true"></i>
+                                <span>{% if oidc_enabled %}View authentication settings{% else %}Change administrative password{% endif %}</span>
+                            </a>
+                            <a href="https://github.com/pantherale0/timekpr-webui/issues"
+                                class="guardian-profile-popout-link" role="menuitem" target="_blank"
+                                rel="noopener noreferrer">
+                                <i class="fas fa-receipt" aria-hidden="true"></i>
+                                <span>View live ledger &amp; billing stack</span>
+                            </a>
+                        </div>
+                        <div class="guardian-profile-popout-divider" role="separator"></div>
+                        <a href="{{ url_for('logout') }}"
+                            class="guardian-profile-popout-link guardian-profile-popout-link--logout" role="menuitem">
+                            <i class="fas fa-sign-out-alt" aria-hidden="true"></i>
+                            <span>Terminate session (Logout)</span>
+                        </a>
                     </div>
-                    {% endif %}
-                    {% if not oidc_enabled %}
-                    <a href="{{ url_for('logout') }}" class="btn btn-xs btn-outline-light w-100 py-1 text-decoration-none">
-                        <i class="fas fa-sign-out-alt me-1"></i> Logout
-                    </a>
-                    {% endif %}
                 </div>
             </div>
         </aside>
 
         <!-- Main Content Area -->
-        <main class="app-main py-4">
-            <!-- Global Flash Messages -->
-            <div class="container-fluid flash-messages-container px-4">
-                {% block flash_messages %}
-                {% with messages = get_flashed_messages(with_categories=true) %}
-                {% if messages %}
-                {% for category, message in messages %}
-                <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show shadow-sm mb-3"
-                    role="alert">
-                    <div class="d-flex align-items-center gap-2">
-                        {% if category == 'success' %}
-                        <i class="fas fa-check-circle text-success fs-5"></i>
-                        {% elif category == 'danger' or category == 'error' %}
-                        <i class="fas fa-exclamation-circle text-danger fs-5"></i>
-                        {% elif category == 'warning' %}
-                        <i class="fas fa-exclamation-triangle text-warning fs-5"></i>
-                        {% else %}
-                        <i class="fas fa-info-circle text-info fs-5"></i>
-                        {% endif %}
-                        <span>{{ message }}</span>
+        <main class="app-main">
+            <div class="container-fluid guardian-page-shell px-4 py-4">
+                <!-- Global Flash Messages -->
+                <div class="flash-messages-container">
+                    {% block flash_messages %}
+                    {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                    {% for category, message in messages %}
+                    <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show shadow-sm mb-3"
+                        role="alert">
+                        <div class="d-flex align-items-center gap-2">
+                            {% if category == 'success' %}
+                            <i class="fas fa-check-circle text-success fs-5"></i>
+                            {% elif category == 'danger' or category == 'error' %}
+                            <i class="fas fa-exclamation-circle text-danger fs-5"></i>
+                            {% elif category == 'warning' %}
+                            <i class="fas fa-exclamation-triangle text-warning fs-5"></i>
+                            {% else %}
+                            <i class="fas fa-info-circle text-info fs-5"></i>
+                            {% endif %}
+                            <span>{{ message }}</span>
+                        </div>
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                     </div>
-                    <button type="submit" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    {% endfor %}
+                    {% endif %}
+                    {% endwith %}
+                    {% endblock %}
                 </div>
-                {% endfor %}
-                {% endif %}
-                {% endwith %}
-                {% endblock %}
-            </div>
 
-            <!-- Page Specific Content -->
-            <div class="app-content px-4">
-                <div class="container-fluid">
-                    {% block content %}{% endblock %}
-                </div>
+                {% block content %}{% endblock %}
             </div>
         </main>
     </div>
@@ -731,17 +783,17 @@
                 ? pendingApprovals.total
                 : 0;
             const navbarBadge = document.getElementById('navbar-approvals-badge');
+            const navbarBadgeMobile = document.getElementById('navbar-approvals-badge-mobile');
             const navbarCount = document.getElementById('navbar-approvals-count');
             const sidebarBadge = document.getElementById('sidebar-approvals-badge');
+            const displayValue = total > 0 ? 'inline-flex' : 'none';
 
             if (navbarBadge && navbarCount) {
-                if (total > 0) {
-                    navbarBadge.style.display = 'inline-flex';
-                    navbarCount.textContent = String(total);
-                } else {
-                    navbarBadge.style.display = 'none';
-                    navbarCount.textContent = '0';
-                }
+                navbarBadge.style.display = displayValue;
+                navbarCount.textContent = String(total);
+            }
+            if (navbarBadgeMobile) {
+                navbarBadgeMobile.style.display = displayValue;
             }
 
             if (sidebarBadge) {
@@ -776,13 +828,16 @@
                     .then(data => {
                         if (data.success) {
                             const badge = document.getElementById('navbar-task-badge');
+                            const badgeMobile = document.getElementById('navbar-task-badge-mobile');
                             const status = data.status;
                             const hasIssues = !status.running || !status.thread_alive || status.last_error;
+                            const displayValue = hasIssues ? 'inline-flex' : 'none';
 
-                            if (hasIssues) {
-                                badge.style.display = 'inline-flex';
-                            } else {
-                                badge.style.display = 'none';
+                            if (badge) {
+                                badge.style.display = displayValue;
+                            }
+                            if (badgeMobile) {
+                                badgeMobile.style.display = displayValue;
                             }
                         }
                     })
@@ -790,6 +845,82 @@
             }
             checkGlobalTaskStatus();
             setInterval(checkGlobalTaskStatus, 15000);
+
+            const profileTrigger = document.getElementById('guardian-profile-node-trigger');
+            const profilePopout = document.getElementById('guardian-profile-popout');
+            if (profileTrigger && profilePopout) {
+                function isSidebarIconRail() {
+                    const sidebar = document.querySelector('.guardian-sidebar');
+                    if (!sidebar || !document.body.classList.contains('sidebar-collapse')) {
+                        return false;
+                    }
+                    return sidebar.getBoundingClientRect().width < 120;
+                }
+
+                function resetProfilePopoutPosition() {
+                    profilePopout.style.position = '';
+                    profilePopout.style.left = '';
+                    profilePopout.style.right = '';
+                    profilePopout.style.bottom = '';
+                    profilePopout.style.top = '';
+                    profilePopout.style.width = '';
+                }
+
+                function positionProfilePopout() {
+                    if (!isSidebarIconRail()) {
+                        resetProfilePopoutPosition();
+                        return;
+                    }
+                    const rect = profileTrigger.getBoundingClientRect();
+                    profilePopout.style.position = 'fixed';
+                    profilePopout.style.left = `${Math.round(rect.right + 10)}px`;
+                    profilePopout.style.bottom = `${Math.round(window.innerHeight - rect.bottom)}px`;
+                    profilePopout.style.top = 'auto';
+                    profilePopout.style.right = 'auto';
+                    profilePopout.style.width = '17rem';
+                }
+
+                function closeProfilePopout() {
+                    profilePopout.hidden = true;
+                    profileTrigger.setAttribute('aria-expanded', 'false');
+                    resetProfilePopoutPosition();
+                }
+
+                profileTrigger.addEventListener('click', (event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    const willOpen = profilePopout.hidden;
+                    profilePopout.hidden = !willOpen;
+                    profileTrigger.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+                    if (willOpen) {
+                        positionProfilePopout();
+                    } else {
+                        resetProfilePopoutPosition();
+                    }
+                });
+
+                window.addEventListener('resize', () => {
+                    if (!profilePopout.hidden) {
+                        positionProfilePopout();
+                    }
+                });
+
+                document.addEventListener('click', (event) => {
+                    if (profilePopout.hidden) {
+                        return;
+                    }
+                    if (profilePopout.contains(event.target) || profileTrigger.contains(event.target)) {
+                        return;
+                    }
+                    closeProfilePopout();
+                });
+
+                document.addEventListener('keydown', (event) => {
+                    if (event.key === 'Escape') {
+                        closeProfilePopout();
+                    }
+                });
+            }
         });
 
         // ── ONBOARDING WIZARD CODE ──────────────────────────────────────────

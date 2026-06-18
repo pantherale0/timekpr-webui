@@ -149,10 +149,12 @@
 {% endblock %}
 
 {% block top_nav_extra %}
-<!-- Global Advanced Date Range Dropdown in top header -->
-<li class="nav-item dropdown me-2">
-    <button class="btn btn-sm btn-outline-secondary dropdown-toggle d-flex align-items-center gap-1 fw-bold" id="dateFilterDropdown" type="button" data-bs-toggle="dropdown" aria-expanded="false" data-bs-auto-close="outside">
-        <i class="fas fa-calendar-alt text-primary"></i> <span id="current-date-range-label">Last 7 Days</span>
+<li class="nav-item dropdown guardian-nav-date-filter">
+    <button class="btn btn-sm btn-outline-secondary dropdown-toggle guardian-nav-action-btn fw-bold"
+        id="dateFilterDropdown" type="button" data-bs-toggle="dropdown" aria-expanded="false"
+        data-bs-auto-close="outside" aria-label="Select date range">
+        <i class="fas fa-calendar-alt text-primary"></i>
+        <span class="guardian-nav-date-label" id="current-date-range-label">Last 7 Days</span>
     </button>
     <div class="dropdown-menu dropdown-menu-end p-3 shadow border" style="width: 280px; font-family: inherit; z-index: 1050;">
         <h6 class="dropdown-header px-0 mb-2 fw-bold text-uppercase tracking-wider" style="font-size: 0.7rem; color: var(--bs-secondary-color);">Select Period</h6>
@@ -179,15 +181,15 @@
 {% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
-    <div>
+<div class="guardian-page-header">
+    <div class="guardian-page-header__intro">
         <h1 class="guardian-page-title mb-1">{{ user.username }} &mdash; Activity story</h1>
         <p class="guardian-page-lead mb-0">
             {{ user.device_mappings|length }} linked device{{ 's' if user.device_mappings|length != 1 else '' }} &bull; Usage patterns and gentle alerts
         </p>
     </div>
-    <div>
-        <a href="{{ url_for('ui_dashboard.user_combined_history', user_id=user.id) }}" class="btn btn-primary fw-bold d-flex align-items-center gap-2">
+    <div class="guardian-page-header__actions">
+        <a href="{{ url_for('ui_dashboard.user_combined_history', user_id=user.id) }}" class="btn btn-primary fw-bold d-inline-flex align-items-center gap-2">
             <i class="fas fa-history"></i> Web &amp; Video History
         </a>
     </div>

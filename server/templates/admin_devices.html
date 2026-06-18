@@ -4,18 +4,20 @@
 {% block title %}Devices - Guardian{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
-    <div>
+<div class="guardian-page-header">
+    <div class="guardian-page-header__intro">
         <h1 class="guardian-page-title mb-1">Devices</h1>
         <p class="guardian-page-lead mb-0">Approve new hardware and keep an eye on the computers, phones, and consoles in your home.</p>
     </div>
-    <button class="btn btn-primary guardian-btn-sage d-flex align-items-center gap-1" onclick="openOnboardingWizard()">
-        <i class="fas fa-plus"></i> Add Device
-    </button>
+    <div class="guardian-page-header__actions">
+        <button class="btn btn-primary guardian-btn-sage d-inline-flex align-items-center gap-1" onclick="openOnboardingWizard()">
+            <i class="fas fa-plus"></i> Add Device
+        </button>
+    </div>
 </div>
 
 <!-- Visual Quick-Stats Widget Rows -->
-<div class="row g-3 mb-4">
+<div class="row g-3 guardian-stat-row">
     <div class="col-sm-6">
         <div class="card border shadow-sm h-100">
             <div class="card-body d-flex align-items-center gap-3">
@@ -137,7 +139,7 @@
     <!-- Approved Devices -->
     <div class="col-12">
         <div class="card shadow-sm border">
-            <div class="card-header bg-dark text-white py-3 d-flex align-items-center gap-2">
+            <div class="card-header guardian-card-header py-3 d-flex align-items-center gap-2">
                 <i class="fas fa-check-double text-success fs-5"></i>
                 <h5 class="mb-0 fw-bold">Connected devices</h5>
             </div>

@@ -5,22 +5,30 @@
 
 {% block extra_head %}{% endblock %}
 
-{% block top_nav_extra %}
-<span id="blocklist-sync-badge" class="badge bg-secondary d-flex align-items-center gap-1 p-2" style="font-size: 0.75rem;">
-    <i class="fas fa-sync-alt" id="sync-badge-icon"></i>
-    <span id="blocklist-sync-text">Checking Sync</span>
+{% block top_nav_center %}
+<span id="blocklist-sync-badge" class="guardian-status-pill" role="status" aria-live="polite">
+    <span id="blocklist-sync-dot" class="guardian-status-dot is-unknown"></span>
+    <i class="fas fa-sync-alt d-none" id="sync-badge-icon"></i>
+    <span id="blocklist-sync-text">Checking sync</span>
 </span>
 {% endblock %}
 
+{% block top_nav_brand_status %}
+<span id="blocklist-sync-dot-mobile" class="guardian-status-dot is-unknown d-lg-none" role="status"
+    aria-label="Checking sync" title="Checking sync"></span>
+{% endblock %}
+
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
-    <div>
+<div class="guardian-page-header">
+    <div class="guardian-page-header__intro">
         <h1 class="guardian-page-title mb-1">{{ user.username }} &mdash; Profile Settings</h1>
         <p class="guardian-page-lead mb-0">Fine-tune browsing shields, routine locks, and family dialogue for this child.</p>
     </div>
-    <a href="{{ url_for('ui_dashboard.admin_users') }}" class="btn btn-outline-secondary d-flex align-items-center gap-1">
-        <i class="fas fa-arrow-left"></i> <span>Back to Children</span>
-    </a>
+    <div class="guardian-page-header__actions">
+        <a href="{{ url_for('ui_dashboard.admin_users') }}" class="btn btn-outline-secondary d-inline-flex align-items-center gap-1">
+            <i class="fas fa-arrow-left"></i> <span>Back to Children</span>
+        </a>
+    </div>
 </div>
 
 <div class="row g-4">
@@ -73,8 +81,8 @@
     <div class="col-12 col-lg-8">
         <!-- Internet Blocklists Section -->
         <div class="card border shadow-sm mb-4">
-            <div class="card-header bg-dark text-white py-3">
-                <h5 class="mb-0 fw-bold"><i class="fas fa-globe me-2" style="color: #a8c4b8;"></i>Browsing Shields</h5>
+            <div class="card-header guardian-card-header py-3">
+                <h5 class="mb-0 fw-bold"><i class="fas fa-globe me-2 guardian-section-icon"></i>Browsing Shields</h5>
             </div>
             <div class="card-body p-4">
                 <p class="text-secondary small fw-medium mb-4">Curated and custom browsing shields applied across this child's linked accounts.</p>
@@ -199,8 +207,8 @@
 
         <!-- Linux Device Restrictions -->
         <div class="card border shadow-sm mb-4">
-            <div class="card-header bg-dark text-white py-3">
-                <h5 class="mb-0 fw-bold"><i class="fas fa-desktop me-2" style="color: #a8c4b8;"></i>Device Routine Locks</h5>
+            <div class="card-header guardian-card-header py-3">
+                <h5 class="mb-0 fw-bold"><i class="fas fa-desktop me-2 guardian-section-icon"></i>Device Routine Locks</h5>
             </div>
             <div class="card-body p-4">
                 <p class="text-secondary small fw-medium mb-3">System privileges via polkit rules and terminal access control for linked Linux accounts.</p>
@@ -280,8 +288,8 @@
 
         <!-- Chrome Browser Restrictions -->
         <div class="card border shadow-sm mb-4">
-            <div class="card-header bg-dark text-white py-3">
-                <h5 class="mb-0 fw-bold"><i class="fab fa-chrome me-2" style="color: #a8c4b8;"></i>Browser Boundaries</h5>
+            <div class="card-header guardian-card-header py-3">
+                <h5 class="mb-0 fw-bold"><i class="fab fa-chrome me-2 guardian-section-icon"></i>Browser Boundaries</h5>
             </div>
             <div class="card-body p-4">
                 <p class="text-secondary small fw-medium mb-3">Enforce browser restrictions across Google Chrome, Chromium, and Brave browsers.</p>
@@ -340,8 +348,8 @@
     <div class="col-12 col-lg-4">
         <!-- Access Approval Policies -->
         <div class="card border shadow-sm mb-4">
-            <div class="card-header bg-dark text-white py-3">
-                <h5 class="mb-0 fw-bold"><i class="fas fa-clipboard-check me-2" style="color: #a8c4b8;"></i>Family Dialogue Settings</h5>
+            <div class="card-header guardian-card-header py-3">
+                <h5 class="mb-0 fw-bold"><i class="fas fa-clipboard-check me-2 guardian-section-icon"></i>Family Dialogue Settings</h5>
             </div>
             <div class="card-body p-4">
                 <p class="text-secondary small fw-medium mb-3">Configure per-device approval modes for app launches and blocked websites.</p>
@@ -387,8 +395,8 @@
         
         <!-- Guardian Space Overlay Settings -->
         <div class="card border shadow-sm mb-4" id="guardian-overlay-card">
-            <div class="card-header bg-dark text-white py-3">
-                <h5 class="mb-0 fw-bold"><i class="fas fa-shield-alt me-2" style="color: #a8c4b8;"></i>Guardian Space Overlay</h5>
+            <div class="card-header guardian-card-header py-3">
+                <h5 class="mb-0 fw-bold"><i class="fas fa-shield-alt me-2 guardian-section-icon"></i>Guardian Space Overlay</h5>
             </div>
             <div class="card-body p-4">
                 <p class="text-secondary small fw-medium mb-3">Customise the full-screen overlay shown to this child when time is up or a site is blocked.</p>
@@ -414,8 +422,8 @@
 
         <!-- Application Control & Locks -->
         <div class="card border shadow-sm mb-4">
-            <div class="card-header bg-dark text-white py-3">
-                <h5 class="mb-0 fw-bold"><i class="fas fa-lock me-2" style="color: #a8c4b8;"></i>App Routine Locks</h5>
+            <div class="card-header guardian-card-header py-3">
+                <h5 class="mb-0 fw-bold"><i class="fas fa-lock me-2 guardian-section-icon"></i>App Routine Locks</h5>
             </div>
             <div class="card-body p-4">
                 <p class="text-secondary small fw-medium mb-3">Assign platform-specific application lock policies to this child.</p>
@@ -477,8 +485,8 @@
 
         <!-- Installed Applications Report -->
         <div class="card border shadow-sm">
-            <div class="card-header bg-dark text-white py-3">
-                <h5 class="mb-0 fw-bold"><i class="fas fa-th me-2" style="color: #a8c4b8;"></i>Installed Apps</h5>
+            <div class="card-header guardian-card-header py-3">
+                <h5 class="mb-0 fw-bold"><i class="fas fa-th me-2 guardian-section-icon"></i>Installed Apps</h5>
             </div>
             <div class="card-body p-3" style="max-height: 400px; overflow-y: auto;">
                 {% if installed_apps %}
@@ -597,39 +605,42 @@
 
 {% block extra_js %}
 <script>
+    function setBlocklistSyncStatus(state, label) {
+        const states = ['is-live', 'is-pending', 'is-unknown', 'is-muted'];
+        document.querySelectorAll('#blocklist-sync-dot, #blocklist-sync-dot-mobile').forEach((dot) => {
+            dot.classList.remove(...states);
+            dot.classList.add(state);
+            dot.title = label;
+            dot.setAttribute('aria-label', label);
+        });
+        const blocklistText = document.getElementById('blocklist-sync-text');
+        if (blocklistText) {
+            blocklistText.textContent = label;
+        }
+    }
+
     function updateSyncStatus() {
         fetch('/api/user/{{ user.id }}/blocklists/sync-status')
             .then(response => response.json())
             .then(blocklistData => {
-                const blocklistBadge = document.getElementById('blocklist-sync-badge');
-                const blocklistText = document.getElementById('blocklist-sync-text');
-                const syncIcon = document.getElementById('sync-badge-icon');
                 const blocklistSyncedCount = document.getElementById('blocklist-synced-count');
-                
+
                 if (blocklistData?.success) {
                     if (blocklistSyncedCount) blocklistSyncedCount.textContent = blocklistData.synced_mapping_count;
-                    
+
                     if ((blocklistData.assigned_source_count || 0) === 0) {
-                        blocklistBadge.className = 'badge bg-secondary d-flex align-items-center gap-1 p-2';
-                        blocklistText.textContent = 'No blocklists assigned';
-                        syncIcon.className = 'fas fa-check-circle text-white-50';
+                        setBlocklistSyncStatus('is-muted', 'No blocklists assigned');
                     } else if (blocklistData.needs_sync) {
-                        blocklistBadge.className = 'badge bg-warning text-dark d-flex align-items-center gap-1 p-2';
                         if ((blocklistData.awaiting_uid_count || 0) > 0) {
-                            blocklistText.textContent = 'Awaiting Linux UID validation';
+                            setBlocklistSyncStatus('is-pending', 'Awaiting Linux UID validation');
                         } else {
-                            blocklistText.textContent = 'Sync Pending';
+                            setBlocklistSyncStatus('is-pending', 'Sync pending');
                         }
-                        syncIcon.className = 'fas fa-exclamation-circle';
                     } else {
-                        blocklistBadge.className = 'badge bg-success d-flex align-items-center gap-1 p-2';
-                        blocklistText.textContent = 'Sync Completed';
-                        syncIcon.className = 'fas fa-check-circle';
+                        setBlocklistSyncStatus('is-live', 'Sync completed');
                     }
                 } else {
-                    blocklistBadge.className = 'badge bg-warning text-dark d-flex align-items-center gap-1 p-2';
-                    blocklistText.textContent = 'Unable to check status';
-                    syncIcon.className = 'fas fa-exclamation-triangle';
+                    setBlocklistSyncStatus('is-unknown', 'Unable to check status');
                 }
             })
             .catch(error => {

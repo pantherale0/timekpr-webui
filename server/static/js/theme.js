@@ -34,15 +34,15 @@ class ThemeManager {
         if (typeof Chart !== 'undefined') {
             const isDark = this.currentTheme === 'dark';
             
-            Chart.defaults.color = isDark ? '#cbd5e1' : '#475569';
+            Chart.defaults.color = isDark ? '#94A3B8' : '#64748B';
             Chart.defaults.borderColor = isDark ? '#334155' : '#e2e8f0';
-            Chart.defaults.backgroundColor = isDark ? '#1e293b' : '#ffffff';
+            Chart.defaults.backgroundColor = isDark ? '#1E293B' : '#ffffff';
             
             // Update existing charts
             Chart.instances.forEach(chart => {
                 if (chart.options.scales) {
                     const gridColor = isDark ? '#334155' : '#e2e8f0';
-                    const tickColor = isDark ? '#cbd5e1' : '#475569';
+                    const tickColor = isDark ? '#94A3B8' : '#64748B';
                     
                     ['x', 'y'].forEach(axis => {
                         if (chart.options.scales[axis]) {
@@ -65,16 +65,16 @@ class ThemeManager {
         const isDark = this.currentTheme === 'dark';
         
         return {
-            primary: isDark ? '#f8fafc' : '#0f172a',
-            secondary: isDark ? '#cbd5e1' : '#475569',
-            tertiary: isDark ? '#94a3b8' : '#64748b',
-            accent: '#3b82f6',
+            primary: isDark ? '#F1F5F9' : '#1E293B',
+            secondary: isDark ? '#94A3B8' : '#64748B',
+            tertiary: isDark ? '#64748B' : '#94A3B8',
+            accent: '#4A6B5D',
             success: '#10b981',
-            warning: '#f59e0b',
-            danger: '#ef4444',
-            info: '#06b6d4',
-            background: isDark ? '#020617' : '#ffffff',
-            surface: isDark ? '#1e293b' : '#f8fafc',
+            warning: '#b8956a',
+            danger: '#8b6f63',
+            info: '#5d8272',
+            background: isDark ? '#141a21' : '#FBFBF9',
+            surface: isDark ? '#1E293B' : '#f4f6f5',
             border: isDark ? '#334155' : '#e2e8f0'
         };
     }

@@ -17,8 +17,8 @@
 {% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
-    <div>
+<div class="guardian-page-header">
+    <div class="guardian-page-header__intro">
         <h1 class="guardian-page-title mb-1">
             {% if device.platform == 'android' %}
             <i class="fab fa-android text-success me-1"></i>
@@ -35,7 +35,7 @@
             Accounts, apps, and gentle alerts for this device.
         </p>
     </div>
-    <div>
+    <div class="guardian-page-header__actions">
         <a href="{{ url_for('ui_dashboard.admin_devices') }}" class="btn btn-secondary btn-sm fw-bold">
             <i class="fas fa-arrow-left me-1"></i> Back to Devices
         </a>
@@ -1216,7 +1216,7 @@
             <!-- Locked Device Recovery Card (Android only) -->
             <div class="col-12 col-lg-4 order-lg-2">
                 <div class="card shadow-sm border mb-4">
-                    <div class="card-header bg-dark text-white py-3 d-flex align-items-center gap-2">
+                    <div class="card-header guardian-card-header py-3 d-flex align-items-center gap-2">
                         <div class="bg-white text-dark p-2 rounded d-flex align-items-center justify-content-center"
                             style="width: 38px; height: 38px;">
                             <i class="fas fa-terminal fs-5"></i>
@@ -1761,7 +1761,7 @@ adb reboot</pre>
 <div class="modal fade" id="add-app-wizard-modal" tabindex="-1" aria-labelledby="addAppWizardLabel" aria-hidden="true" data-bs-backdrop="static">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content shadow-lg border-0">
-            <div class="modal-header bg-dark text-white py-3">
+            <div class="modal-header guardian-card-header py-3">
                 <h5 class="modal-title fw-bold" id="addAppWizardLabel">
                     <i class="fas fa-magic text-primary me-2"></i>Add Application Wizard
                 </h5>

@@ -8,14 +8,16 @@
 {% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
-    <div>
+<div class="guardian-page-header">
+    <div class="guardian-page-header__intro">
         <h1 class="guardian-page-title mb-1">Family Home</h1>
         <p class="guardian-page-lead mb-0">A calm overview of your children's routines, devices, and daily balance.</p>
     </div>
-    <div id="dashboard-live-indicator" class="badge bg-secondary d-flex align-items-center gap-2 p-2" style="font-size: 0.75rem;">
-        <span id="dashboard-live-dot" class="d-inline-block rounded-circle" style="width: 8px; height: 8px; background-color: #cbd5e1;"></span>
-        <span id="dashboard-live-text">Connecting</span>
+    <div class="guardian-page-header__actions">
+        <div id="dashboard-live-indicator" class="badge bg-secondary d-inline-flex align-items-center gap-2 p-2" style="font-size: 0.75rem;">
+            <span id="dashboard-live-dot" class="guardian-live-dot"></span>
+            <span id="dashboard-live-text">Connecting</span>
+        </div>
     </div>
 </div>
 
@@ -26,7 +28,7 @@
                 <div class="card card-outline card-primary shadow-sm h-100" id="user-card-{{ user.id }}">
                     <div class="card-header d-flex justify-content-between align-items-center py-3">
                         <div class="d-flex align-items-center gap-2">
-                            <span id="status-dot-{{ user.id }}" class="status-dot rounded-circle" style="display: inline-block; width: 10px; height: 10px; background-color: {{ 'var(--success-color)' if user.is_online else 'var(--bs-secondary-color)' }};" title="{{ 'Agent Online' if user.is_online else 'Agent Offline' }}"></span>
+                            <span id="status-dot-{{ user.id }}" class="status-dot rounded-circle" style="display: inline-block; width: 10px; height: 10px; background-color: {{ 'var(--guardian-status-connected)' if user.is_online else 'var(--guardian-text-secondary)' }};" title="{{ 'Agent Online' if user.is_online else 'Agent Offline' }}"></span>
                             <h5 class="mb-0 fw-bold text-truncate" style="max-width: 150px;">{{ user.username }}</h5>
                         </div>
                         <div class="d-flex flex-column gap-1 align-items-end">
@@ -130,7 +132,7 @@
 <div class="modal fade" id="timeAdjustModal" tabindex="-1" aria-labelledby="timeAdjustModalLabel" aria-hidden="true" data-bs-backdrop="static">
     <div class="modal-dialog modal-dialog-centered" style="max-width: 400px;">
         <div class="modal-content shadow-lg">
-            <div class="modal-header bg-dark text-white py-3">
+            <div class="modal-header guardian-card-header py-3">
                 <h5 class="modal-title fw-bold" id="timeAdjustModalLabel"><i class="fas fa-stopwatch text-warning me-2"></i>Adjust Time</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close" onclick="closeTimeAdjustModal()"></button>
             </div>
@@ -162,12 +164,6 @@
     </div>
 </div>
 
-<style>
-    /* Styling state color helper classes for modal output */
-    .status-loading { color: #0d6efd !important; }
-    .status-success { color: #10b981 !important; }
-    .status-error { color: #ef4444 !important; }
-</style>
 {% endblock %}
 
 {% block extra_js %}
@@ -337,7 +333,7 @@
     function updateUserCard(user, pendingAdjustments, pendingApprovals) {
         const statusDot = document.getElementById('status-dot-' + user.id);
         if (statusDot) {
-            statusDot.style.backgroundColor = user.is_online ? 'var(--success-color)' : 'var(--bs-secondary-color)';
+            statusDot.style.backgroundColor = user.is_online ? 'var(--guardian-status-connected)' : 'var(--guardian-text-secondary)';
             statusDot.title = user.is_online ? 'Agent Online' : 'Agent Offline';
         }
 
@@ -388,14 +384,16 @@
         const text = document.getElementById('dashboard-live-text');
         if (!dot || !text) return;
 
+        dot.classList.remove('is-connected', 'is-reconnecting');
+        dot.style.backgroundColor = '';
+
         if (state === 'connected') {
-            dot.style.backgroundColor = 'var(--success-color)';
+            dot.classList.add('is-connected');
             text.textContent = 'Live';
         } else if (state === 'reconnecting') {
-            dot.style.backgroundColor = 'var(--warning-color)';
+            dot.classList.add('is-reconnecting');
             text.textContent = 'Reconnecting';
         } else {
-            dot.style.backgroundColor = 'var(--bs-secondary-color)';
             text.textContent = 'Offline';
         }
     }
