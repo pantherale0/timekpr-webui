@@ -182,13 +182,13 @@ def test_admin_panel(client, db_session):
     # Fetch users admin page
     res_users = client.get('/admin/users')
     assert res_users.status_code == 200
-    assert b"Child Accounts" in res_users.data
+    assert b"Child Profiles" in res_users.data
     assert b"alice" in res_users.data
 
     # Fetch devices admin page
     res_devices = client.get('/admin/devices')
     assert res_devices.status_code == 200
-    assert b"Agent Devices" in res_devices.data
+    assert b"Devices" in res_devices.data
     assert b"family-pc (aa)" in res_devices.data
     assert b"family-pc (bb)" in res_devices.data
 

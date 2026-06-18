@@ -5,15 +5,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>{% block title %}Guardian Parental Controls{% endblock %}</title>
+    <title>{% block title %}Guardian Family Safety{% endblock %}</title>
     <meta name="description"
-        content="Guardian Parental Control Web Console. Monitor weekly device usage, manage application locks, restrict login schedules, and protect child accounts.">
+        content="Guardian Family Safety console. Calm routines, browsing shields, and family dialogue for your household.">
 
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website">
-    <meta property="og:title" content="Guardian Parental Control Web Console">
+    <meta property="og:title" content="Guardian Family Safety">
     <meta property="og:description"
-        content="Guardian Parental Control Web Console. Monitor weekly device usage, manage application locks, restrict login schedules, and protect child accounts.">
+        content="Guardian Family Safety console. Calm routines, browsing shields, and family dialogue for your household.">
 
     <!-- Bootstrap 5.3 & AdminLTE 4 & FontAwesome 6 via jsDelivr CDN -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -24,6 +24,7 @@
 
     <!-- Custom Stylesheet -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/guardian-wizard.css') }}">
 
     <!-- Theme Manager -->
     <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
@@ -49,10 +50,6 @@
     </script>
 
     <style>
-        body {
-            font-family: 'Atkinson Hyperlegible', sans-serif;
-        }
-
         .app-sidebar .sidebar-brand {
             height: 60px;
             display: flex;
@@ -72,7 +69,7 @@
 
         .brand-icon-shield {
             font-size: 1.5rem;
-            color: #10b981;
+            color: #a8c4b8;
         }
 
         .sidebar-footer .btn-xs {
@@ -123,15 +120,15 @@
         }
 
         .step-node.active {
-            background-color: #0d6efd;
-            border-color: #0d6efd;
+            background-color: var(--guardian-sage);
+            border-color: var(--guardian-sage);
             color: #fff;
-            box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.25);
+            box-shadow: 0 0 0 3px rgba(74, 107, 93, 0.22);
         }
 
         .step-node.completed {
-            background-color: #10b981;
-            border-color: #10b981;
+            background-color: var(--guardian-sage-light);
+            border-color: var(--guardian-sage-light);
             color: #fff;
         }
 
@@ -143,14 +140,14 @@
         }
 
         .platform-card:hover:not(.disabled) {
-            border-color: #0d6efd;
+            border-color: var(--guardian-sage);
             transform: translateY(-2px);
-            background-color: var(--bs-light-bg-subtle);
+            background-color: var(--guardian-sage-subtle);
         }
 
         .platform-card.selected {
-            border-color: #0d6efd;
-            background-color: var(--bs-primary-bg-subtle);
+            border-color: var(--guardian-sage);
+            background-color: var(--guardian-sage-subtle);
         }
 
         .platform-card.disabled {
@@ -166,7 +163,7 @@
     {% block extra_head %}{% endblock %}
 </head>
 
-<body class="layout-fixed sidebar-expand-lg bg-body-tertiary">
+<body class="layout-fixed sidebar-expand-lg">
     <div class="app-wrapper">
         <!-- Top Navbar Header -->
         <nav class="app-header navbar navbar-expand bg-body shadow-sm">
@@ -181,7 +178,7 @@
                     {% block top_nav_left %}
                     <li class="nav-item d-none d-md-inline-block">
                         <span class="navbar-text fw-bold text-secondary text-uppercase tracking-wide"
-                            style="font-size: 0.85rem; letter-spacing: 0.05em;">Parental Portal</span>
+                            style="font-size: 0.85rem; letter-spacing: 0.05em; color: var(--guardian-charcoal-muted) !important;">Family Home</span>
                     </li>
                     {% endblock %}
                 </ul>
@@ -190,7 +187,7 @@
                 <!-- Start Right Links -->
                 <ul class="navbar-nav ms-auto align-items-center">
                     <li class="nav-item">
-                        <button class="btn btn-sm btn-primary me-3 d-flex align-items-center gap-1"
+                        <button class="btn btn-sm guardian-btn-sage me-3 d-flex align-items-center gap-1"
                             onclick="openOnboardingWizard()">
                             <i class="fas fa-plus"></i> <span>Add Device</span>
                         </button>
@@ -200,7 +197,7 @@
                             style="display: none; cursor: pointer;" aria-live="polite"
                             onclick="location.href='{{ url_for('ui_dashboard.admin_approvals') }}'">
                             <i class="fas fa-clipboard-check me-1"></i>
-                            <span id="navbar-approvals-count">0</span> Requests
+                            <span id="navbar-approvals-count">0</span> Dialogue
                         </span>
                     </li>
                     <li class="nav-item">
@@ -217,14 +214,14 @@
         </nav>
 
         <!-- Sidebar Navigation Drawer -->
-        <aside class="app-sidebar bg-dark shadow" data-bs-theme="dark">
+        <aside class="app-sidebar guardian-sidebar shadow" data-bs-theme="dark">
             <div class="sidebar-brand">
                 <a href="{{ url_for('dashboard') }}" class="brand-link">
                     <i class="fas fa-shield-alt brand-icon-shield"></i>
                     <div class="d-flex flex-column text-start">
                         <span class="brand-text fw-bold lh-1">Guardian</span>
                         <span class="text-muted small fw-bold text-uppercase tracking-wider"
-                            style="font-size: 0.65rem; letter-spacing: 0.05em;">Parental Controls</span>
+                            style="font-size: 0.65rem; letter-spacing: 0.05em;">Family Safety</span>
                     </div>
                 </a>
             </div>
@@ -242,27 +239,27 @@
                             </a>
                         </li>
 
-                        <li class="nav-header text-muted fw-bold mt-2" style="font-size: 0.75rem;">PARENTAL CONTROLS
+                        <li class="nav-header text-muted fw-bold mt-2" style="font-size: 0.75rem;">SAFETY &amp; ROUTINES
                         </li>
                         <li class="nav-item">
                             <a href="{{ url_for('weekly_schedule') }}"
                                 class="nav-link {% if request.path.startswith('/weekly-schedule') %}active{% endif %}">
                                 <i class="nav-icon fas fa-clock"></i>
-                                <p>Schedules &amp; Limits</p>
+                                <p>Routine Locks &amp; Time</p>
                             </a>
                         </li>
                         <li class="nav-item">
                             <a href="{{ url_for('ui_dashboard.admin_restrictions') }}"
                                 class="nav-link {% if request.path.startswith('/admin/restrictions') %}active{% endif %}">
                                 <i class="nav-icon fas fa-globe"></i>
-                                <p>Web Content Filters</p>
+                                <p>Browsing Shields</p>
                             </a>
                         </li>
                         <li class="nav-item">
                             <a href="{{ url_for('ui_apparmor.admin_app_policies') }}"
                                 class="nav-link {% if request.path.startswith('/admin/app-policies') %}active{% endif %}">
                                 <i class="nav-icon fas fa-lock"></i>
-                                <p>App Locks</p>
+                                <p>App Routine Locks</p>
                             </a>
                         </li>
                         <li class="nav-item">
@@ -270,14 +267,14 @@
                                 class="nav-link {% if request.path.startswith('/admin/approvals') %}active{% endif %}">
                                 <i class="nav-icon fas fa-clipboard-check"></i>
                                 <p class="d-flex align-items-center justify-content-between w-100 mb-0">
-                                    <span>Access Requests</span>
+                                    <span>Family Dialogue</span>
                                     <span class="badge bg-warning text-dark ms-2" id="sidebar-approvals-badge"
                                         style="display: none;">0</span>
                                 </p>
                             </a>
                         </li>
 
-                        <li class="nav-header text-muted fw-bold mt-2" style="font-size: 0.75rem;">ADMINISTRATION</li>
+                        <li class="nav-header text-muted fw-bold mt-2" style="font-size: 0.75rem;">YOUR FAMILY</li>
                         <li class="nav-item">
                             <a href="{{ url_for('ui_dashboard.admin_devices') }}"
                                 class="nav-link {% if request.path.startswith('/admin/devices') %}active{% endif %}">
@@ -289,7 +286,7 @@
                             <a href="{{ url_for('ui_dashboard.admin_users') }}"
                                 class="nav-link {% if request.path.startswith('/admin/users') or request.path == url_for('ui_dashboard.admin') %}active{% endif %}">
                                 <i class="nav-icon fas fa-users"></i>
-                                <p>Child Accounts</p>
+                                <p>Child Profiles</p>
                             </a>
                         </li>
 
@@ -313,7 +310,7 @@
                     </div>
                     {% endif %}
                     {% if not oidc_enabled %}
-                    <a href="{{ url_for('logout') }}" class="btn btn-xs btn-danger w-100 py-1 text-decoration-none">
+                    <a href="{{ url_for('logout') }}" class="btn btn-xs btn-outline-light w-100 py-1 text-decoration-none">
                         <i class="fas fa-sign-out-alt me-1"></i> Logout
                     </a>
                     {% endif %}
@@ -365,9 +362,9 @@
         aria-hidden="true" data-bs-backdrop="static">
         <div class="modal-dialog modal-lg modal-dialog-centered">
             <div class="modal-content shadow-lg">
-                <div class="modal-header bg-dark text-white">
+                <div class="modal-header guardian-modal-header">
                     <h5 class="modal-title" id="onboardingWizardModalLabel"><i
-                            class="fas fa-plug text-success me-2"></i>Onboard New Device</h5>
+                            class="fas fa-laptop me-2"></i>Add a Family Device</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"
                         onclick="closeWizard()"></button>
                 </div>
@@ -382,9 +379,8 @@
                     </div>
 
                     <div class="text-center mb-3">
-                        <h4 class="fw-bold" id="step-title">Choose Platform</h4>
-                        <p class="text-muted small" id="step-subtitle">Select the hardware type you wish to enroll under
-                            Guardian.</p>
+                        <h4 class="fw-bold" id="step-title">Choose a device</h4>
+                        <p class="text-muted small" id="step-subtitle">Pick the platform your child uses — we'll walk you through connecting it safely.</p>
                     </div>
 
                     <!-- STEP 1: Select Platform -->
@@ -432,17 +428,15 @@
                     <div class="wizard-step-panel d-none" id="step-panel-2">
                         <!-- Linux Instructions -->
                         <div id="setup-instruction-linux" class="d-none">
-                            <p class="mb-3">Open a terminal window on the target Linux machine and execute the following
-                                installation script command to install the Guardian Agent Daemon:</p>
+                            <p class="mb-3">On the Linux computer, open a terminal and run this one-line installer to connect Guardian:</p>
                             <div class="position-relative mb-3">
-                                <pre class="bg-dark text-white p-3 rounded text-wrap font-monospace"
+                                <pre class="guardian-code-block p-3 text-wrap font-monospace"
                                     style="font-size: 0.85rem;"
                                     id="linux-install-cmd">curl -sSL http://yourserver/scripts/install-agent.sh | sudo bash -s -- --url ws://yourserver/ws</pre>
                                 <button class="btn btn-sm btn-outline-light position-absolute top-0 end-0 m-2"
                                     onclick="copyLinuxCommand()">Copy</button>
                             </div>
-                            <p class="text-muted small"><i class="fas fa-info-circle me-1"></i>The script registers a
-                                systemd background service and initiates the secure pairing process.</p>
+                            <p class="text-muted small"><i class="fas fa-info-circle me-1"></i>Guardian installs quietly in the background and starts a secure pairing handshake with this console.</p>
                         </div>
 
                         <!-- Android Instructions -->
@@ -487,9 +481,9 @@
 
                         <!-- Windows Instructions -->
                         <div id="setup-instruction-windows" class="d-none">
-                            <p class="mb-3">Open PowerShell as Administrator on the target Windows machine and run the following command to download and install the Guardian Agent automatically:</p>
+                            <p class="mb-3">On the Windows computer, open PowerShell as Administrator and paste this command to install Guardian:</p>
                             <div class="position-relative mb-3">
-                                <pre class="bg-dark text-white p-3 rounded text-wrap font-monospace" style="font-size: 0.85rem;" id="windows-install-cmd">powershell -ExecutionPolicy Bypass -Command "..."</pre>
+                                <pre class="guardian-code-block p-3 text-wrap font-monospace" id="windows-install-cmd">powershell -ExecutionPolicy Bypass -Command "..."</pre>
                                 <button class="btn btn-sm btn-outline-light position-absolute top-0 end-0 m-2" onclick="copyWindowsCommand()">Copy</button>
                             </div>
                             <p class="mb-3">Alternatively, you can download the MSI installer package directly and run it:</p>

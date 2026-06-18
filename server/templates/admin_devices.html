@@ -1,18 +1,16 @@
 {% extends "base.html" %}
 
 {% from '_macros.html' import csrf_field %}
-{% block title %}Manage Devices - Guardian Parental Controls{% endblock %}
+{% block title %}Devices - Guardian{% endblock %}
 
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
     <div>
-        <h1 class="fw-bold mb-1" style="font-size: 2.25rem; font-weight: 800; letter-spacing: -0.025em;">Agent Devices
-        </h1>
-        <p class="text-secondary mb-0 fw-medium">Approve and monitor active hardware hosts running the Guardian daemon
-            client.</p>
+        <h1 class="guardian-page-title mb-1">Devices</h1>
+        <p class="guardian-page-lead mb-0">Approve new hardware and keep an eye on the computers, phones, and consoles in your home.</p>
     </div>
-    <button class="btn btn-primary d-flex align-items-center gap-1" onclick="openOnboardingWizard()">
-        <i class="fas fa-plus"></i> Onboard New Device
+    <button class="btn btn-primary guardian-btn-sage d-flex align-items-center gap-1" onclick="openOnboardingWizard()">
+        <i class="fas fa-plus"></i> Add Device
     </button>
 </div>
 
@@ -27,7 +25,7 @@
                 </div>
                 <div>
                     <span class="text-secondary small fw-bold text-uppercase d-block mb-1"
-                        style="font-size: 0.7rem; letter-spacing: 0.05em;">Trusted Hardware</span>
+                        style="font-size: 0.7rem; letter-spacing: 0.05em;">Connected &amp; trusted</span>
                     <h3 class="fw-bold mb-0 lh-1 text-success">{{ approved_devices|length }} Active</h3>
                 </div>
             </div>
@@ -43,7 +41,7 @@
                 </div>
                 <div>
                     <span class="text-secondary small fw-bold text-uppercase d-block mb-1"
-                        style="font-size: 0.7rem; letter-spacing: 0.05em;">Pending Registrations</span>
+                        style="font-size: 0.7rem; letter-spacing: 0.05em;">Waiting for approval</span>
                     <h3 class="fw-bold mb-0 lh-1 {% if pending_devices %}text-warning{% endif %}">{{
                         pending_devices|length }} Pending</h3>
                 </div>
@@ -58,7 +56,7 @@
         <div class="card shadow-sm border">
             <div class="card-header bg-warning-subtle text-warning-emphasis py-3 d-flex align-items-center gap-2">
                 <i class="fas fa-hourglass-half fs-5"></i>
-                <h5 class="mb-0 fw-bold">Pending Device Connections</h5>
+                <h5 class="mb-0 fw-bold">Devices waiting to connect</h5>
             </div>
             <div class="card-body p-0">
                 {% if pending_devices %}
@@ -141,7 +139,7 @@
         <div class="card shadow-sm border">
             <div class="card-header bg-dark text-white py-3 d-flex align-items-center gap-2">
                 <i class="fas fa-check-double text-success fs-5"></i>
-                <h5 class="mb-0 fw-bold">Registered Devices</h5>
+                <h5 class="mb-0 fw-bold">Connected devices</h5>
             </div>
             <div class="card-body p-0">
                 {% if approved_devices %}
@@ -290,7 +288,7 @@
     }
 
     function factoryResetDevice(systemId, deviceLabel) {
-        const typed = prompt(`Erase this Android device and remove TimeKpr management. All personal data will be deleted.\n\nType "${deviceLabel}" or RESET to confirm:`);
+        const typed = prompt(`Erase this Android device and remove Guardian management. All personal data will be deleted.\n\nType "${deviceLabel}" or RESET to confirm:`);
         if (!typed || (typed !== deviceLabel && typed !== 'RESET')) return;
         fetch(`/api/device/${encodeURIComponent(systemId)}/unenroll`, {
             method: 'POST',

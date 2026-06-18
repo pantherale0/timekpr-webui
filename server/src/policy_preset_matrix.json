@@ -1,0 +1,403 @@
+{
+  "age_brackets": {
+    "under7": {
+      "label": "Under 7",
+      "profile_title": "Early Discoverer",
+      "description": "Strict rest — gentle daily rhythms with curated browsing shields for the youngest explorers."
+    },
+    "8_12": {
+      "label": "8–12",
+      "profile_title": "Guided Explorer",
+      "description": "Balanced flow — moderate weekday boundaries with active routine locks and family-friendly browsing."
+    },
+    "13_15": {
+      "label": "13–15",
+      "profile_title": "Digital Apprentice",
+      "description": "Autonomy focus — expanded exploration with transparency alerts instead of blind blocks."
+    },
+    "16_plus": {
+      "label": "16+",
+      "profile_title": "Independent Guardian",
+      "description": "Self-regulation — lighter network rules with optional Anti-Bypass Watching when needed."
+    }
+  },
+  "maturity_levels": {
+    "low": {
+      "label": "Open Dialogue",
+      "description": "Guardian allows software freedom, but surfaces meaningful moments on your home dashboard for parent-child conversations.",
+      "parent_translation": "Guardian allows software execution freedom, but alerts your home dashboard if a hidden rule or schedule conflict is detected, providing an opportunity for active parent-child conversations."
+    },
+    "medium": {
+      "label": "Balanced Watch",
+      "description": "A middle path — Routine Locks stay active with Family Dialogue Settings when something needs your attention.",
+      "parent_translation": "Guardian keeps Routine Locks in place and nudges you when browsing or app patterns shift, so you can coach rather than constantly police."
+    },
+    "high": {
+      "label": "Assisted Steps",
+      "description": "Guardian handles application control and command boundaries automatically so you do not have to troubleshoot sneaky exploits.",
+      "parent_translation": "Guardian will handle application control and command boundaries automatically so you don't have to troubleshoot sneaky exploits."
+    }
+  },
+  "bundles": {
+    "under7_low": {
+      "label": "Under 7 · Low bypass risk",
+      "marketplace_preset_ids": ["malware_phishing", "adult_explicit", "gambling"],
+      "weekly_schedule_hours": { "weekday": 1.0, "weekend": 1.5 },
+      "linux_device_policy": {
+        "terminal_access_disabled": false,
+        "install_software_disabled": false,
+        "uninstall_software_disabled": false,
+        "mount_removable_media_disabled": false,
+        "modify_accounts_disabled": false,
+        "system_power_actions_disabled": false,
+        "pkexec_elevation_disabled": false,
+        "flatpak_install_disabled": false,
+        "snap_install_disabled": false,
+        "bluetooth_disabled": false,
+        "chrome_policies": {
+          "incognito_disabled": true,
+          "safesearch_enforced": true,
+          "youtube_restrict": 2,
+          "block_other_extensions": false,
+          "block_genai_features": false
+        }
+      },
+      "approval_settings": {
+        "domain_access_mode": "blocklist_only",
+        "app_launch_mode": "open",
+        "registration_approval_enabled": false
+      },
+      "android_profile_type": "standard"
+    },
+    "under7_medium": {
+      "label": "Under 7 · Medium bypass risk",
+      "marketplace_preset_ids": ["malware_phishing", "adult_explicit", "gambling", "social_media", "fake_news", "ai_chat"],
+      "weekly_schedule_hours": { "weekday": 0.75, "weekend": 1.0 },
+      "linux_device_policy": {
+        "terminal_access_disabled": true,
+        "install_software_disabled": false,
+        "uninstall_software_disabled": false,
+        "mount_removable_media_disabled": false,
+        "modify_accounts_disabled": false,
+        "system_power_actions_disabled": false,
+        "pkexec_elevation_disabled": false,
+        "flatpak_install_disabled": false,
+        "snap_install_disabled": false,
+        "bluetooth_disabled": false,
+        "chrome_policies": {
+          "incognito_disabled": true,
+          "safesearch_enforced": true,
+          "youtube_restrict": 2,
+          "block_other_extensions": false,
+          "block_genai_features": true
+        }
+      },
+      "approval_settings": {
+        "domain_access_mode": "approval_on_block",
+        "app_launch_mode": "open",
+        "registration_approval_enabled": false
+      },
+      "android_profile_type": "standard"
+    },
+    "under7_high": {
+      "label": "Under 7 · High bypass risk",
+      "marketplace_preset_ids": ["malware_phishing", "adult_explicit", "gambling", "social_media", "fake_news", "vpn_proxy_bypass", "ai_chat"],
+      "weekly_schedule_hours": { "weekday": 0.5, "weekend": 0.75 },
+      "linux_device_policy": {
+        "terminal_access_disabled": true,
+        "install_software_disabled": true,
+        "uninstall_software_disabled": true,
+        "mount_removable_media_disabled": true,
+        "modify_accounts_disabled": true,
+        "system_power_actions_disabled": false,
+        "pkexec_elevation_disabled": true,
+        "flatpak_install_disabled": true,
+        "snap_install_disabled": true,
+        "bluetooth_disabled": false,
+        "chrome_policies": {
+          "incognito_disabled": true,
+          "safesearch_enforced": true,
+          "youtube_restrict": 2,
+          "block_other_extensions": true,
+          "block_genai_features": true
+        }
+      },
+      "approval_settings": {
+        "domain_access_mode": "approval_on_block",
+        "app_launch_mode": "allowlist",
+        "registration_approval_enabled": true
+      },
+      "android_profile_type": "restricted"
+    },
+    "8_12_low": {
+      "label": "8–12 · Low bypass risk",
+      "marketplace_preset_ids": ["malware_phishing", "adult_explicit", "gambling", "social_media"],
+      "weekly_schedule_hours": { "weekday": 2.0, "weekend": 3.0 },
+      "linux_device_policy": {
+        "terminal_access_disabled": false,
+        "install_software_disabled": false,
+        "uninstall_software_disabled": false,
+        "mount_removable_media_disabled": false,
+        "modify_accounts_disabled": false,
+        "system_power_actions_disabled": false,
+        "pkexec_elevation_disabled": false,
+        "flatpak_install_disabled": false,
+        "snap_install_disabled": false,
+        "bluetooth_disabled": false,
+        "chrome_policies": {
+          "incognito_disabled": true,
+          "safesearch_enforced": true,
+          "youtube_restrict": 2,
+          "block_other_extensions": false,
+          "block_genai_features": false
+        }
+      },
+      "approval_settings": {
+        "domain_access_mode": "blocklist_only",
+        "app_launch_mode": "open",
+        "registration_approval_enabled": false
+      },
+      "android_profile_type": "standard"
+    },
+    "8_12_medium": {
+      "label": "8–12 · Medium bypass risk",
+      "marketplace_preset_ids": ["malware_phishing", "adult_explicit", "gambling", "social_media", "fake_news", "vpn_proxy_bypass"],
+      "weekly_schedule_hours": { "weekday": 1.5, "weekend": 2.0 },
+      "linux_device_policy": {
+        "terminal_access_disabled": true,
+        "install_software_disabled": true,
+        "uninstall_software_disabled": false,
+        "mount_removable_media_disabled": false,
+        "modify_accounts_disabled": false,
+        "system_power_actions_disabled": false,
+        "pkexec_elevation_disabled": false,
+        "flatpak_install_disabled": false,
+        "snap_install_disabled": false,
+        "bluetooth_disabled": false,
+        "chrome_policies": {
+          "incognito_disabled": true,
+          "safesearch_enforced": true,
+          "youtube_restrict": 2,
+          "block_other_extensions": false,
+          "block_genai_features": true
+        }
+      },
+      "approval_settings": {
+        "domain_access_mode": "approval_on_block",
+        "app_launch_mode": "open",
+        "registration_approval_enabled": false
+      },
+      "android_profile_type": "standard"
+    },
+    "8_12_high": {
+      "label": "8–12 · High bypass risk",
+      "marketplace_preset_ids": ["malware_phishing", "adult_explicit", "gambling", "social_media", "fake_news", "vpn_proxy_bypass", "ai_chat"],
+      "weekly_schedule_hours": { "weekday": 1.0, "weekend": 1.5 },
+      "linux_device_policy": {
+        "terminal_access_disabled": true,
+        "install_software_disabled": true,
+        "uninstall_software_disabled": true,
+        "mount_removable_media_disabled": true,
+        "modify_accounts_disabled": true,
+        "system_power_actions_disabled": false,
+        "pkexec_elevation_disabled": true,
+        "flatpak_install_disabled": true,
+        "snap_install_disabled": true,
+        "bluetooth_disabled": false,
+        "chrome_policies": {
+          "incognito_disabled": true,
+          "safesearch_enforced": true,
+          "youtube_restrict": 2,
+          "block_other_extensions": true,
+          "block_genai_features": true
+        }
+      },
+      "approval_settings": {
+        "domain_access_mode": "approval_on_block",
+        "app_launch_mode": "allowlist",
+        "registration_approval_enabled": true
+      },
+      "android_profile_type": "restricted"
+    },
+    "13_15_low": {
+      "label": "13–15 · Low bypass risk",
+      "marketplace_preset_ids": ["malware_phishing", "adult_explicit", "gambling"],
+      "weekly_schedule_hours": { "weekday": 3.0, "weekend": 4.0 },
+      "linux_device_policy": {
+        "terminal_access_disabled": false,
+        "install_software_disabled": false,
+        "uninstall_software_disabled": false,
+        "mount_removable_media_disabled": false,
+        "modify_accounts_disabled": false,
+        "system_power_actions_disabled": false,
+        "pkexec_elevation_disabled": false,
+        "flatpak_install_disabled": false,
+        "snap_install_disabled": false,
+        "bluetooth_disabled": false,
+        "chrome_policies": {
+          "incognito_disabled": true,
+          "safesearch_enforced": true,
+          "youtube_restrict": 1,
+          "block_other_extensions": false,
+          "block_genai_features": false
+        }
+      },
+      "approval_settings": {
+        "domain_access_mode": "blocklist_only",
+        "app_launch_mode": "open",
+        "registration_approval_enabled": false
+      },
+      "android_profile_type": "standard"
+    },
+    "13_15_medium": {
+      "label": "13–15 · Medium bypass risk",
+      "marketplace_preset_ids": ["malware_phishing", "adult_explicit", "gambling", "vpn_proxy_bypass"],
+      "weekly_schedule_hours": { "weekday": 2.5, "weekend": 3.5 },
+      "linux_device_policy": {
+        "terminal_access_disabled": true,
+        "install_software_disabled": false,
+        "uninstall_software_disabled": false,
+        "mount_removable_media_disabled": false,
+        "modify_accounts_disabled": false,
+        "system_power_actions_disabled": false,
+        "pkexec_elevation_disabled": false,
+        "flatpak_install_disabled": false,
+        "snap_install_disabled": false,
+        "bluetooth_disabled": false,
+        "chrome_policies": {
+          "incognito_disabled": true,
+          "safesearch_enforced": true,
+          "youtube_restrict": 2,
+          "block_other_extensions": false,
+          "block_genai_features": false
+        }
+      },
+      "approval_settings": {
+        "domain_access_mode": "approval_on_block",
+        "app_launch_mode": "open",
+        "registration_approval_enabled": false
+      },
+      "android_profile_type": "standard"
+    },
+    "13_15_high": {
+      "label": "13–15 · High bypass risk",
+      "marketplace_preset_ids": ["malware_phishing", "adult_explicit", "gambling", "social_media", "vpn_proxy_bypass"],
+      "weekly_schedule_hours": { "weekday": 2.0, "weekend": 3.0 },
+      "linux_device_policy": {
+        "terminal_access_disabled": true,
+        "install_software_disabled": true,
+        "uninstall_software_disabled": false,
+        "mount_removable_media_disabled": false,
+        "modify_accounts_disabled": true,
+        "system_power_actions_disabled": false,
+        "pkexec_elevation_disabled": true,
+        "flatpak_install_disabled": true,
+        "snap_install_disabled": true,
+        "bluetooth_disabled": false,
+        "chrome_policies": {
+          "incognito_disabled": true,
+          "safesearch_enforced": true,
+          "youtube_restrict": 2,
+          "block_other_extensions": true,
+          "block_genai_features": true
+        }
+      },
+      "approval_settings": {
+        "domain_access_mode": "approval_on_block",
+        "app_launch_mode": "allowlist",
+        "registration_approval_enabled": true
+      },
+      "android_profile_type": "restricted"
+    },
+    "16_plus_low": {
+      "label": "16+ · Low bypass risk",
+      "marketplace_preset_ids": ["malware_phishing", "gambling"],
+      "weekly_schedule_hours": { "weekday": 4.0, "weekend": 5.0 },
+      "linux_device_policy": {
+        "terminal_access_disabled": false,
+        "install_software_disabled": false,
+        "uninstall_software_disabled": false,
+        "mount_removable_media_disabled": false,
+        "modify_accounts_disabled": false,
+        "system_power_actions_disabled": false,
+        "pkexec_elevation_disabled": false,
+        "flatpak_install_disabled": false,
+        "snap_install_disabled": false,
+        "bluetooth_disabled": false,
+        "chrome_policies": {
+          "incognito_disabled": false,
+          "safesearch_enforced": false,
+          "youtube_restrict": 0,
+          "block_other_extensions": false,
+          "block_genai_features": false
+        }
+      },
+      "approval_settings": {
+        "domain_access_mode": "blocklist_only",
+        "app_launch_mode": "open",
+        "registration_approval_enabled": false
+      },
+      "android_profile_type": "standard"
+    },
+    "16_plus_medium": {
+      "label": "16+ · Medium bypass risk",
+      "marketplace_preset_ids": ["malware_phishing", "gambling", "adult_explicit", "vpn_proxy_bypass"],
+      "weekly_schedule_hours": { "weekday": 3.5, "weekend": 4.5 },
+      "linux_device_policy": {
+        "terminal_access_disabled": true,
+        "install_software_disabled": false,
+        "uninstall_software_disabled": false,
+        "mount_removable_media_disabled": false,
+        "modify_accounts_disabled": false,
+        "system_power_actions_disabled": false,
+        "pkexec_elevation_disabled": false,
+        "flatpak_install_disabled": false,
+        "snap_install_disabled": false,
+        "bluetooth_disabled": false,
+        "chrome_policies": {
+          "incognito_disabled": true,
+          "safesearch_enforced": true,
+          "youtube_restrict": 1,
+          "block_other_extensions": false,
+          "block_genai_features": false
+        }
+      },
+      "approval_settings": {
+        "domain_access_mode": "blocklist_only",
+        "app_launch_mode": "open",
+        "registration_approval_enabled": false
+      },
+      "android_profile_type": "standard"
+    },
+    "16_plus_high": {
+      "label": "16+ · High bypass risk",
+      "marketplace_preset_ids": ["malware_phishing", "gambling", "adult_explicit", "social_media", "vpn_proxy_bypass"],
+      "weekly_schedule_hours": { "weekday": 3.0, "weekend": 4.0 },
+      "linux_device_policy": {
+        "terminal_access_disabled": true,
+        "install_software_disabled": true,
+        "uninstall_software_disabled": false,
+        "mount_removable_media_disabled": true,
+        "modify_accounts_disabled": true,
+        "system_power_actions_disabled": false,
+        "pkexec_elevation_disabled": true,
+        "flatpak_install_disabled": true,
+        "snap_install_disabled": true,
+        "bluetooth_disabled": false,
+        "chrome_policies": {
+          "incognito_disabled": true,
+          "safesearch_enforced": true,
+          "youtube_restrict": 2,
+          "block_other_extensions": true,
+          "block_genai_features": true
+        }
+      },
+      "approval_settings": {
+        "domain_access_mode": "approval_on_block",
+        "app_launch_mode": "allowlist",
+        "registration_approval_enabled": true
+      },
+      "android_profile_type": "standard"
+    }
+  }
+}

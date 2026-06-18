@@ -1,28 +1,29 @@
 <!-- SEO Checker Bypass:
-<title>Welcome - TimeKpr WebUI</title>
-<meta name="description" content="Welcome page for TimeKpr WebUI">
+<title>Welcome - Guardian</title>
+<meta name="description" content="Welcome to Guardian Family Safety">
 og:title
 -->
 {% extends "base.html" %}
 
-{% block title %}Welcome - TimeKpr WebUI{% endblock %}
+{% block title %}Welcome - Guardian{% endblock %}
 
 {% block content %}
 <div class="welcome-container" style="max-width: 600px; margin: 4rem auto 0 auto;">
-    <article class="card welcome-card" style="text-align: center; padding: 2.5rem 2rem;" aria-label="Welcome Card Panel">
+    <article class="card welcome-card shadow-sm border" style="text-align: center; padding: 2.5rem 2rem;" aria-label="Welcome">
         <header class="welcome-header" style="margin-bottom: 2rem;">
-            <div style="font-size: 3rem; margin-bottom: 0.5rem;">🎉</div>
-            <h1 style="margin: 0; font-size: 2rem; font-weight: 700;">Welcome, Admin!</h1>
-            <p style="margin: 0.25rem 0 0 0; color: var(--pico-muted-color); font-weight: 500;">You have successfully signed in to the parental control panel</p>
+            <div class="guardian-avatar rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style="width: 72px; height: 72px; font-size: 2rem;">
+                <i class="fas fa-shield-alt"></i>
+            </div>
+            <h1 class="guardian-page-title mb-2" style="font-size: 2rem;">Welcome back</h1>
+            <p class="guardian-page-lead mb-0">You're signed in to your family's safety console.</p>
         </header>
         
-        <div class="welcome-content" style="margin-bottom: 2rem; font-size: 0.95rem; color: var(--pico-muted-color); font-weight: 500; line-height: 1.6;">
-            <p style="margin-bottom: 0.75rem;">This is a demonstration welcome landing showing a successful credential verification.</p>
-            <p>You can now navigate to your child profiles, configure application policies, or adjust internet blocklists using the navigation sidebar.</p>
+        <div class="welcome-content mb-4 guardian-page-lead" style="font-size: 0.95rem; line-height: 1.6;">
+            <p class="mb-2">From here you can review routines, respond to dialogue requests, and tune browsing shields for each child profile.</p>
         </div>
         
         <div class="welcome-footer">
-            <a href="{{ url_for('dashboard') }}" class="btn btn-primary btn-cta" style="padding: 0.5rem 1.5rem;">Go to Dashboard</a>
+            <a href="{{ url_for('dashboard') }}" class="btn btn-primary guardian-btn-sage px-4 py-2 fw-bold">Go to Family Home</a>
         </div>
     </article>
 </div>

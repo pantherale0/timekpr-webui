@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 
 {% from '_macros.html' import csrf_field %}
-{% block title %}Weekly Schedule - {{ user.username }} - Guardian{% endblock %}
+{% block title %}Routine for {{ user.username }} - Guardian{% endblock %}
 
 {% block top_nav_extra %}
 <span class="badge bg-warning text-dark sync-status-badge d-none align-items-center gap-1"
@@ -17,12 +17,12 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
     <div>
-        <h1 class="fw-bold mb-1" style="font-size: 2.25rem; font-weight: 800; letter-spacing: -0.025em;">{{ user.username }} &mdash; Time Limits</h1>
-        <p class="text-secondary mb-0 fw-medium">Configure allowed login schedules and daily time limits.</p>
+        <h1 class="guardian-page-title mb-1">{{ user.username }} &mdash; Daily routine</h1>
+        <p class="guardian-page-lead mb-0">Shape when they can log in and how much screen time fits each day of the week.</p>
     </div>
     <div>
         <a href="{{ url_for('weekly_schedule') }}" class="btn btn-secondary btn-sm fw-bold">
-            <i class="fas fa-arrow-left me-1"></i> Back to Users
+            <i class="fas fa-arrow-left me-1"></i> Back to routines
         </a>
     </div>
 </div>

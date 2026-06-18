@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Dashboard - Guardian Parental Controls{% endblock %}
+{% block title %}Family Home - Guardian{% endblock %}
 
 {% block extra_head %}
 <!-- Include Chart.js for data visualization -->
@@ -10,8 +10,8 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
     <div>
-        <h1 class="fw-extrabold mb-1" style="font-size: 2.25rem; font-weight: 800; letter-spacing: -0.025em;">Guardian Dashboard</h1>
-        <p class="text-secondary mb-0 fw-medium">Monitor and manage child accounts and active devices.</p>
+        <h1 class="guardian-page-title mb-1">Family Home</h1>
+        <p class="guardian-page-lead mb-0">A calm overview of your children's routines, devices, and daily balance.</p>
     </div>
     <div id="dashboard-live-indicator" class="badge bg-secondary d-flex align-items-center gap-2 p-2" style="font-size: 0.75rem;">
         <span id="dashboard-live-dot" class="d-inline-block rounded-circle" style="width: 8px; height: 8px; background-color: #cbd5e1;"></span>
@@ -54,7 +54,7 @@
                             <div class="row g-2 mb-3">
                                 <div class="col-6">
                                     <div class="bg-body-secondary p-2 rounded text-center border">
-                                        <span class="text-secondary small fw-bold text-uppercase d-block mb-1" style="font-size: 0.65rem; letter-spacing: 0.05em;">Time Left Today</span>
+                                        <span class="text-secondary small fw-bold text-uppercase d-block mb-1" style="font-size: 0.65rem; letter-spacing: 0.05em;">Routine Left Today</span>
                                         <strong id="time-left-{{ user.id }}" class="fs-5 text-primary d-block lh-1">{{ user.time_left }}</strong>
                                     </div>
                                 </div>

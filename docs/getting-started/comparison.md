@@ -99,6 +99,7 @@ Historical **Circle Home Plus** hardware is a different model (LAN DNS/filter). 
 | Remote factory reset | Partial (Android DO) | No | No | No | No | Partial (Bark Phone) | No |
 | Screenshots (desktop) | Yes (Linux/Windows) | No | No | No | Rare | No | Rare |
 | **Guardian Space overlay** (age-tuned full-screen block page with breathing & drawing intermission + child access-request channel) | **Yes** (browser extension, Linux, Windows, Android) | No | No | No | No | No | No |
+| **Age & maturity policy presets** (one-click bundles for blocklists, screen time, device locks, and approvals by age bracket + bypass risk) | **Yes** | Partial (Screen Time age presets) | Partial | Partial | Partial (vendor “child profile” wizards) | Partial | Partial |
 | Access approval workflow | Yes | Partial | Partial | Partial | Partial | No | Partial |
 | Self-hosted / no vendor account | Yes | No | No | No | No | No | No |
 | Open source | Yes | No | No | No | No | No | No |

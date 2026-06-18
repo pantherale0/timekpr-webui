@@ -181,9 +181,9 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
     <div>
-        <h1 class="fw-bold mb-1" style="font-size: 2.25rem; font-weight: 800; letter-spacing: -0.025em;">{{ user.username }} &mdash; History &amp; Analytics</h1>
-        <p class="text-secondary mb-0 fw-medium">
-            {{ user.device_mappings|length }} linked mapping(s) &bull; Usage statistics and alerts
+        <h1 class="guardian-page-title mb-1">{{ user.username }} &mdash; Activity story</h1>
+        <p class="guardian-page-lead mb-0">
+            {{ user.device_mappings|length }} linked device{{ 's' if user.device_mappings|length != 1 else '' }} &bull; Usage patterns and gentle alerts
         </p>
     </div>
     <div>
@@ -290,7 +290,7 @@
         <div class="card-header py-3 bg-body-secondary d-flex justify-content-between align-items-center flex-wrap gap-2">
             <div>
                 <h5 class="mb-0 fw-bold">Activity Feed</h5>
-                <span class="text-secondary small fw-medium">Chronological feed of device alerts, blocklist violations, and terminal commands</span>
+                <span class="text-secondary small fw-medium">A gentle feed of alerts — shield blocks, app pauses, and routine notices</span>
             </div>
             <div id="timeline-summary-stats">
                 <!-- Injected dynamically -->

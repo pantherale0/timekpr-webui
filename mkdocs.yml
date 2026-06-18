@@ -103,6 +103,8 @@ nav:
       - Web & video history: features/web-video-history.md
       - Alerts & webhooks: features/alerts-and-webhooks.md
       - Site registration approvals: features/registration-approvals.md
+      - Policy presets: features/policy-presets.md
+      - Guardian Space overlay: features/guardian-overlay.md
   - Reference:
       - Policy matrix: reference/policy-matrix.md
       - WebSocket protocol: reference/websocket-protocol.md

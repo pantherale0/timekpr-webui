@@ -105,5 +105,5 @@ def test_admin_approvals_page_requires_auth(client):
 def test_admin_approvals_page_renders(auth_client, approval_fixture):
     response = auth_client.get('/admin/approvals')
     assert response.status_code == 200
-    assert b'Access Requests' in response.data
+    assert b'Family Dialogue' in response.data
     assert b'Test App' in response.data

@@ -318,6 +318,10 @@ class ManagedUser(db.Model):
     overlay_age_tier = db.Column(db.String(16), nullable=True)  # under8 | eight12 | teen
     overlay_parent_note = db.Column(db.Text, nullable=True)     # Message shown on the blocked overlay
 
+    # Policy preset selection (age bracket × maturity / bypass risk)
+    policy_age_bracket = db.Column(db.String(16), nullable=True)   # under7 | 8_12 | 13_15 | 16_plus
+    policy_maturity_level = db.Column(db.String(16), nullable=True)  # low | medium | high
+
     
     # Relationship with usage data and weekly schedules
     usage_data = db.relationship('UserTimeUsage', backref='user', lazy=True, cascade="all, delete-orphan")

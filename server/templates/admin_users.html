@@ -1,15 +1,24 @@
 {% extends "base.html" %}
 
 {% from '_macros.html' import csrf_field %}
-{% block title %}Manage Child Profiles - Guardian Parental Controls{% endblock %}
+{% block title %}Child Profiles - Guardian{% endblock %}
+
+{% block extra_head %}{% endblock %}
+
+{% block top_nav_extra %}
+<li class="nav-item">
+    <button type="button" class="btn btn-sm guardian-btn-sage me-2 d-flex align-items-center gap-1"
+        data-bs-toggle="modal" data-bs-target="#createProfileModal">
+        <i class="fas fa-plus"></i> <span>Create Managed Profile</span>
+    </button>
+</li>
+{% endblock %}
 
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
     <div>
-        <h1 class="fw-bold mb-1" style="font-size: 2.25rem; font-weight: 800; letter-spacing: -0.025em;">Child Accounts
-        </h1>
-        <p class="text-secondary mb-0 fw-medium">Create and manage managed user profiles and link them to local device
-            user accounts.</p>
+        <h1 class="guardian-page-title mb-1">Child Profiles</h1>
+        <p class="guardian-page-lead mb-0">Each profile keeps its own routines, browsing shields, and activity story.</p>
     </div>
 
     <!-- User Search Filter Bar -->
@@ -23,53 +32,10 @@
 </div>
 
 <div class="row g-4">
-    <!-- Create Managed User -->
-    <div class="col-12">
-        <div class="card shadow-sm border">
-            <div class="card-header bg-dark text-white py-3 d-flex align-items-center gap-2">
-                <i class="fas fa-user-plus text-success fs-5"></i>
-                <h5 class="mb-0 fw-bold">Create Managed Child Account</h5>
-            </div>
-            <div class="card-body p-4">
-                <form action="{{ url_for('create_managed_user') }}" method="POST" class="row g-3">
-                    {{ csrf_field() }}
-                    <div class="col-12 col-md-8">
-                        <label for="username" class="form-label fw-bold small text-muted text-uppercase mb-2"
-                            style="font-size: 0.75rem; letter-spacing: 0.05em;">Child Profile Name</label>
-                        <input type="text" id="username" name="username" class="form-control" placeholder="e.g. Jordan"
-                            required>
-                    </div>
-                    <div class="col-12 col-md-4 d-flex align-items-end">
-                        <button type="submit" class="btn btn-primary w-100 fw-bold py-2"><i class="fas fa-plus me-2"></i> Create Profile</button>
-                    </div>
-
-                    <div class="col-12 mt-3">
-                        <label class="form-label fw-bold small text-muted text-uppercase mb-2" style="font-size: 0.75rem; letter-spacing: 0.05em;">Apply Curated Filter Packs (Recommended)</label>
-                        <div class="row g-2">
-                            {% for preset in marketplace_presets %}
-                            <div class="col-12 col-sm-6 col-md-4">
-                                <div class="border rounded p-3 bg-body-tertiary h-100 d-flex align-items-center">
-                                    <div class="form-check">
-                                        <input class="form-check-input cursor-pointer" type="checkbox" name="preset_ids" value="{{ preset.id }}" id="create-preset-{{ preset.id }}">
-                                        <label class="form-check-label ms-2 cursor-pointer small fw-bold text-body" for="create-preset-{{ preset.id }}">
-                                            {{ preset.name }}
-                                            <span class="text-secondary d-block" style="font-size: 0.7rem; font-weight: normal;">Ages: {{ preset.recommended_ages|join(', ') }}</span>
-                                        </label>
-                                    </div>
-                                </div>
-                            </div>
-                            {% endfor %}
-                        </div>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-
     <!-- Managed Users & Account Mappings -->
     <div class="col-12">
         <div class="d-flex align-items-center justify-content-between mb-3">
-            <h4 class="fw-bold mb-0"><i class="fas fa-users-cog me-2"></i>Configure Mappings</h4>
+            <h4 class="fw-bold mb-0"><i class="fas fa-link me-2"></i>Link Device Accounts</h4>
             <span class="badge bg-secondary p-2" id="user-count-badge">{{ users|length }} active</span>
         </div>
 
@@ -82,8 +48,8 @@
                     <div
                         class="card-header bg-body-secondary d-flex justify-content-between align-items-center p-3 flex-wrap gap-2">
                         <div class="d-flex align-items-center gap-3">
-                            <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center fw-bold shadow-sm"
-                                style="width: 46px; height: 46px; font-size: 1.2rem; background: linear-gradient(135deg, #0d6efd 0%, #1d4ed8 100%);">
+                            <div class="rounded-circle guardian-avatar text-white d-flex align-items-center justify-content-center fw-bold shadow-sm"
+                                style="width: 46px; height: 46px; font-size: 1.2rem;">
                                 {{ user.username[:2]|upper }}
                             </div>
                             <div>
@@ -108,8 +74,8 @@
                                 onsubmit="return confirm('Delete managed user {{ user.username }} and all account mappings?')"
                                 class="m-0">
 
-                                {{ csrf_field() }} <button type="submit" class="btn btn-sm btn-danger fw-bold px-3"><i
-                                        class="fas fa-trash me-1"></i> Delete</button>
+                                {{ csrf_field() }} <button type="submit"                                 class="btn btn-sm btn-outline-danger fw-bold px-3"><i
+                                        class="fas fa-trash me-1"></i> Remove</button>
                             </form>
                         </div>
                     </div>
@@ -293,12 +259,159 @@
                         style="width: 64px; height: 64px;">
                         <i class="fas fa-users fs-3"></i>
                     </div>
-                    <h5 class="fw-bold mb-2">No Child Profiles Configured</h5>
-                    <p class="text-secondary mx-auto mb-3" style="max-width: 400px;">Create your first child profile
-                        above to start managing schedules, time limits, and security restrictions.</p>
+                    <h5 class="fw-bold mb-2">No Child Profiles Yet</h5>
+                    <p class="text-secondary mx-auto mb-3" style="max-width: 420px;">Tap <strong>Create Managed Profile</strong> in the header to set up a supportive safety baseline — then link device accounts below.</p>
+                    <button type="button" class="btn guardian-btn-sage fw-bold" data-bs-toggle="modal" data-bs-target="#createProfileModal">
+                        <i class="fas fa-plus me-1"></i> Create Managed Profile
+                    </button>
                 </div>
             </div>
             {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Create Managed Profile Wizard Modal -->
+<div class="modal fade guardian-wizard-modal" id="createProfileModal" tabindex="-1" aria-labelledby="createProfileModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <form action="{{ url_for('create_managed_user') }}" method="POST" id="create-child-form">
+                {{ csrf_field() }}
+                <div class="modal-header">
+                    <div>
+                        <h5 class="modal-title fw-bold mb-1" id="createProfileModalLabel">Create Managed Profile</h5>
+                        <p class="mb-0 small opacity-75">A calm, step-by-step setup — enforcement supports education.</p>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+
+                    <div class="guardian-wizard-progress" aria-hidden="true">
+                        <span class="guardian-wizard-progress-dot active" data-wizard-step="1"></span>
+                        <span class="guardian-wizard-progress-dot" data-wizard-step="2"></span>
+                        <span class="guardian-wizard-progress-dot" data-wizard-step="3"></span>
+                        <span class="guardian-wizard-progress-dot" data-wizard-step="4"></span>
+                    </div>
+
+                    <div class="guardian-wizard-panels">
+
+                        <!-- Step 1: Human identity -->
+                        <section class="guardian-wizard-panel active" data-wizard-step="1">
+                            <div class="guardian-step-label">Step 1 of 4</div>
+                            <h2 class="guardian-step-title">Who are we protecting?</h2>
+                            <p class="guardian-wizard-step-hint">Give this profile a name your family will recognise on the dashboard.</p>
+                            <label for="username" class="form-label fw-semibold small">Child profile name</label>
+                            <input type="text" id="username" name="username" class="form-control form-control-lg"
+                                placeholder="e.g. Sam" autocomplete="off" aria-describedby="username-hint">
+                            <div class="invalid-feedback">Please enter a profile name to continue.</div>
+                            <div class="guardian-nudge mt-3" id="username-hint">
+                                <strong>Profile flexibility choice:</strong> Consolidating multiple kids on one profile is completely free.
+                                However, they will share the exact same bedtimes, browsing shields, and activity reports.
+                                Creating an individual profile allows dynamic safety rules tailored strictly to their own age.
+                            </div>
+                        </section>
+
+                        <!-- Step 2: Growth milestone -->
+                        <section class="guardian-wizard-panel" data-wizard-step="2">
+                            <div class="guardian-step-label">Step 2 of 4</div>
+                            <h2 class="guardian-step-title">Choose a growth milestone</h2>
+                            <p class="guardian-wizard-step-hint">Pick the stage that best matches your child today — you can recalibrate anytime.</p>
+                            <div class="row g-2">
+                                {% for age_id, age_meta in policy_preset_matrix.age_brackets.items() %}
+                                <div class="col-12 col-sm-6">
+                                    <label class="guardian-milestone-card d-block mb-0" for="create-age-{{ age_id }}">
+                                        <div class="form-check m-0">
+                                            <input class="form-check-input policy-age-radio" type="radio" name="policy_age_bracket"
+                                                value="{{ age_id }}" id="create-age-{{ age_id }}" {% if loop.first %}checked{% endif %}>
+                                            <span class="guardian-milestone-age">{{ age_meta.label }}</span>
+                                            <div class="guardian-milestone-title">{{ age_meta.profile_title }}</div>
+                                            <p class="guardian-milestone-desc">{{ age_meta.description }}</p>
+                                        </div>
+                                    </label>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </section>
+
+                        <!-- Step 3: Responsibility calibration -->
+                        <section class="guardian-wizard-panel" data-wizard-step="3">
+                            <div class="guardian-step-label">Step 3 of 4</div>
+                            <h2 class="guardian-step-title">Responsibility calibration</h2>
+                            <p class="guardian-wizard-step-hint">Enforcement supports education — slide toward more hands-on help when your child is comfortable finding workarounds.</p>
+                            <div class="guardian-slider-wrap">
+                                <input type="range" class="guardian-responsibility-slider form-range" id="create-responsibility-slider"
+                                    min="0" max="2" step="1" value="0" aria-label="Responsibility calibration">
+                                <div class="guardian-slider-labels">
+                                    <span>Open Dialogue</span>
+                                    <span>Balanced Watch</span>
+                                    <span>Assisted Steps</span>
+                                </div>
+                                <p class="mb-1 mt-2 small fw-semibold" style="color: var(--guardian-sage);">
+                                    <span id="create-slider-active-label">Open Dialogue</span>
+                                </p>
+                                <div class="guardian-slider-narrative" id="create-responsibility-narrative"></div>
+                                <input type="hidden" name="policy_maturity_level" id="create-policy-maturity-level" value="low">
+                            </div>
+                        </section>
+
+                        <!-- Step 4: Review & save -->
+                        <section class="guardian-wizard-panel" data-wizard-step="4">
+                            <div class="guardian-step-label">Step 4 of 4</div>
+                            <h2 class="guardian-step-title">Review your baseline</h2>
+                            <p class="guardian-wizard-step-hint">Here is what Guardian will apply when you save — every setting stays editable afterward.</p>
+
+                            <div class="guardian-summary-seal" style="margin-top: 0;">
+                                <h3 id="create-preset-summary-title">Baseline Summary</h3>
+                                <ul id="create-preset-summary-details"></ul>
+                                <div class="guardian-summary-credit">
+                                    <strong>Accountability guarantee:</strong> Backed by the Bypass Credit Programme.
+                                    If your child safely breaks past this baseline on a fully managed device because of a flaw in our software,
+                                    we credit your account with a monthly profile voucher and publish the core patch tracking ID on our live public ledger.
+                                </div>
+                            </div>
+
+                            <div class="mt-3">
+                                <button class="btn btn-link guardian-advanced-toggle text-decoration-none p-0" type="button"
+                                    data-bs-toggle="collapse" data-bs-target="#advanced-filter-packs" aria-expanded="false">
+                                    <i class="fas fa-chevron-down me-1"></i> Advanced: hand-pick browsing shields (overrides preset)
+                                </button>
+                                <div class="collapse mt-2" id="advanced-filter-packs">
+                                    <div class="row g-2">
+                                        {% for preset in marketplace_presets %}
+                                        <div class="col-12 col-sm-6">
+                                            <div class="border rounded p-3 bg-white h-100">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" name="preset_ids" value="{{ preset.id }}" id="create-preset-{{ preset.id }}">
+                                                    <label class="form-check-label ms-2 small" for="create-preset-{{ preset.id }}">
+                                                        <strong class="d-block">{{ preset.name }}</strong>
+                                                        <span class="text-secondary" style="font-size: 0.75rem;">Recommended ages: {{ preset.recommended_ages|join(', ') }}</span>
+                                                    </label>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" id="create-wizard-cancel" data-bs-dismiss="modal">Not yet</button>
+                    <div class="guardian-wizard-footer-actions">
+                        <button type="button" class="btn btn-outline-secondary invisible" id="create-wizard-prev" aria-label="Previous step">
+                            <i class="fas fa-arrow-left me-1"></i> Previous
+                        </button>
+                        <button type="button" class="btn guardian-btn-sage fw-bold px-4" id="create-wizard-next">
+                            Next <i class="fas fa-arrow-right ms-1"></i>
+                        </button>
+                        <button type="submit" class="btn guardian-btn-sage fw-bold px-4 d-none" id="create-wizard-submit">
+                            <i class="fas fa-heart me-1"></i> Save Profile Baseline
+                        </button>
+                    </div>
+                </div>
+            </form>
         </div>
     </div>
 </div>
@@ -454,6 +567,40 @@
                 }
             });
         });
+    });
+</script>
+<script type="application/json" id="policy-preset-matrix-data">{{ policy_preset_matrix | tojson }}</script>
+<script type="application/json" id="marketplace-presets-data">{{ marketplace_presets | tojson }}</script>
+<script src="{{ url_for('static', filename='js/guardian-wizard.js') }}"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        if (window.GuardianWizard) {
+            GuardianWizard.bindWizard({
+                matrixDataId: 'policy-preset-matrix-data',
+                presetsDataId: 'marketplace-presets-data',
+                ageSelector: '.policy-age-radio',
+                maturityInputId: 'create-policy-maturity-level',
+                sliderId: 'create-responsibility-slider',
+                sliderLabelId: 'create-slider-active-label',
+                summaryTitleId: 'create-preset-summary-title',
+                summaryListId: 'create-preset-summary-details',
+                narrativeId: 'create-responsibility-narrative',
+            });
+            GuardianWizard.bindCreateStepper({
+                modalId: 'createProfileModal',
+                formId: 'create-child-form',
+                prevBtnId: 'create-wizard-prev',
+                nextBtnId: 'create-wizard-next',
+                submitBtnId: 'create-wizard-submit',
+                usernameInputId: 'username',
+                totalSteps: 4,
+                onStepChange(step) {
+                    if (step === 4 && window.guardianRefreshWizardSummary) {
+                        window.guardianRefreshWizardSummary();
+                    }
+                },
+            });
+        }
     });
 </script>
 {% endblock %}

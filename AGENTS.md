@@ -1,133 +1,198 @@
-# AGENTS.md
+**AGENTS.md (Refined)**
 
-This repository implements a server–agent parental controls system that manages policies across multiple Linux machines, Androide devices and in the future other platforms. The Flask server provides the web UI, REST APIs, and a WebSocket hub; each managed machine runs a Rust agent that connects outbound to the server. A lightweight Python debug agent is included for local testing.
+This repository implements **Guardian**, a multi-tenant, secure, cross-platform parental control and Mobile Device Management (MDM) system. It uses a simple **outbound-only server–agent architecture** to manage open platforms (Linux, Windows, Android) and provides visibility into closed gaming ecosystems (Xbox, Nintendo Switch) via API ingestion where possible.
 
-## Essential commands
+The design prioritizes **security, maintainability, and long-term human support**. Architecture and UI are kept deliberately simple: standard patterns, minimal moving parts, clear separation of concerns, and human-readable code/configs.
 
-- Docker (recommended server run):
-  - Start stack: `docker-compose up -d --build`
-- Manual server run (from `server/`):
-  - Install deps: `pip install -r requirements.txt`
-  - Web app: `python app.py`
-  - Background worker: `python task_worker.py` (run as separate process)
-- Python debug agent (from `server/`):
-  - `python debug_agent.py --server-url "ws://127.0.0.1:5000/ws" --agent-version "vX.Y"`
-- Rust agent (from `agent/`):
-  - Build: `cargo build --release`
-  - See the [Linux agent docs](https://pantherale0.github.io/timekpr-webui/platforms/linux-agent/) (or `docs/platforms/linux-agent.md`) for AppArmor enforcement, domain blocklists, and access approvals.
-- Android agent (from `android-agent/`):
-  - Build: `./gradlew assembleDebug`
-  - See the [Android agent docs](https://pantherale0.github.io/timekpr-webui/platforms/android-agent/) (or `docs/platforms/android-agent.md`) for pairing QR, permissions, and policy mapping.
-- Tests (from `server/`):
-  - `pytest` (project includes tests under `server/tests/`)
-- Agents (from `.agents/`):
-  - Within here you might find important sub-agents to invoke. Always check the details in `.agents/ARCHITECTURE.md` with every request, this is important as this will define how to build features, UI design, backend and frontend specialisms.
+### Core Principles
+- **Zero-trust outbound-only model**: Agents initiate all connections (no inbound firewall holes).
+- **Defense in depth with simplicity**: Use proven OS primitives; avoid custom kernels or overly exotic solutions.
+- **Human maintainability**: Code, configs, and UI must be understandable by a competent developer or sysadmin without deep domain expertise.
+- **Fail-safe defaults**: Security boundaries must degrade gracefully; never brick devices.
+- **Auditability and accountability**: All critical actions are logged; bypass claims are taken seriously.
 
-Environment (observed):
-- `AGENT_TOKEN` bootstrap token (server)
-- `REGISTRATION_TOKEN` optional pairing firewall (server and agent)
-- `FCM_SERVER_KEY` or `FIREBASE_CREDENTIALS_JSON` optional FCM push for Android agents
-- `DATABASE_URL` optional PostgreSQL URL; defaults to SQLite file when unset
-- `TZ` timezone
-- `TIMEKPR_SERVER_VERSION` server version string used in UI/protocol checks
+---
 
-## Architecture and flow
+### 🛠️ Toolchain & Development Environment
 
-- Outbound-only agent connections: agents open a WebSocket to `/ws` (Flask‑Sock) and authenticate via challenge–response HMAC using a per-device secret.
-- Device lifecycle: pending → approved → per-device token issuance. After approval, the agent stores a device-specific secret and reconnects.
-- Server processes:
-  - Flask web app (UI + REST + WS endpoint)
-  - BackgroundTaskManager (separate process via `task_worker.py`) for blocklist refresh, user data sync, policy sync, and alert delivery.
-- Data layer: SQLAlchemy models with Alembic/Flask‑Migrate. Compatible with SQLite and PostgreSQL. SQLite tuned via PRAGMA; optional auto-migration code supports bulk transfer to PostgreSQL.
+**Server (Python)**
+- Python 3.12+ for development.
+- Production: Python 3.12/3.13 base in minimal OCI images.
+- Web framework: Lightweight Flask + SQLAlchemy + Gunicorn (gevent worker) + WebSockets.
+- Database: PostgreSQL (production), SQLite (dev/testing).
 
-## Code organization
+**Client Agents**
+- **Rust (Linux/Windows)**: Edition 2021 or 2024, stable toolchain ≥1.80. Focus on safety and minimal dependencies.
+- **Kotlin (Android)**: SDK 34+, Device Owner mode for robust background operation.
 
-- `server/app.py` — app factory/wiring, WS route, blueprint registration, DB config, background manager init, optional SQLite→PostgreSQL migration helper.
-- `server/src/` — application modules:
-  - `blueprints/` — UI (`ui_*`) and API (`api_*`) blueprints, plus `websocket` handler.
-  - `database.py` — SQLAlchemy models, helpers, coercion utilities, and SQLite PRAGMA.
-  - Managers: `agent_helper.py`, `alerts_manager.py`, `apparmor_manager.py`, `blocklists_manager.py`, `schedule_manager.py`, `settings_manager.py`, `task_manager.py`, `users_manager.py`.
-  - Helpers: `helpers.py`, `oidc_helper.py`, `blocklist_helper.py`.
-- `server/templates/` — Jinja2 templates for UI (admin, schedules, settings, etc.).
-- `server/tests/` — pytest suite with route, helper, and manager coverage.
-- `agent/` — Rust client agent (`Cargo.toml`, `src/`).
-- `android-agent/` — Kotlin Android agent (WebSocket protocol parity, Device Admin, VPN domain policies).
-- `scripts/install-agent.sh` — installer for released agent binaries (systemd setup, config management).
+**Environment Variables** (documented in `.env.example`)
 
-## Patterns and conventions
+| Variable              | Used By     | Purpose                                      |
+|-----------------------|-------------|----------------------------------------------|
+| `AGENT_TOKEN`         | Server/Agent| Bootstrap secret (never sent in clear after pairing) |
+| `REGISTRATION_TOKEN`  | Server      | Optional enrollment gate                     |
+| `DATABASE_URL`        | Server      | PostgreSQL or SQLite                         |
+| `TZ`                  | All         | Consistent timezone handling                 |
+| `TIMEKPR_SERVER_VERSION` | Handshake | Schema compatibility enforcement             |
 
-- Blueprints: all routes live under modular blueprints and are registered in `server/src/blueprints/__init__.py`. When calling `url_for` without blueprint prefix, `app.py` installs a `fallback_handler` that tries each blueprint namespace automatically.
-- WebSocket: the single endpoint `/ws` is registered via Flask‑Sock; the handler is `src/blueprints/websocket.ws_agent_handler` (imported in `app.py` as `ws_agent_handler`).
-- Logging: Python `logging` with module-level loggers (e.g., `_LOGGER = logging.getLogger(__name__)`). Avoid `print`.
-- Timezones: timezone-aware datetimes (`DateTime(timezone=True)` in DB); helpers in `helpers.py` and Jinja filters (`localtime`). Avoid `datetime.utcnow()`, prefer aware UTC conversions.
-- Security tokens: never transmit bootstrap token over the wire; handshake uses HMAC of a server challenge. After approval, agents store per-device tokens.
-- Allowed alert types: enforced in `src/agent_helper.py` via `ALLOWED_AGENT_ALERT_TYPES` and payload normalization; reject events outside the allowlist.
+---
 
-## Testing approach
+### 🧬 System Architecture & Network Flow
 
-- Pytest tests under `server/tests/` exercise:
-  - Auth/OIDC redirects and sessions
-  - Dashboard and UI routes
-  - WebSocket handshake and agent interactions via test doubles
-  - Database helpers and managers (blocklists, tasks, OIDC helper, debug agent)
-- Typical pattern: create fixtures in `conftest.py`, use SQLAlchemy session, mock OIDC endpoints, and simulate WS with an in-memory stub (`MockWS` in tests).
+```
+Managed Endpoint (Agent) ──(outbound wss://)──► Traefik (TLS termination) ──► Flask Server
+                                                              │
+                                                              ▼
+                                                       SQLAlchemy + PostgreSQL
+                                                              │
+                                                              ▼
+                                                       Background Task Queue
+```
 
-## Gotchas and non-obvious details
+**Key Flows**
 
-- Run worker separately: `task_worker.py` must run in its own process; don’t embed in Gunicorn workers to avoid blocking.
-- Token lifecycle: after device approval the stored `agent_token` in the agent config changes and no longer equals the server-wide `AGENT_TOKEN` — this is expected.
-- TLS: use `wss://` in production; `ws://` is for trusted local testing only. Without TLS, agents cannot authenticate the server.
-- Registration firewall: when `REGISTRATION_TOKEN` is set on the server, new clients must include it or pairing will be refused.
-- SQLite tuning: custom PRAGMAs are applied on connect; be careful when swapping engines during tests.
-- URL building: if you add routes in new blueprints, either reference them with `url_for('bp.endpoint')` or rely on the global fallback handler; duplicate endpoint names across BPs can cause ambiguity.
-- Data migrations: Alembic folder lives in `server/migrations/`. The repo includes additional hand-written migration scripts; new models should include migrations.
-- Alerts ingestion: timestamps must be ISO‑8601; `Z` is normalized to `+00:00` and stored/serialized as UTC.
+1. **Registration & Pairing**
+   - Unpaired agent connects with registration payload (optionally protected by `REGISTRATION_TOKEN`).
+   - Device appears in “Pending Approvals” dashboard.
+   - Admin approval → server generates cryptographically secure random 64-char `secure_token`.
+   - Future connections use HMAC-SHA256 challenge-response authentication.
 
-## How to extend safely
+2. **Command & Policy Synchronization**
+   - Persistent WebSocket for real-time commands and heartbeats.
+   - **Disconnected operation**: Server queues policy changes in `pending_commands` table.
+   - On reconnect → queue is replayed in order → agent reaches consistent state.
+   - Use exponential backoff + jitter for reconnection.
 
-- Adding APIs/UI: place new endpoints in an existing or new blueprint under `server/src/blueprints/`, register in `server/src/blueprints/__init__.py`, and ensure templates live under `server/templates/`.
-- Database changes: update SQLAlchemy models in `server/src/database.py`, generate Alembic migration, and ensure tests cover upgrade paths.
-- Agent protocol: keep the `/ws` handshake and message schema backward‑compatible; update both Rust agent and the Python debug agent when changing message formats; enforce validation in `agent_helper.py`.
-- Background work: add toggles in `BackgroundTaskManager` and respect env flags similar to `TIMEKPR_TASKS_*` used in `app.py`.
-- When introducing new features, relevant documentation must be created for the documentation site. Updates should also be made to the feature comparison in `docs/getting-started/comparison.md`.
+**Security Boundaries (Strict)**
+- All external communication uses WSS with certificate pinning where feasible.
+- Agents run with least privilege (drop root/CAPs after startup where possible).
+- No agent should ever execute arbitrary code from the server.
 
-## Minimal local dev workflow
+---
 
-1) `cd server && pip install -r requirements.txt`
-2) `export AGENT_TOKEN=... TZ=...` (and optionally `DATABASE_URL`, `REGISTRATION_TOKEN`)
-3) `python app.py` (terminal 1)
-4) `python task_worker.py` (terminal 2)
-5) Optionally run: `python debug_agent.py --server-url "ws://127.0.0.1:5000/ws" --agent-version "v0.0.0-dev"`
-6) Run tests: `pytest`
+### ⚔️ Platform Enforcement (Keep Simple)
 
-## Cursor Cloud specific instructions
+**Linux**
+- Process monitoring via `netlink` (CN_PROC) + `/proc` checks for race mitigation.
+- AppArmor profiles for application sandboxing (dynamic generation + `apparmor_parser -r`).
+- `iptables`/`nftables` for DNS and basic network control (prefer nftables for modernity).
+- Systemd service with restricted capabilities:
+  ```ini
+  AmbientCapabilities=CAP_NET_ADMIN CAP_MAC_ADMIN
+  CapabilityBoundingSet=CAP_NET_ADMIN CAP_MAC_ADMIN
+  ProtectSystem=strict
+  PrivateTmp=yes
+  ```
 
-### Toolchain versions
+**Android**
+- Device Owner provisioning (factory reset + QR code).
+- Use `DevicePolicyManager` for suspension, app restrictions, and usage controls.
+- Avoid lock screen password reset to prevent bricking on network loss.
 
-- **Python**: system Python 3.12 works for local dev (`python3 app.py`). Production Docker images use Python 3.14.
-- **Rust**: the agent crate uses **edition 2024** (`agent/Cargo.toml`). Ensure `rustup default stable` points at a recent stable toolchain (1.85+); the VM may ship with an older default (1.83) that cannot parse the manifest.
-- **pip scripts**: `pip install --user` puts `flask`, `gunicorn`, etc. under `~/.local/bin`. Prefer `python3 -m pytest` / `python3 app.py` if that directory is not on `PATH`.
+**Windows** (future/partial)
+- Use modern APIs (WDAC, AppLocker, Windows Filtering Platform) instead of brittle registry hacks.
 
-### Services for end-to-end local dev
+**Firmware & Time Integrity**
+- On boot and periodically: verify Secure Boot status.
+- Cross-check system time against trusted NTP sources + monotonic counters.
+- Detect large clock skew → trigger lockout + alert.
 
-| Service | Required? | Command (from repo root) |
-|---------|-----------|--------------------------|
-| Flask web app | **Yes** | `cd server && export AGENT_TOKEN=... TZ=UTC TIMEKPR_SERVER_VERSION=v0.0.0-dev && python3 app.py` |
-| Background worker | Optional for UI/agent testing | `cd server && python3 task_worker.py` (separate terminal; `app.py` also starts in-process tasks) |
-| Python debug agent | Optional (simulates Rust agent) | `cd server && python3 debug_agent.py --server-url "ws://127.0.0.1:5000/ws" --agent-version "v0.0.0-dev"` |
-| Rust agent binary | Optional | `cd agent && cargo build --release` → `target/release/timekpr-agent` (Linux-only; needs D-Bus/TimeKpr-nExT at runtime) |
+---
 
-Default admin login: `admin` / `admin`. Approve new debug-agent devices at `/admin/devices`.
+### Hardware Home Kit Appliance (Optional but Recommended)
 
-### Lint / test / build commands
+A simple, low-power SBC (e.g., NanoPi NEO or equivalent) for network-level visibility and console protection via ARP spoofing / transparent proxying.
 
-- **Python tests**: `cd server && python3 -m pytest` (uses in-memory SQLite; no running server required).
-- **Rust compile check (matches CI)**: `cargo check --manifest-path agent/Cargo.toml`
-- **Rust release build**: `cargo build --release --manifest-path agent/Cargo.toml`
-- **Pyright**: config in `pyrightconfig.json` (`typeCheckingMode: off`); no repo lint script.
+**Design Goals**
+- Fully immutable/read-only root (SquashFS + tmpfs for logs/state).
+- Power from router USB, minimal heat/footprint.
+- Heartbeat to cloud; offline alerts.
+- ARP poisoning only when explicitly enabled per console; fallback to dead MAC on block.
 
-### Gotchas
+Keep appliance software minimal — primarily a Rust binary for filtering and WebSocket reporting.
 
-- Match `--agent-version` / `TIMEKPR_SERVER_VERSION` between server and debug agent (default `v0.0.0-dev`).
-- `debug_agent.py` writes state to `server/debug-agent.json`; delete it to simulate a fresh client.
-- Six pytest failures were observed in this environment (AppArmor UI routes + one task-manager thread test) with 72 passing — treat as pre-existing unless you are working on those areas.
+---
+
+### 🔒 Accountability – Bypass Credit Policy
+
+If a child bypasses an active, correctly configured restriction due to a **verifiable defect** in Guardian (not user modification, rooting, or unsupported config), the household receives a credit.
+
+**Eligible**: Code/logic flaws allowing unpermitted access while device shows “Protected”.
+**Excluded**: Rooted devices, disabled UAC/Secure Boot, admin rights granted to child, unsupported platforms.
+
+Credits are modest, capped annually, and non-cash. All verified incidents become public (anonymized) in the transparency ledger with a linked GitHub issue that must be fixed before closure.
+
+---
+
+### 🎨 UI/UX Guidelines (Keep It Simple & Human)
+
+**Design Philosophy**
+- Supportive, calm, educational tone — not surveillance dystopia.
+- Minimize cognitive load: clear hierarchy, few colors, generous whitespace.
+- Age-aware interfaces (simpler for younger children).
+- Every block screen includes a parent message + calm offline activity (breathing exercise, doodle canvas).
+
+**Color Palette**
+- Primary: Sage Green `#4A6B5D` (safe/active)
+- Backgrounds: Warm light `#FBFBF9`
+- Text: Slate `#1E293B`
+
+**Copy Rules**
+- Use plain, friendly language everywhere user-facing.
+- Replace technical jargon in UI, tooltips, and error messages.
+- Examples:
+  - “Your Home’s Control Centre” instead of “Multi-tenant Workspace”
+  - “Routine Locks” instead of “Polkit/Registry Blocks”
+  - “Anti-Bypass Watching” instead of internal mechanism names
+
+---
+
+### 🧪 Testing & Verification
+
+- All backend changes require passing `server/tests/`.
+- Use `MockWS` for WebSocket logic (no live sockets in unit tests).
+- Rust: `cargo check`, `cargo test`, `cargo fmt`, `cargo clippy`.
+- End-to-end: Minimal, focused on critical paths (pairing, policy sync, enforcement).
+
+Local test commands:
+```bash
+# Server
+cd server && python -m pytest
+
+# Agent
+cd agent && cargo check && cargo test
+```
+
+---
+
+### 📂 Code Organization (Flat & Obvious)
+
+```
+server/
+├── app.py                  # Factory, blueprints, WS setup
+├── src/
+│   ├── blueprints/         # ui_*, api_*, ws_*
+│   ├── database.py         # Models + migrations
+│   ├── managers/           # agent_helper, blocklists, task_manager, etc.
+│   └── utils/              # security, crypto, validation
+├── tests/
+agent/                      # Rust core multi-platform agent
+android-agent/              # Kotlin agent wrapper
+scripts/                    # install-agent.sh, provisioning helpers
+docs/                       # Service documentation (for both users and developers)
+extension/                  # Files related to the web browser extension
+```
+
+**Additional Rules for Contributors / AI Agents**
+- Prefer explicit, readable code over clever abstractions.
+- Configuration via files/env vars — avoid heavy frameworks.
+- Security: Validate all inputs, use prepared statements, rate-limit, log sensibly (no PII where avoidable).
+- Dependencies: Keep minimal and pinned.
+- Breaking changes: Major version bump + clear migration path.
+- Sub-agents: Check for relevant sub-agents based on the requested activity, always pull in and check `.agent/ARCHITECTURE.md` for guidance on their usage. 
+
+This document serves as the **north star** for implementation. When in doubt, choose the simpler, more auditable solution that a human can debug and maintain years from now.
+
+---
+
+**Status**: This is the living reference. Update it as architecture decisions are finalized.

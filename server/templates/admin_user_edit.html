@@ -1,7 +1,9 @@
 {% extends "base.html" %}
 
 {% from '_macros.html' import csrf_field %}
-{% block title %}Profile Settings - {{ user.username }} - Guardian Parental Controls{% endblock %}
+{% block title %}Profile Settings - {{ user.username }} - Guardian{% endblock %}
+
+{% block extra_head %}{% endblock %}
 
 {% block top_nav_extra %}
 <span id="blocklist-sync-badge" class="badge bg-secondary d-flex align-items-center gap-1 p-2" style="font-size: 0.75rem;">
@@ -13,8 +15,8 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
     <div>
-        <h1 class="fw-bold mb-1" style="font-size: 2.25rem; font-weight: 800; letter-spacing: -0.025em;">{{ user.username }} &mdash; Profile Settings</h1>
-        <p class="text-secondary mb-0 fw-medium">Manage web filters, content catalog assignments, and application lock policies.</p>
+        <h1 class="guardian-page-title mb-1">{{ user.username }} &mdash; Profile Settings</h1>
+        <p class="guardian-page-lead mb-0">Fine-tune browsing shields, routine locks, and family dialogue for this child.</p>
     </div>
     <a href="{{ url_for('ui_dashboard.admin_users') }}" class="btn btn-outline-secondary d-flex align-items-center gap-1">
         <i class="fas fa-arrow-left"></i> <span>Back to Children</span>
@@ -26,7 +28,7 @@
     <div class="col-12">
         <div class="card border shadow-sm">
             <div class="card-body p-4 d-flex align-items-center gap-3 flex-wrap">
-                <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center fw-bold shadow" style="width: 64px; height: 64px; font-size: 1.5rem; background: linear-gradient(135deg, #0d6efd 0%, #1d4ed8 100%);">
+                <div class="rounded-circle guardian-avatar text-white d-flex align-items-center justify-content-center fw-bold shadow" style="width: 64px; height: 64px; font-size: 1.5rem;">
                     {{ user.username[:2]|upper }}
                 </div>
                 <div class="flex-grow-1">
@@ -44,33 +46,57 @@
         </div>
     </div>
 
+    <!-- Policy Preset Card -->
+    <div class="col-12">
+        <div class="card border shadow-sm guardian-preset-card">
+            <div class="card-header py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <h5 class="mb-0 fw-bold"><i class="fas fa-seedling me-2"></i>Safety Baseline</h5>
+                <button type="button" class="btn btn-light btn-sm fw-bold" data-bs-toggle="modal" data-bs-target="#policyPresetModal">
+                    <i class="fas fa-sliders-h me-1"></i> Recalibrate Baseline
+                </button>
+            </div>
+            <div class="card-body p-4">
+                {% if user.policy_age_bracket and user.policy_maturity_level %}
+                    {% set age_meta = policy_preset_matrix.age_brackets.get(user.policy_age_bracket, {}) %}
+                    {% set mat_meta = policy_preset_matrix.maturity_levels.get(user.policy_maturity_level, {}) %}
+                    <p class="mb-1 fw-bold" style="color: #1E293B;">
+                        {{ age_meta.profile_title or age_meta.label }} · {{ mat_meta.label }}
+                    </p>
+                    <p class="text-secondary small mb-0">A supportive baseline is active. You can still fine-tune any routine lock or browsing shield below.</p>
+                {% else %}
+                    <p class="mb-0 text-secondary">No baseline applied yet — <span class="fw-semibold" style="color: #1E293B;">Custom configuration</span>. Use <strong>Recalibrate Baseline</strong> to load an age-appropriate starting point.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
     <div class="col-12 col-lg-8">
         <!-- Internet Blocklists Section -->
         <div class="card border shadow-sm mb-4">
             <div class="card-header bg-dark text-white py-3">
-                <h5 class="mb-0 fw-bold"><i class="fas fa-globe text-primary me-2"></i>Web Content Filtering</h5>
+                <h5 class="mb-0 fw-bold"><i class="fas fa-globe me-2" style="color: #a8c4b8;"></i>Browsing Shields</h5>
             </div>
             <div class="card-body p-4">
-                <p class="text-secondary small fw-medium mb-4">Enforce content filters and shared domain catalogs across this child's accounts.</p>
+                <p class="text-secondary small fw-medium mb-4">Curated and custom browsing shields applied across this child's linked accounts.</p>
                 
                 <!-- Quick stats -->
                 <div class="row g-2 mb-4">
                     <div class="col-4">
                         <div class="bg-body-secondary p-3 rounded text-center border">
                             <h3 class="fw-bold mb-0 lh-1">{{ blocklist_sync_status.assigned_source_count }}</h3>
-                            <span class="text-secondary small fw-bold text-uppercase d-block mt-2" style="font-size: 0.65rem; letter-spacing: 0.05em;">Assigned Catalogs</span>
+                            <span class="text-secondary small fw-bold text-uppercase d-block mt-2" style="font-size: 0.65rem; letter-spacing: 0.05em;">Shields assigned</span>
                         </div>
                     </div>
                     <div class="col-4">
                         <div class="bg-body-secondary p-3 rounded text-center border">
                             <h3 class="fw-bold mb-0 lh-1">{{ blocklist_sync_status.effective_domain_count }}</h3>
-                            <span class="text-secondary small fw-bold text-uppercase d-block mt-2" style="font-size: 0.65rem; letter-spacing: 0.05em;">Blocked Domains</span>
+                            <span class="text-secondary small fw-bold text-uppercase d-block mt-2" style="font-size: 0.65rem; letter-spacing: 0.05em;">Sites shielded</span>
                         </div>
                     </div>
                     <div class="col-4">
                         <div class="bg-body-secondary p-3 rounded text-center border">
                             <h3 class="fw-bold mb-0 lh-1"><span id="blocklist-synced-count">{{ blocklist_sync_status.synced_mapping_count }}</span>/{{ blocklist_sync_status.mapping_count }}</h3>
-                            <span class="text-secondary small fw-bold text-uppercase d-block mt-2" style="font-size: 0.65rem; letter-spacing: 0.05em;">Synced Accounts</span>
+                            <span class="text-secondary small fw-bold text-uppercase d-block mt-2" style="font-size: 0.65rem; letter-spacing: 0.05em;">Accounts in sync</span>
                         </div>
                     </div>
                 </div>
@@ -79,7 +105,7 @@
                 <form action="{{ url_for('subscribe_user_marketplace', user_id=user.id) }}" method="POST" class="mb-4">
                     {{ csrf_field() }}
                     <h6 class="fw-bold mb-3 d-flex align-items-center gap-2 text-dark">
-                        <i class="fas fa-store text-success"></i> Curated Filter Packs
+                        <i class="fas fa-store me-2" style="color: var(--guardian-sage);"></i> Curated Browsing Shields
                     </h6>
                     <div class="row g-3 mb-3">
                         {% for preset in marketplace_presets %}
@@ -102,7 +128,7 @@
                     </div>
                     
                     <button type="submit" class="btn btn-sm btn-success fw-bold px-4">
-                        <i class="fas fa-check-circle me-1"></i> Save Curated Filter Subscriptions
+                        <i class="fas fa-check-circle me-1"></i> Save Curated Shields
                     </button>
                 </form>
 
@@ -110,7 +136,7 @@
                 <form action="{{ url_for('update_user_blocklists', user_id=user.id) }}" method="POST" class="border-top pt-4 border-secondary-subtle">
                     {{ csrf_field() }}
                     <h6 class="fw-bold mb-3 d-flex align-items-center gap-2 text-dark">
-                        <i class="fas fa-sliders-h text-primary"></i> Custom Filter Lists
+                        <i class="fas fa-sliders-h me-2" style="color: var(--guardian-sage);"></i> Custom Shield Lists
                     </h6>
                     <div class="row g-3 mb-3">
                         {% for source in blocklist_sources %}
@@ -132,13 +158,13 @@
                     
                     {% if not blocklist_sources %}
                         <div class="alert alert-info py-2 small mb-3">
-                            <i class="fas fa-info-circle me-1"></i> No custom filter lists defined. Define them in <a href="{{ url_for('ui_dashboard.admin_restrictions') }}" class="alert-link">Web Content Filters</a> before assigning.
+                            <i class="fas fa-info-circle me-1"></i> No custom shields yet. Create them under <a href="{{ url_for('ui_dashboard.admin_restrictions') }}" class="alert-link">Browsing Shields</a> before assigning.
                         </div>
                     {% endif %}
 
                     <div class="d-flex gap-2">
-                        <button type="submit" class="btn btn-sm btn-primary fw-bold px-4">Save Custom Assignments</button>
-                        <a href="{{ url_for('ui_dashboard.admin_restrictions') }}" class="btn btn-sm btn-outline-secondary fw-bold px-3">Manage Catalogs</a>
+                        <button type="submit" class="btn btn-sm btn-primary fw-bold px-4">Save custom shields</button>
+                        <a href="{{ url_for('ui_dashboard.admin_restrictions') }}" class="btn btn-sm btn-outline-secondary fw-bold px-3">Manage shields</a>
                     </div>
                 </form>
 
@@ -174,7 +200,7 @@
         <!-- Linux Device Restrictions -->
         <div class="card border shadow-sm mb-4">
             <div class="card-header bg-dark text-white py-3">
-                <h5 class="mb-0 fw-bold"><i class="fas fa-desktop text-success me-2"></i>Linux Device Restrictions</h5>
+                <h5 class="mb-0 fw-bold"><i class="fas fa-desktop me-2" style="color: #a8c4b8;"></i>Device Routine Locks</h5>
             </div>
             <div class="card-body p-4">
                 <p class="text-secondary small fw-medium mb-3">System privileges via polkit rules and terminal access control for linked Linux accounts.</p>
@@ -255,7 +281,7 @@
         <!-- Chrome Browser Restrictions -->
         <div class="card border shadow-sm mb-4">
             <div class="card-header bg-dark text-white py-3">
-                <h5 class="mb-0 fw-bold"><i class="fab fa-chrome text-info me-2"></i>Chrome Browser Restrictions</h5>
+                <h5 class="mb-0 fw-bold"><i class="fab fa-chrome me-2" style="color: #a8c4b8;"></i>Browser Boundaries</h5>
             </div>
             <div class="card-body p-4">
                 <p class="text-secondary small fw-medium mb-3">Enforce browser restrictions across Google Chrome, Chromium, and Brave browsers.</p>
@@ -315,7 +341,7 @@
         <!-- Access Approval Policies -->
         <div class="card border shadow-sm mb-4">
             <div class="card-header bg-dark text-white py-3">
-                <h5 class="mb-0 fw-bold"><i class="fas fa-clipboard-check text-warning me-2"></i>Access Approval Policies</h5>
+                <h5 class="mb-0 fw-bold"><i class="fas fa-clipboard-check me-2" style="color: #a8c4b8;"></i>Family Dialogue Settings</h5>
             </div>
             <div class="card-body p-4">
                 <p class="text-secondary small fw-medium mb-3">Configure per-device approval modes for app launches and blocked websites.</p>
@@ -362,7 +388,7 @@
         <!-- Guardian Space Overlay Settings -->
         <div class="card border shadow-sm mb-4" id="guardian-overlay-card">
             <div class="card-header bg-dark text-white py-3">
-                <h5 class="mb-0 fw-bold"><i class="fas fa-shield-alt text-success me-2"></i>Guardian Space Overlay</h5>
+                <h5 class="mb-0 fw-bold"><i class="fas fa-shield-alt me-2" style="color: #a8c4b8;"></i>Guardian Space Overlay</h5>
             </div>
             <div class="card-body p-4">
                 <p class="text-secondary small fw-medium mb-3">Customise the full-screen overlay shown to this child when time is up or a site is blocked.</p>
@@ -389,7 +415,7 @@
         <!-- Application Control & Locks -->
         <div class="card border shadow-sm mb-4">
             <div class="card-header bg-dark text-white py-3">
-                <h5 class="mb-0 fw-bold"><i class="fas fa-lock text-danger me-2"></i>App Locks &amp; Policies</h5>
+                <h5 class="mb-0 fw-bold"><i class="fas fa-lock me-2" style="color: #a8c4b8;"></i>App Routine Locks</h5>
             </div>
             <div class="card-body p-4">
                 <p class="text-secondary small fw-medium mb-3">Assign platform-specific application lock policies to this child.</p>
@@ -452,7 +478,7 @@
         <!-- Installed Applications Report -->
         <div class="card border shadow-sm">
             <div class="card-header bg-dark text-white py-3">
-                <h5 class="mb-0 fw-bold"><i class="fas fa-th text-info me-2"></i>Reported Applications</h5>
+                <h5 class="mb-0 fw-bold"><i class="fas fa-th me-2" style="color: #a8c4b8;"></i>Installed Apps</h5>
             </div>
             <div class="card-body p-3" style="max-height: 400px; overflow-y: auto;">
                 {% if installed_apps %}
@@ -492,6 +518,78 @@
                     <p class="text-secondary mb-0 small fw-medium text-center py-4"><i class="fas fa-info-circle me-1"></i>No applications reported yet.</p>
                 {% endif %}
             </div>
+        </div>
+    </div>
+</div>
+
+<!-- Policy Preset Modal -->
+<div class="modal fade guardian-wizard-modal" id="policyPresetModal" tabindex="-1" aria-labelledby="policyPresetModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <form action="{{ url_for('apply_policy_preset_route', user_id=user.id) }}" method="POST" id="apply-policy-preset-form" onsubmit="return confirmPolicyPresetApply(event)">
+                {{ csrf_field() }}
+                <div class="modal-header">
+                    <div>
+                        <h5 class="modal-title fw-bold mb-1" id="policyPresetModalLabel">Recalibrate Safety Baseline</h5>
+                        <p class="mb-0 small opacity-75">Updates browsing shields, Routine Locks, and Family Dialogue Settings for {{ user.username }}.</p>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <section class="guardian-wizard-step">
+                        <div class="guardian-step-label">Growth milestone</div>
+                        <h2 class="guardian-step-title">Choose a growth milestone</h2>
+                        <div class="row g-2">
+                            {% for age_id, age_meta in policy_preset_matrix.age_brackets.items() %}
+                            <div class="col-12 col-sm-6">
+                                <label class="guardian-milestone-card d-block mb-0" for="edit-age-{{ age_id }}">
+                                    <div class="form-check m-0">
+                                        <input class="form-check-input edit-policy-age-radio" type="radio" name="policy_age_bracket" value="{{ age_id }}" id="edit-age-{{ age_id }}"
+                                            {% if user.policy_age_bracket == age_id %}checked{% elif not user.policy_age_bracket and loop.first %}checked{% endif %}>
+                                        <span class="guardian-milestone-age">{{ age_meta.label }}</span>
+                                        <div class="guardian-milestone-title">{{ age_meta.profile_title }}</div>
+                                        <p class="guardian-milestone-desc">{{ age_meta.description }}</p>
+                                    </div>
+                                </label>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </section>
+
+                    <section class="guardian-wizard-step">
+                        <div class="guardian-step-label">Responsibility</div>
+                        <h2 class="guardian-step-title">Responsibility calibration</h2>
+                        <div class="guardian-slider-wrap">
+                            {% set mat_slider_val = {'low': 0, 'medium': 1, 'high': 2}.get(user.policy_maturity_level, 0) %}
+                            <input type="range" class="guardian-responsibility-slider form-range" id="edit-responsibility-slider"
+                                min="0" max="2" step="1" value="{{ mat_slider_val }}" aria-label="Responsibility calibration">
+                            <div class="guardian-slider-labels">
+                                <span>Open Dialogue</span>
+                                <span>Balanced Watch</span>
+                                <span>Assisted Steps</span>
+                            </div>
+                            <p class="mb-1 mt-2 small fw-semibold" style="color: var(--guardian-sage);">
+                                <span id="edit-slider-active-label">Open Dialogue</span>
+                            </p>
+                            <div class="guardian-slider-narrative" id="edit-responsibility-narrative"></div>
+                            <input type="hidden" name="policy_maturity_level" id="edit-policy-maturity-level"
+                                value="{{ user.policy_maturity_level or 'low' }}">
+                        </div>
+                    </section>
+
+                    <div class="guardian-summary-seal">
+                        <h3 id="edit-preset-summary-title">Baseline Summary</h3>
+                        <ul id="edit-preset-summary-details"></ul>
+                        <div class="guardian-summary-credit">
+                            <strong>Accountability guarantee:</strong> Backed by the Bypass Credit Programme — see our public ledger for patch transparency.
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn guardian-btn-sage fw-bold">Apply Baseline</button>
+                </div>
+            </form>
         </div>
     </div>
 </div>
@@ -730,6 +828,42 @@
     document.addEventListener('DOMContentLoaded', function () {
         updateSyncStatus();
         setInterval(updateSyncStatus, 15000);
+        if (window.GuardianWizard) {
+            GuardianWizard.bindWizard({
+                matrixDataId: 'policy-preset-matrix-data',
+                presetsDataId: 'marketplace-presets-data',
+                ageSelector: '.edit-policy-age-radio',
+                maturityInputId: 'edit-policy-maturity-level',
+                sliderId: 'edit-responsibility-slider',
+                sliderLabelId: 'edit-slider-active-label',
+                summaryTitleId: 'edit-preset-summary-title',
+                summaryListId: 'edit-preset-summary-details',
+                narrativeId: 'edit-responsibility-narrative',
+            });
+        }
     });
+
+    function confirmPolicyPresetApply(event) {
+        const msg = [
+            'Apply this safety baseline?',
+            '',
+            'This will refresh:',
+            '• Browsing shields (curated subscriptions)',
+            '• Routine Locks (daily screen-time hours)',
+            '• Device and browser boundaries (per linked account)',
+            '• Family Dialogue Settings',
+            '• Guardian Space overlay tone',
+            '',
+            'You can still adjust individual settings afterward.',
+        ].join('\n');
+        if (!confirm(msg)) {
+            event.preventDefault();
+            return false;
+        }
+        return true;
+    }
 </script>
+<script type="application/json" id="policy-preset-matrix-data">{{ policy_preset_matrix | tojson }}</script>
+<script type="application/json" id="marketplace-presets-data">{{ marketplace_presets | tojson }}</script>
+<script src="{{ url_for('static', filename='js/guardian-wizard.js') }}"></script>
 {% endblock %}

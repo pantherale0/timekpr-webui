@@ -1,28 +1,81 @@
 /* 
 ==========================================================================
-GUARDIAN CUSTOM STYLES (Bootstrap 5 & AdminLTE 4 Compatible)
+GUARDIAN DESIGN SYSTEM (Bootstrap 5 & AdminLTE 4)
+Supportive safety utility — Sage, Ivory, Charcoal
 ==========================================================================
 */
 
 :root {
-  /* Guard accent colors (No Banned Colors - Purple Ban) */
-  --accent-cta: #f97316; /* Warm Orange CTA */
-  --accent-cta-hover: #ea580c;
-  --success-color: #10b981;
-  --success-bg: #d1fae5;
-  --warning-color: #f59e0b;
-  --warning-bg: #fef3c7;
-  --danger-color: #ef4444;
-  --danger-bg: #fee2e2;
-  --info-color: #06b6d4;
-  --info-bg: #cffafe;
+  /* Core palette */
+  --guardian-sage: #4A6B5D;
+  --guardian-sage-light: #5d8272;
+  --guardian-sage-dark: #3d574c;
+  --guardian-sage-subtle: #e8efeb;
+  --guardian-ivory: #FBFBF9;
+  --guardian-charcoal: #1E293B;
+  --guardian-charcoal-muted: #64748b;
+  --guardian-warm-border: #e2e8f0;
+  --guardian-attention: #b8956a;
+  --guardian-attention-bg: #faf6f0;
+  --guardian-remove: #8b6f63;
+  --guardian-remove-bg: #f5eeeb;
+
+  /* Bootstrap mapping */
+  --bs-primary: #4A6B5D;
+  --bs-primary-rgb: 74, 107, 93;
+  --bs-secondary: #64748b;
+  --bs-secondary-rgb: 100, 116, 139;
+  --bs-body-bg: #FBFBF9;
+  --bs-body-color: #1E293B;
+  --bs-emphasis-color: #1E293B;
+  --bs-secondary-color: #64748b;
+  --bs-tertiary-color: #94a3b8;
+  --bs-border-color: #e2e8f0;
+  --bs-link-color: #4A6B5D;
+  --bs-link-hover-color: #3d574c;
+  --bs-primary-bg-subtle: #e8efeb;
+  --bs-primary-border-subtle: #c5d4cc;
+  --bs-success: #4A6B5D;
+  --bs-success-rgb: 74, 107, 93;
+  --bs-warning: #b8956a;
+  --bs-warning-rgb: 184, 149, 106;
+  --bs-danger: #8b6f63;
+  --bs-danger-rgb: 139, 111, 99;
+  --bs-info: #5d8272;
+  --bs-info-rgb: 93, 130, 114;
+
+  /* Legacy tokens (used across templates) */
+  --accent-cta: #4A6B5D;
+  --accent-cta-hover: #3d574c;
+  --success-color: #4A6B5D;
+  --success-bg: #e8efeb;
+  --warning-color: #b8956a;
+  --warning-bg: #faf6f0;
+  --danger-color: #8b6f63;
+  --danger-bg: #f5eeeb;
+  --info-color: #5d8272;
+  --info-bg: #e8efeb;
+}
+
+[data-bs-theme="dark"] {
+  --guardian-ivory: #1a222d;
+  --guardian-charcoal: #f1f5f9;
+  --guardian-charcoal-muted: #94a3b8;
+  --guardian-sage-subtle: #243329;
+  --bs-body-bg: #141a21;
+  --bs-body-color: #f1f5f9;
+  --bs-border-color: #2d3744;
+  --success-bg: #1a2e26;
+  --warning-bg: #2a241c;
+  --danger-bg: #2a211e;
+  --info-bg: #1a2e26;
 }
 
 [data-theme="dark"] {
-  --success-bg: #022c22;
-  --warning-bg: #292524;
-  --danger-bg: #2d1b1b;
-  --info-bg: #0c2929;
+  --success-bg: #1a2e26;
+  --warning-bg: #2a241c;
+  --danger-bg: #2a211e;
+  --info-bg: #1a2e26;
 }
 
 /* 24-Hour Interactive Timeline Visual Blocks CSS */
@@ -443,4 +496,247 @@ body > .theme-toggle:hover {
   height: 12px;
   background-color: var(--bs-border-color);
   opacity: 0.8;
+}
+
+/* ==========================================================================
+   GUARDIAN GLOBAL UI — layout, chrome, components
+   ========================================================================== */
+
+body {
+  font-family: 'Atkinson Hyperlegible', system-ui, sans-serif;
+  background-color: var(--guardian-ivory) !important;
+  color: var(--guardian-charcoal);
+}
+
+.app-main {
+  background-color: var(--guardian-ivory);
+}
+
+.app-header.navbar {
+  background-color: #fff !important;
+  border-bottom: 1px solid var(--guardian-warm-border);
+  box-shadow: 0 1px 3px rgba(30, 41, 59, 0.04) !important;
+}
+
+/* Sidebar */
+.app-sidebar.guardian-sidebar {
+  background: linear-gradient(180deg, var(--guardian-sage-dark) 0%, #324840 100%) !important;
+  border-right: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.guardian-sidebar .brand-icon-shield {
+  color: #a8c4b8 !important;
+}
+
+.guardian-sidebar .nav-link {
+  color: rgba(255, 255, 255, 0.82) !important;
+  border-radius: 0.5rem;
+  margin: 0.1rem 0.65rem;
+  padding: 0.55rem 0.85rem !important;
+}
+
+.guardian-sidebar .nav-link:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
+  color: #fff !important;
+}
+
+.guardian-sidebar .nav-link.active {
+  background: rgba(255, 255, 255, 0.14) !important;
+  color: #fff !important;
+  font-weight: 700;
+}
+
+.guardian-sidebar .nav-header {
+  color: rgba(255, 255, 255, 0.45) !important;
+  letter-spacing: 0.06em;
+}
+
+/* Primary actions */
+.guardian-btn-sage,
+.btn-primary {
+  --bs-btn-bg: var(--guardian-sage);
+  --bs-btn-border-color: var(--guardian-sage);
+  --bs-btn-hover-bg: var(--guardian-sage-light);
+  --bs-btn-hover-border-color: var(--guardian-sage-light);
+  --bs-btn-active-bg: var(--guardian-sage-dark);
+  --bs-btn-active-border-color: var(--guardian-sage-dark);
+  --bs-btn-disabled-bg: var(--guardian-sage);
+  --bs-btn-disabled-border-color: var(--guardian-sage);
+}
+
+.btn-outline-primary {
+  --bs-btn-color: var(--guardian-sage);
+  --bs-btn-border-color: var(--guardian-sage);
+  --bs-btn-hover-bg: var(--guardian-sage);
+  --bs-btn-hover-border-color: var(--guardian-sage);
+  --bs-btn-active-bg: var(--guardian-sage-dark);
+  --bs-btn-active-border-color: var(--guardian-sage-dark);
+}
+
+.btn-danger {
+  --bs-btn-color: #fff;
+  --bs-btn-bg: var(--guardian-remove);
+  --bs-btn-border-color: var(--guardian-remove);
+  --bs-btn-hover-bg: #7a6156;
+  --bs-btn-hover-border-color: #7a6156;
+}
+
+.btn-outline-danger {
+  --bs-btn-color: var(--guardian-remove);
+  --bs-btn-border-color: #d4c4be;
+  --bs-btn-hover-bg: var(--guardian-remove-bg);
+  --bs-btn-hover-border-color: var(--guardian-remove);
+  --bs-btn-hover-color: var(--guardian-remove);
+}
+
+/* Cards */
+.card {
+  border-color: var(--guardian-warm-border);
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(30, 41, 59, 0.04);
+}
+
+.card-header.bg-dark,
+.modal-header.bg-dark {
+  background: var(--guardian-sage) !important;
+  color: #fff !important;
+  border-bottom: none;
+}
+
+.card-header.bg-dark .text-primary,
+.card-header.bg-dark .text-success,
+.card-header.bg-dark .text-info,
+.card-header.bg-dark .text-danger {
+  color: #c5ddd2 !important;
+}
+
+.card-outline.card-primary {
+  border-top: 3px solid var(--guardian-sage) !important;
+}
+
+/* Child profile avatars */
+.guardian-avatar {
+  background: linear-gradient(135deg, var(--guardian-sage) 0%, var(--guardian-sage-dark) 100%) !important;
+  color: #fff !important;
+}
+
+/* Page titles */
+.guardian-page-title {
+  font-size: 2.25rem;
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  color: var(--guardian-charcoal);
+}
+
+.guardian-page-lead {
+  color: var(--guardian-charcoal-muted);
+  font-weight: 500;
+}
+
+/* Terminal / install snippets */
+.guardian-code-block {
+  background: var(--guardian-charcoal) !important;
+  color: #e8efeb !important;
+  border-radius: 0.5rem;
+  font-size: 0.85rem;
+}
+
+.modal-header.guardian-modal-header {
+  background: var(--guardian-sage) !important;
+  color: #fff !important;
+  border-bottom: none;
+}
+
+/* Flash alerts — supportive tone */
+.alert-danger {
+  background-color: var(--guardian-remove-bg);
+  border-color: #e8d8d2;
+  color: var(--guardian-charcoal);
+}
+
+.alert-success {
+  background-color: var(--guardian-sage-subtle);
+  border-color: #c5d4cc;
+  color: var(--guardian-charcoal);
+}
+
+.alert-warning {
+  background-color: var(--guardian-attention-bg);
+  border-color: #e8dcc8;
+  color: var(--guardian-charcoal);
+}
+
+/* Badges */
+.badge.bg-warning {
+  background-color: var(--guardian-attention) !important;
+  color: #fff !important;
+}
+
+.badge.bg-danger {
+  background-color: var(--guardian-remove) !important;
+}
+
+.badge.bg-primary,
+.badge.bg-info {
+  background-color: var(--guardian-sage) !important;
+}
+
+/* Text utilities */
+.text-primary {
+  color: var(--guardian-sage) !important;
+}
+
+.text-danger {
+  color: var(--guardian-remove) !important;
+}
+
+.bg-body-secondary {
+  background-color: #f4f6f5 !important;
+}
+
+/* Forms */
+.form-control:focus,
+.form-select:focus {
+  border-color: var(--guardian-sage-light);
+  box-shadow: 0 0 0 0.2rem rgba(74, 107, 93, 0.18);
+}
+
+.form-check-input:checked {
+  background-color: var(--guardian-sage);
+  border-color: var(--guardian-sage);
+}
+
+/* Wizard stepper in device onboarding */
+.step-node.active {
+  background-color: var(--guardian-sage) !important;
+  border-color: var(--guardian-sage) !important;
+  box-shadow: 0 0 0 3px rgba(74, 107, 93, 0.22) !important;
+}
+
+.step-node.completed {
+  background-color: var(--guardian-sage-light) !important;
+  border-color: var(--guardian-sage-light) !important;
+}
+
+.platform-card:hover:not(.disabled) {
+  border-color: var(--guardian-sage) !important;
+}
+
+.platform-card.selected {
+  border-color: var(--guardian-sage) !important;
+  background-color: var(--guardian-sage-subtle) !important;
+}
+
+/* Status */
+.status-loading {
+  color: var(--guardian-sage) !important;
+}
+
+.task-status-indicator-dot.danger {
+  background-color: var(--guardian-attention);
+}
+
+#navbar-task-badge.bg-danger {
+  background-color: var(--guardian-attention) !important;
+  color: #fff !important;
 }

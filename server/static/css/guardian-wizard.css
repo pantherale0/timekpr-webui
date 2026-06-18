@@ -1,0 +1,281 @@
+/* Guardian profile wizard — extends global design tokens from style.css */
+
+.guardian-btn-sage {
+    background-color: var(--guardian-sage) !important;
+    border-color: var(--guardian-sage) !important;
+    color: #fff !important;
+}
+
+.guardian-btn-sage:hover,
+.guardian-btn-sage:focus {
+    background-color: var(--guardian-sage-light) !important;
+    border-color: var(--guardian-sage-light) !important;
+    color: #fff !important;
+}
+
+.guardian-wizard-modal .modal-content {
+    background: var(--guardian-ivory);
+    border: 1px solid #e2e8f0;
+    border-radius: 1rem;
+    overflow: hidden;
+}
+
+.guardian-wizard-modal .modal-header {
+    background: var(--guardian-sage);
+    color: #fff;
+    border-bottom: none;
+    padding: 1.25rem 1.5rem;
+}
+
+.guardian-wizard-modal .modal-header .btn-close {
+    filter: brightness(0) invert(1);
+}
+
+.guardian-wizard-modal .modal-body {
+    color: var(--guardian-charcoal);
+    padding: 1.5rem;
+    min-height: 20rem;
+    overflow: visible;
+}
+
+.guardian-wizard-modal .modal-dialog {
+    max-width: 42rem;
+}
+
+.guardian-wizard-progress {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    margin-bottom: 1.25rem;
+}
+
+.guardian-wizard-progress-dot {
+    width: 0.55rem;
+    height: 0.55rem;
+    border-radius: 50%;
+    background: #d4e0da;
+    transition: background 0.2s, transform 0.2s;
+}
+
+.guardian-wizard-progress-dot.active {
+    background: var(--guardian-sage);
+    transform: scale(1.15);
+}
+
+.guardian-wizard-progress-dot.done {
+    background: var(--guardian-sage-light);
+}
+
+.guardian-wizard-panels {
+    position: relative;
+}
+
+.guardian-wizard-panel {
+    display: none;
+    animation: guardianWizardFadeIn 0.25s ease;
+}
+
+.guardian-wizard-panel.active {
+    display: block;
+    max-height: 26rem;
+    overflow-y: auto;
+    padding-right: 0.15rem;
+}
+
+@keyframes guardianWizardFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(6px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.guardian-wizard-step {
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: none;
+}
+
+.guardian-wizard-step-hint {
+    font-size: 0.8rem;
+    color: var(--guardian-charcoal-muted);
+    margin-bottom: 1rem;
+}
+
+.guardian-step-label {
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--guardian-sage);
+    margin-bottom: 0.35rem;
+}
+
+.guardian-step-title {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--guardian-charcoal);
+    margin-bottom: 0.75rem;
+}
+
+.guardian-nudge {
+    background: var(--guardian-sage-subtle);
+    border-left: 4px solid var(--guardian-sage);
+    border-radius: 0.5rem;
+    padding: 1rem 1.1rem;
+    font-size: 0.875rem;
+    color: var(--guardian-charcoal);
+    line-height: 1.55;
+}
+
+.guardian-nudge strong {
+    color: var(--guardian-sage);
+}
+
+.guardian-milestone-card {
+    background: #fff;
+    border: 2px solid #e8ece9;
+    border-radius: 0.75rem;
+    padding: 1rem;
+    height: 100%;
+    cursor: pointer;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.guardian-milestone-card:hover {
+    border-color: var(--guardian-sage-light);
+}
+
+.guardian-milestone-card.selected,
+.guardian-milestone-card:has(.form-check-input:checked) {
+    border-color: var(--guardian-sage);
+    box-shadow: 0 0 0 3px rgba(74, 107, 93, 0.15);
+    background: #fff;
+}
+
+.guardian-milestone-card .form-check-input:checked {
+    background-color: var(--guardian-sage);
+    border-color: var(--guardian-sage);
+}
+
+.guardian-milestone-age {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--guardian-charcoal-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.guardian-milestone-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--guardian-charcoal);
+    margin: 0.2rem 0;
+}
+
+.guardian-milestone-desc {
+    font-size: 0.78rem;
+    color: var(--guardian-charcoal-muted);
+    line-height: 1.45;
+    margin: 0;
+}
+
+.guardian-slider-wrap {
+    background: #fff;
+    border: 1px solid #e8ece9;
+    border-radius: 0.75rem;
+    padding: 1.25rem;
+}
+
+.guardian-responsibility-slider {
+    accent-color: var(--guardian-sage);
+    width: 100%;
+    height: 0.5rem;
+}
+
+.guardian-slider-labels {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--guardian-charcoal);
+    margin-top: 0.5rem;
+}
+
+.guardian-slider-narrative {
+    margin-top: 1rem;
+    padding: 1rem;
+    background: var(--guardian-sage-subtle);
+    border-radius: 0.5rem;
+    font-size: 0.9rem;
+    line-height: 1.55;
+    color: var(--guardian-charcoal);
+}
+
+.guardian-summary-seal {
+    background: linear-gradient(135deg, #fff 0%, var(--guardian-sage-subtle) 100%);
+    border: 1px solid #d4e0da;
+    border-radius: 0.85rem;
+    padding: 1.35rem 1.5rem;
+    margin-top: 1.5rem;
+}
+
+.guardian-summary-seal h3 {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--guardian-charcoal);
+    margin-bottom: 0.85rem;
+}
+
+.guardian-summary-seal ul {
+    margin: 0;
+    padding-left: 1.2rem;
+    color: var(--guardian-charcoal);
+    font-size: 0.9rem;
+    line-height: 1.6;
+}
+
+.guardian-summary-seal li {
+    margin-bottom: 0.45rem;
+}
+
+.guardian-summary-credit {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px dashed #c5d4cc;
+    font-size: 0.8rem;
+    color: var(--guardian-charcoal-muted);
+    line-height: 1.5;
+}
+
+.guardian-preset-card {
+    background: var(--guardian-ivory);
+    border: 1px solid #d4e0da !important;
+}
+
+.guardian-preset-card .card-header {
+    background: var(--guardian-sage) !important;
+    color: #fff !important;
+    border-bottom: none;
+}
+
+.guardian-wizard-modal .modal-footer {
+    background: #fff;
+    border-top: 1px solid #e8ece9;
+    justify-content: space-between;
+}
+
+.guardian-wizard-footer-actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-left: auto;
+}
+
+.guardian-advanced-toggle {
+    color: var(--guardian-charcoal-muted);
+    font-size: 0.85rem;
+}

@@ -19,7 +19,7 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
     <div>
-        <h1 class="fw-bold mb-1" style="font-size: 2.25rem; font-weight: 800; letter-spacing: -0.025em;">
+        <h1 class="guardian-page-title mb-1">
             {% if device.platform == 'android' %}
             <i class="fab fa-android text-success me-1"></i>
             {% elif device.platform == 'nintendo' %}
@@ -31,8 +31,8 @@
             {% endif %}
             {{ device_label }}
         </h1>
-        <p class="text-secondary mb-0 fw-medium">
-            Device details, account mappings, application inventory, and alert logs.
+        <p class="guardian-page-lead mb-0">
+            Accounts, apps, and gentle alerts for this device.
         </p>
     </div>
     <div>
@@ -285,7 +285,7 @@
                         {% if device.platform == 'android' %}
                         <hr>
                         <p class="small text-secondary mb-3">
-                            <strong>Factory reset</strong> erases this Android device and removes TimeKpr management.
+                            <strong>Factory reset</strong> erases this Android device and removes Guardian management.
                             All personal data on the device will be deleted. This cannot be undone.
                             Requires device-owner provisioning.
                         </p>
@@ -557,14 +557,14 @@
                                     <label class="form-label fw-bold text-body small" for="short_support_message">Short Support Message</label>
                                     <input type="text" class="form-control form-control-sm" id="short_support_message"
                                         name="short_support_message" maxlength="200" required
-                                        value="{{ android_device_policy.short_support_message if android_device_policy else 'This setting is managed by your parent through TimeKpr.' }}">
+                                        value="{{ android_device_policy.short_support_message if android_device_policy else 'This setting is managed by your parent through Guardian.' }}">
                                     <div class="form-text small text-secondary" style="font-size: 0.75rem;">Shown when a restricted setting is blocked (e.g., in Settings). Max 200 chars.</div>
                                 </div>
                                 <div class="mb-4">
                                     <label class="form-label fw-bold text-body small" for="long_support_message">Long Support Message</label>
                                     <textarea class="form-control form-control-sm" id="long_support_message"
                                         name="long_support_message" rows="3" maxlength="4096"
-                                        required>{{ android_device_policy.long_support_message if android_device_policy else 'This device is protected by TimeKpr parental controls. Your parent manages screen time, apps, and websites. Ask them if you need something changed.' }}</textarea>
+                                        required>{{ android_device_policy.long_support_message if android_device_policy else 'This device is protected by Guardian. Your parent manages screen time, apps, and websites. Ask them if you need something changed.' }}</textarea>
                                     <div class="form-text small text-secondary" style="font-size: 0.75rem;">Shown in the Device Administrator details screen. Max 4096 chars.</div>
                                 </div>
 
@@ -631,13 +631,13 @@
                             </div>
                             <div>
                                 <h5 class="mb-0 fw-bold card-title-accent">Unlocking Advanced Restrictions</h5>
-                                <span class="text-secondary small fw-medium">TimeKpr needs Device Owner (DO) permission for these controls.</span>
+                                <span class="text-secondary small fw-medium">Guardian needs Device Owner permission for these controls.</span>
                             </div>
                         </div>
                         <div class="card-body">
                             <p class="small text-secondary mb-3">
                                 Enforcing hardware limitations, preventing uninstall, and automatically provisioning child user
-                                accounts requires the TimeKpr agent to be set as <strong>Device Owner</strong>.
+                                accounts requires the Guardian agent to be set as <strong>Device Owner</strong>.
                             </p>
 
                             <h6 class="fw-bold small text-body mb-2">To provision via ADB:</h6>
@@ -653,7 +653,7 @@
 
                             <p class="small text-secondary mb-0">
                                 <i class="fas fa-info-circle me-1 text-primary"></i> Once successfully executed, restart the
-                                TimeKpr agent. The Device Owner status will refresh and unlock these restrictions.
+                                Guardian agent. Device Owner status will refresh and unlock these routine locks.
                             </p>
                         </div>
                     </div>
@@ -1515,7 +1515,7 @@ adb reboot</pre>
             factoryResetBtn.addEventListener('click', async () => {
                 const expected = factoryResetBtn.dataset.deviceLabel || 'RESET';
                 const typed = prompt(
-                    `Erase this Android device and remove TimeKpr management. All personal data will be deleted.\n\nType "${expected}" or RESET to confirm:`
+                    `Erase this Android device and remove Guardian management. All personal data will be deleted.\n\nType "${expected}" or RESET to confirm:`
                 );
                 if (!typed || (typed !== expected && typed !== 'RESET')) return;
 

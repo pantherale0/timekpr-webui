@@ -82,7 +82,9 @@ def admin_users():
     approved_devices = AgentDevice.query.filter_by(status='approved').all()
     
     from src.marketplace_manager import load_marketplace_presets
+    from src.policy_preset_manager import get_matrix_metadata_for_ui
     marketplace_presets = load_marketplace_presets()
+    policy_preset_matrix = get_matrix_metadata_for_ui()
 
     return render_template(
         'admin_users.html',
@@ -90,6 +92,7 @@ def admin_users():
         approved_devices=approved_devices,
         device_labels=device_labels,
         marketplace_presets=marketplace_presets,
+        policy_preset_matrix=policy_preset_matrix,
     )
 
 
@@ -106,7 +109,9 @@ def edit_user_profile(user_id):
     blocklist_sources = [s for s in blocklist_sources if not s.get('is_marketplace')]
 
     from src.marketplace_manager import load_marketplace_presets
+    from src.policy_preset_manager import get_matrix_metadata_for_ui
     marketplace_presets = load_marketplace_presets()
+    policy_preset_matrix = get_matrix_metadata_for_ui()
     subscribed_preset_ids = [
         assignment.source.preset_id
         for assignment in user.blocklist_assignments
@@ -207,6 +212,7 @@ def edit_user_profile(user_id):
         approval_settings_by_mapping=approval_settings_by_mapping,
         linux_device_policy_by_mapping=linux_device_policy_by_mapping,
         device_labels=device_labels,
+        policy_preset_matrix=policy_preset_matrix,
     )
 
 

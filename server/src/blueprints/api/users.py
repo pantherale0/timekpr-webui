@@ -22,6 +22,8 @@ def create_managed_user():
 
     username = (request.form.get('username') or '').strip()
     selected_preset_ids = request.form.getlist('preset_ids')
+    policy_age_bracket = (request.form.get('policy_age_bracket') or '').strip()
+    policy_maturity_level = (request.form.get('policy_maturity_level') or '').strip()
 
     if not username:
         flash('Managed user name is required', 'danger')
@@ -40,16 +42,78 @@ def create_managed_user():
     db.session.add(managed_user)
     db.session.commit()
 
-    # Sync curated marketplace preset subscriptions
-    if selected_preset_ids:
+    if policy_age_bracket and policy_maturity_level:
+        from src.policy_preset_manager import apply_policy_preset
+        try:
+            apply_policy_preset(managed_user, policy_age_bracket, policy_maturity_level)
+        except ValueError as exc:
+            _LOGGER.error(
+                "Failed to apply policy preset for user %s: %s",
+                username,
+                exc,
+            )
+            flash(f'Profile created but policy preset failed: {exc}', 'warning')
+        except Exception as exc:
+            _LOGGER.error(
+                "Failed to apply policy preset for user %s: %s",
+                username,
+                exc,
+            )
+            flash('Profile created but policy preset could not be applied', 'warning')
+    elif selected_preset_ids:
         from src.marketplace_manager import sync_marketplace_subscriptions
         try:
             sync_marketplace_subscriptions(managed_user, selected_preset_ids)
         except Exception as exc:
             _LOGGER.error("Failed to subscribe user %s to marketplace presets: %s", username, exc)
 
+    # Advanced override: individual filter packs after composite preset
+    if selected_preset_ids and policy_age_bracket and policy_maturity_level:
+        from src.marketplace_manager import sync_marketplace_subscriptions
+        try:
+            sync_marketplace_subscriptions(managed_user, selected_preset_ids)
+        except Exception as exc:
+            _LOGGER.error(
+                "Failed to apply advanced marketplace overrides for %s: %s",
+                username,
+                exc,
+            )
+
     flash(f'Managed user {username} created', 'success')
     return redirect(url_for('ui_dashboard.admin'))
+
+
+@api_users_bp.route('/managed-users/<int:user_id>/apply-policy-preset', methods=['POST'])
+def apply_policy_preset_route(user_id):
+    """Apply or re-apply an age × maturity policy preset to a managed child profile."""
+    if not session.get('logged_in'):
+        return jsonify({'success': False, 'message': 'Not authenticated'}), 401
+
+    user = ManagedUser.query.get_or_404(user_id)
+    policy_age_bracket = (request.form.get('policy_age_bracket') or '').strip()
+    policy_maturity_level = (request.form.get('policy_maturity_level') or '').strip()
+
+    if not policy_age_bracket or not policy_maturity_level:
+        flash('Age bracket and technical understanding level are required', 'danger')
+        return redirect(url_for('ui_dashboard.edit_user_profile', user_id=user.id))
+
+    from src.policy_preset_manager import apply_policy_preset
+
+    try:
+        apply_policy_preset(user, policy_age_bracket, policy_maturity_level)
+        flash(f'Policy preset applied for {user.username}', 'success')
+    except ValueError as exc:
+        flash(f'Failed to apply policy preset: {exc}', 'danger')
+    except Exception as exc:
+        _LOGGER.error(
+            "Failed to apply policy preset for user %s (id=%d): %s",
+            user.username,
+            user.id,
+            exc,
+        )
+        flash('Failed to apply policy preset', 'danger')
+
+    return redirect(url_for('ui_dashboard.edit_user_profile', user_id=user.id))
 
 
 @api_users_bp.route('/managed-users/<int:user_id>/mappings/add', methods=['POST'])

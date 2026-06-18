@@ -1,13 +1,13 @@
 {% extends "base.html" %}
 
 {% from '_macros.html' import csrf_field %}
-{% block title %}App Locks & Policies - Guardian{% endblock %}
+{% block title %}App Routine Locks - Guardian{% endblock %}
 
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
     <div>
-        <h1 class="fw-bold mb-1" style="font-size: 2.25rem; font-weight: 800; letter-spacing: -0.025em;">App Locks &amp; Policies</h1>
-        <p class="text-secondary mb-0 fw-medium">Create reusable application lock profiles and enforce them across child accounts.</p>
+        <h1 class="guardian-page-title mb-1">App Routine Locks</h1>
+        <p class="guardian-page-lead mb-0">Build reusable app-lock profiles and apply them gently across your children's accounts.</p>
     </div>
     
     <!-- Real-time search/filter bar -->
@@ -27,7 +27,7 @@
                 <div class="bg-success-subtle text-success p-2 rounded d-flex align-items-center justify-content-center" style="width: 38px; height: 38px;">
                     <i class="fas fa-folder-plus fs-5"></i>
                 </div>
-                <h5 class="mb-0 fw-bold">Create New App Policy Profile</h5>
+                <h5 class="mb-0 fw-bold">Create an app routine profile</h5>
             </div>
             <div class="card-body">
                 <form action="{{ url_for('ui_apparmor.create_app_policy') }}" method="POST" class="row g-3 align-items-end m-0">

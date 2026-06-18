@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login - Guardian</title>
-    <meta name="description" content="Secure administrative login console for Guardian parental controls. Log in to manage screen time, user limits, schedules, and application locks.">
+    <meta name="description" content="Sign in to Guardian Family Safety — calm routines, browsing shields, and family dialogue.">
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website">
     <meta property="og:title" content="Login - Guardian">
@@ -17,11 +17,12 @@
     <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap" rel="stylesheet">
     
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/guardian-wizard.css') }}">
     <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
     <style>
         body {
             font-family: 'Atkinson Hyperlegible', sans-serif;
-            background: linear-gradient(135deg, var(--bs-body-bg) 0%, var(--bs-border-color) 100%);
+            background: linear-gradient(160deg, var(--guardian-ivory) 0%, var(--guardian-sage-subtle) 100%);
             min-height: 100vh;
             display: flex;
             align-items: center;
@@ -73,18 +74,18 @@
                 <form method="POST" action="{{ url_for('login') }}" class="m-0">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <div class="input-group mb-3 shadow-sm rounded">
-                        <input type="text" id="username" name="username" class="form-control" placeholder="Admin Username" required autocomplete="username">
+                        <input type="text" id="username" name="username" class="form-control" placeholder="Parent username" required autocomplete="username">
                         <span class="input-group-text bg-body text-secondary"><i class="fas fa-user"></i></span>
                     </div>
                     <div class="input-group mb-4 shadow-sm rounded">
-                        <input type="password" id="password" name="password" class="form-control" placeholder="Admin Password" required autocomplete="current-password">
+                        <input type="password" id="password" name="password" class="form-control" placeholder="Password" required autocomplete="current-password">
                         <span class="input-group-text bg-body text-secondary"><i class="fas fa-lock"></i></span>
                     </div>
 
                     <div class="row">
                         <div class="col-12">
                             <button type="submit" class="btn btn-primary btn-cta w-100 fw-bold py-2 shadow-sm">
-                                <i class="fas fa-sign-in-alt me-1"></i> Sign In to Console
+                                <i class="fas fa-sign-in-alt me-1"></i> Sign in
                             </button>
                         </div>
                     </div>
