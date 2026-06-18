@@ -23,6 +23,7 @@ import com.guardian.agent.policy.DeviceRestrictionPolicy
 import com.guardian.agent.policy.PolicyStorePayloadPush
 import com.guardian.agent.policy.ProfileProvisioningStore
 import com.guardian.agent.ui.TimeExhaustedOverlay
+import com.guardian.agent.ui.GuardianOverlayActivity
 import com.guardian.agent.util.AgentLog
 import com.guardian.agent.util.AndroidUsers
 import com.guardian.agent.vpn.DomainBlockVpnService
@@ -171,6 +172,20 @@ class EnforcementController(
     private fun enforceTimeExhaustionForUser(username: String, uid: Int, dpm: DevicePolicyManager) {
         val showCallButton = PhoneCallExemption.canMakeCalls(context)
         if (uid == AndroidUsers.activeUserUid(context)) {
+            // Launch the Guardian Space full-screen overlay
+            try {
+                val overlayIntent = GuardianOverlayActivity.buildIntent(
+                    context = context.applicationContext,
+                    reason = "sleep",
+                    ageTier = null,
+                    parentNote = null,
+                    deviceName = android.os.Build.MODEL,
+                    linuxUsername = username,
+                )
+                context.startActivity(overlayIntent)
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to launch GuardianOverlayActivity for $username", e)
+            }
             TimeExhaustedOverlay.show(context, showCallButton)
         }
 

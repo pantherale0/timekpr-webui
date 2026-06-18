@@ -10,6 +10,8 @@ from src.installed_apps_manager import list_installed_apps_for_managed_user
 
 _LOGGER = logging.getLogger(__name__)
 
+_VALID_AGE_TIERS = {"under8", "eight12", "teen"}
+
 api_users_bp = Blueprint('api_users', __name__)
 
 
@@ -19,6 +21,8 @@ def create_managed_user():
         return jsonify({'success': False, 'message': 'Not authenticated'}), 401
 
     username = (request.form.get('username') or '').strip()
+    selected_preset_ids = request.form.getlist('preset_ids')
+
     if not username:
         flash('Managed user name is required', 'danger')
         return redirect(url_for('ui_dashboard.admin'))
@@ -35,6 +39,14 @@ def create_managed_user():
     )
     db.session.add(managed_user)
     db.session.commit()
+
+    # Sync curated marketplace preset subscriptions
+    if selected_preset_ids:
+        from src.marketplace_manager import sync_marketplace_subscriptions
+        try:
+            sync_marketplace_subscriptions(managed_user, selected_preset_ids)
+        except Exception as exc:
+            _LOGGER.error("Failed to subscribe user %s to marketplace presets: %s", username, exc)
 
     flash(f'Managed user {username} created', 'success')
     return redirect(url_for('ui_dashboard.admin'))
@@ -147,6 +159,14 @@ def add_user():
     )
     db.session.add(mapping)
     db.session.commit()
+
+    selected_preset_ids = request.form.getlist('preset_ids')
+    if selected_preset_ids:
+        from src.marketplace_manager import sync_marketplace_subscriptions
+        try:
+            sync_marketplace_subscriptions(user, selected_preset_ids)
+        except Exception as exc:
+            _LOGGER.error("Failed to subscribe user %s to marketplace presets: %s", username, exc)
 
     from app import task_manager
     task_manager.notify_domain_policy_hint(system_ids={system_id}, reason='mapping_updated')
@@ -461,3 +481,38 @@ def get_user_stats(user_id):
     })
 
 
+@api_users_bp.route('/managed-users/<int:user_id>/overlay', methods=['PATCH'])
+def update_overlay_settings(user_id):
+    """Update the Guardian Space overlay configuration for a managed user.
+
+    Accepts JSON body with optional ``overlay_age_tier`` and ``overlay_parent_note`` fields.
+    """
+    if not session.get('logged_in'):
+        return jsonify({'success': False, 'message': 'Not authenticated'}), 401
+
+    user = ManagedUser.query.get_or_404(user_id)
+    data = request.get_json(silent=True) or {}
+
+    if 'overlay_age_tier' in data:
+        age_tier = (data['overlay_age_tier'] or '').strip() or None
+        if age_tier is not None and age_tier not in _VALID_AGE_TIERS:
+            return jsonify({
+                'success': False,
+                'message': f"overlay_age_tier must be one of: {', '.join(sorted(_VALID_AGE_TIERS))}",
+            }), 400
+        user.overlay_age_tier = age_tier
+
+    if 'overlay_parent_note' in data:
+        note = data['overlay_parent_note']
+        if note is not None:
+            note = str(note).strip() or None
+        user.overlay_parent_note = note
+
+    db.session.commit()
+    _LOGGER.info("Updated overlay settings for managed user %s (id=%d)", user.username, user.id)
+
+    return jsonify({
+        'success': True,
+        'overlay_age_tier': user.overlay_age_tier,
+        'overlay_parent_note': user.overlay_parent_note,
+    })

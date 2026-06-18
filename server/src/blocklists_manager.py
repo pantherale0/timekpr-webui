@@ -20,6 +20,8 @@ def _serialize_blocklist_source(
         'source_type': source.source_type,
         'source_url': source.source_url,
         'is_enabled': source.is_enabled,
+        'is_marketplace': bool(getattr(source, 'is_marketplace', False)),
+        'preset_id': getattr(source, 'preset_id', None),
         'domain_count': int(domain_count or 0),
         'assigned_user_count': int(assigned_user_count or 0),
         'last_sync_at': source.last_sync_at.strftime('%Y-%m-%d %H:%M') if source.last_sync_at else None,

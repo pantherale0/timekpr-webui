@@ -12,6 +12,19 @@ name = "uniffi-bindgen"
 path = "src/uniffi-bindgen.rs"
 required-features = ["uniffi/cli"]
 
+[[bin]]
+name = "guardian-overlay-helper"
+path = "src/overlay_helper_main.rs"
+required-features = ["cef-overlay"]
+
+[features]
+default = []
+cef-overlay = ["dep:cef"]
+
+[package.metadata.cef.bundle]
+helper_name = "guardian-overlay-helper"
+resources_path = "overlay_resources"
+
 [dependencies]
 uniffi = { version = "0.28.0", features = ["cli", "tokio"] }
 tokio = { version = "1.35", features = ["full"] }
@@ -32,7 +45,7 @@ base64 = "0.22"
 minisign-verify = "0.2.5"
 image = { version = "0.25", default-features = false, features = ["jpeg", "png"] }
 sentry = { version = "0.34.0", default-features = false, features = ["backtrace", "contexts", "panic", "reqwest", "rustls"] }
-
+cef = { version = "149", optional = true, features = ["build-util"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 zbus = { version = "5.15.0", default-features = false, features = ["tokio"] }

@@ -6,6 +6,8 @@ use serde::{Deserialize, Serialize};
 struct AgentConfig {
     server_url: String,
     agent_token: Option<String>,
+    #[serde(default)]
+    system_id: Option<String>,
 }
 
 fn get_config_path() -> String {
@@ -98,6 +100,13 @@ enum IpcRequest {
     LoginDetected {
         domain: String,
         username: String,
+    },
+    /// Access request forwarded by the Guardian Space browser overlay.
+    /// The browser extension sends this when the child taps a preset button.
+    #[serde(rename = "ACCESS_REQUEST")]
+    AccessRequest {
+        reason: String,
+        message: String,
     },
 }
 
@@ -198,6 +207,15 @@ async fn process_ipc_messages<R: tokio::io::AsyncReadExt + Unpin, W: tokio::io::
             }
             IpcRequest::LoginDetected { domain, username: login_username } => {
                 let response = handle_login_detected(username, domain, login_username).await;
+                if let Ok(res_bytes) = serde_json::to_vec(&response) {
+                    if let Err(e) = write_framed_message(writer, &res_bytes).await {
+                        eprintln!("IPC error writing response: {}", e);
+                        break;
+                    }
+                }
+            }
+            IpcRequest::AccessRequest { reason, message } => {
+                let response = handle_access_request(username, reason, message).await;
                 if let Ok(res_bytes) = serde_json::to_vec(&response) {
                     if let Err(e) = write_framed_message(writer, &res_bytes).await {
                         eprintln!("IPC error writing response: {}", e);
@@ -408,6 +426,70 @@ async fn handle_request_registration(username: &str, domain: String) -> serde_js
             serde_json::json!({
                 "success": false,
                 "message": format!("Failed to route request to backend: {}", e)
+            })
+        }
+    }
+}
+
+async fn handle_access_request(username: &str, reason: String, message: String) -> serde_json::Value {
+    let Some(config) = load_agent_config() else {
+        return serde_json::json!({
+            "success": false,
+            "message": "Local agent config missing or unreadable"
+        });
+    };
+
+    let system_id = match config.system_id {
+        Some(ref id) if !id.is_empty() => id.clone(),
+        _ => {
+            return serde_json::json!({
+                "success": false,
+                "message": "system_id not set in agent config"
+            });
+        }
+    };
+
+    let rest_url = convert_ws_to_http(&config.server_url);
+    let target_url = format!("{}/api/access-request", rest_url);
+    let token = config.agent_token.as_deref().unwrap_or("");
+
+    let payload = serde_json::json!({
+        "system_id": system_id,
+        "linux_username": username,
+        "reason": reason,
+        "message": message,
+    });
+
+    let payload_str = serde_json::to_string(&payload).unwrap_or_default();
+
+    let client = reqwest::Client::new();
+    match client
+        .post(&target_url)
+        .header("Authorization", format!("Bearer {}", token))
+        .header("Content-Type", "application/json")
+        .body(payload_str)
+        .send()
+        .await
+    {
+        Ok(res) => {
+            let status = res.status();
+            if status.is_success() {
+                let text = res.text().await.unwrap_or_default();
+                serde_json::from_str::<serde_json::Value>(&text).unwrap_or_else(|_| {
+                    serde_json::json!({ "success": true, "message": "Access request submitted" })
+                })
+            } else {
+                let err_msg = res.text().await.unwrap_or_default();
+                serde_json::json!({
+                    "success": false,
+                    "message": format!("Server returned HTTP {}: {}", status.as_u16(), err_msg)
+                })
+            }
+        }
+        Err(e) => {
+            serde_json::json!({
+                "success": false,
+                "message": format!("Failed to submit access request: {}", e)
             })
         }
     }

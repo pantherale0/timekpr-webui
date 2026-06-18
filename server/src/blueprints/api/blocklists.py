@@ -252,3 +252,81 @@ def get_blocklist_sync_status(user_id):
         'awaiting_uid_count': status['awaiting_uid_count'],
         'mappings': status['mappings'],
     })
+
+
+@api_blocklists_bp.route('/managed-users/<int:user_id>/blocklists/subscribe-marketplace', methods=['POST'])
+def subscribe_user_marketplace(user_id):
+    if not session.get('logged_in'):
+        return jsonify({'success': False, 'message': 'Not authenticated'}), 401
+
+    user = ManagedUser.query.get_or_404(user_id)
+    selected_preset_ids = request.form.getlist('preset_ids')
+    redirect_target = request.form.get('redirect_to') or 'profile'
+
+    from src.marketplace_manager import sync_marketplace_subscriptions
+    try:
+        sync_marketplace_subscriptions(user, selected_preset_ids)
+        flash(f'Curated filter subscriptions updated for {user.username}', 'success')
+    except Exception as exc:
+        _LOGGER.error("Failed to update marketplace subscriptions: %s", exc)
+        flash('Failed to update curated filter subscriptions', 'danger')
+
+    if redirect_target == 'restrictions':
+        return redirect(url_for('ui_dashboard.admin_restrictions'))
+    return redirect(url_for('ui_dashboard.edit_user_profile', user_id=user.id))
+
+
+@api_blocklists_bp.route('/admin/marketplace/subscribe', methods=['POST'])
+def subscribe_preset_users():
+    if not session.get('logged_in'):
+        return jsonify({'success': False, 'message': 'Not authenticated'}), 401
+
+    preset_id = (request.form.get('preset_id') or '').strip()
+    if not preset_id:
+        flash('Preset ID is required', 'danger')
+        return redirect(url_for('ui_dashboard.admin_restrictions'))
+
+    from src.marketplace_manager import get_marketplace_presets_dict, sync_marketplace_subscriptions
+    presets = get_marketplace_presets_dict()
+    if preset_id not in presets:
+        flash(' Curated preset not found', 'danger')
+        return redirect(url_for('ui_dashboard.admin_restrictions'))
+
+    # Get user IDs submitted from the checkboxes
+    submitted_user_ids = {
+        int(raw_id)
+        for raw_id in request.form.getlist('user_ids')
+        if raw_id.strip().isdigit()
+    }
+
+    # Fetch all active users to reconcile subscriptions for this preset
+    all_users = ManagedUser.query.all()
+    
+    try:
+        for user in all_users:
+            # Determine existing subscriptions for this user
+            current_preset_ids = []
+            for assignment in user.blocklist_assignments:
+                if assignment.source and assignment.source.is_marketplace and assignment.source.preset_id:
+                    current_preset_ids.append(assignment.source.preset_id)
+            
+            # Reconcile for this specific preset
+            should_be_subscribed = user.id in submitted_user_ids
+            is_subscribed = preset_id in current_preset_ids
+            
+            if should_be_subscribed != is_subscribed:
+                new_preset_ids = list(set(current_preset_ids))
+                if should_be_subscribed:
+                    new_preset_ids.append(preset_id)
+                else:
+                    if preset_id in new_preset_ids:
+                        new_preset_ids.remove(preset_id)
+                
+                sync_marketplace_subscriptions(user, new_preset_ids)
+                
+        flash(f'Curated filter "{presets[preset_id]["name"]}" subscriptions updated successfully', 'success')
+    except Exception as exc:
+        _LOGGER.error("Failed to update marketplace subscriptions for preset %s: %s", preset_id, exc)
+        flash('Failed to update curated filter subscriptions', 'danger')
+
+    return redirect(url_for('ui_dashboard.admin_restrictions'))

@@ -63,6 +63,18 @@
             android:showWhenLocked="true"
             android:excludeFromRecents="true" />
 
+        <!-- Guardian Space overlay — shows blockedv2.html when enforcement triggers -->
+        <activity
+            android:name=".ui.GuardianOverlayActivity"
+            android:exported="false"
+            android:launchMode="singleInstance"
+            android:theme="@style/Theme.GuardianAgent"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:excludeFromRecents="true"
+            android:taskAffinity="com.guardian.agent.overlay" />
+
+
         <activity
             android:name=".admin.DeviceAdminActivationActivity"
             android:exported="false" />

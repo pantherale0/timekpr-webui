@@ -1,6 +1,7 @@
 package com.guardian.agent.ui
 
 import android.app.NotificationChannel
+
 import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
@@ -24,6 +25,10 @@ import com.guardian.agent.boot.OtpLockActivity
 
 /**
  * Persistent top banner shown when screen time is exhausted or owner profile lockdown is active.
+ *
+ * For [Mode.TIME_EXHAUSTED] the richer [GuardianOverlayActivity] is launched first; this banner
+ * remains as a lightweight fallback when the SYSTEM_ALERT_WINDOW permission is not granted or
+ * when the overlay window manager call fails.
  */
 object TimeExhaustedOverlay {
     enum class Mode {
@@ -42,6 +47,23 @@ object TimeExhaustedOverlay {
     private var currentMode: Mode? = null
 
     fun show(context: Context, showCallButton: Boolean, mode: Mode = Mode.TIME_EXHAUSTED) {
+        if (mode == Mode.TIME_EXHAUSTED) {
+            // Launch the full Guardian Space overlay for richer UX.
+            // The banner below acts as a supplementary reminder at the top of the screen.
+            try {
+                val overlayIntent = GuardianOverlayActivity.buildIntent(
+                    context = context.applicationContext,
+                    reason = "sleep",
+                    ageTier = null,   // server will push the correct tier via show_overlay command
+                    parentNote = null,
+                    deviceName = android.os.Build.MODEL,
+                    linuxUsername = "android",
+                )
+                context.startActivity(overlayIntent)
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to launch GuardianOverlayActivity", e)
+            }
+        }
         handler.post {
             if (!Settings.canDrawOverlays(context)) {
                 showNotificationFallback(context.applicationContext, mode)

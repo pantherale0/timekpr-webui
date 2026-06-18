@@ -31,17 +31,35 @@
                 <h5 class="mb-0 fw-bold">Create Managed Child Account</h5>
             </div>
             <div class="card-body p-4">
-                <form action="{{ url_for('create_managed_user') }}" method="POST" class="row g-3 align-items-end">
-
-                    {{ csrf_field() }} <div class="col-12 col-md-9">
+                <form action="{{ url_for('create_managed_user') }}" method="POST" class="row g-3">
+                    {{ csrf_field() }}
+                    <div class="col-12 col-md-8">
                         <label for="username" class="form-label fw-bold small text-muted text-uppercase mb-2"
                             style="font-size: 0.75rem; letter-spacing: 0.05em;">Child Profile Name</label>
                         <input type="text" id="username" name="username" class="form-control" placeholder="e.g. Jordan"
                             required>
                     </div>
-                    <div class="col-12 col-md-3">
-                        <button type="submit" class="btn btn-primary w-100 fw-bold"><i class="fas fa-plus me-1"></i>
-                            Create Profile</button>
+                    <div class="col-12 col-md-4 d-flex align-items-end">
+                        <button type="submit" class="btn btn-primary w-100 fw-bold py-2"><i class="fas fa-plus me-2"></i> Create Profile</button>
+                    </div>
+
+                    <div class="col-12 mt-3">
+                        <label class="form-label fw-bold small text-muted text-uppercase mb-2" style="font-size: 0.75rem; letter-spacing: 0.05em;">Apply Curated Filter Packs (Recommended)</label>
+                        <div class="row g-2">
+                            {% for preset in marketplace_presets %}
+                            <div class="col-12 col-sm-6 col-md-4">
+                                <div class="border rounded p-3 bg-body-tertiary h-100 d-flex align-items-center">
+                                    <div class="form-check">
+                                        <input class="form-check-input cursor-pointer" type="checkbox" name="preset_ids" value="{{ preset.id }}" id="create-preset-{{ preset.id }}">
+                                        <label class="form-check-label ms-2 cursor-pointer small fw-bold text-body" for="create-preset-{{ preset.id }}">
+                                            {{ preset.name }}
+                                            <span class="text-secondary d-block" style="font-size: 0.7rem; font-weight: normal;">Ages: {{ preset.recommended_ages|join(', ') }}</span>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
                     </div>
                 </form>
             </div>

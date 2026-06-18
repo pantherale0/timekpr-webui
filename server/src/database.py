@@ -313,6 +313,11 @@ class ManagedUser(db.Model):
     pending_time_operation = db.Column(db.String(1), nullable=True) # + or -
     daily_limit_adjustment_date = db.Column(db.Date, nullable=True)
     daily_limit_adjustment_seconds = db.Column(db.Integer, nullable=True)
+
+    # Guardian Space overlay personalisation
+    overlay_age_tier = db.Column(db.String(16), nullable=True)  # under8 | eight12 | teen
+    overlay_parent_note = db.Column(db.Text, nullable=True)     # Message shown on the blocked overlay
+
     
     # Relationship with usage data and weekly schedules
     usage_data = db.relationship('UserTimeUsage', backref='user', lazy=True, cascade="all, delete-orphan")
@@ -646,6 +651,8 @@ class BlocklistSource(db.Model):
     source_type = db.Column(db.String(32), nullable=False, default=TYPE_MANUAL)
     source_url = db.Column(db.Text, nullable=True)
     is_enabled = db.Column(db.Boolean, default=True, nullable=False)
+    is_marketplace = db.Column(db.Boolean, default=False, nullable=False)
+    preset_id = db.Column(db.String(64), nullable=True)
     last_sync_at = db.Column(db.DateTime(timezone=True), nullable=True)
     last_sync_status = db.Column(db.String(32), default=SYNC_NEVER, nullable=False)
     last_sync_error = db.Column(db.Text, nullable=True)

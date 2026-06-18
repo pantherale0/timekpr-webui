@@ -80,11 +80,16 @@ def admin_users():
     users = ManagedUser.query.order_by(ManagedUser.username.asc()).all()
     device_labels = _get_device_label_map()
     approved_devices = AgentDevice.query.filter_by(status='approved').all()
+    
+    from src.marketplace_manager import load_marketplace_presets
+    marketplace_presets = load_marketplace_presets()
+
     return render_template(
         'admin_users.html',
         users=users,
         approved_devices=approved_devices,
         device_labels=device_labels,
+        marketplace_presets=marketplace_presets,
     )
 
 
@@ -98,6 +103,15 @@ def edit_user_profile(user_id):
     user = ManagedUser.query.get_or_404(user_id)
     blocklist_sync_status = _build_user_blocklist_sync_status(user)
     blocklist_sources = _get_blocklist_sources(include_domains=False, enabled_only=True)
+    blocklist_sources = [s for s in blocklist_sources if not s.get('is_marketplace')]
+
+    from src.marketplace_manager import load_marketplace_presets
+    marketplace_presets = load_marketplace_presets()
+    subscribed_preset_ids = [
+        assignment.source.preset_id
+        for assignment in user.blocklist_assignments
+        if assignment.source and assignment.source.is_marketplace and assignment.source.preset_id
+    ]
     app_policies = AppPolicy.query.order_by(AppPolicy.name.asc()).all()
     linux_app_policies = [policy for policy in app_policies if policy.platform == AppPolicy.PLATFORM_LINUX]
     android_app_policies = [policy for policy in app_policies if policy.platform == AppPolicy.PLATFORM_ANDROID]
@@ -182,6 +196,8 @@ def edit_user_profile(user_id):
         user=user,
         blocklist_sources=blocklist_sources,
         blocklist_sync_status=blocklist_sync_status,
+        marketplace_presets=marketplace_presets,
+        subscribed_preset_ids=subscribed_preset_ids,
         app_policies=app_policies,
         linux_app_policies=linux_app_policies,
         android_app_policies=android_app_policies,
@@ -246,9 +262,27 @@ def admin_restrictions():
         return redirect(url_for('ui_auth.login'))
     
     blocklist_sources = _get_blocklist_sources(include_domains=True)
+    custom_sources = [s for s in blocklist_sources if not s.get('is_marketplace')]
+
+    from src.marketplace_manager import load_marketplace_presets
+    marketplace_presets = load_marketplace_presets()
+    
+    users = ManagedUser.query.order_by(ManagedUser.username.asc()).all()
+    subscribed_map = {preset['id']: [] for preset in marketplace_presets}
+    
+    for u in users:
+        for assignment in u.blocklist_assignments:
+            if assignment.source and assignment.source.is_marketplace and assignment.source.preset_id:
+                pid = assignment.source.preset_id
+                if pid in subscribed_map:
+                    subscribed_map[pid].append(u.id)
+
     return render_template(
         'restrictions.html',
-        blocklist_sources=blocklist_sources,
+        blocklist_sources=custom_sources,
+        marketplace_presets=marketplace_presets,
+        users=users,
+        subscribed_map=subscribed_map,
     )
 
 

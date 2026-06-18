@@ -733,6 +733,31 @@ class AgentClient:
             raise RuntimeError(message or 'Agent rejected capture_screenshot')
         return data or {"queued": True}
 
+    def show_overlay(self, username, reason, age_tier, parent_note, device_name):
+        """Ask the agent to show the Guardian Space blocked overlay for a managed user."""
+        success, message, _ = AgentConnectionManager.send_command_sync(
+            self.system_id,
+            "show_overlay",
+            username,
+            {
+                "reason": reason or "sleep",
+                "age_tier": age_tier or "eight12",
+                "parent_note": parent_note or "",
+                "device_name": device_name or "",
+            },
+        )
+        return success, message
+
+    def dismiss_overlay(self, username):
+        """Ask the agent to dismiss the Guardian Space blocked overlay."""
+        success, message, _ = AgentConnectionManager.send_command_sync(
+            self.system_id,
+            "dismiss_overlay",
+            username,
+            {},
+        )
+        return success, message
+
     def unenroll_device(self, username):
         """Ask the connected agent to stop enforcement and clear local enrollment state."""
         success, message, _ = AgentConnectionManager.send_command_sync(

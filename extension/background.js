@@ -43,7 +43,21 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         );
         return false;
     }
+
+    // Forward child access requests (Guardian Space overlay) to the native agent
+    if (message.type === "ACCESS_REQUEST") {
+        sendNativeRequest(
+            {
+                type: "ACCESS_REQUEST",
+                reason: message.reason || "unknown",
+                message: message.message || ""
+            },
+            () => {}
+        );
+        return false;
+    }
 });
+
 
 // ============================================================
 // Registration enforcement
@@ -63,14 +77,16 @@ function handleCheckRegistration(message, sender, sendResponse) {
                 return;
             }
 
-            // Registration is blocked — redirect tab to the extension block page
+            // Registration is blocked — redirect tab to the Guardian Space block page
             if (sender && sender.tab && sender.tab.id) {
                 const blockUrl =
-                    chrome.runtime.getURL("blocked.html") +
-                    "?url=" +
-                    encodeURIComponent(message.url || "") +
-                    "&domain=" +
-                    encodeURIComponent(message.domain || "");
+                    chrome.runtime.getURL("blockedv2.html") +
+                    "?reason=signup" +
+                    "&age=eight12" +
+                    "&device=" +
+                    encodeURIComponent(message.domain || "") +
+                    "&note=" +
+                    encodeURIComponent("Creating accounts online requires a parent check.");
 
                 chrome.tabs.update(sender.tab.id, { url: blockUrl });
             }

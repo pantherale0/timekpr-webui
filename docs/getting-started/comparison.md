@@ -98,6 +98,7 @@ Historical **Circle Home Plus** hardware is a different model (LAN DNS/filter). 
 | Remote device lock | Partial | Vendor | Vendor | Vendor | Vendor | Vendor | Vendor |
 | Remote factory reset | Partial (Android DO) | No | No | No | No | Partial (Bark Phone) | No |
 | Screenshots (desktop) | Yes (Linux/Windows) | No | No | No | Rare | No | Rare |
+| **Guardian Space overlay** (age-tuned full-screen block page with breathing & drawing intermission + child access-request channel) | **Yes** (browser extension, Linux, Windows, Android) | No | No | No | No | No | No |
 | Access approval workflow | Yes | Partial | Partial | Partial | Partial | No | Partial |
 | Self-hosted / no vendor account | Yes | No | No | No | No | No | No |
 | Open source | Yes | No | No | No | No | No | No |
@@ -249,6 +250,7 @@ Threads such as [r/software — best parental control 2025](https://www.reddit.c
 - You want **one dashboard** for Linux, Windows, Android, Switch, and Xbox without per-device SaaS fees.
 - You prefer **data on your own server** (home NAS, VPS, Docker) with optional OIDC.
 - You want **approval workflows** (child requests app/domain access; parent grants in UI).
+- You want a **child-friendly blocked page** (Guardian Space overlay) that explains restrictions in age-appropriate language, includes a breathing exercise and drawing pad, and lets children send a message to their parent directly from the lock screen.
 - You want to **gate new account sign-ups** on any website — the Guardian extension can block registration pages until you explicitly approve them (see [Site Registration Approvals](../features/registration-approvals.md)).
 - You want a passive **online account inventory** of sites and services your child already has accounts on, without reading messages or passwords.
 - You need **Android Device Owner**-class control on family tablets (with acceptable provisioning constraints).

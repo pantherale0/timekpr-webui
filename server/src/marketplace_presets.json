@@ -1,0 +1,144 @@
+[
+  {
+    "id": "adult_explicit",
+    "name": "Adult & Explicit Content",
+    "description": "Blocks pornographic websites, adult-themed search engines, and sexually explicit online content.",
+    "approx_domain_count": "~120,000 domains",
+    "recommended_ages": [
+      "Under 7",
+      "8–12",
+      "13–15"
+    ],
+    "categories": [
+      "Adult"
+    ],
+    "source_type": "external_url",
+    "source_url": "https://raw.githubusercontent.com/StevenBlack/hosts/master/alternates/porn/hosts",
+    "last_updated": "2026-06-18"
+  },
+  {
+    "id": "gambling",
+    "name": "Gambling",
+    "description": "Blocks online casinos, sports betting platforms, lottery sites, and online gambling applications.",
+    "approx_domain_count": "~30,000 domains",
+    "recommended_ages": [
+      "Under 7",
+      "8–12",
+      "13–15",
+      "16+"
+    ],
+    "categories": [
+      "Gambling"
+    ],
+    "source_type": "external_url",
+    "source_url": "https://raw.githubusercontent.com/StevenBlack/hosts/master/alternates/gambling/hosts",
+    "last_updated": "2026-06-18"
+  },
+  {
+    "id": "social_media",
+    "name": "Social Media & Networks",
+    "description": "Restricts access to major social networks (e.g. Facebook, Instagram, TikTok, Twitter/X, Pinterest, Reddit).",
+    "approx_domain_count": "~87,000 domains",
+    "recommended_ages": [
+      "Under 7",
+      "8–12"
+    ],
+    "categories": [
+      "Social"
+    ],
+    "source_type": "external_url",
+    "source_url": "https://raw.githubusercontent.com/StevenBlack/hosts/refs/heads/master/alternates/social/hosts",
+    "last_updated": "2026-06-18"
+  },
+  {
+    "id": "fake_news",
+    "name": "Fake News",
+    "description": "Blocks known fake news sources",
+    "approx_domain_count": "~1k domains",
+    "recommended_ages": [
+      "Under 7",
+      "8–12"
+    ],
+    "categories": [
+      "News"
+    ],
+    "source_type": "external_url",
+    "source_url": "https://raw.githubusercontent.com/StevenBlack/hosts/refs/heads/master/alternates/fakenews/hosts",
+    "last_updated": "2026-06-18"
+  },
+  {
+    "id": "malware_phishing",
+    "name": "Malware & Phishing Protection",
+    "description": "Blocks malicious hosts, phishing sites, spyware, and adware domains to protect devices from cyber threats.",
+    "approx_domain_count": "~85,000 domains",
+    "recommended_ages": [
+      "Under 7",
+      "8–12",
+      "13–15",
+      "16+"
+    ],
+    "categories": [
+      "Malware"
+    ],
+    "source_type": "external_url",
+    "source_url": "https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts",
+    "last_updated": "2026-06-18"
+  },
+  {
+    "id": "vpn_proxy_bypass",
+    "name": "VPN & Proxy Bypass Protection",
+    "description": "Blocks known VPN services, proxy servers, and bypass tools that are used to circumvent parental control filters.",
+    "approx_domain_count": "~17 domains",
+    "recommended_ages": [
+      "Under 7",
+      "8–12",
+      "13–15"
+    ],
+    "categories": [
+      "VPN/Proxy bypass"
+    ],
+    "source_type": "manual",
+    "domains": [
+      "nordvpn.com",
+      "expressvpn.com",
+      "protonvpn.com",
+      "tunnelbear.com",
+      "windscribe.com",
+      "cyberghostvpn.com",
+      "hotspotshield.com",
+      "surfshark.com",
+      "mullvad.net",
+      "privateinternetaccess.com",
+      "vpnbook.com",
+      "proxysite.com",
+      "hide.me",
+      "croxyproxy.com",
+      "kproxy.com",
+      "whoer.net",
+      "megaproxy.com"
+    ],
+    "last_updated": "2026-06-18"
+  },
+  {
+    "id": "ai_chat",
+    "name": "AI Chat & Assistants",
+    "description": "Restricts access to AI chatbots and generative AI platforms (e.g., ChatGPT, Claude, Google Gemini, Midjourney).",
+    "approx_domain_count": "~6 domains",
+    "recommended_ages": [
+      "Under 7"
+    ],
+    "categories": [
+      "AI chat"
+    ],
+    "source_type": "manual",
+    "domains": [
+      "chatgpt.com",
+      "openai.com",
+      "claude.ai",
+      "gemini.google.com",
+      "midjourney.com",
+      "copilot.microsoft.com"
+    ],
+    "last_updated": "2026-06-18"
+  }
+]

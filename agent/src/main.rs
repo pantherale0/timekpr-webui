@@ -23,6 +23,8 @@ mod update_verify;
 mod terminal_monitor;
 mod extension_policy;
 mod ipc;
+#[cfg(target_os = "linux")]
+mod overlay;
 
 #[cfg(target_os = "windows")]
 pub mod windows_service;
@@ -911,6 +913,14 @@ async fn handle_command(action: &str, username: &str, args: &serde_json::Value) 
                 ),
                 Err(message) => (false, message, serde_json::json!({})),
             }
+        }
+        "show_overlay" => match overlay::show(args, username) {
+            Ok(msg) => (true, msg, serde_json::json!({})),
+            Err(msg) => (false, msg, serde_json::json!({})),
+        },
+        "dismiss_overlay" => {
+            overlay::dismiss();
+            (true, "Guardian Space overlay dismissed".to_string(), serde_json::json!({}))
         }
         _ => (false, format!("Unknown action '{}'", action), serde_json::json!({})),
     }

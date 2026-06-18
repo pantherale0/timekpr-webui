@@ -75,16 +75,51 @@
                     </div>
                 </div>
 
-                <form action="{{ url_for('update_user_blocklists', user_id=user.id) }}" method="POST">
+                <!-- Curated Filter Packs (Marketplace) -->
+                <form action="{{ url_for('subscribe_user_marketplace', user_id=user.id) }}" method="POST" class="mb-4">
+                    {{ csrf_field() }}
+                    <h6 class="fw-bold mb-3 d-flex align-items-center gap-2 text-dark">
+                        <i class="fas fa-store text-success"></i> Curated Filter Packs
+                    </h6>
+                    <div class="row g-3 mb-3">
+                        {% for preset in marketplace_presets %}
+                            <div class="col-12 col-md-6">
+                                <div class="border rounded p-3 bg-body-tertiary h-100 d-flex flex-column justify-content-between">
+                                    <div class="form-check">
+                                        <input class="form-check-input cursor-pointer" type="checkbox" name="preset_ids" value="{{ preset.id }}" id="preset-{{ preset.id }}" {% if preset.id in subscribed_preset_ids %}checked{% endif %}>
+                                        <label class="form-check-label ms-2 cursor-pointer" for="preset-{{ preset.id }}">
+                                            <strong class="text-body d-block lh-sm mb-1" style="font-size: 0.9rem;">{{ preset.name }}</strong>
+                                            <span class="text-secondary small d-block mb-2" style="font-size: 0.75rem; line-height: 1.4;">{{ preset.description }}</span>
+                                        </label>
+                                    </div>
+                                    <div class="d-flex flex-wrap gap-1 mt-1 ms-4">
+                                        <span class="badge bg-primary-subtle text-primary" style="font-size: 0.65rem;">Ages: {{ preset.recommended_ages|join(', ') }}</span>
+                                        <span class="badge bg-secondary-subtle text-secondary-emphasis" style="font-size: 0.65rem;">{{ preset.approx_domain_count }}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                    
+                    <button type="submit" class="btn btn-sm btn-success fw-bold px-4">
+                        <i class="fas fa-check-circle me-1"></i> Save Curated Filter Subscriptions
+                    </button>
+                </form>
 
-                {{ csrf_field() }}                    <div class="row g-3 mb-4">
+                <!-- Custom Filter Lists -->
+                <form action="{{ url_for('update_user_blocklists', user_id=user.id) }}" method="POST" class="border-top pt-4 border-secondary-subtle">
+                    {{ csrf_field() }}
+                    <h6 class="fw-bold mb-3 d-flex align-items-center gap-2 text-dark">
+                        <i class="fas fa-sliders-h text-primary"></i> Custom Filter Lists
+                    </h6>
+                    <div class="row g-3 mb-3">
                         {% for source in blocklist_sources %}
                             <div class="col-12 col-md-6">
-                                <div class="border rounded p-3 bg-body-tertiary">
+                                <div class="border rounded p-3 bg-body-tertiary h-100">
                                     <div class="form-check">
-                                        <input class="form-check-input" type="checkbox" name="source_ids" value="{{ source.id }}" id="source-{{ source.id }}" {% if source.id in blocklist_sync_status.assigned_source_ids %}checked{% endif %}>
-                                        <label class="form-check-label ms-2" for="source-{{ source.id }}">
-                                            <strong class="text-body d-block lh-sm mb-1">{{ source.name }}</strong>
+                                        <input class="form-check-input cursor-pointer" type="checkbox" name="source_ids" value="{{ source.id }}" id="source-{{ source.id }}" {% if source.id in blocklist_sync_status.assigned_source_ids %}checked{% endif %}>
+                                        <label class="form-check-label ms-2 cursor-pointer" for="source-{{ source.id }}">
+                                            <strong class="text-body d-block lh-sm mb-1" style="font-size: 0.9rem;">{{ source.name }}</strong>
                                             <span class="text-secondary small fw-bold d-block" style="font-size: 0.72rem;">
                                                 {{ source.domain_count }} domains &bull; {{ source.source_type|replace('_', ' ')|title }}
                                             </span>
@@ -96,14 +131,14 @@
                     </div>
                     
                     {% if not blocklist_sources %}
-                        <div class="alert alert-info py-2 small mb-4">
-                            <i class="fas fa-info-circle me-1"></i>Please define blocklists in Web Content Filters before assigning them here.
+                        <div class="alert alert-info py-2 small mb-3">
+                            <i class="fas fa-info-circle me-1"></i> No custom filter lists defined. Define them in <a href="{{ url_for('ui_dashboard.admin_restrictions') }}" class="alert-link">Web Content Filters</a> before assigning.
                         </div>
                     {% endif %}
 
                     <div class="d-flex gap-2">
-                        <button type="submit" class="btn btn-primary fw-bold">Save Assignments</button>
-                        <a href="{{ url_for('ui_dashboard.admin_restrictions') }}" class="btn btn-outline-secondary fw-bold">Manage Catalogs</a>
+                        <button type="submit" class="btn btn-sm btn-primary fw-bold px-4">Save Custom Assignments</button>
+                        <a href="{{ url_for('ui_dashboard.admin_restrictions') }}" class="btn btn-sm btn-outline-secondary fw-bold px-3">Manage Catalogs</a>
                     </div>
                 </form>
 
@@ -324,6 +359,33 @@
         </div>
 
         
+        <!-- Guardian Space Overlay Settings -->
+        <div class="card border shadow-sm mb-4" id="guardian-overlay-card">
+            <div class="card-header bg-dark text-white py-3">
+                <h5 class="mb-0 fw-bold"><i class="fas fa-shield-alt text-success me-2"></i>Guardian Space Overlay</h5>
+            </div>
+            <div class="card-body p-4">
+                <p class="text-secondary small fw-medium mb-3">Customise the full-screen overlay shown to this child when time is up or a site is blocked.</p>
+                <div class="mb-3">
+                    <label class="form-label fw-bold small text-muted text-uppercase mb-1" style="font-size: 0.7rem;">Age Tier</label>
+                    <select class="form-select form-select-sm" id="overlay-age-tier">
+                        <option value="" {% if not user.overlay_age_tier %}selected{% endif %}>Not set (defaults to 8–12)</option>
+                        <option value="under8" {% if user.overlay_age_tier == 'under8' %}selected{% endif %}>Under 8 — Simple, playful language</option>
+                        <option value="eight12" {% if user.overlay_age_tier == 'eight12' %}selected{% endif %}>8–12 — Clear, friendly language</option>
+                        <option value="teen" {% if user.overlay_age_tier == 'teen' %}selected{% endif %}>Teen — Direct, respectful language</option>
+                    </select>
+                    <div class="form-text small text-secondary mt-1">Controls the tone and wording displayed on the Guardian Space blocked page.</div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold small text-muted text-uppercase mb-1" style="font-size: 0.7rem;">Parent Note</label>
+                    <textarea class="form-control form-control-sm" id="overlay-parent-note" rows="2" maxlength="300" placeholder='e.g. "Hey! Bedtime rules are on. Sleep well — limits refresh in the morning!"'>{{ user.overlay_parent_note or '' }}</textarea>
+                    <div class="form-text small text-secondary mt-1">Optional message shown on the overlay card. Leave blank for the built-in default.</div>
+                </div>
+                <button type="button" class="btn btn-success btn-sm fw-bold" onclick="saveOverlaySettings({{ user.id }})">Save Overlay Settings</button>
+                <span class="ms-2 small text-secondary" id="overlay-save-status"></span>
+            </div>
+        </div>
+
         <!-- Application Control & Locks -->
         <div class="card border shadow-sm mb-4">
             <div class="card-header bg-dark text-white py-3">
@@ -637,6 +699,32 @@
                 window.location.reload();
             })
             .catch(() => showNotification('Failed to revoke grant', 'error'));
+    }
+
+    function saveOverlaySettings(userId) {
+        const ageTier = document.getElementById('overlay-age-tier').value;
+        const parentNote = document.getElementById('overlay-parent-note').value.trim();
+        const statusEl = document.getElementById('overlay-save-status');
+
+        fetch(`/managed-users/${userId}/overlay`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                overlay_age_tier: ageTier || null,
+                overlay_parent_note: parentNote || null,
+            }),
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (!data.success) {
+                    showNotification(data.message || 'Failed to save overlay settings', 'error');
+                    return;
+                }
+                statusEl.textContent = 'Saved';
+                setTimeout(() => { statusEl.textContent = ''; }, 3000);
+                showNotification('Guardian Space overlay settings saved');
+            })
+            .catch(() => showNotification('Failed to save overlay settings', 'error'));
     }
 
     document.addEventListener('DOMContentLoaded', function () {
