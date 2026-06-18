@@ -62,6 +62,18 @@ def inject_timezone():
     return {'timezone': TIMEZONE_STR}
 
 
+def inject_create_profile_wizard():
+    """Inject preset data for the global Create Managed Profile wizard."""
+    if not session.get('logged_in'):
+        return {}
+    from src.marketplace_manager import load_marketplace_presets
+    from src.policy_preset_manager import get_matrix_metadata_for_ui
+    return {
+        'policy_preset_matrix': get_matrix_metadata_for_ui(),
+        'marketplace_presets': load_marketplace_presets(),
+    }
+
+
 def _format_seconds(seconds):
     if seconds is None:
         return "Unknown"

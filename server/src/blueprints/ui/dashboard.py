@@ -81,18 +81,11 @@ def admin_users():
     device_labels = _get_device_label_map()
     approved_devices = AgentDevice.query.filter_by(status='approved').all()
     
-    from src.marketplace_manager import load_marketplace_presets
-    from src.policy_preset_manager import get_matrix_metadata_for_ui
-    marketplace_presets = load_marketplace_presets()
-    policy_preset_matrix = get_matrix_metadata_for_ui()
-
     return render_template(
         'admin_users.html',
         users=users,
         approved_devices=approved_devices,
         device_labels=device_labels,
-        marketplace_presets=marketplace_presets,
-        policy_preset_matrix=policy_preset_matrix,
     )
 
 

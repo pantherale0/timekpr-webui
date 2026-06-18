@@ -208,6 +208,17 @@
                             </button>
                         </li>
                         {% block top_nav_secondary %}
+                        {% block top_nav_create_profile %}
+                        {% if session.get('logged_in') and policy_preset_matrix is defined %}
+                        <li class="nav-item d-none d-lg-flex">
+                            <button type="button" class="btn btn-sm guardian-btn-sage guardian-nav-action-btn"
+                                data-bs-toggle="modal" data-bs-target="#createProfileModal">
+                                <i class="fas fa-user-plus"></i>
+                                <span>Create Managed Profile</span>
+                            </button>
+                        </li>
+                        {% endif %}
+                        {% endblock %}
                         {% block top_nav_extra %}{% endblock %}
                         {% endblock %}
                         {% block top_nav_primary %}{% endblock %}
@@ -224,7 +235,15 @@
                                         <i class="fas fa-plus me-2 text-secondary"></i>Add Device
                                     </button>
                                 </li>
-                                {% block top_nav_overflow %}{% endblock %}
+                                {% block top_nav_overflow %}
+                                {% if session.get('logged_in') and policy_preset_matrix is defined %}
+                                <li>
+                                    <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#createProfileModal">
+                                        <i class="fas fa-user-plus me-2 text-secondary"></i>Create Managed Profile
+                                    </button>
+                                </li>
+                                {% endif %}
+                                {% endblock %}
                             </ul>
                         </li>
                     </ul>
@@ -1695,6 +1714,42 @@
             });
         }
     </script>
+    {% if session.get('logged_in') and policy_preset_matrix is defined %}
+    {% include '_create_profile_wizard.html' %}
+    <script type="application/json" id="policy-preset-matrix-data">{{ policy_preset_matrix | tojson }}</script>
+    <script type="application/json" id="marketplace-presets-data">{{ marketplace_presets | tojson }}</script>
+    <script src="{{ url_for('static', filename='js/guardian-wizard.js') }}"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            if (!window.GuardianWizard) return;
+            GuardianWizard.bindWizard({
+                matrixDataId: 'policy-preset-matrix-data',
+                presetsDataId: 'marketplace-presets-data',
+                ageSelector: '.policy-age-radio',
+                maturityInputId: 'create-policy-maturity-level',
+                sliderId: 'create-responsibility-slider',
+                sliderLabelId: 'create-slider-active-label',
+                summaryTitleId: 'create-preset-summary-title',
+                summaryListId: 'create-preset-summary-details',
+                narrativeId: 'create-responsibility-narrative',
+            });
+            GuardianWizard.bindCreateStepper({
+                modalId: 'createProfileModal',
+                formId: 'create-child-form',
+                prevBtnId: 'create-wizard-prev',
+                nextBtnId: 'create-wizard-next',
+                submitBtnId: 'create-wizard-submit',
+                usernameInputId: 'username',
+                totalSteps: 4,
+                onStepChange(step) {
+                    if (step === 4 && window.guardianRefreshWizardSummary) {
+                        window.guardianRefreshWizardSummary();
+                    }
+                },
+            });
+        });
+    </script>
+    {% endif %}
     {% block extra_js %}{% endblock %}
 </body>
 

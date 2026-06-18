@@ -26,6 +26,7 @@ from src.helpers import (
     inject_oidc_status,
     localtime_filter,
     inject_timezone,
+    inject_create_profile_wizard,
     TIMEZONE_STR,
     LOCAL_TIMEZONE,
     ADMIN_USERNAME,
@@ -147,6 +148,7 @@ oidc_helper = OIDCHelper()
 app.context_processor(inject_oidc_status)
 app.template_filter('localtime')(localtime_filter)
 app.context_processor(inject_timezone)
+app.context_processor(inject_create_profile_wizard)
 
 # Import and register blueprints
 from src.blueprints import (
