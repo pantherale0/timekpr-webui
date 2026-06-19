@@ -208,8 +208,11 @@
         clearManagedHead();
     }
 
-    function markExistingScripts() {
+    function markExistingScripts(container) {
         document.querySelectorAll('script[src]').forEach((script) => {
+            if (container && container.contains(script)) {
+                return;
+            }
             if (script.dataset.spaLoadedSrc) {
                 return;
             }
@@ -222,7 +225,7 @@
     }
 
     function executeScripts(container) {
-        markExistingScripts();
+        markExistingScripts(container);
         const scripts = Array.from(container.querySelectorAll('script'));
         scripts.forEach((oldScript) => {
             const src = oldScript.getAttribute('src');

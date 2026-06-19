@@ -1025,8 +1025,13 @@ const form = document.getElementById('android-policy-form');
 
     }
 
+    let lastBootedRoot = null;
+
     function boot() {
-        if (!getRoot()) return;
+        const root = getRoot();
+        if (!root) return;
+        if (lastBootedRoot === root) return;
+        lastBootedRoot = root;
         init();
     }
 
