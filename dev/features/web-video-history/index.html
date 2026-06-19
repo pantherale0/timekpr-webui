@@ -2490,7 +2490,7 @@
 
 
 <h1 id="web-video-history-monitoring">Web &amp; Video History Monitoring<a class="headerlink" href="#web-video-history-monitoring" title="Permanent link">&para;</a></h1>
-<p>Guardian supports logging general web browsing history and watched YouTube videos across managed devices (Android, Linux, and Windows). This feature tracks URLs, page titles, domains, video details, watch durations, and timestamps, presenting them in a unified parent portal dashboard with chronological timelines and aggregate analytics.</p>
+<p>Guardian supports logging general web browsing history and watched videos (YouTube, TikTok, and extensible platforms) across managed devices (Android, Linux, and Windows). Video watch events are stored in a unified <code>VideoHistory</code> table keyed by <code>platform</code>.</p>
 <h2 id="mechanics-platform-integration">Mechanics &amp; Platform Integration<a class="headerlink" href="#mechanics-platform-integration" title="Permanent link">&para;</a></h2>
 <p>The history monitoring feature runs on outbound logging directly from client devices or client-side browser extensions to the server's REST API.</p>
 <h3 id="android-agent">Android Agent<a class="headerlink" href="#android-agent" title="Permanent link">&para;</a></h3>
@@ -2511,8 +2511,8 @@
 - Captures page URLs, titles, and extracts root domains.
 - Deduplicates concurrent loads on the same tab index.
 - Filters out internal <code>chrome://</code> or local pages.
-- Ignores YouTube video watch pages (which are handled specifically by the content scripts to gather video analytics like duration).
-- Packs browsing logs as a <code>BROWSER_LOG</code> IPC payload and forwards them via Native Messaging to the Rust agent, which routes them to the server.</p>
+- Ignores YouTube video watch pages, Shorts (<code>/shorts/VIDEO_ID</code>), and TikTok video pages (<code>/@handle/video/ID</code>), which are handled specifically by the content scripts to gather video analytics like duration.
+- Packs video logs as a unified <code>VIDEO_LOG</code> IPC payload (with a <code>platform</code> field) and forwards them via Native Messaging to the Rust agent, which routes them to <code>/api/video/log</code>.</p>
 <h3 id="building-the-extension">Building the extension<a class="headerlink" href="#building-the-extension" title="Permanent link">&para;</a></h3>
 <p>The CRX is built in CI as part of the server image workflow:
 - <strong>Release tags</strong> (<code>v1.2.3</code>): extension version is <code>1.2.3</code> (the <code>v</code> prefix is stripped).
@@ -2527,8 +2527,8 @@
 <h2 id="server-configuration">Server Configuration<a class="headerlink" href="#server-configuration" title="Permanent link">&para;</a></h2>
 <p>Configure settings in <strong>Settings</strong>:</p>
 <ul>
-<li><strong>YouTube API Key</strong>: (Optional) A Google Developer API key. If provided, a background worker asynchronously resolves category metadata (e.g., <em>Gaming</em>, <em>Education</em>, <em>Music</em>) for watched videos. If not provided, category defaults to "Unknown".</li>
-<li><strong>YouTube History Retention (Days)</strong>: (Optional) Configures automatic pruning of YouTube logs older than the set threshold. If blank, history is kept indefinitely.</li>
+<li><strong>YouTube API Key</strong>: (Optional) A Google Developer API key. If provided, a background worker asynchronously resolves category metadata for YouTube videos only.</li>
+<li><strong>Video History Retention (Days)</strong>: (Optional) Configures automatic pruning of all video platform logs older than the set threshold. If blank, history is kept indefinitely.</li>
 <li><strong>Web History Retention (Days)</strong>: (Optional) Configures automatic pruning of web browsing logs. Defaults to 7 days to prevent SQLite database bloat.</li>
 </ul>
 <hr />
@@ -2544,10 +2544,22 @@
 </thead>
 <tbody>
 <tr>
+<td><code>/api/video/log</code></td>
+<td>POST</td>
+<td>Agent Secure Token (<code>Bearer</code>)</td>
+<td>Logs a batch of watched videos (<code>platform</code>: <code>youtube</code>, <code>tiktok</code>, …)</td>
+</tr>
+<tr>
 <td><code>/api/youtube/log</code></td>
 <td>POST</td>
 <td>Agent Secure Token (<code>Bearer</code>)</td>
-<td>Logs a batch of watched YouTube videos</td>
+<td>Backward-compatible alias for YouTube logs</td>
+</tr>
+<tr>
+<td><code>/api/tiktok/log</code></td>
+<td>POST</td>
+<td>Agent Secure Token (<code>Bearer</code>)</td>
+<td>Backward-compatible alias for TikTok logs</td>
 </tr>
 <tr>
 <td><code>/api/browser/log</code></td>
@@ -2571,7 +2583,7 @@
 <td><code>/api/user/&lt;user_id&gt;/history</code></td>
 <td>GET</td>
 <td>Session Auth</td>
-<td>Query combined web and YouTube history feed &amp; analytics</td>
+<td>Query combined web and video history feed &amp; analytics</td>
 </tr>
 </tbody>
 </table>
