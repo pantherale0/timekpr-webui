@@ -1909,6 +1909,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#windows" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Windows
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -2519,6 +2530,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#windows" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Windows
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -2711,6 +2733,8 @@
 <p>The Windows agent handles <code>show_overlay</code> and <code>dismiss_overlay</code> commands via the same <code>command_request</code> WebSocket protocol.  The <code>guardian-overlay-helper.exe</code> binary uses the same CEF kiosk window (<code>cef-overlay</code> feature) and forwards access requests via the <code>\\.\pipe\guardian-agent-ipc</code> named pipe.</p>
 <h3 id="android-agent-kotlin">Android Agent (Kotlin)<a class="headerlink" href="#android-agent-kotlin" title="Permanent link">&para;</a></h3>
 <p>The Android agent launches <code>GuardianOverlayActivity</code>, a full-screen <code>Activity</code> that loads the bundled <code>blockedv2.html</code> asset inside a <code>WebView</code>.</p>
+<h3 id="windows">Windows<a class="headerlink" href="#windows" title="Permanent link">&para;</a></h3>
+<p>The Windows service broadcasts overlay IPC messages to the per-session user agent. The user agent launches Microsoft Edge in kiosk app mode, loading <code>blockedv2.html</code> from <code>C:\Program Files\Guardian\</code> (bundled in the MSI). Clock tamper lockdown uses <code>reason=clock_tamper</code>; parent override uses the <code>clear_clock_tamper</code> server command.</p>
 <ul>
 <li>Intent extras (<code>guardian_reason</code>, <code>guardian_age_tier</code>, <code>guardian_parent_note</code>, <code>guardian_device_name</code>) are passed when launching the activity.</li>
 <li>The <code>WebView</code> injects runtime values via JavaScript after page load: <code>setAge(...)</code>, <code>setReason(...)</code>, <code>setDeviceInfo(...)</code>.</li>

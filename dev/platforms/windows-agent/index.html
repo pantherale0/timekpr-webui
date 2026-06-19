@@ -2528,8 +2528,8 @@
 <td>Runs as SYSTEM; WebSocket loop, DNS proxy, process monitor, policy catalog</td>
 </tr>
 <tr>
-<td><strong>Per-session user agent</strong></td>
-<td>Runs in each logged-in user session; named-pipe IPC for toast notifications</td>
+<td>Per-session user agent</td>
+<td>Runs in each logged-in user session; named-pipe IPC for toast notifications and full-screen overlay (<code>blockedv2.html</code> via Edge kiosk mode)</td>
 </tr>
 </tbody>
 </table>
@@ -2538,6 +2538,7 @@
 <ul>
 <li><strong>DNS proxy</strong> — redirects adapters to <code>127.0.0.1</code> for domain blocklists; outbound UDP/53 firewall rule reduces bypass</li>
 <li><strong>Process monitor</strong> — ToolHelp snapshot loop; terminates blocked executables and enforces time lockouts</li>
+<li><strong>Clock integrity</strong> — periodic wall-clock tamper detection via <code>QueryInterruptTime</code> cross-check and SNTP; triggers process lockout, parent alerts, and a full-screen Edge overlay on tamper</li>
 <li><strong>Policy store</strong> — Windows user enumeration (RID ≥ 1000); AppArmor-like app rules per mapped username</li>
 </ul>
 <p>On service stop, DNS settings and policies are restored.</p>
