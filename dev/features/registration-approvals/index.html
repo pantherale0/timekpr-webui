@@ -16,7 +16,7 @@
         <link rel="prev" href="../alerts-and-webhooks/">
       
       
-        <link rel="next" href="../../reference/policy-matrix/">
+        <link rel="next" href="../policy-presets/">
       
       
         
@@ -966,6 +966,8 @@
       
         
       
+        
+      
     
     
     
@@ -1235,6 +1237,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../web-ui/install-pwa/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Install PWA
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1433,6 +1463,10 @@
   
     
     
+      
+        
+      
+        
       
         
       
@@ -1878,6 +1912,62 @@
   
 </nav>
       
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../policy-presets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Policy presets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guardian-overlay/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guardian Space overlay
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -2496,11 +2586,14 @@
 <hr />
 <h2 id="how-it-works">How it works<a class="headerlink" href="#how-it-works" title="Permanent link">&para;</a></h2>
 <h3 id="1-signup-detection">1. Signup detection<a class="headerlink" href="#1-signup-detection" title="Permanent link">&para;</a></h3>
-<p>When the Guardian browser extension loads on any web page, it runs a lightweight detection pass:</p>
-<ul>
-<li><strong>URL heuristics</strong> — paths containing <code>/signup</code>, <code>/register</code>, <code>/join</code>, <code>/create-account</code>, and similar patterns are flagged.</li>
-<li><strong>DOM analysis</strong> — the page's form structure is inspected: multiple password fields (password + confirm) or a single password field alongside buttons labelled <em>Sign Up</em>, <em>Create Account</em>, or <em>Get Started</em> indicate a registration form.</li>
-</ul>
+<p>When the Guardian browser extension loads on any web page, it runs a detection pass across five complementary signal layers, stopping as soon as any layer matches:</p>
+<ol>
+<li><strong>URL heuristics</strong> — paths containing <code>/signup</code>, <code>/register</code>, <code>/join</code>, <code>/create-account</code>, etc. are flagged immediately without inspecting the DOM.</li>
+<li><strong><code>autocomplete="new-password"</code></strong> — the most reliable single signal. The HTML spec requires registration forms to set this attribute on new-password fields (and <code>current-password</code> on login fields). All major services follow this convention: Google, GitHub, Facebook, DigitalOcean, and more.</li>
+<li><strong>Multiple password fields</strong> — a password field alongside a confirm-password field is a clear registration indicator.</li>
+<li><strong>Registration-specific form fields</strong> — fields for first/last name, phone number, or date of birth (<code>autocomplete="given-name"</code>, <code>autocomplete="bday"</code>, <code>input[type="tel"]</code>, etc.) are essentially never present on login forms.</li>
+<li><strong>Page-level text</strong> — headings (<code>h1</code>–<code>h3</code>), submit buttons, and navigation links are scanned for text such as <em>Sign Up</em>, <em>Create Account</em>, <em>Join</em>, or <em>Register</em>.</li>
+</ol>
 <p>If the page matches, the extension immediately asks the native agent (<code>com.guardian.agent</code>) whether registration on that domain is currently allowed for this user.</p>
 <h3 id="2-approval-check">2. Approval check<a class="headerlink" href="#2-approval-check" title="Permanent link">&para;</a></h3>
 <p>The agent calls <code>/api/registration/check</code> on the Guardian server using the device's secure token. The server returns one of three states:</p>
