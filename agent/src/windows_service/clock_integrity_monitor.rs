@@ -1,6 +1,6 @@
 //! Windows clock integrity monitor: periodic checks, process lockout, alerts, toast.
 
-use super::tamper_state::{clock_integrity_state_handle, save_state};
+use super::tamper_state::{clock_integrity_state_handle, is_clock_tamper_active, save_state};
 use guardian_agent::clock_integrity::{apply_tick, fetch_tick_inputs, DetectionSource, TickStatus};
 use serde_json::json;
 use std::collections::HashMap;
@@ -115,7 +115,7 @@ pub struct ClockIntegrityMonitor {
 
 impl ClockIntegrityMonitor {
     fn new(users_map: HashMap<u32, String>) -> Self {
-        if tamper_state::is_clock_tamper_active() {
+        if is_clock_tamper_active() {
             if let Some(username) = primary_managed_username(&users_map) {
                 show_tamper_toast();
                 show_overlay(&username);

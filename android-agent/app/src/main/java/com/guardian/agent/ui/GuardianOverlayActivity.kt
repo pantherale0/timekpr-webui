@@ -1,5 +1,6 @@
 package com.guardian.agent.ui
 
+import android.annotation.SuppressLint
 import android.net.Uri
 import android.app.Activity
 import android.content.Context
