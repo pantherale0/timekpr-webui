@@ -63,6 +63,9 @@
     .border-youtube {
         border-left-color: #de3b2c !important; /* Premium YouTube Red */
     }
+    .border-tiktok {
+        border-left-color: #010101 !important;
+    }
     .border-web {
         border-left-color: #0ea5e9 !important; /* Premium Web Blue */
     }
@@ -71,6 +74,11 @@
         background-color: rgba(222, 59, 44, 0.1);
         color: #de3b2c;
         border: 1px solid rgba(222, 59, 44, 0.2);
+    }
+    .badge-activity-tiktok {
+        background-color: rgba(1, 1, 1, 0.08);
+        color: #010101;
+        border: 1px solid rgba(1, 1, 1, 0.15);
     }
     .badge-activity-web {
         background-color: rgba(14, 165, 233, 0.1);
@@ -203,6 +211,7 @@
                                 <option value="all">{{ t('pages.web_video_history.filter_all') }}</option>
                                 <option value="web">{{ t('pages.web_video_history.filter_web') }}</option>
                                 <option value="youtube">{{ t('pages.web_video_history.filter_youtube') }}</option>
+                                <option value="tiktok">{{ t('pages.web_video_history.filter_tiktok') }}</option>
                             </select>
                         </div>
                     </div>
@@ -388,11 +397,14 @@
         if (!analytics) return;
 
         document.getElementById('stat-web-count').innerText = analytics.total_web_visits || 0;
-        document.getElementById('stat-video-count').innerText = analytics.total_youtube_videos || 0;
-        document.getElementById('stat-video-time').innerText = formatDuration(analytics.total_youtube_seconds) + ' watch time';
-        
-        const distinctDestinations = (analytics.web_domains ? analytics.web_domains.length : 0) + 
-                                     (analytics.youtube_channels ? analytics.youtube_channels.length : 0);
+        const videoCount = analytics.total_video_count ?? analytics.total_youtube_videos ?? 0;
+        const videoSeconds = analytics.total_video_seconds ?? analytics.total_youtube_seconds ?? 0;
+        document.getElementById('stat-video-count').innerText = videoCount;
+        document.getElementById('stat-video-time').innerText = formatDuration(videoSeconds) + ' watch time';
+
+        const videoCreators = analytics.video_creators || analytics.youtube_channels || [];
+        const distinctDestinations = (analytics.web_domains ? analytics.web_domains.length : 0) +
+                                     videoCreators.length;
         document.getElementById('stat-dest-count').innerText = distinctDestinations;
     }
 
@@ -419,12 +431,15 @@
         state.history.forEach(item => {
             const card = document.createElement('div');
             
-            if (item.type === 'youtube') {
+            if (item.type === 'youtube' || item.type === 'tiktok') {
                 const durationFormatted = formatDuration(item.duration_seconds);
                 const watchedAtFormatted = formatDateTime(item.timestamp);
-                const thumbnailUrl = `https://img.youtube.com/vi/${item.video_id}/mqdefault.jpg`;
+                const isTiktok = item.type === 'tiktok';
+                const thumbnailUrl = isTiktok
+                    ? '/static/img/video_placeholder.png'
+                    : `https://img.youtube.com/vi/${item.video_id}/mqdefault.jpg`;
 
-                card.className = 'history-feed-item p-3 border-bottom d-flex gap-3 align-items-start border-youtube';
+                card.className = `history-feed-item p-3 border-bottom d-flex gap-3 align-items-start ${isTiktok ? 'border-tiktok' : 'border-youtube'}`;
                 card.innerHTML = `
                     <div class="video-thumbnail-container">
                         <img class="video-thumbnail" src="${thumbnailUrl}" alt="Thumbnail" onerror="this.src='/static/img/video_placeholder.png'; this.onerror=null;">
@@ -437,7 +452,9 @@
                             </a>
                         </h6>
                         <div class="d-flex align-items-center gap-2 flex-wrap small text-secondary">
-                            <span class="badge badge-activity-yt px-2 py-0.5 rounded-pill"><i class="fab fa-youtube me-1"></i>Video</span>
+                            <span class="badge ${isTiktok ? 'badge-activity-tiktok' : 'badge-activity-yt'} px-2 py-0.5 rounded-pill">
+                                <i class="fab fa-${isTiktok ? 'tiktok' : 'youtube'} me-1"></i>${isTiktok ? 'TikTok' : 'Video'}
+                            </span>
                             <span class="fw-semibold text-dark-emphasis">${escapeHtml(item.channel_name)}</span>
                             <span class="text-muted">&bull;</span>
                             <span class="badge bg-secondary px-2 py-0.5 rounded-pill text-white">${escapeHtml(item.category)}</span>
@@ -579,15 +596,19 @@
             state.channelsChart = null;
         }
 
-        if (!analytics || !analytics.youtube_channels || analytics.youtube_channels.length === 0) {
+        const creatorRows = analytics.video_creators || analytics.youtube_channels || [];
+        if (!analytics || creatorRows.length === 0) {
             chanWrapper.style.display = 'none';
             chanEmpty.style.display = 'block';
         } else {
             chanWrapper.style.display = 'block';
             chanEmpty.style.display = 'none';
 
-            const chanLabels = analytics.youtube_channels.map(c => c.channel_name);
-            const chanDurations = analytics.youtube_channels.map(c => Math.round(c.total_seconds / 60)); // in minutes
+            const chanLabels = creatorRows.map(c => {
+                const prefix = c.platform === 'tiktok' ? '[TT] ' : '';
+                return prefix + c.channel_name;
+            });
+            const chanDurations = creatorRows.map(c => Math.round(c.total_seconds / 60));
 
             const ctxChan = document.getElementById('chart-youtube-channels').getContext('2d');
             state.channelsChart = new Chart(ctxChan, {

@@ -35,7 +35,7 @@ from src.database import (
     get_mapping_time_spent_for_day,
     stamp_usage_snapshot,
     utc_today,
-    YoutubeHistory,
+    VideoHistory,
     WebHistory,
 )
 from pynintendoparental import Authenticator, NintendoParental
@@ -338,7 +338,7 @@ class BackgroundTaskManager:
 
         # YouTube background tasks
         self._fetch_youtube_categories()
-        self._prune_youtube_history()
+        self._prune_video_history()
 
         # Web history background tasks
         self._prune_web_history()
@@ -371,7 +371,10 @@ class BackgroundTaskManager:
 
             # Find distinct video IDs that have category == 'Unknown'
             # Limit to 50 because that's the max allowed in a single YouTube API call
-            pending = db.session.query(YoutubeHistory.video_id).filter_by(category='Unknown').distinct().limit(50).all()
+            pending = db.session.query(VideoHistory.video_id).filter_by(
+                platform=VideoHistory.VIDEO_PLATFORM_YOUTUBE,
+                category='Unknown',
+            ).distinct().limit(50).all()
             if not pending:
                 return
 
@@ -437,9 +440,13 @@ class BackgroundTaskManager:
             for v_id in video_ids:
                 category = resolved_categories.get(v_id, 'Unavailable') # Set Unavailable if video not returned (private/deleted)
                 # Bulk update all rows with this video ID
-                YoutubeHistory.query.filter_by(video_id=v_id, category='Unknown').update(
-                    {YoutubeHistory.category: category},
-                    synchronize_session=False
+                VideoHistory.query.filter_by(
+                    video_id=v_id,
+                    platform=VideoHistory.VIDEO_PLATFORM_YOUTUBE,
+                    category='Unknown',
+                ).update(
+                    {VideoHistory.category: category},
+                    synchronize_session=False,
                 )
             
             db.session.commit()
@@ -448,23 +455,27 @@ class BackgroundTaskManager:
             logger.exception("Failed to fetch YouTube categories in background task.")
             db.session.rollback()
 
-    def _prune_youtube_history(self):
-        """Automatically prune YouTube history older than the configured threshold."""
+    def _prune_video_history(self):
+        """Automatically prune video history older than the configured threshold."""
         try:
-            from src.settings_manager import _get_youtube_history_retention_days
-            retention_days = _get_youtube_history_retention_days()
+            from src.settings_manager import _get_video_history_retention_days
+            retention_days = _get_video_history_retention_days()
             if retention_days > 0:
                 cutoff_date = datetime.now(timezone.utc) - timedelta(days=retention_days)
-                
-                deleted_count = YoutubeHistory.query.filter(
-                    YoutubeHistory.watched_at < cutoff_date
+
+                deleted_count = VideoHistory.query.filter(
+                    VideoHistory.watched_at < cutoff_date
                 ).delete(synchronize_session=False)
-                
+
                 if deleted_count > 0:
                     db.session.commit()
-                    logger.info("Automatically pruned %d YouTube history entries older than %d days", deleted_count, retention_days)
+                    logger.info(
+                        "Automatically pruned %d video history entries older than %d days",
+                        deleted_count,
+                        retention_days,
+                    )
         except Exception as exc:
-            logger.warning("Failed to automatically prune YouTube history: %s", exc)
+            logger.warning("Failed to automatically prune video history: %s", exc)
             db.session.rollback()
 
     def _prune_web_history(self):

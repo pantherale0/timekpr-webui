@@ -13,6 +13,7 @@
   ],
   "host_permissions": [
     "*://*.youtube.com/*",
+    "*://*.tiktok.com/*",
     "http://*/*",
     "https://*/*"
   ],
@@ -27,7 +28,9 @@
       ],
       "js": [
         "youtube_utils.js",
-        "content.js"
+        "tiktok_utils.js",
+        "content.js",
+        "tiktok_monitor.js"
       ],
       "run_at": "document_end"
     }

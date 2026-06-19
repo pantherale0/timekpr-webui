@@ -15,6 +15,7 @@ from src.blueprints.api.linux_device_policy import api_linux_device_policy_bp
 from src.blueprints.api.nintendo import api_nintendo_bp
 from src.blueprints.api.xbox import api_xbox_bp
 from src.blueprints.api.screenshots import api_screenshots_bp
+from src.blueprints.api.video import api_video_bp
 from src.blueprints.api.youtube import api_youtube_bp
 
 __all__ = [
@@ -34,5 +35,6 @@ __all__ = [
     'api_nintendo_bp',
     'api_xbox_bp',
     'api_screenshots_bp',
+    'api_video_bp',
     'api_youtube_bp',
 ]

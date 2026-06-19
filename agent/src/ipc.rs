@@ -80,8 +80,17 @@ pub async fn write_framed_message<W: tokio::io::AsyncWriteExt + Unpin>(writer: &
 #[derive(Deserialize, Debug)]
 #[serde(tag = "type")]
 enum IpcRequest {
+    #[serde(rename = "VIDEO_LOG")]
+    VideoLog {
+        platform: String,
+        logs: serde_json::Value,
+    },
     #[serde(rename = "YOUTUBE_LOG")]
     YoutubeLog {
+        logs: serde_json::Value,
+    },
+    #[serde(rename = "TIKTOK_LOG")]
+    TiktokLog {
         logs: serde_json::Value,
     },
     #[serde(rename = "BROWSER_LOG")]
@@ -169,8 +178,26 @@ async fn process_ipc_messages<R: tokio::io::AsyncReadExt + Unpin, W: tokio::io::
         };
 
         match request {
+            IpcRequest::VideoLog { platform, logs } => {
+                let response = handle_video_log(username, &platform, logs).await;
+                if let Ok(res_bytes) = serde_json::to_vec(&response) {
+                    if let Err(e) = write_framed_message(writer, &res_bytes).await {
+                        eprintln!("IPC error writing response: {}", e);
+                        break;
+                    }
+                }
+            }
             IpcRequest::YoutubeLog { logs } => {
-                let response = handle_youtube_log(username, logs).await;
+                let response = handle_video_log(username, "youtube", logs).await;
+                if let Ok(res_bytes) = serde_json::to_vec(&response) {
+                    if let Err(e) = write_framed_message(writer, &res_bytes).await {
+                        eprintln!("IPC error writing response: {}", e);
+                        break;
+                    }
+                }
+            }
+            IpcRequest::TiktokLog { logs } => {
+                let response = handle_video_log(username, "tiktok", logs).await;
                 if let Ok(res_bytes) = serde_json::to_vec(&response) {
                     if let Err(e) = write_framed_message(writer, &res_bytes).await {
                         eprintln!("IPC error writing response: {}", e);
@@ -227,7 +254,7 @@ async fn process_ipc_messages<R: tokio::io::AsyncReadExt + Unpin, W: tokio::io::
     }
 }
 
-async fn handle_youtube_log(username: &str, logs: serde_json::Value) -> serde_json::Value {
+async fn handle_video_log(username: &str, platform: &str, logs: serde_json::Value) -> serde_json::Value {
     let Some(config) = load_agent_config() else {
         return serde_json::json!({
             "success": false,
@@ -236,11 +263,12 @@ async fn handle_youtube_log(username: &str, logs: serde_json::Value) -> serde_js
     };
 
     let rest_url = convert_ws_to_http(&config.server_url);
-    let target_url = format!("{}/api/youtube/log", rest_url);
+    let target_url = format!("{}/api/video/log", rest_url);
     let token = config.agent_token.as_deref().unwrap_or("");
 
     let payload = serde_json::json!({
         "linux_username": username,
+        "platform": platform,
         "logs": logs,
     });
 

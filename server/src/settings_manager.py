@@ -162,7 +162,14 @@ def _get_youtube_api_key() -> str:
 
 def _get_youtube_history_retention_days() -> int:
     """Get the YouTube history retention period in days (default: 0 / indefinite)."""
-    raw_value = _safe_get_setting_value('youtube_history_retention_days', '0')
+    return _get_video_history_retention_days()
+
+
+def _get_video_history_retention_days() -> int:
+    """Get the shared video history retention period in days (default: 0 / indefinite)."""
+    raw_value = _safe_get_setting_value('video_history_retention_days', '')
+    if not raw_value:
+        raw_value = _safe_get_setting_value('youtube_history_retention_days', '0')
     try:
         return max(0, int(raw_value))
     except (TypeError, ValueError):

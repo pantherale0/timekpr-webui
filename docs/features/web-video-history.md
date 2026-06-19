@@ -1,6 +1,6 @@
 # Web & Video History Monitoring
 
-Guardian supports logging general web browsing history and watched YouTube videos across managed devices (Android, Linux, and Windows). This feature tracks URLs, page titles, domains, video details, watch durations, and timestamps, presenting them in a unified parent portal dashboard with chronological timelines and aggregate analytics.
+Guardian supports logging general web browsing history and watched videos (YouTube, TikTok, and extensible platforms) across managed devices (Android, Linux, and Windows). Video watch events are stored in a unified `VideoHistory` table keyed by `platform`.
 
 ## Mechanics & Platform Integration
 
@@ -26,8 +26,8 @@ The Chrome extension uses `chrome.tabs.onUpdated` and `chrome.webNavigation` API
 - Captures page URLs, titles, and extracts root domains.
 - Deduplicates concurrent loads on the same tab index.
 - Filters out internal `chrome://` or local pages.
-- Ignores YouTube video watch pages and Shorts (`/shorts/VIDEO_ID`), which are handled specifically by the content scripts to gather video analytics like duration.
-- Packs browsing logs as a `BROWSER_LOG` IPC payload and forwards them via Native Messaging to the Rust agent, which routes them to the server.
+- Ignores YouTube video watch pages, Shorts (`/shorts/VIDEO_ID`), and TikTok video pages (`/@handle/video/ID`), which are handled specifically by the content scripts to gather video analytics like duration.
+- Packs video logs as a unified `VIDEO_LOG` IPC payload (with a `platform` field) and forwards them via Native Messaging to the Rust agent, which routes them to `/api/video/log`.
 
 ### Building the extension
 
@@ -51,8 +51,8 @@ The packaged version is written to `server/static/extensions/extension_version.t
 
 Configure settings in **Settings**:
 
-- **YouTube API Key**: (Optional) A Google Developer API key. If provided, a background worker asynchronously resolves category metadata (e.g., *Gaming*, *Education*, *Music*) for watched videos. If not provided, category defaults to "Unknown".
-- **YouTube History Retention (Days)**: (Optional) Configures automatic pruning of YouTube logs older than the set threshold. If blank, history is kept indefinitely.
+- **YouTube API Key**: (Optional) A Google Developer API key. If provided, a background worker asynchronously resolves category metadata for YouTube videos only.
+- **Video History Retention (Days)**: (Optional) Configures automatic pruning of all video platform logs older than the set threshold. If blank, history is kept indefinitely.
 - **Web History Retention (Days)**: (Optional) Configures automatic pruning of web browsing logs. Defaults to 7 days to prevent SQLite database bloat.
 
 ---
@@ -61,11 +61,13 @@ Configure settings in **Settings**:
 
 | Endpoint | Method | Authentication | Description |
 |----------|--------|----------------|-------------|
-| `/api/youtube/log` | POST | Agent Secure Token (`Bearer`) | Logs a batch of watched YouTube videos |
+| `/api/video/log` | POST | Agent Secure Token (`Bearer`) | Logs a batch of watched videos (`platform`: `youtube`, `tiktok`, …) |
+| `/api/youtube/log` | POST | Agent Secure Token (`Bearer`) | Backward-compatible alias for YouTube logs |
+| `/api/tiktok/log` | POST | Agent Secure Token (`Bearer`) | Backward-compatible alias for TikTok logs |
 | `/api/browser/log` | POST | Agent Secure Token (`Bearer`) | Logs a batch of visited web pages |
 | `/api/extensions/update` | GET | None | Chrome update XML manifest |
 | `/api/extensions/download` | GET | None | Download signed `.crx` extension |
-| `/api/user/<user_id>/history` | GET | Session Auth | Query combined web and YouTube history feed & analytics |
+| `/api/user/<user_id>/history` | GET | Session Auth | Query combined web and video history feed & analytics |
 
 ---
 

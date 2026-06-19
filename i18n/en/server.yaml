@@ -1200,6 +1200,7 @@ pages:
     filter_all: All Activities
     filter_web: Web Pages Only
     filter_youtube: YouTube Videos Only
+    filter_tiktok: TikTok Videos Only
     loading_feed: Loading activity feed...
     empty_title: No history logs found
     empty_lead: Logs will appear here once the child browses the web or watches videos on monitored devices.

@@ -1,11 +1,12 @@
-// Service worker to handle background YouTube and Web log shipping with local offline buffering,
+// Service worker to handle background video and web log shipping with local offline buffering,
 // plus registration detection enforcement and login audit forwarding.
 
-importScripts('i18n.js', 'youtube_utils.js');
+importScripts('i18n.js', 'youtube_utils.js', 'tiktok_utils.js');
 
 // Flush queues on startup
 chrome.runtime.onInstalled.addListener(() => {
-    flushBufferQueue();
+    migrateLegacyVideoQueue();
+    flushVideoBufferQueue();
     flushWebBufferQueue();
 });
 
@@ -13,7 +14,7 @@ chrome.runtime.onInstalled.addListener(() => {
 chrome.alarms.create("flush_queue_alarm", { periodInMinutes: 5 });
 chrome.alarms.onAlarm.addListener((alarm) => {
     if (alarm.name === "flush_queue_alarm") {
-        flushBufferQueue();
+        flushVideoBufferQueue();
         flushWebBufferQueue();
     }
 });
@@ -23,14 +24,19 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 // ============================================================
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (message.type === "VIDEO_LOG" && message.log) {
+        queueVideoLog(message.platform || 'youtube', message.log);
+        return false;
+    }
+
     if (message.type === "YOUTUBE_LOG" && message.log) {
-        queueLog(message.log);
-        return false; // No async response needed
+        queueVideoLog('youtube', message.log);
+        return false;
     }
 
     if (message.type === "CHECK_REGISTRATION" && message.domain) {
         handleCheckRegistration(message, sender, sendResponse);
-        return true; // Keep channel open for async response
+        return true;
     }
 
     if (message.type === "REQUEST_REGISTRATION" && message.domain) {
@@ -46,7 +52,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         return false;
     }
 
-    // Forward child access requests (Guardian Space overlay) to the native agent
     if (message.type === "ACCESS_REQUEST") {
         sendNativeRequest(
             {
@@ -65,21 +70,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 // Registration enforcement
 // ============================================================
 
-/**
- * Asks the native agent whether registration on this domain is allowed.
- * If not allowed, redirects the tab to the block page.
- */
 function handleCheckRegistration(message, sender, sendResponse) {
     sendNativeRequest(
         { type: "CHECK_REGISTRATION", domain: message.domain },
         (response) => {
             if (!response || response.allowed !== false) {
-                // Allowed or agent unavailable — let the page through
                 sendResponse({ allowed: true });
                 return;
             }
 
-            // Registration is blocked — redirect tab to the Guardian Space block page
             if (sender && sender.tab && sender.tab.id) {
                 const lang = (navigator.language || "en").split("-")[0];
                 const blockUrl =
@@ -108,29 +107,27 @@ function handleCheckRegistration(message, sender, sendResponse) {
 
 const lastLoggedUrls = {};
 
-// Listen for tab navigation changes to record web history
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
     if (changeInfo.status === 'complete' && tab.url) {
         const urlString = tab.url;
 
-        // Skip internal/invalid URLs
         if (!urlString.startsWith('http://') && !urlString.startsWith('https://')) {
             return;
         }
 
-        // Skip the extension's own blocked page
         if (urlString.startsWith(chrome.runtime.getURL(""))) {
             return;
         }
 
-        // Skip YouTube watch pages since they are handled separately by content.js
         try {
             const parsedUrl = new URL(urlString);
             if (parsedUrl.hostname.includes('youtube.com') && parseYoutubeVideoId(urlString)) {
                 return;
             }
+            if (parsedUrl.hostname.includes('tiktok.com') && parseTiktokVideoId(urlString)) {
+                return;
+            }
 
-            // Prevent duplicate logs for the same URL in the same tab
             if (lastLoggedUrls[tabId] === urlString) {
                 return;
             }
@@ -139,21 +136,18 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
             const domain = parsedUrl.hostname;
             const title = tab.title || domain;
 
-            const webLogEntry = {
+            queueWebLog({
                 url: urlString,
                 title: title,
                 domain: domain,
                 visited_at: new Date().toISOString()
-            };
-
-            queueWebLog(webLogEntry);
+            });
         } catch (e) {
             console.error("Guardian History Monitor: Error parsing tab update:", e);
         }
     }
 });
 
-// Clean up stored tab URLs when tabs are closed
 chrome.tabs.onRemoved.addListener((tabId) => {
     delete lastLoggedUrls[tabId];
 });
@@ -162,48 +156,50 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 // Queue helpers
 // ============================================================
 
-// Queue a YouTube log entry in local storage and trigger flush
-function queueLog(logEntry) {
-    chrome.storage.local.get({ log_queue: [] }, (result) => {
-        const queue = result.log_queue;
-        queue.push(logEntry);
-        
-        // Keep queue capped at 1000 items to avoid storage overflow
+function migrateLegacyVideoQueue() {
+    chrome.storage.local.get({ log_queue: [], video_log_queue: [] }, (result) => {
+        if (!result.log_queue || result.log_queue.length === 0) {
+            return;
+        }
+        const migrated = result.log_queue.map((entry) => ({
+            platform: 'youtube',
+            ...entry,
+        }));
+        const merged = [...result.video_log_queue, ...migrated];
+        chrome.storage.local.set({ video_log_queue: merged, log_queue: [] });
+    });
+}
+
+function queueVideoLog(platform, logEntry) {
+    chrome.storage.local.get({ video_log_queue: [] }, (result) => {
+        const queue = result.video_log_queue;
+        queue.push({ platform, ...logEntry });
+
         if (queue.length > 1000) {
             queue.shift();
         }
-        
-        chrome.storage.local.set({ log_queue: queue }, () => {
-            flushBufferQueue();
+
+        chrome.storage.local.set({ video_log_queue: queue }, () => {
+            flushVideoBufferQueue();
         });
     });
 }
 
-// Queue a web log entry in local storage and trigger flush
 function queueWebLog(logEntry) {
     chrome.storage.local.get({ web_queue: [] }, (result) => {
         const queue = result.web_queue;
         queue.push(logEntry);
-        
-        // Keep queue capped at 2000 items to avoid storage overflow
+
         if (queue.length > 2000) {
             queue.shift();
         }
-        
+
         chrome.storage.local.set({ web_queue: queue }, () => {
             flushWebBufferQueue();
         });
     });
 }
 
-// ============================================================
-// Native messaging helpers
-// ============================================================
-
-/**
- * Sends a single request to the native messaging host and invokes the callback
- * with the parsed response (or null on error).
- */
 function sendNativeRequest(payload, callback) {
     chrome.runtime.sendNativeMessage('com.guardian.agent', payload, (response) => {
         if (chrome.runtime.lastError) {
@@ -222,48 +218,94 @@ function sendNativeRequest(payload, callback) {
 // Flush functions
 // ============================================================
 
-// Flush buffered YouTube queue to TimeKpr/Guardian server via Native Messaging Host
-function flushBufferQueue() {
-    chrome.storage.local.get({ log_queue: [] }, (result) => {
-        const queue = result.log_queue;
-        if (queue.length === 0) return;
+function flushVideoBufferQueue() {
+    migrateLegacyVideoQueue();
 
-        const logsToSend = [...queue];
-        const payload = {
-            type: 'YOUTUBE_LOG',
-            logs: logsToSend
-        };
+    chrome.storage.local.get({ video_log_queue: [] }, (result) => {
+        const queue = result.video_log_queue;
+        if (queue.length === 0) {
+            return;
+        }
 
-        chrome.runtime.sendNativeMessage('com.guardian.agent', payload, (response) => {
-            if (chrome.runtime.lastError) {
-                const errMsg = chrome.runtime.lastError.message;
-                console.warn("Guardian YouTube Monitor: Failed to connect to Native Messaging Host. Keeping logs in buffer.", errMsg);
-                chrome.storage.local.set({ last_native_error: "Connection failed: " + errMsg });
+        const grouped = {};
+        for (const entry of queue) {
+            const platform = entry.platform || 'youtube';
+            if (!grouped[platform]) {
+                grouped[platform] = [];
+            }
+            grouped[platform].push(entry);
+        }
+
+        const platforms = Object.keys(grouped);
+        let remainingFailures = false;
+
+        const flushPlatform = (index) => {
+            if (index >= platforms.length) {
+                if (!remainingFailures) {
+                    chrome.storage.local.set({ video_log_queue: [], last_native_error: "None" });
+                }
                 return;
             }
 
-            if (response && response.success) {
-                chrome.storage.local.get({ log_queue: [] }, (currentResult) => {
-                    const currentQueue = currentResult.log_queue;
-                    const remainingQueue = currentQueue.filter(item => {
-                        return !logsToSend.some(sentItem => 
-                            sentItem.video_id === item.video_id && 
-                            sentItem.watched_at === item.watched_at
+            const platform = platforms[index];
+            const logsToSend = grouped[platform].map((entry) => {
+                const copy = { ...entry };
+                delete copy.platform;
+                return copy;
+            });
+
+            const payload = {
+                type: 'VIDEO_LOG',
+                platform: platform,
+                logs: logsToSend,
+            };
+
+            chrome.runtime.sendNativeMessage('com.guardian.agent', payload, (response) => {
+                if (chrome.runtime.lastError) {
+                    const errMsg = chrome.runtime.lastError.message;
+                    console.warn(
+                        "Guardian Video Monitor: Failed to connect to Native Messaging Host. Keeping logs in buffer.",
+                        errMsg
+                    );
+                    chrome.storage.local.set({ last_native_error: "Connection failed: " + errMsg });
+                    remainingFailures = true;
+                    flushPlatform(index + 1);
+                    return;
+                }
+
+                if (response && response.success) {
+                    chrome.storage.local.get({ video_log_queue: [] }, (currentResult) => {
+                        const currentQueue = currentResult.video_log_queue;
+                        const remainingQueue = currentQueue.filter((item) => {
+                            const itemPlatform = item.platform || 'youtube';
+                            if (itemPlatform !== platform) {
+                                return true;
+                            }
+                            return !logsToSend.some((sentItem) =>
+                                sentItem.video_id === item.video_id &&
+                                sentItem.watched_at === item.watched_at
+                            );
+                        });
+                        chrome.storage.local.set({ video_log_queue: remainingQueue });
+                        console.log(
+                            `Guardian Video Monitor: Successfully flushed ${logsToSend.length} ${platform} log(s).`
                         );
+                        flushPlatform(index + 1);
                     });
-                    chrome.storage.local.set({ log_queue: remainingQueue, last_native_error: "None" });
-                    console.log(`Guardian YouTube Monitor: Successfully flushed ${logsToSend.length} log(s) via Native Messaging.`);
-                });
-            } else {
-                const errMsg = response ? response.message : "No response";
-                console.error("Guardian YouTube Monitor: Agent failed to log YouTube history:", errMsg);
-                chrome.storage.local.set({ last_native_error: "Agent error: " + errMsg });
-            }
-        });
+                } else {
+                    const errMsg = response ? response.message : "No response";
+                    console.error("Guardian Video Monitor: Agent failed to log video history:", errMsg);
+                    chrome.storage.local.set({ last_native_error: "Agent error: " + errMsg });
+                    remainingFailures = true;
+                    flushPlatform(index + 1);
+                }
+            });
+        };
+
+        flushPlatform(0);
     });
 }
 
-// Flush buffered Web queue to TimeKpr/Guardian server via Native Messaging Host
 function flushWebBufferQueue() {
     chrome.storage.local.get({ web_queue: [] }, (result) => {
         const queue = result.web_queue;
@@ -287,8 +329,8 @@ function flushWebBufferQueue() {
                 chrome.storage.local.get({ web_queue: [] }, (currentResult) => {
                     const currentQueue = currentResult.web_queue;
                     const remainingQueue = currentQueue.filter(item => {
-                        return !logsToSend.some(sentItem => 
-                            sentItem.url === item.url && 
+                        return !logsToSend.some(sentItem =>
+                            sentItem.url === item.url &&
                             sentItem.visited_at === item.visited_at
                         );
                     });

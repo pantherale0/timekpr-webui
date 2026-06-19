@@ -1893,13 +1893,18 @@ class DeviceScreenshot(db.Model):
         }
 
 
-class YoutubeHistory(db.Model):
-    __tablename__ = 'youtube_history'
+class VideoHistory(db.Model):
+    __tablename__ = 'video_history'
+
+    VIDEO_PLATFORM_YOUTUBE = 'youtube'
+    VIDEO_PLATFORM_TIKTOK = 'tiktok'
+    SUPPORTED_PLATFORMS = frozenset({VIDEO_PLATFORM_YOUTUBE, VIDEO_PLATFORM_TIKTOK})
 
     id = db.Column(db.Integer, primary_key=True)
     device_id = db.Column(db.String(50), db.ForeignKey('agent_device.system_id'), nullable=False)
     managed_user_id = db.Column(db.Integer, db.ForeignKey('managed_user.id'), nullable=False)
-    video_id = db.Column(db.String(20), nullable=False)
+    platform = db.Column(db.String(20), nullable=False, default=VIDEO_PLATFORM_YOUTUBE)
+    video_id = db.Column(db.String(25), nullable=False)
     title = db.Column(db.String(255), nullable=False)
     channel_name = db.Column(db.String(255), nullable=True)
     channel_id = db.Column(db.String(100), nullable=True)
@@ -1914,25 +1919,30 @@ class YoutubeHistory(db.Model):
 
     device = db.relationship(
         'AgentDevice',
-        backref=db.backref('youtube_history', cascade='all, delete-orphan'),
+        backref=db.backref('video_history', cascade='all, delete-orphan'),
     )
     managed_user = db.relationship(
         'ManagedUser',
-        backref=db.backref('youtube_history', cascade='all, delete-orphan'),
+        backref=db.backref('video_history', cascade='all, delete-orphan'),
     )
 
     __table_args__ = (
-        db.Index('youtube_history_user_watched_idx', 'managed_user_id', 'watched_at'),
+        db.Index('video_history_user_watched_idx', 'managed_user_id', 'watched_at'),
+        db.Index('video_history_platform_idx', 'platform', 'managed_user_id', 'watched_at'),
     )
 
     def __repr__(self):
-        return f'<YoutubeHistory {self.managed_user_id} watched {self.video_id} at {self.watched_at}>'
+        return (
+            f'<VideoHistory {self.managed_user_id} watched {self.platform}:'
+            f'{self.video_id} at {self.watched_at}>'
+        )
 
     def to_dict(self):
         return {
             'id': self.id,
             'device_id': self.device_id,
             'managed_user_id': self.managed_user_id,
+            'platform': self.platform,
             'video_id': self.video_id,
             'title': self.title,
             'channel_name': self.channel_name,
@@ -1942,6 +1952,10 @@ class YoutubeHistory(db.Model):
             'watched_at': self.watched_at.isoformat() if self.watched_at else None,
             'created_at': self.created_at.isoformat() if self.created_at else None,
         }
+
+
+# Backward compatibility alias for existing imports.
+YoutubeHistory = VideoHistory
 
 
 class WebHistory(db.Model):

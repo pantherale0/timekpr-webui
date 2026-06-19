@@ -221,6 +221,7 @@ def settings():
                 if retention_val < 0 or web_retention_val < 0:
                     flash_t('flash.settings.retention_invalid', 'danger')
                 else:
+                    Settings.set_value('video_history_retention_days', str(retention_val))
                     Settings.set_value('youtube_history_retention_days', str(retention_val))
                     Settings.set_value('web_history_retention_days', str(web_retention_val))
                     if youtube_api_key:
