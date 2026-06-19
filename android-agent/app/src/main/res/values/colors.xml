@@ -2,7 +2,7 @@
 <resources>
     <color name="guardian_primary">#2563EB</color>
     <color name="guardian_primary_dark">#1D4ED8</color>
-    <!-- Guardian Space overlay background — matches --bg-slate from blockedv2.html -->
+    <!-- Guardian Space overlay background (bg-slate from blockedv2.html) -->
     <color name="guardian_overlay_bg">#1a2234</color>
 </resources>
 
