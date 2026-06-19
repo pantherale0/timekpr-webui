@@ -242,7 +242,7 @@ pub fn boottime_ms() -> Result<i64, String> {
 
 #[cfg(target_os = "windows")]
 pub fn boottime_ms() -> Result<i64, String> {
-    use windows_sys::Win32::System::SystemInformation::QueryInterruptTime;
+    use windows_sys::Win32::System::WindowsProgramming::QueryInterruptTime;
 
     let mut interrupt_100ns = 0_u64;
     unsafe {

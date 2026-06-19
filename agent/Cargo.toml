@@ -65,6 +65,7 @@ windows-sys = { version = "0.52", features = [
     "Win32_System_IO",
     "Win32_System_Pipes",
     "Win32_System_SystemInformation",
+    "Win32_System_WindowsProgramming",
     "Win32_UI_WindowsAndMessaging",
     "Win32_NetworkManagement_NetManagement",
     "Win32_System_Registry",
