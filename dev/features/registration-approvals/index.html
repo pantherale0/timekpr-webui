@@ -2620,12 +2620,12 @@
 </tbody>
 </table>
 <h3 id="3-block-page-redirect">3. Block page redirect<a class="headerlink" href="#3-block-page-redirect" title="Permanent link">&para;</a></h3>
-<p>If the response indicates the registration is blocked, the extension redirects the tab to a built-in block page (<code>blocked.html</code>). The child sees a clear, friendly explanation and two action buttons:</p>
+<p>If the response indicates the registration is blocked, the extension redirects the tab to the Guardian Space overlay (<code>blockedv2.html</code>). The child sees a clear, friendly explanation and a <strong>Request Sign-up Approval</strong> button:</p>
 <ul>
-<li><strong>Request Approval</strong> — sends a <code>REQUEST_REGISTRATION</code> message to the agent, which creates a pending <code>ApprovalRequest</code> in the Guardian server. The parent sees a <em>Site Sign-Up</em> badge in the <a href="../../web-ui/access-requests/">Access Requests</a> panel.</li>
-<li><strong>Check Approval Status</strong> — manually re-queries the agent. The page also polls automatically every <strong>10 seconds</strong> and whenever the browser tab regains focus.</li>
+<li><strong>Request Sign-up Approval</strong> — sends a <code>REQUEST_REGISTRATION</code> message to the agent, which creates a pending <code>ApprovalRequest</code> in the Guardian server. The parent sees a <em>Site Sign-Up</em> badge in the <a href="../../web-ui/access-requests/">Access Requests</a> panel.</li>
+<li>The page polls automatically every <strong>10 seconds</strong> and whenever the browser tab regains focus to detect approval.</li>
 </ul>
-<p>Once the parent approves the request in the admin panel, the block page detects the approval on the next poll and automatically redirects the child back to the original sign-up URL.</p>
+<p>Once the parent approves the request in the admin panel, the overlay detects the approval on the next poll and automatically redirects the child back to the original sign-up URL.</p>
 <hr />
 <h2 id="enabling-sign-up-approvals">Enabling sign-up approvals<a class="headerlink" href="#enabling-sign-up-approvals" title="Permanent link">&para;</a></h2>
 <ol>
@@ -2676,7 +2676,7 @@
 </tbody>
 </table>
 <h3 id="viewing-the-report">Viewing the report<a class="headerlink" href="#viewing-the-report" title="Permanent link">&para;</a></h3>
-<p>Navigate to <strong>Admin → Users → [child account] → Online Accounts</strong>. The page displays a searchable, sortable table of all recorded accounts. Use the search bar to filter by domain or username.</p>
+<p>Navigate to <strong>Admin → Users → [child account] → Online Accounts</strong>, or open <strong>Activity → Online accounts</strong> from the child's dashboard card. The page displays a searchable, sortable table of all recorded accounts. Use the search bar to filter by domain or username.</p>
 <hr />
 <h2 id="handling-approval-requests">Handling approval requests<a class="headerlink" href="#handling-approval-requests" title="Permanent link">&para;</a></h2>
 <p>Pending site sign-up requests appear in the global <strong>Access Requests</strong> list alongside time extension, app access, and domain unblock requests. They are identified by the <strong>Site Sign-Up</strong> amber badge.</p>
