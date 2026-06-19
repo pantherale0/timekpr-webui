@@ -3,7 +3,16 @@ import logging
 from datetime import datetime, timezone, timedelta, time
 from flask import Blueprint, session, request, jsonify, redirect, url_for
 from src.i18n.catalog import flash_t, api_message, t
-from src.database import db, ManagedUser, AgentDevice, ManagedUserDeviceMap, UserTimeUsage, AppUsageHistory
+from src.database import (
+    db,
+    ManagedUser,
+    AgentDevice,
+    ManagedUserDeviceMap,
+    UserTimeUsage,
+    AppUsageHistory,
+    stamp_usage_snapshot,
+    utc_today,
+)
 from src.helpers import _device_display_label, _get_device_label_map, _mapping_display_label
 from src.users_manager import _refresh_managed_user_summary
 from src.agent_helper import AgentClient
@@ -27,7 +36,9 @@ def _apply_mapping_validation(mapping):
     mapping.last_checked = datetime.now(timezone.utc)
     mapping.is_valid = is_valid
     if is_valid and config_dict:
-        mapping.last_config = json.dumps(config_dict)
+        mapping.last_config = json.dumps(
+            stamp_usage_snapshot(config_dict, utc_today())
+        )
         if config_dict.get("LINUX_UID") is not None:
             try:
                 mapping.linux_uid = int(config_dict.get("LINUX_UID"))

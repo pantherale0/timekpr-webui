@@ -14,7 +14,10 @@ import random
 import socket
 import time
 import uuid
+from datetime import datetime, timezone
 from pathlib import Path
+
+from src.database import USAGE_SNAPSHOT_DATE_KEY
 
 LOGGER = logging.getLogger(__name__)
 
@@ -29,6 +32,30 @@ DEFAULT_EMIT_STARTUP_ALERT_ON_AUTH = False
 DEFAULT_SEND_POLICY_SYNC_CHECK_ON_AUTH = False
 DEFAULT_SEND_INSTALLED_APPS_ON_AUTH = True
 SECONDS_PER_HOUR = 60 * 60
+
+
+def _utc_today_iso():
+    return datetime.now(timezone.utc).date().isoformat()
+
+
+def _maybe_roll_user_day(state):
+    """Reset per-day counters when the UTC calendar day advances."""
+    today = _utc_today_iso()
+    if state.get('usage_snapshot_date') == today:
+        return
+
+    state['usage_snapshot_date'] = today
+    state['time_spent_day'] = 0
+    schedule = state.get('weekly_schedule') or {}
+    today_name = datetime.now(timezone.utc).strftime('%A').lower()
+    hours = schedule.get(today_name)
+    if hours is not None:
+        limit_seconds = int(float(hours) * SECONDS_PER_HOUR)
+        state['limit'] = max(limit_seconds, 0)
+        state['time_left_day'] = state['limit']
+    else:
+        state['time_left_day'] = state.get('limit', state.get('time_left_day', 0))
+
 
 LINUX_DEVICE_POLICY_DEFAULT_SUPPORT_MESSAGE = (
     'This setting is managed by your parent through TimeKpr.'
@@ -1068,6 +1095,7 @@ class DebugAgentProtocol:
             ("Minecraft", "/usr/bin/minecraft-launcher"),
         ])
         duration_seconds = self.random.choice([120, 300, 600, 900, 1200])
+        _maybe_roll_user_day(user_state)
         user_state["time_spent_day"] += duration_seconds
         user_state["time_left_day"] = max(user_state["time_left_day"] - duration_seconds, 0)
         end_time = time.time()
@@ -1151,7 +1179,9 @@ class DebugAgentProtocol:
                 self.config["default_time_left_day"],
             )
             self.config["next_linux_uid"] += 1
-        return users[username]
+        state = users[username]
+        _maybe_roll_user_day(state)
+        return state
 
     def _user_config_payload(self, username, state):
         enforced_entry = self.config.get("enforced_linux_device_policy")
@@ -1171,6 +1201,7 @@ class DebugAgentProtocol:
             "ALLOWED_HOURS": _json_clone(state["allowed_hours"]),
             "DOMAIN_POLICY_SOURCE_IDS": list(state["domain_policy_source_ids"]),
             "APPARMOR_POLICY_COUNT": len(state["apparmor_policies"]),
+            USAGE_SNAPSHOT_DATE_KEY: state.get("usage_snapshot_date", _utc_today_iso()),
         }
         payload.update(_linux_device_policy_summary(linux_policy_entry))
         return payload

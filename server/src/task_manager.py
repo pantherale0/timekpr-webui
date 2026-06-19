@@ -11,7 +11,7 @@ import uuid
 import asyncio
 import aiohttp
 from contextlib import contextmanager
-from datetime import date, datetime, timezone, timedelta
+from datetime import datetime, timezone, timedelta
 
 import requests
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
@@ -31,7 +31,10 @@ from src.database import (
     UserDailyTimeInterval,
     coerce_time_left_day,
     coerce_time_spent_day,
+    ensure_offline_mapping_day_snapshot,
     get_mapping_time_spent_for_day,
+    stamp_usage_snapshot,
+    utc_today,
     YoutubeHistory,
     WebHistory,
 )
@@ -494,7 +497,7 @@ class BackgroundTaskManager:
                 try:
                     mappings = list(user.device_mappings)
                     logger.info("Processing managed user: %s across %d mapping(s)", user.username, len(mappings))
-                    today = date.today()
+                    today = utc_today()
                     effective_daily_limit_seconds = user.get_effective_daily_limit_seconds(today)
 
                     if (
@@ -564,9 +567,12 @@ class BackgroundTaskManager:
                     validated_mappings = []
 
                     for mapping in mappings:
-                        mapping.last_checked = datetime.now(timezone.utc)
-
                         if not AgentConnectionManager.is_online(mapping.system_id):
+                            ensure_offline_mapping_day_snapshot(
+                                mapping,
+                                today,
+                                effective_daily_limit_seconds,
+                            )
                             logger.info(
                                 "Mapping offline for %s on %s",
                                 mapping.linux_username,
@@ -639,7 +645,10 @@ class BackgroundTaskManager:
                             any_valid_mapping = True
                             previous_linux_uid = mapping.linux_uid
                             mapping.is_valid = True
-                            mapping.last_config = json.dumps(config_dict)
+                            mapping.last_checked = datetime.now(timezone.utc)
+                            mapping.last_config = json.dumps(
+                                stamp_usage_snapshot(config_dict, today)
+                            )
                             mapping.linux_uid = _safe_int(config_dict.get("LINUX_UID"), mapping.linux_uid)
                             if mapping.linux_uid != previous_linux_uid:
                                 domain_policy_hint_system_ids.add(mapping.system_id)
@@ -698,7 +707,9 @@ class BackgroundTaskManager:
                             )
                             if success:
                                 config_dict["TIME_LEFT_DAY"] = shared_time_left
-                                mapping.last_config = json.dumps(config_dict)
+                                mapping.last_config = json.dumps(
+                                    stamp_usage_snapshot(config_dict, today)
+                                )
                             else:
                                 logger.warning(
                                     "Daily time rebalance failed for %s on %s: %s",
@@ -1003,7 +1014,7 @@ class BackgroundTaskManager:
                     client = await NintendoParental.create(auth)
 
                     await client.update()
-                    today = date.today()
+                    today = utc_today()
 
                     for db_device in nintendo_devices:
                         cloud_device = client.devices.get(db_device.system_id)
@@ -1129,7 +1140,7 @@ class BackgroundTaskManager:
                 if auth.refresh_token and auth.refresh_token != session_token:
                     Settings.set_value('xbox_refresh_token', auth.refresh_token)
 
-                today = date.today()
+                today = utc_today()
 
                 for db_device in xbox_devices:
                     cloud_device = None

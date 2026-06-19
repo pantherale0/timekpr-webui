@@ -1,5 +1,5 @@
 from collections import defaultdict
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 import pytz
 import json
 
@@ -54,14 +54,98 @@ def coerce_time_left_day(value):
         return None
 
 
+USAGE_SNAPSHOT_DATE_KEY = 'USAGE_SNAPSHOT_DATE'
+
+
+def utc_today() -> date:
+    """Return the current calendar day in UTC."""
+    return datetime.now(timezone.utc).date()
+
+
+def utc_date_of(value) -> date | None:
+    """Normalize a datetime to its UTC calendar date."""
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc).date()
+
+
+def mapping_usage_snapshot_date(mapping) -> date | None:
+    """Return the UTC day stamped on a mapping usage snapshot, if present."""
+    if mapping is None:
+        return None
+    raw = mapping.get_config_value(USAGE_SNAPSHOT_DATE_KEY)
+    if not raw:
+        return None
+    try:
+        return datetime.strptime(str(raw)[:10], '%Y-%m-%d').date()
+    except (TypeError, ValueError):
+        return None
+
+
+def mapping_usage_is_for_day(mapping, day=None) -> bool:
+    """Return True when mapping.last_config reflects usage for the requested UTC day."""
+    if mapping is None:
+        return False
+
+    day = day or utc_today()
+    snapshot_day = mapping_usage_snapshot_date(mapping)
+    if snapshot_day is not None:
+        return snapshot_day == day
+
+    # Legacy snapshots without USAGE_SNAPSHOT_DATE rely on last agent contact day.
+    return utc_date_of(getattr(mapping, 'last_checked', None)) == day
+
+
+def stamp_usage_snapshot(config, day=None) -> dict:
+    """Attach a UTC usage snapshot date to an agent/cloud config payload."""
+    day = day or utc_today()
+    stamped = dict(config) if isinstance(config, dict) else {}
+    stamped[USAGE_SNAPSHOT_DATE_KEY] = day.isoformat()
+    return stamped
+
+
+def ensure_offline_mapping_day_snapshot(mapping, day=None, effective_limit_seconds=None) -> bool:
+    """Reset stale offline mapping usage when the UTC day advances.
+
+    Returns True when the mapping config was rolled forward to a new day.
+    """
+    if mapping is None:
+        return False
+
+    day = day or utc_today()
+    if mapping_usage_is_for_day(mapping, day):
+        if mapping_usage_snapshot_date(mapping) is None and mapping.last_config:
+            try:
+                config = json.loads(mapping.last_config)
+            except (TypeError, ValueError, json.JSONDecodeError):
+                config = None
+            if isinstance(config, dict):
+                mapping.last_config = json.dumps(stamp_usage_snapshot(config, day))
+        return False
+
+    try:
+        config = json.loads(mapping.last_config) if mapping.last_config else {}
+    except (TypeError, ValueError, json.JSONDecodeError):
+        config = {}
+    if not isinstance(config, dict):
+        config = {}
+
+    config['TIME_SPENT_DAY'] = 0
+    if effective_limit_seconds is not None:
+        config['TIME_LEFT_DAY'] = effective_limit_seconds
+    mapping.last_config = json.dumps(stamp_usage_snapshot(config, day))
+    return True
+
+
 def get_mapping_time_spent_for_day(mapping, day=None):
     """Return a mapping's last known TIME_SPENT_DAY only for the requested day."""
     if mapping is None:
         return 0
 
-    day = day or datetime.now(timezone.utc).date()
-    last_checked = getattr(mapping, 'last_checked', None)
-    if last_checked is None or last_checked.date() != day:
+    day = day or utc_today()
+    if not mapping_usage_is_for_day(mapping, day):
         return 0
 
     return coerce_time_spent_day(mapping.get_config_value('TIME_SPENT_DAY'))
@@ -72,9 +156,8 @@ def get_mapping_time_left_for_day(mapping, day=None):
     if mapping is None:
         return None
 
-    day = day or datetime.now(timezone.utc).date()
-    last_checked = getattr(mapping, 'last_checked', None)
-    if last_checked is None or last_checked.date() != day:
+    day = day or utc_today()
+    if not mapping_usage_is_for_day(mapping, day):
         return None
 
     return coerce_time_left_day(mapping.get_config_value('TIME_LEFT_DAY'))

@@ -14,6 +14,7 @@ from src.database import (
     Settings,
     UserTimeUsage,
     db,
+    stamp_usage_snapshot,
 )
 from pyfamilysafety.enum import OverrideTarget, DayOfWeek
 from pyfamilysafety.schedule import DeviceLimitsSchedule, DailyRestriction, AllottedInterval
@@ -95,14 +96,14 @@ def build_xbox_mapping_stats(
     now_utc: datetime,
 ) -> dict:
     """Extract Xbox stats for storing in mapping config."""
-    return {
+    return stamp_usage_snapshot({
         'TIME_SPENT_DAY': player_playtime,
         'TIME_LEFT_DAY': None, # Read-only for now
         'LIMIT_TIME': None,    # Read-only for now
         'last_playtime_change_at': last_active_str,
         'last_sync': format_xbox_last_sync(cloud_device.last_seen),
         'blocked': cloud_device.blocked,
-    }
+    }, now_utc.date())
 
 
 def update_xbox_players(db_device: AgentDevice, accounts: list) -> None:

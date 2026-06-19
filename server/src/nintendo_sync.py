@@ -15,6 +15,7 @@ from src.database import (
     UserDailyTimeInterval,
     UserTimeUsage,
     db,
+    stamp_usage_snapshot,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -91,7 +92,7 @@ def build_nintendo_mapping_stats(
     now_utc: datetime,
 ) -> dict:
     timer_mode = cloud_device.timer_mode
-    return {
+    return stamp_usage_snapshot({
         'TIME_SPENT_DAY': player_playtime,
         'TIME_LEFT_DAY': (
             max((cloud_device.limit_time * 60) - global_playtime_seconds, 0)
@@ -103,7 +104,7 @@ def build_nintendo_mapping_stats(
         'bedtime_alarm': str(cloud_device.bedtime_alarm) if cloud_device.bedtime_alarm else None,
         'last_playtime_change_at': last_active_str,
         'last_sync': format_nintendo_last_sync(cloud_device.last_sync),
-    }
+    }, now_utc.date())
 
 
 def update_nintendo_players(db_device: AgentDevice, cloud_device) -> None:

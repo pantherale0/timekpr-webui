@@ -1,7 +1,14 @@
 import json
 import logging
-from datetime import date, datetime, timezone
-from src.database import db, UserTimeUsage, get_mapping_time_spent_for_day, get_mapping_time_left_for_day
+from datetime import datetime, timezone
+from src.database import (
+    db,
+    UserTimeUsage,
+    ensure_offline_mapping_day_snapshot,
+    get_mapping_time_left_for_day,
+    get_mapping_time_spent_for_day,
+    utc_today,
+)
 from src.agent_helper import AgentConnectionManager
 
 _LOGGER = logging.getLogger(__name__)
@@ -10,7 +17,7 @@ _LOGGER = logging.getLogger(__name__)
 def _refresh_managed_user_summary(user):
     valid_mappings = [mapping for mapping in user.device_mappings if mapping.is_valid]
     user.is_valid = bool(valid_mappings)
-    today = date.today()
+    today = utc_today()
     effective_daily_limit_seconds = user.get_effective_daily_limit_seconds(today)
 
     if not valid_mappings:
@@ -26,6 +33,12 @@ def _refresh_managed_user_summary(user):
     shared_spent = 0
     time_left_values = []
     for mapping in valid_mappings:
+        if not AgentConnectionManager.is_online(mapping.system_id):
+            ensure_offline_mapping_day_snapshot(
+                mapping,
+                today,
+                effective_daily_limit_seconds,
+            )
         shared_spent += get_mapping_time_spent_for_day(mapping, today)
         time_left = get_mapping_time_left_for_day(mapping, today)
         if time_left is not None:

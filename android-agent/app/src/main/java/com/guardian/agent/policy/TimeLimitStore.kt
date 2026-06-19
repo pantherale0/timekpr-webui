@@ -9,6 +9,7 @@ import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
+import java.time.ZoneOffset
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -112,6 +113,7 @@ class TimeLimitStore(context: Context) {
             state.linuxUid = defaultUid
             persist(username, state)
         }
+        ensureDayRollover(username, state)
         return state
     }
 
@@ -161,6 +163,7 @@ class TimeLimitStore(context: Context) {
 
     fun recordUsage(username: String, seconds: Int) {
         val state = users[username] ?: return
+        ensureDayRollover(username, state)
         state.timeSpentDay += seconds
         state.timeLeftDay = maxOf(0, state.timeLeftDay - seconds)
         persist(username, state)
@@ -213,6 +216,7 @@ class TimeLimitStore(context: Context) {
     }
 
     fun configPayload(username: String, state: UserTimeState): JSONObject {
+        ensureDayRollover(username, state)
         val allowedHoursJson = JSONObject()
         state.allowedHours.forEach { (day, hours) ->
             val dayJson = JSONObject()
@@ -240,6 +244,7 @@ class TimeLimitStore(context: Context) {
             .put("ALLOWED_DAYS", state.allowedDays.sorted().map { it.toString() })
             .put("WEEKLY_SCHEDULE", weeklyJson)
             .put("ALLOWED_HOURS", allowedHoursJson)
+            .put(USAGE_SNAPSHOT_DATE, utcToday())
     }
 
     private fun dayOfWeekIndex(day: DayOfWeek): Int {
@@ -273,8 +278,46 @@ class TimeLimitStore(context: Context) {
             .put("time_left_day", state.timeLeftDay)
             .put("limit", state.limit)
             .put("enabled", state.enabled)
+            .put(USAGE_SNAPSHOT_DATE, utcToday())
         prefs.edit().putString("user_$username", json.toString()).apply()
     }
+
+    private fun ensureDayRollover(username: String, state: UserTimeState) {
+        val today = utcToday()
+        val storedDate = readPersistedSnapshotDate(username)
+        if (storedDate == today) {
+            return
+        }
+
+        state.timeSpentDay = 0
+        resolveTodayLimitSeconds(state)?.let { limitSeconds ->
+            state.limit = limitSeconds
+            state.timeLeftDay = limitSeconds
+        } ?: run {
+            state.timeLeftDay = state.limit
+        }
+        persist(username, state)
+    }
+
+    private fun resolveTodayLimitSeconds(state: UserTimeState): Int? {
+        if (state.weeklySchedule.isEmpty()) {
+            return null
+        }
+        val today = LocalDate.now(ZoneOffset.UTC).dayOfWeek.name.lowercase()
+        val hours = state.weeklySchedule[today] ?: return null
+        return (hours * 3600).toInt().coerceAtLeast(0)
+    }
+
+    private fun readPersistedSnapshotDate(username: String): String? {
+        val raw = readPersistedRaw(username) ?: return null
+        return try {
+            JSONObject(raw).optString(USAGE_SNAPSHOT_DATE, "").takeIf { it.isNotBlank() }
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private fun utcToday(): String = LocalDate.now(ZoneOffset.UTC).toString()
 
     private fun loadPersisted(username: String): UserTimeState? {
         val raw = readPersistedRaw(username) ?: return null
@@ -337,5 +380,6 @@ class TimeLimitStore(context: Context) {
     companion object {
         private const val PREFS_NAME = "guardian_time_limits"
         private const val KEY_SCREENTIME_EXEMPT = "screentime_exempt_packages"
+        const val USAGE_SNAPSHOT_DATE = "USAGE_SNAPSHOT_DATE"
     }
 }
