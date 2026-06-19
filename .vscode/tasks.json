@@ -44,6 +44,17 @@
             "problemMatcher": []
         },
         {
+            "label": "Bundle i18n for Server",
+            "type": "shell",
+            "command": "python scripts/i18n/manage.py bundle --target server",
+            "group": "test",
+            "presentation": {
+                "reveal": "silent",
+                "panel": "shared"
+            },
+            "problemMatcher": []
+        },
+        {
             "label": "Docker: Compose Up",
             "type": "shell",
             "command": "docker-compose up -d --build",

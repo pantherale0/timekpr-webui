@@ -179,21 +179,40 @@
                 <!-- Mapping Sync Details -->
                 {% if blocklist_sync_status.mappings %}
                     <div class="border-top pt-4 mt-4">
-                        <h6 class="text-secondary small fw-bold text-uppercase mb-3" style="font-size: 0.75rem; letter-spacing: 0.05em;">Account Synchronization Log</h6>
+                        <h6 class="text-secondary small fw-bold text-uppercase mb-3" style="font-size: 0.75rem; letter-spacing: 0.05em;">{{ t('pages.admin_user_edit.account_sync_log') }}</h6>
                         <div class="d-flex flex-column gap-2">
                             {% for mapping in blocklist_sync_status.mappings %}
                                 <div class="border rounded p-3 bg-body-secondary d-flex justify-content-between align-items-center flex-wrap gap-2">
                                     <div>
-                                        <strong class="text-body">{{ mapping.linux_username }}@{{ mapping.device_label }}</strong>
+                                        <strong class="text-body">{{ mapping.linux_username }} on {{ mapping.device_label }}</strong>
                                         <div class="text-secondary small fw-semibold mt-1">
-                                            UID: {{ mapping.linux_uid if mapping.linux_uid is not none else 'unknown' }}
                                             {% if mapping.last_synced %}
-                                                &bull; Last Sync: {{ mapping.last_synced }}
+                                                {{ t('pages.admin_user_edit.last_sync', time=mapping.last_synced) }}
                                             {% endif %}
+                                            <button type="button" class="btn btn-link btn-sm p-0 text-secondary small sync-details-toggle"
+                                                data-bs-toggle="collapse" data-bs-target="#sync-details-{{ loop.index }}"
+                                                aria-expanded="false">
+                                                {{ t('pages.admin_user_edit.sync_show_details') }}
+                                            </button>
+                                            <div class="collapse" id="sync-details-{{ loop.index }}">
+                                                {% if mapping.linux_uid is not none %}
+                                                {{ t('pages.admin_user_edit.uid_label', uid=mapping.linux_uid) }}
+                                                {% else %}
+                                                {{ t('pages.admin_users.technical_uid_unknown') }}
+                                                {% endif %}
+                                            </div>
                                         </div>
                                     </div>
                                     <span class="badge {% if mapping.status == 'synced' %}bg-success{% elif mapping.status == 'awaiting_uid' %}bg-warning text-dark{% elif mapping.status == 'not_configured' %}bg-secondary{% else %}bg-warning text-dark{% endif %} p-2">
-                                        {{ mapping.status|replace('_', ' ')|title }}
+                                        {% if mapping.status == 'synced' %}
+                                            {{ t('pages.admin_user_edit.sync_status_synced') }}
+                                        {% elif mapping.status == 'awaiting_uid' %}
+                                            {{ t('pages.admin_user_edit.sync_status_awaiting_uid') }}
+                                        {% elif mapping.status == 'not_configured' %}
+                                            {{ t('pages.admin_user_edit.sync_status_not_configured') }}
+                                        {% else %}
+                                            {{ t('pages.admin_user_edit.sync_status_pending') }}
+                                        {% endif %}
                                     </span>
                                 </div>
                             {% endfor %}

@@ -173,6 +173,8 @@
 
 {% block extra_js %}
 <script>
+    (function () {
+    'use strict';
     const i18n = JSON.parse(document.getElementById('i18n-data')?.textContent || '{}');
     const fmt = (key, params) => (window.guardianI18n ? window.guardianI18n(key, params) : i18n[key] || key);
 
@@ -688,5 +690,6 @@
             statusEl.className = 'status-error';
         });
     }
+    })();
 </script>
 {% endblock %}

@@ -8,6 +8,7 @@
             "program": "${workspaceFolder}/server/app.py",
             "cwd": "${workspaceFolder}/server",
             "console": "integratedTerminal",
+            "preLaunchTask": "Bundle i18n for Server",
             "jinja": true,
             "justMyCode": true,
             "env": {

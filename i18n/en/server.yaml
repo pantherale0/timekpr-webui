@@ -87,8 +87,8 @@ shell:
   wizard_step3_subtitle: Waiting for your device agent client to make contact with the server.
   wizard_step4_title: Select Child Profile
   wizard_step4_subtitle: Assign this hardware device to a child profile.
-  wizard_step5_title: Account Mappings
-  wizard_step5_subtitle: Map the local hardware accounts to this profile.
+  wizard_step5_title: Who uses this device?
+  wizard_step5_subtitle: Pick the account your child signs in with on this device.
   platform_linux: Linux PC
   platform_linux_hint: Ubuntu, Debian, Fedora, Arch
   platform_android: Android
@@ -135,9 +135,9 @@ shell:
   wizard_scanning: Scanning for new agent connections...
   wizard_scanning_hint: Guardian is waiting for the device client to connect to the WebSocket hub. This usually takes a few seconds.
   wizard_device_connected: Device Connected!
-  wizard_device_label: ASSIGN A DEVICE LABEL
+  wizard_device_label: Device nickname
   wizard_device_placeholder: "e.g. Jordan's Laptop"
-  wizard_approve_continue: Approve & Continue
+  wizard_approve_continue: Continue
   wizard_nintendo_found: Nintendo Console Found
   wizard_nintendo_select: SELECT SWITCH CONSOLE
   wizard_nintendo_label: ASSIGN A DEVICE LABEL
@@ -152,7 +152,7 @@ shell:
   wizard_select_child: Select child account
   wizard_new_profile: NEW CHILD PROFILE NAME
   wizard_new_profile_placeholder: e.g. Jordan
-  wizard_mapping_lead: "Guardian found the following local accounts on the device. Select which local user account should be locked under this profile:"
+  wizard_mapping_lead: Select the account your child uses to sign in on this device.
   wizard_local_username: LOCAL OS USERNAME
   wizard_linux_uid: LINUX UID (OPTIONAL)
   wizard_linux_uid_placeholder: e.g. 1000
@@ -291,6 +291,14 @@ api:
   approval_request_not_found: Approval request not found
   approval_grant_not_found: Approval grant not found
   device_not_pending: "Device is not pending (status: {status})"
+  device_not_registered: Device {device} is not registered or approved
+  mapping_fields_required: Device and sign-in account are required
+  already_linked: "{username} is already connected to {device}"
+  uid_numeric: Account ID must be numeric
+  mapping_connected: "Connected {username} to {device}"
+  device_label_required: A device name is required
+  device_not_approved: "Device is not approved (status: {status})"
+  device_label_updated: Renamed device to {device}
   device_approved: Device {device} approved successfully.
   device_rejected: Device {device} rejected successfully.
   invalid_json: Request body must be a JSON object
@@ -340,8 +348,8 @@ js:
   shell_wizard_step3_subtitle: Waiting for your device agent client to make contact with the server.
   shell_wizard_step4_title: Select Child Profile
   shell_wizard_step4_subtitle: Assign this hardware device to a child profile.
-  shell_wizard_step5_title: Account Mappings
-  shell_wizard_step5_subtitle: Map the local hardware accounts to this profile.
+  shell_wizard_step5_title: Who uses this device?
+  shell_wizard_step5_subtitle: Pick the account your child signs in with on this device.
   shell_platform_linux: Linux PC
   shell_platform_android: Android Device
   shell_platform_windows: Windows PC
@@ -371,6 +379,16 @@ js:
   shell_no_android_profiles: No Android profiles reported.
   shell_onboarding_success: Device paired and child account linked successfully!
   shell_onboarding_error: "Error completing onboarding: {message}"
+  device_link_who_signs_in: Who signs in on this device?
+  device_link_android_profile: Which Android profile?
+  device_link_player_nintendo: Which Switch player?
+  device_link_player_xbox: Which Xbox profile?
+  device_link_select_account: Choose an account...
+  device_link_select_player: Choose a player profile...
+  device_link_no_accounts: No accounts reported yet — use Advanced options
+  device_link_device_required: Please choose a device
+  device_link_account_required: Please choose who signs in on this device
+  device_link_connect_failed: Could not connect — please try again
   shell_nintendo_redirect_required: Please paste the redirect URL from the Nintendo login process.
   shell_nintendo_auth_failed: "Authentication failed: {message}"
   shell_nintendo_auth_error: Failed to connect to authentication API.
@@ -636,14 +654,31 @@ pages:
     heading: Child Profiles
     lead: Each profile keeps its own routines, browsing shields, and activity story.
     search_placeholder: Search child accounts...
-    link_device_accounts: Link Device Accounts
+    link_device_accounts: Connected Devices
     active_count: "{count} active"
-    linked_device_accounts: "{count} linked device accounts ({verified} verified)"
+    linked_device_accounts: "{count} connected devices ({verified} connected)"
     edit_profile: Edit Profile
     verify: Verify
     remove: Remove
-    delete_confirm: Delete managed user {username} and all account mappings?
-    link_new_mapping: Link New Hardware Account Mapping
+    delete_confirm: Delete managed user {username} and all device connections?
+    connect_device: Connect a device
+    which_device: Which device?
+    select_device: Choose a device...
+    who_signs_in: Who signs in on this device?
+    select_account: Choose an account...
+    select_player: Choose a player profile...
+    manual_account: Sign-in name (manual)
+    manual_account_placeholder: e.g. jordan
+    advanced_uid: Account ID (advanced)
+    uid_placeholder: e.g. 1000
+    connect: Connect
+    connected: Connected
+    needs_attention: Needs attention
+    check_again: Check again
+    disconnect: Disconnect
+    advanced_options: Advanced options
+    uid_helper: Usually filled in automatically — only change if Connect fails.
+    link_new_mapping: Connect a device
     target_device: Target Device
     select_hardware: Select hardware
     cloud_suffix: Cloud
@@ -654,21 +689,27 @@ pages:
     create_restricted_profile: Create Restricted Profile
     create_standard_user: Create Standard User
     link_mapping: Link Mapping
+    col_sign_in: Sign-in on device
+    col_device: Device
+    col_status: Status
+    col_last_check: Last checked
+    col_actions: Actions
     col_device_user: Device User
     col_target_device: Target Device
     col_uid: UID
-    col_status: Status
-    col_last_check: Last Connection Check
-    col_actions: Actions
+    show_details: Details
+    hide_details: Hide details
+    technical_uid: "Account ID: {uid}"
+    technical_uid_unknown: "Account ID: unknown"
     nintendo_player: Nintendo Player
     programmatic: "Programmatic: {type}"
     verified: Verified
     unverified: Unverified
     never_checked: Never checked
-    revoke_mapping_confirm: Revoke account mapping for {username}?
-    no_mappings: No active device mappings linked. Link one above or use the wizard to begin tracking screen time.
+    revoke_mapping_confirm: Disconnect {username} from this device?
+    no_mappings: No devices connected yet. Connect one above or use Add a Family Device to get started.
     empty_title: No Child Profiles Yet
-    empty_lead: Tap Create Managed Profile in the header to set up a supportive safety baseline — then link device accounts below.
+    empty_lead: Tap Create Managed Profile in the header to set up a supportive safety baseline — then connect devices below.
     create_managed_profile: Create Managed Profile
     found_count: "{count} found"
 
@@ -699,6 +740,12 @@ pages:
     save_custom_shields: Save custom shields
     manage_shields: Manage shields
     account_sync_log: Account Synchronization Log
+    sync_status_synced: Up to date
+    sync_status_awaiting_uid: Finishing setup
+    sync_status_not_configured: Shields not applied yet
+    sync_status_pending: Updating…
+    sync_show_details: Show details
+    sync_hide_details: Hide details
     uid_label: "UID: {uid}"
     last_sync: "Last Sync: {time}"
     device_routine_locks: Device Routine Locks

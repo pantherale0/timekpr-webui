@@ -7,7 +7,7 @@ from src.database import db, AgentDevice
 from src.agent_helper import AgentConnectionManager
 from src.agent_push import notify_pairing_approved
 from src.device_lifecycle_manager import unenroll_device as lifecycle_unenroll_device
-from src.helpers import _device_display_label
+from src.helpers import _device_display_label, _build_device_label_map
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -33,6 +33,12 @@ def approve_device(system_id):
     secure_token = secrets.token_hex(32)
     device.secure_token = secure_token
     device.status = 'approved'
+
+    payload = request.get_json(silent=True) or {}
+    display_name = (payload.get('display_name') or '').strip()
+    if display_name:
+        device.system_hostname = display_name[:255]
+
     db.session.commit()
     device_label = _device_display_label(system_id)
     
@@ -48,6 +54,36 @@ def approve_device(system_id):
     return jsonify({
         'success': True,
         'message': api_message('device_approved', device=device_label),
+    })
+
+
+@api_devices_bp.route('/api/device/<system_id>/label', methods=['PATCH'])
+def update_device_label(system_id):
+    """Set a parent-friendly display label for an approved device."""
+    if not session.get('logged_in'):
+        return jsonify({'success': False, 'message': api_message('not_authenticated')}), 401
+
+    device = AgentDevice.query.get(system_id)
+    if not device:
+        return jsonify({'success': False, 'message': api_message('device_not_found')}), 404
+    if device.status != 'approved':
+        return jsonify({
+            'success': False,
+            'message': api_message('device_not_approved', status=device.status),
+        }), 400
+
+    payload = request.get_json(silent=True) or {}
+    display_name = (payload.get('display_name') or '').strip()
+    if not display_name:
+        return jsonify({'success': False, 'message': api_message('device_label_required')}), 400
+
+    device.system_hostname = display_name[:255]
+    db.session.commit()
+    device_label = _device_display_label(system_id)
+    return jsonify({
+        'success': True,
+        'message': api_message('device_label_updated', device=device_label),
+        'display_name': device_label,
     })
 
 
@@ -109,11 +145,12 @@ def get_pending_devices():
         return jsonify({'success': False, 'message': api_message('not_authenticated')}), 401
     
     pending = AgentDevice.query.filter_by(status='pending').all()
+    label_map = _build_device_label_map(pending)
     results = []
     for device in pending:
         results.append({
             'system_id': device.system_id,
-            'display_name': device.display_name,
+            'display_name': label_map.get(device.system_id, device.display_name),
             'system_ip': device.system_ip,
             'linux_users': device.linux_users,
             'platform': device.platform or 'linux'

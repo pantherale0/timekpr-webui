@@ -1,6 +1,7 @@
 {% extends "_spa_fragment.html" %}
 
 {% from '_macros.html' import csrf_field %}
+{% from '_device_link_panel.html' import device_link_panel with context %}
 {% block title %}{{ t('pages.admin_users.title') }}{% endblock %}
 
 {% block extra_head %}{% endblock %}
@@ -54,10 +55,6 @@
                                 class="btn btn-sm btn-primary fw-bold px-3">
                                 <i class="fas fa-edit me-1"></i> {{ t('pages.admin_users.edit_profile') }}
                             </a>
-                            <a href="{{ url_for('validate_user', user_id=user.id) }}"
-                                class="btn btn-sm btn-outline-secondary fw-bold px-3">
-                                <i class="fas fa-sync me-1"></i> {{ t('pages.admin_users.verify') }}
-                            </a>
                             <form action="{{ url_for('delete_user', user_id=user.id) }}" method="POST"
                                 onsubmit="return confirm({{ t('pages.admin_users.delete_confirm', username=user.username)|tojson }})"
                                 class="m-0">
@@ -72,60 +69,15 @@
                         <div class="bg-body-secondary border rounded p-3 mb-3">
                             <h6 class="fw-bold text-secondary text-uppercase mb-3"
                                 style="font-size: 0.75rem; letter-spacing: 0.05em;"><i
-                                    class="fas fa-plus-circle me-1"></i>{{ t('pages.admin_users.link_new_mapping') }}</h6>
-                            <form action="{{ url_for('add_user_mapping', user_id=user.id) }}" method="POST"
-                                class="row g-3 align-items-end">
-
-                                {{ csrf_field() }} <div class="col-12 col-md-3">
-                                    <label class="form-label fw-bold text-muted" style="font-size: 0.7rem;">{{ t('pages.admin_users.target_device') }}</label>
-                                    <select name="system_id" class="form-select target-device-select" required>
-                                        <option value="" disabled selected>{{ t('pages.admin_users.select_hardware') }}</option>
-                                        {% for device in approved_devices %}
-                                        <option value="{{ device.system_id }}"
-                                            data-linux-users="{{ device.linux_users|tojson|forceescape }}"
-                                            data-platform="{{ device.platform }}"
-                                            data-is-device-owner="{{ 'true' if device.is_device_owner else 'false' }}">
-                                            {% if device.system_ip %}
-                                            {{ device_labels.get(device.system_id, device.display_name) }} ({{
-                                            device.system_ip }})
-                                            {% else %}
-                                            {{ device_labels.get(device.system_id, device.display_name) }} ({{ t('pages.admin_users.cloud_suffix') }})
-                                            {% endif %}
-                                        </option>
-                                        {% endfor %}
-                                    </select>
-                                </div>
-                                <div class="col-12 col-md-3">
-                                    <label class="form-label fw-bold text-muted linux-username-label"
-                                        style="font-size: 0.7rem;">{{ t('pages.admin_users.local_os_username') }}</label>
-                                    <input type="text" name="linux_username" class="form-control linux-username-input"
-                                        placeholder="e.g. jordan" required list="linux-users-list-{{ user.id }}"
-                                        autocomplete="off">
-                                    <select class="form-select nintendo-player-select d-none" disabled
-                                        aria-label="Nintendo player profile">
-                                        <option value="" disabled selected>Select player profile</option>
-                                    </select>
-                                    <datalist id="linux-users-list-{{ user.id }}"></datalist>
-                                </div>
-                                <div class="col-12 col-md-2 linux-uid-container">
-                                    <label class="form-label fw-bold text-muted" style="font-size: 0.7rem;">{{ t('pages.admin_users.linux_uid_optional') }}</label>
-                                    <input type="text" name="linux_uid" class="form-control linux-uid-input"
-                                        placeholder="e.g. 1000">
-                                </div>
-                                <div class="col-12 col-md-2 profile-provision-container" style="display: none;">
-                                    <label class="form-label fw-bold text-muted" style="font-size: 0.7rem;">{{ t('pages.admin_users.profile_provisioning') }}</label>
-                                    <select name="android_profile_type"
-                                        class="form-select form-select-sm profile-provision-select">
-                                        <option value="">{{ t('pages.admin_users.map_to_existing') }}</option>
-                                        <option value="restricted">{{ t('pages.admin_users.create_restricted_profile') }}</option>
-                                        <option value="standard">{{ t('pages.admin_users.create_standard_user') }}</option>
-                                    </select>
-                                </div>
-                                <div class="col-12 col-md-2 ms-auto">
-                                    <button type="submit" class="btn btn-sm btn-primary w-100 fw-bold py-2"><i
-                                            class="fas fa-link me-1"></i> {{ t('pages.admin_users.link_mapping') }}</button>
-                                </div>
-                            </form>
+                                    class="fas fa-plus-circle me-1"></i>{{ t('pages.admin_users.connect_device') }}</h6>
+                            {{ device_link_panel(
+                                panel_id='device-link-' ~ user.id,
+                                mode='inline',
+                                user_id=user.id,
+                                approved_devices=approved_devices,
+                                device_labels=device_labels,
+                                show_device_picker=true
+                            ) }}
                         </div>
 
                         {% if user.device_mappings %}
@@ -134,11 +86,9 @@
                                 <thead>
                                     <tr class="table-light border-bottom">
                                         <th class="ps-3 text-secondary fw-bold"
-                                            style="font-size: 0.75rem; text-transform: uppercase;">{{ t('pages.admin_users.col_device_user') }}</th>
+                                            style="font-size: 0.75rem; text-transform: uppercase;">{{ t('pages.admin_users.col_sign_in') }}</th>
                                         <th class="text-secondary fw-bold"
-                                            style="font-size: 0.75rem; text-transform: uppercase;">{{ t('pages.admin_users.col_target_device') }}</th>
-                                        <th class="text-secondary fw-bold text-center"
-                                            style="font-size: 0.75rem; text-transform: uppercase;">{{ t('pages.admin_users.col_uid') }}</th>
+                                            style="font-size: 0.75rem; text-transform: uppercase;">{{ t('pages.admin_users.col_device') }}</th>
                                         <th class="text-secondary fw-bold text-center"
                                             style="font-size: 0.75rem; text-transform: uppercase;">{{ t('pages.admin_users.col_status') }}</th>
                                         <th class="text-secondary fw-bold"
@@ -150,9 +100,9 @@
                                 </thead>
                                 <tbody>
                                     {% for mapping in user.device_mappings %}
+                                    {% set mapped_player = mapping.nintendo_player %}
                                     <tr>
-                                        <td class="ps-3 fw-bold">
-                                            {% set mapped_player = mapping.nintendo_player %}
+                                        <td class="ps-3">
                                             <div class="d-flex align-items-center gap-2">
                                                 {% if mapped_player and mapped_player.player_image %}
                                                 <img src="{{ mapped_player.player_image }}" alt=""
@@ -160,8 +110,7 @@
                                                     style="width: 28px; height: 28px; background-color: var(--bs-secondary-bg);">
                                                 {% endif %}
                                                 <div>
-                                                    <code class="bg-body-secondary border px-2 py-1 rounded small"
-                                                        style="color: var(--bs-body-color);">{{ mapping.display_linux_username }}</code>
+                                                    <span class="fw-bold">{{ mapping.display_linux_username }}</span>
                                                     {% if mapped_player %}
                                                     <div class="text-secondary small mt-1" style="font-size: 0.7rem;">
                                                         <i class="fas fa-gamepad text-warning"></i> {{ t('pages.admin_users.nintendo_player') }}
@@ -171,6 +120,18 @@
                                                         <i class="fab fa-android text-success"></i> {{ t('pages.admin_users.programmatic', type=mapping.android_profile_type|title) }}
                                                     </div>
                                                     {% endif %}
+                                                    <button type="button" class="btn btn-link btn-sm p-0 text-secondary small mapping-details-toggle"
+                                                        data-bs-toggle="collapse" data-bs-target="#mapping-details-{{ mapping.id }}"
+                                                        aria-expanded="false">
+                                                        {{ t('pages.admin_users.show_details') }}
+                                                    </button>
+                                                    <div class="collapse small text-secondary" id="mapping-details-{{ mapping.id }}">
+                                                        {% if mapping.linux_uid is not none %}
+                                                        {{ t('pages.admin_users.technical_uid', uid=mapping.linux_uid) }}
+                                                        {% else %}
+                                                        {{ t('pages.admin_users.technical_uid_unknown') }}
+                                                        {% endif %}
+                                                    </div>
                                                 </div>
                                             </div>
                                         </td>
@@ -183,16 +144,12 @@
                                             </a>
                                         </td>
                                         <td class="text-center">
-                                            <span class="badge bg-body-secondary text-body border fw-bold">{{
-                                                mapping.linux_uid if mapping.linux_uid is not none else '-' }}</span>
-                                        </td>
-                                        <td class="text-center">
                                             {% if mapping.is_valid %}
                                             <span
-                                                class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1">{{ t('pages.admin_users.verified') }}</span>
+                                                class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1">{{ t('pages.admin_users.connected') }}</span>
                                             {% else %}
                                             <span
-                                                class="badge bg-warning-subtle text-warning border border-warning-subtle px-2 py-1">{{ t('pages.admin_users.unverified') }}</span>
+                                                class="badge bg-warning-subtle text-warning border border-warning-subtle px-2 py-1">{{ t('pages.admin_users.needs_attention') }}</span>
                                             {% endif %}
                                         </td>
                                         <td class="text-secondary small">
@@ -206,7 +163,7 @@
                                             <div class="d-inline-flex gap-2">
                                                 <a href="{{ url_for('validate_mapping', user_id=user.id, mapping_id=mapping.id) }}"
                                                     class="btn btn-xs btn-outline-secondary fw-bold px-2 py-1"
-                                                    style="font-size: 0.75rem;">{{ t('pages.admin_users.verify') }}</a>
+                                                    style="font-size: 0.75rem;">{{ t('pages.admin_users.check_again') }}</a>
                                                 <form
                                                     action="{{ url_for('delete_mapping', user_id=user.id, mapping_id=mapping.id) }}"
                                                     method="POST"
@@ -215,7 +172,7 @@
 
                                                     {{ csrf_field() }} <button type="submit"
                                                         class="btn btn-xs btn-outline-danger fw-bold px-2 py-1"
-                                                        style="font-size: 0.75rem;">{{ t('pages.admin_users.remove') }}</button>
+                                                        style="font-size: 0.75rem;">{{ t('pages.admin_users.disconnect') }}</button>
                                                 </form>
                                             </div>
                                         </td>
@@ -253,6 +210,7 @@
 {% endblock %}
 
 {% block extra_js %}
+<script src="{{ url_for('static', filename='js/guardian-device-link.js') }}"></script>
 <script>
     document.addEventListener('DOMContentLoaded', () => {
         const searchInput = document.getElementById('user-search');
@@ -281,123 +239,8 @@
             });
         }
 
-        const deviceSelects = document.querySelectorAll('.target-device-select');
-
-        function setLinuxUsernameMode(form, platform) {
-            const usernameLabel = form.querySelector('.linux-username-label');
-            const usernameInput = form.querySelector('.linux-username-input');
-            const nintendoSelect = form.querySelector('.nintendo-player-select');
-            const uidContainer = form.querySelector('.linux-uid-container');
-            const isNintendo = platform === 'nintendo';
-
-            if (usernameLabel) {
-                usernameLabel.textContent = isNintendo ? 'Player Profile' : {{ t('pages.admin_users.local_os_username')|tojson }};
-            }
-            if (usernameInput) {
-                usernameInput.classList.toggle('d-none', isNintendo);
-                usernameInput.required = !isNintendo;
-                if (isNintendo) {
-                    usernameInput.removeAttribute('name');
-                    usernameInput.value = '';
-                } else {
-                    usernameInput.setAttribute('name', 'linux_username');
-                }
-            }
-            if (nintendoSelect) {
-                nintendoSelect.classList.toggle('d-none', !isNintendo);
-                nintendoSelect.disabled = !isNintendo;
-                nintendoSelect.required = isNintendo;
-                if (isNintendo) {
-                    nintendoSelect.setAttribute('name', 'linux_username');
-                } else {
-                    nintendoSelect.removeAttribute('name');
-                    nintendoSelect.innerHTML = '<option value="" disabled selected>Select player profile</option>';
-                }
-            }
-            if (uidContainer) {
-                uidContainer.classList.toggle('d-none', isNintendo);
-            }
-        }
-
-        deviceSelects.forEach(select => {
-            select.addEventListener('change', (e) => {
-                const selectedOption = e.target.options[e.target.selectedIndex];
-                const usersJson = selectedOption.getAttribute('data-linux-users');
-                const platform = selectedOption.getAttribute('data-platform') || '';
-                const isDeviceOwner = selectedOption.getAttribute('data-is-device-owner') === 'true';
-                const form = e.target.closest('form');
-                const datalist = form.querySelector('datalist');
-                const usernameInput = form.querySelector('.linux-username-input');
-                const nintendoSelect = form.querySelector('.nintendo-player-select');
-                const uidInput = form.querySelector('.linux-uid-input');
-
-                setLinuxUsernameMode(form, platform);
-
-                const provisionContainer = form.querySelector('.profile-provision-container');
-                const provisionSelect = form.querySelector('.profile-provision-select');
-                if (provisionContainer) {
-                    if (platform === 'android' && isDeviceOwner) {
-                        provisionContainer.style.display = 'block';
-                    } else {
-                        provisionContainer.style.display = 'none';
-                        if (provisionSelect) {
-                            provisionSelect.value = '';
-                        }
-                    }
-                }
-
-                datalist.innerHTML = '';
-                if (nintendoSelect) {
-                    nintendoSelect.innerHTML = '<option value="" disabled selected>Select player profile</option>';
-                }
-
-                if (usersJson) {
-                    try {
-                        const users = JSON.parse(usersJson);
-                        if (platform === 'nintendo' && nintendoSelect) {
-                            users.forEach(player => {
-                                const option = document.createElement('option');
-                                option.value = player.username;
-                                option.textContent = (player.nickname || '').trim() || player.username;
-                                nintendoSelect.appendChild(option);
-                            });
-                            return;
-                        }
-
-                        users.forEach(user => {
-                            const option = document.createElement('option');
-                            option.value = user.username;
-                            option.setAttribute('data-uid', user.uid);
-                            datalist.appendChild(option);
-                        });
-
-                        usernameInput.addEventListener('input', () => {
-                            const val = usernameInput.value;
-                            const matchedUser = users.find(u => u.username === val);
-                            const provisionSelect = form.querySelector('.profile-provision-select');
-                            const provisioningNewProfile = provisionSelect && provisionSelect.value;
-                            if (matchedUser && !provisioningNewProfile) {
-                                uidInput.value = matchedUser.uid;
-                            } else if (provisioningNewProfile) {
-                                uidInput.value = '';
-                            }
-                        });
-
-                        if (provisionSelect) {
-                            provisionSelect.addEventListener('change', () => {
-                                if (provisionSelect.value) {
-                                    uidInput.value = '';
-                                    uidInput.placeholder = 'Assigned after profile is created';
-                                } else {
-                                    uidInput.placeholder = 'e.g. 1000';
-                                }
-                            });
-                        }
-                    } catch (err) {
-                        console.error('Failed to parse linux users data', err);
-                    }
-                }
-            });
+        document.querySelectorAll('.guardian-device-link-panel').forEach((panel) => {
+            window.GuardianDeviceLink.initDeviceLinkPanel(panel);
         });
     });
 </script>

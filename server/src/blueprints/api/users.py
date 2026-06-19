@@ -16,6 +16,38 @@ _VALID_AGE_TIERS = {"under8", "eight12", "teen"}
 api_users_bp = Blueprint('api_users', __name__)
 
 
+def _apply_mapping_validation(mapping):
+    """Validate mapping against the agent; update mapping fields in place."""
+    previous_linux_uid = mapping.linux_uid
+    agent_client = AgentClient(system_id=mapping.system_id)
+    is_valid, message, config_dict = agent_client.validate_user(
+        mapping.linux_username,
+        linux_uid=mapping.linux_uid,
+    )
+    mapping.last_checked = datetime.now(timezone.utc)
+    mapping.is_valid = is_valid
+    if is_valid and config_dict:
+        mapping.last_config = json.dumps(config_dict)
+        if config_dict.get("LINUX_UID") is not None:
+            try:
+                mapping.linux_uid = int(config_dict.get("LINUX_UID"))
+            except (TypeError, ValueError):
+                pass
+    uid_changed = mapping.linux_uid != previous_linux_uid
+    return is_valid, message, uid_changed
+
+
+def _parse_linux_uid(raw_value):
+    if raw_value is None:
+        return None
+    if isinstance(raw_value, int):
+        return raw_value
+    text = str(raw_value).strip()
+    if not text:
+        return None
+    return int(text)
+
+
 @api_users_bp.route('/managed-users/add', methods=['POST'])
 def create_managed_user():
     if not session.get('logged_in'):
@@ -190,6 +222,98 @@ def add_user_mapping(user_id):
     return redirect(url_for('ui_dashboard.admin'))
 
 
+@api_users_bp.route('/api/managed-users/<int:user_id>/mappings/connect', methods=['POST'])
+def connect_user_mapping(user_id):
+    if not session.get('logged_in'):
+        return jsonify({'success': False, 'message': api_message('not_authenticated')}), 401
+
+    payload = request.get_json(silent=True) or {}
+    system_id = (payload.get('system_id') or '').strip()
+    linux_username = (payload.get('linux_username') or '').strip()
+    linux_uid_raw = payload.get('linux_uid')
+
+    if not system_id or not linux_username:
+        return jsonify({
+            'success': False,
+            'message': api_message('mapping_fields_required'),
+        }), 400
+
+    user = ManagedUser.query.get_or_404(user_id)
+    device = AgentDevice.query.get(system_id)
+    if not device or device.status != 'approved':
+        return jsonify({
+            'success': False,
+            'message': api_message('device_not_registered', device=_device_display_label(system_id)),
+        }), 400
+
+    device_labels = _get_device_label_map()
+    device_label = device_labels.get(system_id, _device_display_label(system_id))
+    existing_mapping = ManagedUserDeviceMap.query.filter_by(
+        managed_user_id=user.id,
+        system_id=system_id,
+    ).first()
+    if existing_mapping:
+        return jsonify({
+            'success': False,
+            'message': api_message('already_linked', username=user.username, device=device_label),
+        }), 409
+
+    try:
+        linux_uid = _parse_linux_uid(linux_uid_raw)
+    except ValueError:
+        return jsonify({'success': False, 'message': api_message('uid_numeric')}), 400
+
+    android_profile_type = payload.get('android_profile_type')
+    if android_profile_type not in ('restricted', 'standard'):
+        android_profile_type = None
+
+    mapping = ManagedUserDeviceMap(
+        managed_user_id=user.id,
+        system_id=system_id,
+        linux_username=linux_username,
+        linux_uid=linux_uid,
+        is_valid=False,
+        android_profile_type=android_profile_type,
+    )
+    db.session.add(mapping)
+    db.session.flush()
+
+    is_valid, validation_message, uid_changed = _apply_mapping_validation(mapping)
+    _refresh_managed_user_summary(user)
+    db.session.commit()
+
+    from src.dashboard_events import notify_dashboard_changed
+    notify_dashboard_changed('mapping_changed')
+
+    policy_hint_system_ids = set()
+    if uid_changed:
+        policy_hint_system_ids.add(system_id)
+    from app import task_manager
+    task_manager.notify_domain_policy_hint(system_ids={system_id}, reason='mapping_updated')
+    if policy_hint_system_ids:
+        task_manager.notify_domain_policy_hint(
+            system_ids=policy_hint_system_ids,
+            reason='mapping_updated',
+        )
+
+    display_label = _mapping_display_label(mapping, device_labels)
+    return jsonify({
+        'success': True,
+        'message': api_message(
+            'mapping_connected',
+            username=user.username,
+            device=device_label,
+        ),
+        'mapping': {
+            'id': mapping.id,
+            'is_valid': is_valid,
+            'linux_uid': mapping.linux_uid,
+            'display_label': display_label,
+        },
+        'validation_message': validation_message if not is_valid else None,
+    })
+
+
 @api_users_bp.route('/users/add', methods=['GET', 'POST'])
 def add_user():
     """
@@ -280,19 +404,10 @@ def validate_user(user_id):
     policy_hint_system_ids = set()
     for mapping in mappings:
         previous_linux_uid = mapping.linux_uid
-        agent_client = AgentClient(system_id=mapping.system_id)
-        is_valid, message, config_dict = agent_client.validate_user(mapping.linux_username, linux_uid=mapping.linux_uid)
-        mapping.last_checked = datetime.now(timezone.utc)
-        mapping.is_valid = is_valid
-        if is_valid and config_dict:
-            mapping.last_config = json.dumps(config_dict)
-            if config_dict.get("LINUX_UID") is not None:
-                try:
-                    mapping.linux_uid = int(config_dict.get("LINUX_UID"))
-                except (TypeError, ValueError):
-                    pass
-            if mapping.linux_uid != previous_linux_uid:
-                policy_hint_system_ids.add(mapping.system_id)
+        is_valid, message, uid_changed = _apply_mapping_validation(mapping)
+        if uid_changed:
+            policy_hint_system_ids.add(mapping.system_id)
+        if is_valid:
             total_valid += 1
         else:
             messages.append(f"{_mapping_display_label(mapping, device_labels)}: {message}")
@@ -329,25 +444,14 @@ def validate_mapping(user_id, mapping_id):
 
     user = ManagedUser.query.get_or_404(user_id)
     mapping = ManagedUserDeviceMap.query.filter_by(id=mapping_id, managed_user_id=user.id).first_or_404()
-    agent_client = AgentClient(system_id=mapping.system_id)
-    is_valid, message, config_dict = agent_client.validate_user(mapping.linux_username, linux_uid=mapping.linux_uid)
-
     previous_linux_uid = mapping.linux_uid
-    mapping.last_checked = datetime.now(timezone.utc)
-    mapping.is_valid = is_valid
-    if is_valid and config_dict:
-        mapping.last_config = json.dumps(config_dict)
-        if config_dict.get("LINUX_UID") is not None:
-            try:
-                mapping.linux_uid = int(config_dict.get("LINUX_UID"))
-            except (TypeError, ValueError):
-                pass
+    is_valid, message, uid_changed = _apply_mapping_validation(mapping)
 
     _refresh_managed_user_summary(user)
     db.session.commit()
     from src.dashboard_events import notify_dashboard_changed
     notify_dashboard_changed('mapping_changed')
-    if mapping.linux_uid != previous_linux_uid:
+    if uid_changed or mapping.linux_uid != previous_linux_uid:
         from app import task_manager
         task_manager.notify_domain_policy_hint(
             system_ids={mapping.system_id},

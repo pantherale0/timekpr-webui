@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="{{ locale }}" data-bs-theme="light">
+{% from '_device_link_panel.html' import device_link_panel with context %}
 
 <head>
     <meta charset="UTF-8">
@@ -726,27 +727,18 @@
                         </div>
                     </div>
 
-                    <!-- STEP 5: Account Mapping -->
+                    <!-- STEP 5: Who uses this device -->
                     <div class="wizard-step-panel d-none" id="step-panel-5">
-                        <div style="max-width: 500px; margin: 0 auto;">
-                            <!-- Mappings Info -->
-                            <div id="wizard-mapping-section">
-                                <p class="mb-3 text-center" id="wizard-mapping-instructions">{{ t('shell.wizard_mapping_lead') }}</p>
-                                <div class="form-group mb-3">
-                                    <label for="wizard-linux-user-select" class="form-label fw-bold small text-muted"
-                                        id="wizard-user-select-label">{{ t('shell.wizard_local_username') }}</label>
-                                    <select id="wizard-linux-user-select" class="form-select">
-                                        <!-- Will populate dynamically -->
-                                    </select>
-                                </div>
-                                <div class="form-group mb-3">
-                                    <label for="wizard-linux-uid" class="form-label fw-bold small text-muted"
-                                        id="wizard-uid-label">{{ t('shell.wizard_linux_uid') }}</label>
-                                    <input type="text" id="wizard-linux-uid" class="form-control"
-                                        placeholder="{{ t('shell.wizard_linux_uid_placeholder') }}">
-                                </div>
-                            </div>
-
+                        <div style="max-width: 560px; margin: 0 auto;">
+                            {{ device_link_panel(
+                                panel_id='wizard-device-link-panel',
+                                mode='wizard',
+                                approved_devices=[],
+                                device_labels={},
+                                show_device_picker=false,
+                                show_connect_button=false,
+                                lead_text=t('shell.wizard_mapping_lead')
+                            ) }}
                             <div class="text-center mt-4">
                                 <button class="btn btn-secondary me-2" onclick="setWizardStep(4)">{{ t('common.back') }}</button>
                                 <button class="btn btn-success" onclick="completeOnboarding()">{{ t('shell.wizard_complete') }}</button>
@@ -775,6 +767,8 @@
 
     <!-- Background Task Poller & Onboarding Wizard Controller -->
     <script>
+        (function () {
+        'use strict';
         const i18n = JSON.parse(document.getElementById('i18n-data')?.textContent || '{}');
         const fmt = (key, params) => (window.guardianI18n ? window.guardianI18n(key, params) : i18n[key] || key);
 
@@ -1308,102 +1302,49 @@
 
             setWizardStep(5);
 
-            const instructions = document.getElementById('wizard-mapping-instructions');
-            const selectLabel = document.getElementById('wizard-user-select-label');
-            const uidLabel = document.getElementById('wizard-uid-label');
-            const usersSelect = document.getElementById('wizard-linux-user-select');
-            const uidInput = document.getElementById('wizard-linux-uid');
-            const uidGroup = uidInput ? (uidInput.closest('.form-group') || uidInput.parentElement) : null;
+            const panel = document.getElementById('wizard-device-link-panel');
+            const device = wizardState.detectedDevice;
+            if (!panel || !device) return;
 
-            usersSelect.innerHTML = '';
-            
+            const devicePayload = { ...device };
             if (wizardState.platform === 'nintendo' || wizardState.platform === 'xbox') {
-                instructions.textContent = wizardState.platform === 'nintendo'
-                    ? i18n.shell_mapping_nintendo
-                    : i18n.shell_mapping_xbox;
-                selectLabel.textContent = wizardState.platform === 'nintendo' ? i18n.shell_nintendo_player : i18n.shell_xbox_player;
-                if (uidLabel) uidLabel.classList.add('d-none');
-                if (uidInput) {
-                    uidInput.classList.add('d-none');
-                    uidInput.value = '';
-                }
-                if (uidGroup) uidGroup.classList.add('d-none');
-
-                const players = wizardState.detectedDevice.players || [];
-                if (players.length === 0) {
-                    const opt = document.createElement('option');
-                    opt.value = '';
-                    opt.textContent = i18n.shell_no_players;
-                    usersSelect.appendChild(opt);
+                devicePayload.linux_users = device.players || [];
+            }
+            const lead = panel.querySelector('.device-link-lead');
+            if (lead) {
+                if (wizardState.platform === 'nintendo') {
+                    lead.textContent = i18n.shell_mapping_nintendo;
+                } else if (wizardState.platform === 'xbox') {
+                    lead.textContent = i18n.shell_mapping_xbox;
+                } else if (wizardState.platform === 'android') {
+                    lead.textContent = i18n.shell_mapping_android;
                 } else {
-                    players.forEach(p => {
-                        const opt = document.createElement('option');
-                        opt.value = p.player_id;
-                        opt.textContent = p.nickname;
-                        usersSelect.appendChild(opt);
-                    });
-                }
-                usersSelect.onchange = null;
-            } else {
-                if (uidLabel) uidLabel.classList.remove('d-none');
-                if (uidInput) uidInput.classList.remove('d-none');
-                if (uidGroup) uidGroup.classList.remove('d-none');
-
-                const detectedUsers = wizardState.detectedDevice.linux_users || [];
-
-                if (wizardState.platform === 'linux') {
-                    instructions.textContent = i18n.shell_mapping_linux;
-                    selectLabel.textContent = i18n.shell_local_username;
-                    if (uidLabel) uidLabel.textContent = i18n.shell_linux_uid;
-                    if (uidInput) uidInput.placeholder = i18n.shell_uid_placeholder_linux;
-                } else {
-                    instructions.textContent = i18n.shell_mapping_android;
-                    selectLabel.textContent = i18n.shell_android_profile;
-                    if (uidLabel) uidLabel.textContent = i18n.shell_android_uid;
-                    if (uidInput) uidInput.placeholder = i18n.shell_uid_placeholder_android;
-                }
-
-                if (detectedUsers.length === 0) {
-                    const opt = document.createElement('option');
-                    opt.value = '';
-                    opt.textContent = wizardState.platform === 'linux'
-                        ? i18n.shell_no_linux_accounts
-                        : i18n.shell_no_android_profiles;
-                    usersSelect.appendChild(opt);
-                } else {
-                    detectedUsers.forEach(u => {
-                        const opt = document.createElement('option');
-                        opt.value = u.username;
-                        opt.textContent = `${u.username} (UID: ${u.uid})`;
-                        opt.dataset.uid = u.uid;
-                        usersSelect.appendChild(opt);
-                    });
-                }
-
-                // Auto fill UID on change
-                usersSelect.onchange = () => {
-                    const opt = usersSelect.options[usersSelect.selectedIndex];
-                    uidInput.value = opt ? (opt.dataset.uid || '') : '';
-                };
-
-                // Set initial UID if user exists
-                if (detectedUsers.length > 0) {
-                    uidInput.value = detectedUsers[0].uid;
-                } else {
-                    uidInput.value = '';
+                    lead.textContent = i18n.shell_mapping_linux;
                 }
             }
+            window.GuardianDeviceLink.initDeviceLinkPanel(panel, { device: devicePayload });
         }
 
         function completeOnboarding() {
             const isNewUser = document.getElementById('wizard-new-user-checkbox').checked;
             const newName = document.getElementById('wizard-user-input').value.trim();
             const existingUserId = document.getElementById('wizard-user-select').value;
-            const deviceName = document.getElementById('wizard-device-label').value.trim();
+            const deviceName = (
+                document.getElementById('wizard-device-label')?.value
+                || document.getElementById('wizard-nintendo-device-label')?.value
+                || document.getElementById('wizard-xbox-device-label')?.value
+                || ''
+            ).trim();
+
+            const panel = document.getElementById('wizard-device-link-panel');
+            const linkPayload = panel ? window.GuardianDeviceLink.getPayload(panel) : null;
+            if (!linkPayload || !linkPayload.systemId || !linkPayload.linuxUsername) {
+                alert(i18n.device_link_account_required || i18n.shell_select_profile_required);
+                return;
+            }
 
             let userPromise;
             if (isNewUser) {
-                // Create user profile via AJAX
                 userPromise = fetch('/api/user/create', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -1420,11 +1361,15 @@
 
             userPromise
                 .then(userId => {
-                    // 1. Approve device with display label
                     if (wizardState.platform === 'nintendo' || wizardState.platform === 'xbox') {
                         return userId;
                     }
-                    return fetch(`/api/device/approve/${wizardState.detectedDevice.system_id}`, { method: 'POST' })
+                    const approveBody = deviceName ? { display_name: deviceName } : {};
+                    return fetch(`/api/device/approve/${wizardState.detectedDevice.system_id}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(approveBody),
+                    })
                         .then(r => r.json())
                         .then(data => {
                             if (!data.success) throw new Error(data.message);
@@ -1432,31 +1377,15 @@
                         });
                 })
                 .then(userId => {
-                    // 2. Link account mapping
-                    const mappingData = new FormData();
-                    mappingData.append('system_id', wizardState.detectedDevice.system_id);
-
-                    const mappedUser = document.getElementById('wizard-linux-user-select').value;
-                    const mappedUid = document.getElementById('wizard-linux-uid').value.trim();
-
-                    mappingData.append('linux_username', mappedUser || (wizardState.platform === 'android' ? 'android-agent' : ''));
-                    if (mappedUid) {
-                        mappingData.append('linux_uid', mappedUid);
-                    }
-
-                    return fetch(`/managed-users/${userId}/mappings/add`, {
-                        method: 'POST',
-                        body: mappingData
-                    })
-                        .then(r => {
-                            // Redirect handles verification down the line
-                            // Since redirect yields HTML, we assume success or check status
-                            return userId;
-                        });
+                    linkPayload.userId = userId;
+                    return window.GuardianDeviceLink.submitDeviceLink(linkPayload);
                 })
-                .then(userId => {
-                    // 3. Trigger validation check to finalize sync
-                    alert(i18n.shell_onboarding_success);
+                .then((result) => {
+                    if (result.validation_message) {
+                        alert(result.validation_message);
+                    } else {
+                        alert(i18n.shell_onboarding_success);
+                    }
                     window.location.reload();
                 })
                 .catch(err => {
@@ -1717,10 +1646,33 @@
                 alert(i18n.shell_xbox_import_error);
             });
         }
+
+        window.showNotification = showNotification;
+        window.updateApprovalsBadges = updateApprovalsBadges;
+        window.openOnboardingWizard = openOnboardingWizard;
+        window.closeWizard = closeWizard;
+        window.setWizardStep = setWizardStep;
+        window.selectPlatform = selectPlatform;
+        window.copyLinuxCommand = copyLinuxCommand;
+        window.copyWindowsCommand = copyWindowsCommand;
+        window.goToStep3 = goToStep3;
+        window.goToStep4 = goToStep4;
+        window.goToStep5 = goToStep5;
+        window.toggleNewUserField = toggleNewUserField;
+        window.completeOnboarding = completeOnboarding;
+        window.submitNintendoAuth = submitNintendoAuth;
+        window.importNintendoDevice = importNintendoDevice;
+        window.onNintendoConsoleChange = onNintendoConsoleChange;
+        window.submitXboxAuth = submitXboxAuth;
+        window.importXboxDevice = importXboxDevice;
+        window.onXboxConsoleChange = onXboxConsoleChange;
+        })();
+    </script>
     {% if session.get('logged_in') and policy_preset_matrix is defined %}
     {% include '_create_profile_wizard.html' %}
     <script type="application/json" id="policy-preset-matrix-data">{{ policy_preset_matrix | tojson }}</script>
     <script type="application/json" id="marketplace-presets-data">{{ marketplace_presets | tojson }}</script>
+    <script src="{{ url_for('static', filename='js/guardian-device-link.js') }}"></script>
     <script src="{{ url_for('static', filename='js/guardian-wizard.js') }}"></script>
     <script>
         document.addEventListener('DOMContentLoaded', () => {

@@ -30,40 +30,77 @@ class ThemeManager {
     }
 
     updateChartTheme() {
-        // Update Chart.js default colors for theme
-        if (typeof Chart !== 'undefined') {
+        if (typeof Chart === 'undefined') {
+            return;
+        }
+
+        try {
             const isDark = this.currentTheme === 'dark';
-            
+
             Chart.defaults.color = isDark ? '#94A3B8' : '#64748B';
             Chart.defaults.borderColor = isDark ? '#334155' : '#e2e8f0';
             Chart.defaults.backgroundColor = isDark ? '#1E293B' : '#ffffff';
-            
-            // Update existing charts (Chart.js 3.x stores instances in an object map)
-            const charts = typeof Chart.instances === 'object'
-                ? Object.values(Chart.instances)
-                : [];
+
+            const charts = this._collectCharts();
             charts.forEach((chart) => {
-                if (!chart || typeof chart.update !== 'function') {
+                if (!chart.options?.scales) {
+                    chart.update();
                     return;
                 }
-                if (chart.options.scales) {
-                    const gridColor = isDark ? '#334155' : '#e2e8f0';
-                    const tickColor = isDark ? '#94A3B8' : '#64748B';
-                    
-                    ['x', 'y'].forEach(axis => {
-                        if (chart.options.scales[axis]) {
-                            if (chart.options.scales[axis].grid) {
-                                chart.options.scales[axis].grid.color = gridColor;
-                            }
-                            if (chart.options.scales[axis].ticks) {
-                                chart.options.scales[axis].ticks.color = tickColor;
-                            }
-                        }
-                    });
-                }
+
+                const gridColor = isDark ? '#334155' : '#e2e8f0';
+                const tickColor = isDark ? '#94A3B8' : '#64748B';
+
+                ['x', 'y'].forEach((axis) => {
+                    const scale = chart.options.scales[axis];
+                    if (!scale) return;
+                    if (scale.grid) {
+                        scale.grid.color = gridColor;
+                    }
+                    if (scale.ticks) {
+                        scale.ticks.color = tickColor;
+                    }
+                });
                 chart.update();
             });
+        } catch (err) {
+            console.warn('Chart theme sync skipped:', err);
         }
+    }
+
+    _collectCharts() {
+        const charts = [];
+        const seen = new Set();
+
+        const addChart = (chart) => {
+            if (!chart || typeof chart.update !== 'function' || seen.has(chart)) {
+                return;
+            }
+            seen.add(chart);
+            charts.push(chart);
+        };
+
+        // Chart.js 3.x stores instances in a plain object map — never call .forEach on it.
+        const instances = Chart.instances;
+        if (instances && typeof instances === 'object') {
+            Object.values(instances).forEach(addChart);
+        }
+
+        // Chart.js 4.x registry API
+        const registry = Chart.registry;
+        if (registry && typeof registry.getAll === 'function') {
+            registry.getAll().forEach(addChart);
+        }
+
+        Object.values(window._chartInstances || {}).forEach(addChart);
+
+        if (typeof Chart.getChart === 'function') {
+            document.querySelectorAll('canvas').forEach((canvas) => {
+                addChart(Chart.getChart(canvas));
+            });
+        }
+
+        return charts;
     }
 
     // Get current theme colors for JavaScript use

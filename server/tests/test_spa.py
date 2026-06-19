@@ -25,6 +25,15 @@ def test_spa_shell_renders_for_authenticated_user(auth_client):
     assert b'spa-router.js' in response.data
     assert b'Family Home' in response.data
     assert b'manifest.webmanifest' in response.data
+    assert b'id="createProfileModal"' in response.data
+    assert b'guardian-wizard.js' in response.data
+
+    html = response.data.decode('utf-8')
+    onboarding_marker = html.find('function openOnboardingWizard')
+    script_close_after_onboarding = html.find('</script>', onboarding_marker)
+    modal_pos = html.find('id="createProfileModal"')
+    assert script_close_after_onboarding != -1
+    assert modal_pos > script_close_after_onboarding
 
 
 def test_spa_fragment_requires_auth(client):

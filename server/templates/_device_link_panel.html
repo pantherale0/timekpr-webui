@@ -1,0 +1,79 @@
+{% macro device_link_panel(panel_id, mode='inline', user_id=none, approved_devices=[], device_labels={}, show_device_picker=true, lead_text=none, show_connect_button=true) %}
+<div class="guardian-device-link-panel"
+    id="{{ panel_id }}"
+    data-mode="{{ mode }}"
+    {% if user_id is not none %}data-user-id="{{ user_id }}"{% endif %}
+    data-show-device-picker="{{ 'true' if show_device_picker else 'false' }}">
+    <input type="hidden" class="device-link-system-id" name="system_id" value="">
+    {% if lead_text %}
+    <p class="mb-3 text-secondary small fw-medium device-link-lead">{{ lead_text }}</p>
+    {% endif %}
+    <div class="device-link-controls">
+        <div class="row g-3 align-items-end device-link-main-row">
+            <div class="col-12 {% if mode == 'inline' %}col-md-5{% endif %} device-link-device-col{% if not show_device_picker %} d-none{% endif %}">
+                <label class="form-label fw-bold text-muted small mb-1">{{ t('pages.admin_users.which_device') }}</label>
+                <select class="form-select device-link-device-select" {% if show_device_picker %}required{% endif %}>
+                    <option value="" disabled selected>{{ t('pages.admin_users.select_device') }}</option>
+                    {% for device in approved_devices %}
+                    <option value="{{ device.system_id }}"
+                        data-linux-users="{{ device.linux_users|tojson|forceescape }}"
+                        data-platform="{{ device.platform }}"
+                        data-is-device-owner="{{ 'true' if device.is_device_owner else 'false' }}"
+                        data-subtitle="{% if device.system_ip %}{{ device.system_ip }}{% else %}{{ t('pages.admin_users.cloud_suffix') }}{% endif %}">
+                        {{ device_labels.get(device.system_id, device.display_name) }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-12 {% if mode == 'inline' %}col-md-5{% endif %} device-link-account-col">
+                <label class="form-label fw-bold text-muted small mb-1 device-link-account-label">{{ t('pages.admin_users.who_signs_in') }}</label>
+                <select class="form-select device-link-account-select" required>
+                    <option value="" disabled selected>{{ t('pages.admin_users.select_account') }}</option>
+                </select>
+                <select class="form-select device-link-player-select d-none" disabled aria-hidden="true">
+                    <option value="" disabled selected>{{ t('pages.admin_users.select_player') }}</option>
+                </select>
+            </div>
+            <div class="col-12 {% if mode == 'inline' %}col-md-2{% endif %} device-link-action-col{% if not show_connect_button %} d-none{% endif %}">
+                <label class="form-label device-link-action-spacer small mb-1" aria-hidden="true">&nbsp;</label>
+                <button type="button" class="btn btn-primary w-100 fw-bold device-link-connect-btn">
+                    <i class="fas fa-link me-1"></i> {{ t('pages.admin_users.connect') }}
+                </button>
+            </div>
+        </div>
+        <div class="row g-3 device-link-provision-row d-none">
+            <div class="col-12 {% if mode == 'inline' %}col-md-6{% endif %} device-link-provision-col">
+                <label class="form-label fw-bold text-muted small mb-1">{{ t('pages.admin_users.profile_provisioning') }}</label>
+                <select class="form-select device-link-provision-select" name="android_profile_type">
+                    <option value="">{{ t('pages.admin_users.map_to_existing') }}</option>
+                    <option value="restricted">{{ t('pages.admin_users.create_restricted_profile') }}</option>
+                    <option value="standard">{{ t('pages.admin_users.create_standard_user') }}</option>
+                </select>
+            </div>
+        </div>
+        <div class="device-link-device-subtitle text-muted small{% if not show_device_picker %} d-none{% endif %}" aria-live="polite"></div>
+    </div>
+    <div class="device-link-advanced mt-2">
+        <button type="button" class="btn btn-link btn-sm text-secondary p-0 device-link-advanced-toggle" data-bs-toggle="collapse"
+            data-bs-target="#{{ panel_id }}-advanced" aria-expanded="false">
+            {{ t('pages.admin_users.advanced_options') }}
+        </button>
+        <div class="collapse mt-2" id="{{ panel_id }}-advanced">
+            <div class="border rounded p-3 bg-body-tertiary">
+                <div class="mb-2">
+                    <label class="form-label fw-bold text-muted small">{{ t('pages.admin_users.manual_account') }}</label>
+                    <input type="text" class="form-control form-control-sm device-link-manual-account"
+                        placeholder="{{ t('pages.admin_users.manual_account_placeholder') }}" autocomplete="off">
+                </div>
+                <div>
+                    <label class="form-label fw-bold text-muted small">{{ t('pages.admin_users.advanced_uid') }}</label>
+                    <input type="text" class="form-control form-control-sm device-link-uid-input"
+                        placeholder="{{ t('pages.admin_users.uid_placeholder') }}">
+                    <div class="form-text">{{ t('pages.admin_users.uid_helper') }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="device-link-error alert alert-danger mt-2 d-none small py-2" role="alert"></div>
+</div>
+{% endmacro %}
