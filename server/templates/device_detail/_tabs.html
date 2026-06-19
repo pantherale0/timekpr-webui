@@ -1,0 +1,15 @@
+{% macro device_detail_tabs(mobile=false) %}
+<div class="segmented-control guardian-nav-segmented-tabs device-detail-tabs{% if mobile %} device-detail-tabs--mobile{% endif %}" role="tablist"
+    aria-label="{{ t('pages.device_detail.tab_nav_label') }}">
+    <button type="button" class="segmented-tab-btn" data-tab-target="#overview-tab">
+        {% if mobile %}{{ t('pages.device_detail.tab_glance_short') }}{% else %}{{ t('pages.device_detail.tab_at_a_glance') }}{% endif %}
+    </button>
+    {% if device.platform in ['android', 'nintendo', 'xbox'] or screenshot_settings is not none %}
+    <button type="button" class="segmented-tab-btn" data-tab-target="#settings-tab">
+        {% if mobile %}{{ t('pages.device_detail.tab_settings_short') }}{% else %}{{ t('pages.device_detail.tab_device_settings') }}{% endif %}
+    </button>
+    {% endif %}
+    <button type="button" class="segmented-tab-btn" data-tab-target="#activity-tab">{{ t('pages.device_detail.tab_activity_short') }}</button>
+    <button type="button" class="segmented-tab-btn" data-tab-target="#advanced-tab">{{ t('pages.device_detail.tab_advanced') }}</button>
+</div>
+{% endmacro %}

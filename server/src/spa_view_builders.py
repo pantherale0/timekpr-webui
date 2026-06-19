@@ -36,7 +36,107 @@ from src.settings_manager import (
     _get_youtube_api_key_encrypted,
     _get_youtube_history_retention_days,
 )
+from src.i18n.catalog import t
 from src.xbox_sync import build_xbox_console_view_context
+
+
+def _build_device_protection_summary(
+    device,
+    mapped_accounts,
+    blocklist_contributors,
+    alert_summary,
+    agent_online,
+    android_device_policy=None,
+    screenshot_settings=None,
+):
+    platform = (device.platform or 'linux').strip().lower()
+    is_cloud_console = platform in {'nintendo', 'xbox'}
+    attention_items = []
+
+    if not is_cloud_console and not agent_online:
+        attention_items.append({
+            'message_key': 'pages.device_detail.attention_offline',
+            'href': '#advanced',
+            'severity': 'warning',
+        })
+
+    unverified_count = sum(1 for mapping in mapped_accounts if not mapping.is_valid)
+    if unverified_count:
+        attention_items.append({
+            'message_key': 'pages.device_detail.attention_unverified_mappings',
+            'message_params': {'count': unverified_count},
+            'href': '#overview',
+            'severity': 'warning',
+        })
+
+    alert_total = int((alert_summary or {}).get('total') or 0)
+    if alert_total > 0:
+        attention_items.append({
+            'message_key': 'pages.device_detail.attention_connection_notes',
+            'message_params': {'count': alert_total},
+            'href': '#advanced',
+            'severity': 'info',
+        })
+
+    pending_contributors = [
+        contributor for contributor in blocklist_contributors
+        if contributor.get('sync_status') != 'synced'
+    ]
+    if pending_contributors:
+        attention_items.append({
+            'message_key': 'pages.device_detail.attention_filter_sync',
+            'message_params': {'count': len(pending_contributors)},
+            'href': '#advanced',
+            'severity': 'warning',
+        })
+
+    if android_device_policy is not None and not android_device_policy.is_synced:
+        attention_items.append({
+            'message_key': 'pages.device_detail.attention_android_policy',
+            'href': '#settings',
+            'severity': 'warning',
+        })
+
+    if screenshot_settings is not None and not screenshot_settings.is_synced:
+        attention_items.append({
+            'message_key': 'pages.device_detail.attention_screen_history',
+            'href': '#settings',
+            'severity': 'warning',
+        })
+
+    if not mapped_accounts:
+        attention_items.append({
+            'message_key': 'pages.device_detail.attention_no_profiles',
+            'href': '#overview',
+            'severity': 'info',
+        })
+
+    offline_only = (
+        len(attention_items) == 1
+        and attention_items[0]['message_key'] == 'pages.device_detail.attention_offline'
+    )
+    if attention_items:
+        if offline_only:
+            status = 'offline'
+            label_key = 'pages.device_detail.protection_offline'
+        else:
+            status = 'needs_attention'
+            label_key = 'pages.device_detail.protection_needs_attention'
+    else:
+        status = 'connected'
+        label_key = 'pages.device_detail.protection_connected'
+
+    return {
+        'status': status,
+        'label': t(label_key),
+        'attention_items': [
+            {
+                **item,
+                'message': t(item['message_key'], **item.get('message_params', {})),
+            }
+            for item in attention_items
+        ],
+    }
 
 
 def build_dashboard_context():
@@ -369,6 +469,17 @@ def build_device_detail_context(system_id):
                 configured_url=_get_agent_websocket_url(),
             )
 
+    agent_online = AgentConnectionManager.is_online(system_id)
+    protection_summary = _build_device_protection_summary(
+        device,
+        mapped_accounts,
+        blocklist_contributors,
+        alert_summary,
+        agent_online,
+        android_device_policy=android_device_policy,
+        screenshot_settings=screenshot_settings,
+    )
+
     return {
         'template': 'device_detail.html',
         'device': device,
@@ -381,7 +492,8 @@ def build_device_detail_context(system_id):
         'usage_summaries': usage_summaries,
         'installed_apps_by_mapping': installed_apps_by_mapping,
         'android_device_policy': android_device_policy,
-        'agent_online': AgentConnectionManager.is_online(system_id),
+        'agent_online': agent_online,
+        'protection_summary': protection_summary,
         'fcm_available': bool((device.fcm_token or '').strip()),
         'parental_access_code': parental_access_code,
         'android_recovery_ws_url': android_recovery_ws_url,

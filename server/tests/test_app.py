@@ -346,7 +346,7 @@ def test_blocklist_catalog_and_assignment_routes(client, db_session):
 
     device_page = client.get(f'/devices/{device.system_id}')
     assert device_page.status_code == 200
-    assert b'Domain Policy Contributors' in device_page.data
+    assert b'Website filters on this device' in device_page.data
     assert b'Lists: 1' in device_page.data
 
 
@@ -1382,7 +1382,8 @@ def test_alert_pages_for_user_and_device(client, db_session):
     device_page = client.get(f'/devices/{device.system_id}')
     assert device_page.status_code == 200
     assert b'Accounts, apps, and gentle alerts for this device.' in device_page.data
-    assert b'jack &rarr; jack' in device_page.data
+    assert b'jack' in device_page.data
+    assert b'Manage routines' in device_page.data
 
     # Query device alerts API
     device_api_res = client.get(f'/api/alerts?system_id={device.system_id}')

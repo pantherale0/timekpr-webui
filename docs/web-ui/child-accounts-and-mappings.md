@@ -9,7 +9,7 @@
 
 ## Device mapping
 
-Each mapping ties `(system_id, linux_username, linux_uid)` to the child:
+Each mapping ties `(system_id, linux_username, linux_uid)` to the child. From **Child Accounts**, the device name in a mapping row opens the child's **Computer & browser** profile tab (not device admin). Use the small **Device admin** link when you need the full device page.
 
 | Platform | `linux_username` meaning |
 |----------|-------------------------|

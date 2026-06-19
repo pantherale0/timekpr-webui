@@ -13,13 +13,11 @@ Actions:
 
 ## Approved devices
 
-Click a device name for **device detail** (`/devices/<system_id>`):
+Click a device name for **device detail** (`/devices/<system_id>`). The default **At a glance** tab shows protection status, linked children, and console play time. Deeper controls are grouped by tab:
 
-- Platform-specific policy tabs (Android device policy, Linux restrictions, cloud stats)
-- Per-mapping inventory and **Refresh installed apps**
-- Screenshot gallery (Linux/Windows when enabled)
-- **Sync Now** for Nintendo/Xbox
-- **Unenroll** / **Factory reset** (Android DO)
+- **Device settings** — screen history, Nintendo/Xbox sync, Android routine locks, parental access code
+- **Activity** — installed apps, runtime tracker, screenshot gallery
+- **Advanced** — unenroll, factory reset, website-filter sync details, ADB setup, connection history, technical identifiers
 
 ## Online indicator
 

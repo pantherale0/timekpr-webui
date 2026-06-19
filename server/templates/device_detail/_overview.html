@@ -1,0 +1,163 @@
+    <div id="overview-tab" class="tab-pane-custom">
+        <div class="card border shadow-sm mb-4">
+            <div class="card-body p-4">
+                <div class="d-flex align-items-start gap-3 flex-wrap">
+                    <div class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0
+                        {% if protection_summary.status == 'connected' %}bg-success-subtle text-success
+                        {% elif protection_summary.status == 'offline' %}bg-secondary-subtle text-secondary
+                        {% else %}bg-warning-subtle text-warning{% endif %}"
+                        style="width: 56px; height: 56px;">
+                        {% if protection_summary.status == 'connected' %}
+                        <i class="fas fa-shield-alt fs-4"></i>
+                        {% elif protection_summary.status == 'offline' %}
+                        <i class="fas fa-wifi-slash fs-4"></i>
+                        {% else %}
+                        <i class="fas fa-exclamation-circle fs-4"></i>
+                        {% endif %}
+                    </div>
+                    <div class="flex-grow-1 min-w-0">
+                        <span class="text-secondary small fw-bold text-uppercase d-block mb-1"
+                            style="font-size: 0.7rem; letter-spacing: 0.05em;">{{ t('pages.device_detail.protection_status') }}</span>
+                        <h2 class="h4 fw-bold mb-1">{{ protection_summary.label }}</h2>
+                        {% if device.platform == 'nintendo' or device.platform == 'xbox' %}
+                        <p class="text-secondary small mb-0">{{ t('pages.device_detail.cloud_managed') }}</p>
+                        {% elif agent_online %}
+                        <p class="text-secondary small mb-0">{{ t('pages.device_detail.agent_online') }}</p>
+                        {% else %}
+                        <p class="text-secondary small mb-0">{{ t('pages.device_detail.agent_offline') }}</p>
+                        {% endif %}
+                    </div>
+                </div>
+
+                {% if protection_summary.attention_items %}
+                <div class="mt-4 pt-3 border-top">
+                    <h6 class="fw-bold small text-uppercase text-secondary mb-3" style="font-size: 0.7rem; letter-spacing: 0.05em;">
+                        {{ t('pages.device_detail.needs_attention_title') }}
+                    </h6>
+                    <ul class="list-unstyled mb-0 d-flex flex-column gap-2">
+                        {% for item in protection_summary.attention_items %}
+                        <li>
+                            <a href="{{ item.href }}" class="d-flex align-items-center gap-2 text-decoration-none small fw-semibold
+                                {% if item.severity == 'warning' %}text-warning-emphasis{% else %}text-body{% endif %}">
+                                <i class="fas fa-chevron-right" style="font-size: 0.65rem;"></i>
+                                {{ item.message }}
+                            </a>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        {% if nintendo_console and nintendo_console.has_data %}
+        <div class="card border shadow-sm mb-4">
+            <div class="card-body p-4">
+                <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+                    <h5 class="fw-bold mb-0">{{ t('pages.device_detail.todays_play_time') }}</h5>
+                    <a href="#settings" class="btn btn-sm btn-outline-secondary fw-bold">{{ t('pages.device_detail.tab_device_settings') }}</a>
+                </div>
+                <p class="mb-2 fw-semibold text-body">
+                    {% if nintendo_console.unlimited %}
+                    {{ nintendo_console.playtime_summary or t('pages.device_detail.no_daily_limit') }}
+                    {% else %}
+                    {{ nintendo_console.playtime_summary or t('pages.device_detail.no_play_time') }}
+                    {% endif %}
+                </p>
+                {% if not nintendo_console.unlimited and nintendo_console.progress_pct is not none %}
+                <div class="progress" style="height: 8px;">
+                    <div class="progress-bar {% if nintendo_console.progress_pct >= 90 %}bg-danger{% elif nintendo_console.progress_pct >= 70 %}bg-warning{% else %}bg-success{% endif %}"
+                        role="progressbar" style="width: {{ nintendo_console.progress_pct }}%;"
+                        aria-valuenow="{{ nintendo_console.progress_pct }}" aria-valuemin="0" aria-valuemax="100"></div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% elif xbox_console and xbox_console.has_data %}
+        <div class="card border shadow-sm mb-4">
+            <div class="card-body p-4">
+                <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+                    <h5 class="fw-bold mb-0">{{ t('pages.device_detail.todays_play_time') }}</h5>
+                    <a href="#settings" class="btn btn-sm btn-outline-secondary fw-bold">{{ t('pages.device_detail.tab_device_settings') }}</a>
+                </div>
+                <p class="mb-0 fw-semibold text-body">{{ xbox_console.playtime_summary or t('pages.device_detail.no_play_time') }}</p>
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="card shadow-sm border">
+            <div class="card-header bg-body-secondary py-3 d-flex align-items-center gap-2">
+                <div class="bg-primary-subtle text-primary p-2 rounded d-flex align-items-center justify-content-center"
+                    style="width: 38px; height: 38px;">
+                    <i class="fas fa-users fs-5"></i>
+                </div>
+                <h5 class="mb-0 fw-bold">{{ t('pages.device_detail.linked_accounts') }}</h5>
+            </div>
+            <div class="card-body">
+                {% if mapped_accounts %}
+                <div class="d-flex flex-column gap-2">
+                    {% for mapping in mapped_accounts %}
+                    <div class="border rounded p-3 bg-body-secondary d-flex justify-content-between align-items-center flex-wrap gap-3">
+                        {% set mapped_player = (device.linux_users|selectattr('username', 'equalto', mapping.linux_username)|first) if ((device.platform == 'nintendo' or device.platform == 'xbox') and device.linux_users) else None %}
+                        <div class="d-flex align-items-center gap-3">
+                            {% if (device.platform == 'nintendo' or device.platform == 'xbox') and mapped_player and mapped_player.player_image %}
+                            <img src="{{ mapped_player.player_image }}" alt="" class="rounded-circle border" style="width: 48px; height: 48px; background-color: var(--bs-secondary-bg);">
+                            {% endif %}
+                            <div>
+                                <div class="fw-bold fs-5 text-body">
+                                    {{ mapping.managed_user.username }}
+                                    <span class="text-secondary fw-semibold">&rarr;</span>
+                                    {% if device.platform == 'nintendo' or device.platform == 'xbox' %}
+                                    {{ mapped_player.nickname if mapped_player else mapping.linux_username }}
+                                    {% else %}
+                                    {{ mapping.linux_username }}
+                                    {% endif %}
+                                </div>
+                                <div class="text-secondary small fw-semibold mt-1 d-flex flex-wrap align-items-center gap-2">
+                                    <span class="badge {% if mapping.is_valid %}bg-success-subtle text-success border border-success-subtle{% else %}bg-warning-subtle text-warning border border-warning-subtle{% endif %} px-2 py-0.5"
+                                        style="font-size: 0.7rem;">
+                                        {% if mapping.is_valid %}{{ t('pages.device_detail.verified') }}{% else %}{{ t('pages.device_detail.pending_check') }}{% endif %}
+                                    </span>
+                                    <button type="button" class="btn btn-link btn-sm p-0 text-secondary small"
+                                        data-bs-toggle="collapse" data-bs-target="#device-mapping-details-{{ mapping.id }}"
+                                        aria-expanded="false">
+                                        {{ t('pages.device_detail.show_account_details') }}
+                                    </button>
+                                </div>
+                                <div class="collapse small text-secondary mt-1" id="device-mapping-details-{{ mapping.id }}">
+                                    {% if device.platform == 'nintendo' %}
+                                    {{ t('pages.device_detail.nintendo_player_id') }}: {{ mapping.linux_username }}
+                                    {% elif device.platform == 'xbox' %}
+                                    {{ t('pages.device_detail.xbox_user_id') }}: {{ mapping.linux_username }}
+                                    {% elif mapping.linux_uid is not none %}
+                                    {{ t('pages.device_detail.linux_uid', uid=mapping.linux_uid) }}
+                                    {% else %}
+                                    {{ t('pages.device_detail.linux_uid', uid=t('pages.device_detail.unassigned')) }}
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        <div>
+                            <a href="{{ url_for('ui_dashboard.edit_user_profile', user_id=mapping.managed_user.id) }}"
+                                class="btn btn-sm btn-primary fw-bold">
+                                <i class="fas fa-sliders-h me-1"></i> {{ t('pages.device_detail.manage_routines') }}
+                            </a>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="empty-state">
+                    <svg class="empty-state-svg" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M18 18.72a6 6 0 00-3.44-5.32m2.84-2.24A6 6 0 1010.5 3.5m.75 18l3.75-3.75m0 0L11.25 14m3.75 3.75h-9"></path>
+                    </svg>
+                    <h6 class="empty-state-title">{{ t('pages.device_detail.no_profiles_title') }}</h6>
+                    <p class="empty-state-desc">{{ t('pages.device_detail.no_profiles_desc') }}</p>
+                    <button type="button" class="btn btn-sm btn-primary fw-bold" onclick="openOnboardingWizard()">
+                        <i class="fas fa-link me-1"></i> {{ t('pages.device_detail.link_account') }}
+                    </button>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>

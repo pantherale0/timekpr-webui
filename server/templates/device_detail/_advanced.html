@@ -1,0 +1,302 @@
+    <div id="advanced-tab" class="tab-pane-custom d-none">
+        <div class="row g-4">
+            <div class="col-12 col-lg-4 order-lg-last">
+{% if device.status == 'approved' %}
+                <div class="card shadow-sm border card-accent-danger mb-4">
+                    <div class="card-header py-3 d-flex align-items-center gap-2">
+                        <div class="bg-danger-subtle text-danger p-2 rounded d-flex align-items-center justify-content-center"
+                            style="width: 38px; height: 38px;">
+                            <i class="fas fa-exclamation-triangle fs-5"></i>
+                        </div>
+                        <div>
+                            <h5 class="mb-0 fw-bold card-title-accent">{{ t('pages.device_detail.device_management') }}</h5>
+                            <span class="text-secondary small fw-medium">{{ t('pages.device_detail.device_management_lead') }}</span>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="d-flex flex-wrap gap-2 mb-3">
+                            {% if device.platform == 'nintendo' %}
+                                {% if agent_online %}
+                                <span class="badge bg-success-subtle text-success border border-success-subtle">Console Active</span>
+                                {% else %}
+                                <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle">Console Inactive</span>
+                                {% endif %}
+                                <span class="badge bg-warning-subtle text-warning border border-warning-subtle">Cloud Sync</span>
+                            {% else %}
+                                {% if agent_online %}
+                                <span class="badge bg-success-subtle text-success border border-success-subtle">Agent online</span>
+                                {% else %}
+                                <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle">Agent offline</span>
+                                {% endif %}
+                                {% if fcm_available %}
+                                <span class="badge bg-primary-subtle text-primary border border-primary-subtle">FCM available</span>
+                                {% else %}
+                                <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle">No FCM token</span>
+                                {% endif %}
+                            {% endif %}
+                        </div>
+     
+                        <p class="small text-secondary mb-3">
+                            {% if device.platform == 'nintendo' %}
+                            <strong>Unenroll</strong> removes this Switch console from Guardian. Playtime logs and account associations will be kept as read-only history.
+                            {% else %}
+                            <strong>Unenroll</strong> revokes server trust and asks the agent to stop enforcement and clear local credentials. You can re-pair the device later.
+                            {% endif %}
+                        </p>
+                        <button type="button" id="unenroll-device-btn" class="btn btn-outline-danger fw-bold w-100 mb-3">
+                            <i class="fas fa-unlink me-1"></i> {{ t('pages.device_detail.unenroll_device') }}
+                        </button>
+
+                        {% if device.platform == 'android' %}
+                        <hr>
+                        <p class="small text-secondary mb-3">
+                            <strong>Factory reset</strong> erases this Android device and removes Guardian management.
+                            All personal data on the device will be deleted. This cannot be undone.
+                            Requires device-owner provisioning.
+                        </p>
+                        <button type="button" id="factory-reset-device-btn" class="btn btn-danger fw-bold w-100"
+                            data-device-label="{{ device_label }}">
+                            <i class="fas fa-eraser me-1"></i> {{ t('pages.device_detail.factory_reset_device') }}
+                        </button>
+                        {% endif %}
+
+                        <div id="lifecycle-result" class="alert mt-3 mb-0 d-none" role="alert"></div>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+            <div class="col-12">
+<!-- {{ t('pages.device_detail.website_filters_on_device') }} Card -->
+                <div class="card shadow-sm border mb-4">
+                    <div class="card-header bg-body-secondary py-3 d-flex align-items-center gap-2">
+                        <div class="bg-warning-subtle text-warning p-2 rounded d-flex align-items-center justify-content-center"
+                            style="width: 38px; height: 38px;">
+                            <i class="fas fa-globe fs-5"></i>
+                        </div>
+                        <h5 class="mb-0 fw-bold">{{ t('pages.device_detail.website_filters_on_device') }}</h5>
+                    </div>
+                    <div class="card-body">
+                        {% if blocklist_contributors %}
+                        <div class="d-flex flex-column gap-2">
+                            {% for contributor in blocklist_contributors %}
+                            <div class="border rounded p-3 bg-body-secondary">
+                                <div class="fw-bold text-body fs-6">{{ contributor.managed_user }} &rarr;
+                                    <code>{{ contributor.linux_username }}</code></div>
+                                <div class="text-secondary small fw-semibold mt-2 d-flex flex-wrap gap-2 align-items-center">
+                                    <span class="badge bg-body border text-body">UID: {{ contributor.linux_uid if
+                                        contributor.linux_uid is not none else '-' }}</span>
+                                    <span class="badge bg-body border text-body">Lists: {{ contributor.assigned_source_count
+                                        }}</span>
+                                    <span class="badge bg-body border text-body">Hosts: {{
+                                        contributor.effective_domain_count }}</span>
+                                    <span class="badge {% if contributor.sync_status == 'synced' %}bg-success{% else %}bg-warning text-dark{% endif %}">
+                                        Sync: {{ contributor.sync_status|replace('_', ' ')|title }}
+                                    </span>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                        <div class="empty-state">
+                            <svg class="empty-state-svg" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.57-.599-3.75A11.902 11.902 0 0112 2.744z"></path>
+                            </svg>
+                            <h6 class="empty-state-title">{{ t('pages.device_detail.no_contributors_title') }}</h6>
+                            <p class="empty-state-desc">{{ t('pages.device_detail.no_contributors_desc') }}</p>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+                {% if device.platform == 'android' and not device.is_device_owner %}
+                <div class="col-12">
+                    <div class="card shadow-sm border card-accent-warning mb-4">
+                        <div class="card-header py-3 d-flex align-items-center gap-2">
+                            <div class="bg-warning-subtle text-warning p-2 rounded d-flex align-items-center justify-content-center"
+                                style="width: 38px; height: 38px;">
+                                <i class="fas fa-shield-alt fs-5"></i>
+                            </div>
+                            <div>
+                                <h5 class="mb-0 fw-bold card-title-accent">{{ t('pages.device_detail.unlocking_restrictions') }}</h5>
+                                <span class="text-secondary small fw-medium">{{ t('pages.device_detail.unlocking_lead') }}</span>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <p class="small text-secondary mb-3">{{ t('pages.device_detail.device_owner_body') }}</p>
+                            <h6 class="fw-bold small text-body mb-2">{{ t('pages.device_detail.provision_via_adb') }}</h6>
+                            <ol class="small text-secondary mb-3 ps-3">
+                                <li>{{ t('pages.device_detail.adb_step_dev_options') }}</li>
+                                <li>{{ t('pages.device_detail.adb_step_remove_accounts') }}</li>
+                                <li>{{ t('pages.device_detail.adb_step_run_command') }}</li>
+                            </ol>
+                            <div class="p-3 border rounded bg-body-secondary mb-3">
+                                <code class="d-block text-break font-monospace small" style="user-select: all;">adb shell dpm set-device-owner com.timekpr.agent/.admin.TimeKprDeviceAdminReceiver</code>
+                            </div>
+                            <p class="small text-secondary mb-0">
+                                <i class="fas fa-info-circle me-1 text-primary"></i> {{ t('pages.device_detail.adb_restart_note') }}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+            {% if device.secure_token and android_recovery_ws_url and has_managed_profiles and device.platform == 'android' %}
+            <!-- Locked Device Recovery Card (Android only) -->
+            <div class="col-12 col-lg-4 order-lg-2">
+                <div class="card shadow-sm border mb-4">
+                    <div class="card-header guardian-card-header py-3 d-flex align-items-center gap-2">
+                        <div class="bg-white text-dark p-2 rounded d-flex align-items-center justify-content-center"
+                            style="width: 38px; height: 38px;">
+                            <i class="fas fa-terminal fs-5"></i>
+                        </div>
+                        <div>
+                            <h5 class="mb-0 fw-bold">{{ t('pages.device_detail.locked_recovery') }}</h5>
+                            <span class="text-white-50 text-wrap small fw-medium">{{ t('pages.device_detail.locked_recovery_lead') }}</span>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <p class="small text-secondary">
+                            {{ t('pages.device_detail.locked_recovery_body') }}
+                        </p>
+                        <label class="form-label small fw-bold text-secondary mb-1">{{ t('pages.device_detail.device_token') }}</label>
+                        <div class="font-monospace small bg-body-secondary border rounded p-2 mb-3 user-select-all">{{
+                            device.secure_token }}</div>
+                        <label class="form-label small fw-bold text-secondary mb-1">{{ t('pages.device_detail.recovery_commands') }}</label>
+                        <pre class="small bg-body-secondary border rounded p-2 mb-0 user-select-all" style="white-space: pre-wrap;">adb install -r app-debug.apk
+adb shell am broadcast --user 0 \
+  -a com.timekpr.agent.LOCKED_BOOT_SEED_CONFIG \
+  -n com.timekpr.agent/.boot.LockedBootRecoveryReceiver \
+  --es agent_token "{{ device.secure_token }}" \
+  --es server_url "{{ android_recovery_ws_url }}"
+adb reboot</pre>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Diagnostic Alert History -->
+            <div class="col-12 {% if device.secure_token and android_recovery_ws_url and has_managed_profiles and device.platform == 'android' %}col-lg-8 order-lg-1{% endif %}">
+                <div class="card shadow-sm border mb-4">
+                    <div class="card-header bg-body-secondary py-3 d-flex justify-content-between align-items-center flex-wrap gap-3">
+                        <div class="d-flex align-items-center gap-2">
+                            <div class="bg-danger-subtle text-danger p-2 rounded d-flex align-items-center justify-content-center"
+                                style="width: 38px; height: 38px;">
+                                <i class="fas fa-bug fs-5"></i>
+                            </div>
+                            <div>
+                                <h5 class="mb-0 fw-bold">{{ t('pages.device_detail.connection_history') }}</h5>
+                                <span class="text-secondary small fw-medium">{{ t('pages.device_detail.connection_history_lead') }}</span>
+                            </div>
+                        </div>
+                        <div id="alert-summary-stats">
+                            <!-- Injected by JS -->
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <!-- Toolbar -->
+                        <div class="d-flex gap-2 mb-3 flex-wrap align-items-center justify-content-between">
+                            <div class="d-flex gap-2 flex-wrap flex-grow-1">
+                                <input type="text" id="alert-search-input" class="form-control form-control-sm"
+                                    placeholder="Search events, details..." style="max-width: 250px;">
+                                <select id="alert-type-filter" class="form-select form-select-sm" style="max-width: 180px;">
+                                    <option value="">All Event Types</option>
+                                </select>
+                                <select id="alert-sort-by" class="form-select form-select-sm" style="max-width: 140px;">
+                                    <option value="date">Sort by Date</option>
+                                    <option value="type">Sort by Type</option>
+                                </select>
+                                <select id="alert-sort-dir" class="form-select form-select-sm" style="max-width: 100px;">
+                                    <option value="desc">Desc</option>
+                                    <option value="asc">Asc</option>
+                                </select>
+                            </div>
+                            <div>
+                                <button id="alert-prune-btn" class="btn btn-sm btn-outline-danger fw-bold"><i
+                                        class="fas fa-trash-alt me-1"></i> {{ t('pages.device_detail.prune_alerts') }}</button>
+                            </div>
+                        </div>
+
+                        <div id="alerts-loading" class="text-center py-5" style="display: none;">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading alert history...</span>
+                            </div>
+                            <p class="text-muted mt-2 mb-0">Loading alert history...</p>
+                        </div>
+
+                        <div id="alerts-table-container" class="table-responsive" style="display: none;">
+                            <table class="table table-striped align-middle mb-0" style="font-size: 0.9rem;">
+                                <thead>
+                                    <tr class="table-light">
+                                        <th class="ps-3 text-secondary fw-bold"
+                                            style="font-size: 0.75rem; text-transform: uppercase;">Date &amp; Time</th>
+                                        <th class="text-secondary fw-bold"
+                                            style="font-size: 0.75rem; text-transform: uppercase;">Event Type</th>
+                                        <th class="text-secondary fw-bold"
+                                            style="font-size: 0.75rem; text-transform: uppercase;">Scope</th>
+                                        <th class="text-secondary fw-bold"
+                                            style="font-size: 0.75rem; text-transform: uppercase;">Delivery Status</th>
+                                        <th class="pe-3 text-secondary fw-bold"
+                                            style="font-size: 0.75rem; text-transform: uppercase;">Diagnostic Details</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="alerts-tbody">
+                                    <!-- Injected by JS -->
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div id="alerts-empty" class="empty-state" style="display: none;">
+                            <svg class="empty-state-svg" style="color: var(--success-color); opacity: 0.85;" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            <h6 class="empty-state-title">{{ t('pages.device_detail.no_audit_title') }}</h6>
+                            <p class="empty-state-desc">{{ t('pages.device_detail.no_audit_desc') }}</p>
+                            <p class="empty-state-desc">This client is connection-healthy. No connection diagnostic alerts match your filters.</p>
+                        </div>
+
+                        <div id="alerts-pagination"
+                            class="d-flex justify-content-between align-items-center mt-3 pt-3 border-top"
+                            style="display: none;">
+                            <div id="pagination-info" class="text-secondary small fw-bold">
+                                Showing 0-0 of 0 alerts
+                            </div>
+                            <div class="d-inline-flex gap-2">
+                                <button id="prev-page" class="btn btn-secondary btn-sm fw-bold" disabled>Previous</button>
+                                <button id="next-page" class="btn btn-secondary btn-sm fw-bold" disabled>Next</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-12">
+                <div class="card shadow-sm border mb-4">
+                    <div class="card-header bg-body-secondary py-3">
+                        <button class="btn btn-link text-body text-decoration-none fw-bold p-0 w-100 text-start d-flex justify-content-between align-items-center"
+                            type="button" data-bs-toggle="collapse" data-bs-target="#device-technical-identifiers" aria-expanded="false">
+                            <span>{{ t('pages.device_detail.technical_identifiers') }}</span>
+                            <i class="fas fa-chevron-down small"></i>
+                        </button>
+                    </div>
+                    <div class="collapse" id="device-technical-identifiers">
+                        <div class="card-body">
+                            <dl class="row mb-0 small">
+                                <dt class="col-sm-4 text-secondary">{{ t('pages.device_detail.device_identifier') }}</dt>
+                                <dd class="col-sm-8 font-monospace text-break">{{ device.system_id }}</dd>
+                                {% if device.platform != 'nintendo' and device.platform != 'xbox' %}
+                                <dt class="col-sm-4 text-secondary">{{ t('pages.device_detail.last_ip') }}</dt>
+                                <dd class="col-sm-8 font-monospace">{{ device.system_ip or t('pages.device_detail.offline_label') }}</dd>
+                                <dt class="col-sm-4 text-secondary">{{ t('pages.device_detail.agent_connection') }}</dt>
+                                <dd class="col-sm-8">{% if agent_online %}{{ t('pages.device_detail.agent_online') }}{% else %}{{ t('pages.device_detail.agent_offline') }}{% endif %}</dd>
+                                {% if device.platform == 'android' %}
+                                <dt class="col-sm-4 text-secondary">{{ t('pages.device_detail.wake_channel') }}</dt>
+                                <dd class="col-sm-8">{% if fcm_available %}{{ t('pages.device_detail.wake_available') }}{% else %}{{ t('pages.device_detail.wake_unavailable') }}{% endif %}</dd>
+                                {% endif %}
+                                {% endif %}
+                                <dt class="col-sm-4 text-secondary">{{ t('pages.device_detail.trust_status') }}</dt>
+                                <dd class="col-sm-8">{{ device.status|title }}</dd>
+                            </dl>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>

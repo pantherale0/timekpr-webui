@@ -725,6 +725,7 @@ pages:
     col_uid: UID
     show_details: Details
     hide_details: Hide details
+    device_admin: Device admin
     technical_uid: "Account ID: {uid}"
     technical_uid_unknown: "Account ID: unknown"
     nintendo_player: Nintendo Player
@@ -1248,13 +1249,54 @@ pages:
   device_detail:
     title: "{label} - Device Details - Guardian"
     tab_nav_label: Device views
+    tab_at_a_glance: At a glance
+    tab_glance_short: Glance
     tab_overview: Overview
+    tab_device_settings: Device settings
+    tab_settings_short: Settings
     tab_policies: Control Policies
     tab_policies_short: Policies
     tab_activity: Activity & Apps
     tab_activity_short: Activity
+    tab_advanced: Advanced
     tab_diagnostics: Diagnostics
     lead: Accounts, apps, and gentle alerts for this device.
+    protection_status: Protection status
+    protection_connected: Connected and protected
+    protection_offline: Not connected right now
+    protection_needs_attention: Needs attention
+    needs_attention_title: Things to look at
+    attention_offline: Device is not connected to Guardian right now
+    attention_unverified_mappings: "{count} account link(s) need a check"
+    attention_connection_notes: "{count} connection note(s) in history"
+    attention_filter_sync: Website filters still syncing for {count} account(s)
+    attention_android_policy: Android routine locks still syncing
+    attention_screen_history: Screen history settings still syncing
+    attention_no_profiles: No child accounts linked yet
+    manage_routines: Manage routines
+    show_account_details: Account details
+    show_app_details: App details
+    website_filters_on_device: Website filters on this device
+    connection_history: Connection history
+    connection_history_lead: Connection notes and exceptions reported by this device
+    technical_identifiers: Technical details
+    device_identifier: Device identifier
+    agent_connection: Agent connection
+    wake_channel: Background wake
+    wake_available: Available
+    wake_unavailable: Not available
+    offline_label: Offline
+    no_daily_limit: No daily limit set
+    no_play_time: No play time reported
+    device_owner_setup: Set up device owner
+    device_owner_body: Enforcing hardware limitations, preventing uninstall, and automatically provisioning child user accounts requires the Guardian agent to be set as Device Owner.
+    adb_step_dev_options: Enable Developer Options and USB Debugging on the child's device.
+    adb_step_remove_accounts: Remove all existing user accounts from the device under Settings → Passwords & Accounts.
+    adb_step_run_command: Connect the device to a computer and execute the terminal command below.
+    adb_restart_note: Once successfully executed, restart the Guardian agent. Device Owner status will refresh and unlock these routine locks.
+    custom_installs_advanced: Custom app installs (advanced)
+    prune_alerts: Clear old notes
+    recovery_commands: Recovery commands
     back_to_devices: Back to Devices
     system_id: System ID
     trust_status: Trust Status

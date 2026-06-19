@@ -104,6 +104,19 @@
 
         const initialTab = tabIdFromHash(window.location.hash) || TAB_TARGETS.browsing;
         activateTab(initialTab, { updateHash: !window.location.hash });
+        highlightMappingFromQuery();
+    }
+
+    function highlightMappingFromQuery() {
+        const params = new URLSearchParams(window.location.search);
+        const mappingId = params.get('highlight_mapping');
+        if (!mappingId) return;
+        const card = document.querySelector(
+            `.device-policy-card[data-mapping-id="${CSS.escape(mappingId)}"]`,
+        );
+        if (!card) return;
+        card.classList.add('border-primary', 'shadow-sm');
+        card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
 
     function bindInPageTabLinks() {

@@ -1,0 +1,603 @@
+    <div id="settings-tab" class="tab-pane-custom d-none">
+        <div class="row g-4 justify-content-center">
+        {% if parental_access_code and has_managed_profiles %}
+        <div class="col-12 col-xl-10">
+            <div class="card shadow-sm border mb-4">
+                <div class="card-header bg-primary text-white py-3 d-flex align-items-center gap-2">
+                    <div class="bg-white text-primary p-2 rounded d-flex align-items-center justify-content-center"
+                        style="width: 38px; height: 38px;">
+                        <i class="fas fa-key fs-5"></i>
+                    </div>
+                    <div>
+                        <h5 class="mb-0 fw-bold">{{ t('pages.device_detail.parental_access_code') }}</h5>
+                        <span class="text-white-50 text-wrap small fw-medium">{{ t('pages.device_detail.access_code_hint') }}</span>
+                    </div>
+                </div>
+                <div class="card-body text-center">
+                    <div class="display-4 fw-bold my-3 text-primary font-monospace" style="letter-spacing: 0.1em;">
+                        {{ parental_access_code }}
+                    </div>
+                    <p class="small text-secondary mb-0">{{ t('pages.device_detail.access_code_help') }}</p>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+            {% if device.platform == 'android' %}
+            <div class="col-12 col-xl-10">
+                {% if device.is_device_owner %}
+                    <!-- Android Device Policy Form Card -->
+                    <div class="card shadow-sm border mb-4">
+                        <div class="card-header bg-body-secondary py-3 d-flex align-items-center justify-content-between flex-wrap gap-2">
+                            <div class="d-flex align-items-center gap-2">
+                                <div class="bg-success-subtle text-success p-2 rounded d-flex align-items-center justify-content-center"
+                                    style="width: 38px; height: 38px;">
+                                    <i class="fab fa-android fs-5"></i>
+                                </div>
+                                <div>
+                                    <h5 class="mb-0 fw-bold">{{ t('pages.device_detail.android_policy') }}</h5>
+                                    <span class="text-secondary small fw-medium">{{ t('pages.device_detail.android_policy_lead') }}</span>
+                                </div>
+                            </div>
+                            <div>
+                                <span id="policy-sync-badge"
+                                    class="badge {% if android_device_policy and android_device_policy.is_synced %}bg-success-subtle text-success border border-success-subtle{% else %}bg-warning-subtle text-warning border border-warning-subtle{% endif %} px-2.5 py-1.5 fw-bold"
+                                    style="font-size: 0.75rem;">
+                                    {% if android_device_policy and android_device_policy.is_synced %}
+                                    <i class="fas fa-check-circle me-1"></i> {{ t('pages.device_detail.synced_to_device') }}
+                                    {% else %}
+                                    <i class="fas fa-sync me-1"></i> {{ t('pages.device_detail.sync_pending') }}
+                                    {% endif %}
+                                </span>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <form id="android-policy-form" class="needs-validation" novalidate>
+                                {{ csrf_field() }}
+                                <!-- Success/Error Alert -->
+                                <div id="policy-alert" class="alert d-none mb-3" role="alert"></div>
+
+                                <!-- Category: Hardware & Connectivity -->
+                                <h6 class="fw-bold text-secondary text-uppercase mb-3 pb-1 border-bottom"
+                                    style="font-size: 0.75rem; letter-spacing: 0.05em;">
+                                    <i class="fas fa-microchip me-1 text-primary"></i> {{ t('pages.device_detail.hardware_connectivity') }}
+                                </h6>
+                                <div class="row g-3 mb-4">
+                                    <div class="col-12 col-md-6">
+                                        <label class="form-label fw-bold text-body small" for="camera_access">Camera Access</label>
+                                        <select id="camera_access" name="camera_access" class="form-select form-select-sm">
+                                            <option value="CAMERA_ACCESS_UNSPECIFIED" {% if android_device_policy and
+                                                android_device_policy.camera_access=='CAMERA_ACCESS_UNSPECIFIED' %}selected{%
+                                                endif %}>Unspecified (Default)</option>
+                                            <option value="CAMERA_ACCESS_DISABLED" {% if android_device_policy and
+                                                android_device_policy.camera_access=='CAMERA_ACCESS_DISABLED' %}selected{% endif
+                                                %}>Disabled</option>
+                                            <option value="CAMERA_ACCESS_USER_CHOICE" {% if android_device_policy and
+                                                android_device_policy.camera_access=='CAMERA_ACCESS_USER_CHOICE' %}selected{%
+                                                endif %}>User Choice</option>
+                                            <option value="CAMERA_ACCESS_ENFORCED" {% if android_device_policy and
+                                                android_device_policy.camera_access=='CAMERA_ACCESS_ENFORCED' %}selected{% endif
+                                                %}>Enforced</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-12 col-md-6">
+                                        <label class="form-label fw-bold text-body small" for="microphone_access">Microphone Access</label>
+                                        <select id="microphone_access" name="microphone_access"
+                                            class="form-select form-select-sm">
+                                            <option value="MICROPHONE_ACCESS_UNSPECIFIED" {% if android_device_policy and
+                                                android_device_policy.microphone_access=='MICROPHONE_ACCESS_UNSPECIFIED'
+                                                %}selected{% endif %}>Unspecified (Default)</option>
+                                            <option value="MICROPHONE_ACCESS_DISABLED" {% if android_device_policy and
+                                                android_device_policy.microphone_access=='MICROPHONE_ACCESS_DISABLED'
+                                                %}selected{% endif %}>Disabled</option>
+                                            <option value="MICROPHONE_ACCESS_USER_CHOICE" {% if android_device_policy and
+                                                android_device_policy.microphone_access=='MICROPHONE_ACCESS_USER_CHOICE'
+                                                %}selected{% endif %}>User Choice</option>
+                                            <option value="MICROPHONE_ACCESS_ENFORCED" {% if android_device_policy and
+                                                android_device_policy.microphone_access=='MICROPHONE_ACCESS_ENFORCED'
+                                                %}selected{% endif %}>Enforced</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-12 col-md-6">
+                                        <label class="form-label fw-bold text-body small" for="usb_data_access">USB Data Access</label>
+                                        <select id="usb_data_access" name="usb_data_access" class="form-select form-select-sm">
+                                            <option value="USB_DATA_ACCESS_UNSPECIFIED" {% if android_device_policy and
+                                                android_device_policy.usb_data_access=='USB_DATA_ACCESS_UNSPECIFIED'
+                                                %}selected{% endif %}>Unspecified (Default)</option>
+                                            <option value="ALLOW_USB_DATA_TRANSFER" {% if android_device_policy and
+                                                android_device_policy.usb_data_access=='ALLOW_USB_DATA_TRANSFER' %}selected{%
+                                                endif %}>Allow USB Data Transfer</option>
+                                            <option value="DISALLOW_USB_FILE_TRANSFER" {% if android_device_policy and
+                                                android_device_policy.usb_data_access=='DISALLOW_USB_FILE_TRANSFER' %}selected{%
+                                                endif %}>Disallow USB File Transfer (Charge Only)</option>
+                                            <option value="DISALLOW_USB_DATA_TRANSFER" {% if android_device_policy and
+                                                android_device_policy.usb_data_access=='DISALLOW_USB_DATA_TRANSFER' %}selected{%
+                                                endif %}>Disallow USB Data Transfer Completely</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-12 col-md-6 col-lg-4 d-flex align-items-center mt-auto pb-1">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="bluetooth_disabled"
+                                                name="bluetooth_disabled" {% if android_device_policy and
+                                                android_device_policy.bluetooth_disabled %}checked{% endif %}>
+                                            <label class="form-check-label fw-bold text-body small"
+                                                for="bluetooth_disabled">Disable Bluetooth</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-12 col-md-6 col-lg-4 d-flex align-items-center mt-auto pb-1">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="block_nfc" name="block_nfc" {%
+                                                if android_device_policy and android_device_policy.block_nfc %}checked{% endif
+                                                %}>
+                                            <label class="form-check-label fw-bold text-body small" for="block_nfc">Block NFC</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-12 col-md-6 col-lg-4 d-flex align-items-center mt-auto pb-1">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="mount_physical_media_disabled"
+                                                name="mount_physical_media_disabled" {% if android_device_policy and
+                                                android_device_policy.mount_physical_media_disabled %}checked{% endif %}>
+                                            <label class="form-check-label fw-bold text-body small"
+                                                for="mount_physical_media_disabled">Disable SD Card/External Drive</label>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Category: System Security -->
+                                <h6 class="fw-bold text-secondary text-uppercase mb-3 pb-1 border-bottom"
+                                    style="font-size: 0.75rem; letter-spacing: 0.05em;">
+                                    <i class="fas fa-shield-alt me-1 text-primary"></i> System Security
+                                </h6>
+                                <div class="row g-3 mb-4">
+                                    <div class="col-12 col-md-6">
+                                        <label class="form-label fw-bold text-body small" for="developer_settings">Developer Options</label>
+                                        <select id="developer_settings" name="developer_settings"
+                                            class="form-select form-select-sm">
+                                            <option value="DEVELOPER_SETTINGS_UNSPECIFIED" {% if android_device_policy and
+                                                android_device_policy.developer_settings=='DEVELOPER_SETTINGS_UNSPECIFIED'
+                                                %}selected{% endif %}>Unspecified (Default)</option>
+                                            <option value="DEVELOPER_SETTINGS_DISABLED" {% if android_device_policy and
+                                                android_device_policy.developer_settings=='DEVELOPER_SETTINGS_DISABLED'
+                                                %}selected{% endif %}>Disabled</option>
+                                            <option value="DEVELOPER_SETTINGS_ALLOWED" {% if android_device_policy and
+                                                android_device_policy.developer_settings=='DEVELOPER_SETTINGS_ALLOWED'
+                                                %}selected{% endif %}>Allowed</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-12 col-md-6 col-lg-4 d-flex align-items-center mt-auto pb-1">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="factory_reset_disabled"
+                                                name="factory_reset_disabled" {% if android_device_policy and
+                                                android_device_policy.factory_reset_disabled %}checked{% endif %}>
+                                            <label class="form-check-label fw-bold text-body small"
+                                                for="factory_reset_disabled">Disable Factory Reset</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-12 col-md-6 col-lg-4 d-flex align-items-center mt-auto pb-1">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="modify_accounts_disabled"
+                                                name="modify_accounts_disabled" {% if android_device_policy and
+                                                android_device_policy.modify_accounts_disabled %}checked{% endif %}>
+                                            <label class="form-check-label fw-bold text-body small"
+                                                for="modify_accounts_disabled">Disable Accounts Mod</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-12 col-md-6 col-lg-4 d-flex align-items-center mt-auto pb-1">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="screen_capture_disabled"
+                                                name="screen_capture_disabled" {% if android_device_policy and
+                                                android_device_policy.screen_capture_disabled %}checked{% endif %}>
+                                            <label class="form-check-label fw-bold text-body small"
+                                                for="screen_capture_disabled">Disable Screenshots</label>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Category: Applications & Control -->
+                                <h6 class="fw-bold text-secondary text-uppercase mb-3 pb-1 border-bottom"
+                                    style="font-size: 0.75rem; letter-spacing: 0.05em;">
+                                    <i class="fas fa-mobile-alt me-1 text-primary"></i> Applications & Control
+                                </h6>
+                                <div class="row g-3 mb-4">
+                                    <div class="col-12 col-md-6 col-lg-4">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="install_apps_disabled"
+                                                name="install_apps_disabled" {% if android_device_policy and
+                                                android_device_policy.install_apps_disabled %}checked{% endif %}>
+                                            <label class="form-check-label fw-bold text-body small"
+                                                for="install_apps_disabled">Disable App Installation</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-12 col-md-6 col-lg-4">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="uninstall_apps_disabled"
+                                                name="uninstall_apps_disabled" {% if android_device_policy and
+                                                android_device_policy.uninstall_apps_disabled %}checked{% endif %}>
+                                            <label class="form-check-label fw-bold text-body small"
+                                                for="uninstall_apps_disabled">Disable App Uninstallation</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-12 col-md-6 col-lg-4">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="adjust_volume_disabled"
+                                                name="adjust_volume_disabled" {% if android_device_policy and
+                                                android_device_policy.adjust_volume_disabled %}checked{% endif %}>
+                                            <label class="form-check-label fw-bold text-body small"
+                                                for="adjust_volume_disabled">Disable Volume Adjustment</label>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Category: Call & Network Controls -->
+                                <h6 class="fw-bold text-secondary text-uppercase mb-3 pb-1 border-bottom"
+                                    style="font-size: 0.75rem; letter-spacing: 0.05em;">
+                                    <i class="fas fa-phone me-1 text-primary"></i> Call & Network Controls
+                                </h6>
+                                <div class="row g-3 mb-4">
+                                    <div class="col-12 col-md-6 col-lg-4">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="outgoing_calls_disabled"
+                                                name="outgoing_calls_disabled" {% if android_device_policy and
+                                                android_device_policy.outgoing_calls_disabled %}checked{% endif %}>
+                                            <label class="form-check-label fw-bold text-body small"
+                                                for="outgoing_calls_disabled">Disable Outgoing Phone Calls</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-12 col-md-6 col-lg-4">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="sms_disabled"
+                                                name="sms_disabled" {% if android_device_policy and
+                                                android_device_policy.sms_disabled %}checked{% endif %}>
+                                            <label class="form-check-label fw-bold text-body small" for="sms_disabled">Disable SMS (Text Messages)</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-12 col-md-6 col-lg-4">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="block_wifi_tethering"
+                                                name="block_wifi_tethering" {% if android_device_policy and
+                                                android_device_policy.block_wifi_tethering %}checked{% endif %}>
+                                            <label class="form-check-label fw-bold text-body small"
+                                                for="block_wifi_tethering">Disable Wi-Fi Hotspot</label>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Category: Support Message -->
+                                <h6 class="fw-bold text-secondary text-uppercase mb-3 pb-1 border-bottom"
+                                    style="font-size: 0.75rem; letter-spacing: 0.05em;">
+                                    <i class="fas fa-comment-dots me-1 text-primary"></i> Support Message
+                                </h6>
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold text-body small" for="short_support_message">Short Support Message</label>
+                                    <input type="text" class="form-control form-control-sm" id="short_support_message"
+                                        name="short_support_message" maxlength="200" required
+                                        value="{{ android_device_policy.short_support_message if android_device_policy else 'This setting is managed by your parent through Guardian.' }}">
+                                    <div class="form-text small text-secondary" style="font-size: 0.75rem;">Shown when a restricted setting is blocked (e.g., in Settings). Max 200 chars.</div>
+                                </div>
+                                <div class="mb-4">
+                                    <label class="form-label fw-bold text-body small" for="long_support_message">Long Support Message</label>
+                                    <textarea class="form-control form-control-sm" id="long_support_message"
+                                        name="long_support_message" rows="3" maxlength="4096"
+                                        required>{{ android_device_policy.long_support_message if android_device_policy else 'This device is protected by Guardian. Your parent manages screen time, apps, and websites. Ask them if you need something changed.' }}</textarea>
+                                    <div class="form-text small text-secondary" style="font-size: 0.75rem;">Shown in the Device Administrator details screen. Max 4096 chars.</div>
+                                </div>
+
+                                <button type="button" class="btn btn-link btn-sm p-0 text-secondary small mb-2" data-bs-toggle="collapse" data-bs-target="#force-apps-advanced" aria-expanded="false">
+                                    {{ t('pages.device_detail.custom_installs_advanced') }}
+                                </button>
+                                <div class="collapse" id="force-apps-advanced">
+                                <!-- Category: Force Installed Applications -->
+                                <h6 class="fw-bold text-secondary text-uppercase mb-3 pb-1 border-bottom"
+                                    style="font-size: 0.75rem; letter-spacing: 0.05em;">
+                                    <i class="fas fa-download me-1 text-primary"></i> Force Installed Applications
+                                </h6>
+                                <div class="mb-4">
+                                    <span class="text-secondary small fw-medium d-block mb-3">Specify external APK URLs to silently download and install on the child's device in the background.</span>
+                                    <div class="table-responsive">
+                                        <table class="table table-sm table-bordered align-middle mb-2" id="force-apps-table">
+                                            <thead>
+                                                <tr class="bg-body-secondary text-secondary" style="font-size: 0.75rem;">
+                                                    <th style="width: 30%;">Package Name</th>
+                                                    <th style="width: 45%;">APK URL (HTTPS)</th>
+                                                    <th style="width: 20%;">SHA-256 Checksum (Optional)</th>
+                                                    <th style="width: 5%;" class="text-center">Action</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="force-apps-list">
+                                                {% if android_device_policy and android_device_policy.force_installed_apps %}
+                                                    {% for app in android_device_policy.force_installed_apps %}
+                                                    <tr class="force-app-row">
+                                                        <td>
+                                                            <input type="text" class="form-control form-control-sm app-package-name bg-body-secondary" placeholder="com.example.app" required readonly value="{{ app.package_name }}">
+                                                        </td>
+                                                        <td>
+                                                            <input type="url" class="form-control form-control-sm app-apk-url bg-body-secondary" placeholder="https://example.com/app.apk" required readonly value="{{ app.apk_url }}">
+                                                        </td>
+                                                        <td>
+                                                            <input type="text" class="form-control form-control-sm app-checksum bg-body-secondary" placeholder="SHA-256 Hash" readonly value="{{ app.sha256_checksum or '' }}">
+                                                        </td>
+                                                        <td class="text-center">
+                                                            <button type="button" class="btn btn-sm btn-outline-danger border-0 remove-app-btn"><i class="fas fa-trash-alt"></i></button>
+                                                        </td>
+                                                    </tr>
+                                                    {% endfor %}
+                                                {% endif %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    <button type="button" class="btn btn-sm btn-outline-primary fw-bold" id="add-force-app-btn">
+                                        <i class="fas fa-plus me-1"></i> Add Application
+                                    </button>
+                                </div>
+
+                                </div>
+                                <!-- Save Action -->
+                                <div class="d-flex justify-content-end">
+                                    <button type="submit" id="save-policy-btn" class="btn btn-primary fw-bold">
+                                        <i class="fas fa-save me-1"></i> {{ t('pages.device_detail.save_restrictions') }}
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="card shadow-sm border mb-4">
+                        <div class="card-body p-4">
+                            <p class="small text-secondary mb-3">{{ t('pages.device_detail.unlocking_lead') }}</p>
+                            <a href="#advanced" class="btn btn-sm btn-outline-warning fw-bold">{{ t('pages.device_detail.device_owner_setup') }}</a>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+                {% endif %}
+
+                {% if screenshot_settings is not none %}
+                <div class="col-12 col-lg-8">
+                    <!-- Screen History Settings Card -->
+                    <div class="card shadow-sm border card-accent-primary mb-4" id="screen-history-card">
+                        <div class="card-header py-3 d-flex justify-content-between align-items-center flex-wrap gap-3">
+                            <div class="d-flex align-items-center gap-2">
+                                <div class="bg-primary-subtle text-primary p-2 rounded d-flex align-items-center justify-content-center"
+                                    style="width: 38px; height: 38px;">
+                                    <i class="fas fa-images fs-5"></i>
+                                </div>
+                                <div>
+                                    <h5 class="mb-0 fw-bold card-title-accent">Screen History Settings</h5>
+                                    <span class="text-secondary small fw-semibold">
+                                        Configure periodic desktop screenshot capturing.
+                                    </span>
+                                </div>
+                            </div>
+                            <span id="screen-history-sync-badge"
+                                class="badge {% if screenshot_settings.is_synced %}bg-success-subtle text-success border border-success-subtle{% else %}bg-warning-subtle text-warning border border-warning-subtle{% endif %} px-2.5 py-1.5 fw-bold"
+                                style="font-size: 0.75rem;">
+                                {% if screenshot_settings.is_synced %}
+                                <i class="fas fa-check-circle me-1"></i> Synced to Agent
+                                {% else %}
+                                <i class="fas fa-sync me-1"></i> Sync Pending
+                                {% endif %}
+                            </span>
+                        </div>
+                        <div class="card-body">
+                            <div id="screen-history-alert" class="alert d-none mb-3" role="alert"></div>
+                            <div class="row g-3 mb-4">
+                                <div class="col-12 col-md-4">
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" id="screen-history_enabled"
+                                            {% if screenshot_settings.enabled %}checked{% endif %}>
+                                        <label class="form-check-label fw-bold small" for="screen-history_enabled">Enable Screen History</label>
+                                    </div>
+                                    <div class="form-text">When enabled, the agent captures the desktop on a schedule while a user session is active.</div>
+                                </div>
+                                <div class="col-12 col-md-4">
+                                    <label class="form-label fw-bold text-body small" for="screen-history_interval_seconds">Capture Interval</label>
+                                    <select id="screen-history_interval_seconds" class="form-select form-select-sm">
+                                        <option value="60" {% if screenshot_settings.interval_seconds == 60 %}selected{% endif %}>Every 1 minute</option>
+                                        <option value="300" {% if screenshot_settings.interval_seconds == 300 %}selected{% endif %}>Every 5 minutes</option>
+                                        <option value="900" {% if screenshot_settings.interval_seconds == 900 %}selected{% endif %}>Every 15 minutes</option>
+                                        <option value="1800" {% if screenshot_settings.interval_seconds == 1800 %}selected{% endif %}>Every 30 minutes</option>
+                                    </select>
+                                </div>
+                                <div class="col-12 col-md-4">
+                                    <label class="form-label fw-bold text-body small" for="screen-history_retention_hours">Retention</label>
+                                    <select id="screen-history_retention_hours" class="form-select form-select-sm">
+                                        <option value="24" {% if screenshot_settings.retention_hours == 24 %}selected{% endif %}>24 hours</option>
+                                        <option value="168" {% if screenshot_settings.retention_hours == 168 %}selected{% endif %}>7 days</option>
+                                        <option value="720" {% if screenshot_settings.retention_hours == 720 %}selected{% endif %}>30 days</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="d-flex flex-wrap gap-2">
+                                <button type="button" id="screen-history-save-btn" class="btn btn-sm btn-primary fw-bold">
+                                    <i class="fas fa-save me-1"></i> Save Settings
+                                </button>
+                                {% if agent_online %}
+                                <button type="button" id="screen-history-capture-btn" class="btn btn-sm btn-outline-primary fw-bold">
+                                    <i class="fas fa-camera me-1"></i> Capture Now
+                                </button>
+                                {% endif %}
+                                <button type="button" id="screen-history-clear-btn" class="btn btn-sm btn-outline-danger fw-bold">
+                                    <i class="fas fa-trash-alt me-1"></i> Clear History
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+                {% if device.platform in ['nintendo', 'xbox'] %}
+                <div class="col-12 col-md-8 col-lg-6">
+                    {% if nintendo_console %}
+                    <div class="card shadow-sm border card-accent-warning mb-4" id="nintendo-console-card">
+                    <div class="card-header py-3 d-flex align-items-center justify-content-between gap-2">
+                        <div class="d-flex align-items-center gap-2">
+                            <div class="bg-warning-subtle text-warning p-2 rounded d-flex align-items-center justify-content-center"
+                                style="width: 38px; height: 38px;">
+                                <i class="fas fa-gamepad fs-5"></i>
+                            </div>
+                            <div>
+                                <h5 class="mb-0 fw-bold card-title-accent">Console Settings</h5>
+                                <span class="text-secondary small fw-medium">Cloud-managed parental controls</span>
+                            </div>
+                        </div>
+                        {% if nintendo_console.has_data %}
+                        <span class="badge rounded-pill px-3 py-2 {% if nintendo_console.is_stale %}bg-warning-subtle text-warning-emphasis border border-warning-subtle{% else %}bg-success-subtle text-success border border-success-subtle{% endif %}">
+                            {% if nintendo_console.is_stale %}
+                            <i class="fas fa-exclamation-circle me-1"></i>Stale{% if nintendo_console.sync_age_label %} · {{ nintendo_console.sync_age_label }}{% endif %}
+                            {% else %}
+                            <i class="fas fa-check-circle me-1"></i>Synced{% if nintendo_console.sync_age_label %} · {{ nintendo_console.sync_age_label }}{% endif %}
+                            {% endif %}
+                        </span>
+                        {% endif %}
+                    </div>
+                    <div class="card-body">
+                        {% if nintendo_console.has_data %}
+                        <div class="mb-4">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span class="small fw-bold text-uppercase text-secondary">Today's Play Time</span>
+                                <span class="small fw-semibold text-body">
+                                    {% if nintendo_console.unlimited %}
+                                    {{ nintendo_console.playtime_summary or 'No daily limit set' }}
+                                    {% elif nintendo_console.playtime_summary %}
+                                    {{ nintendo_console.playtime_summary }}
+                                    {% else %}
+                                    No daily limit set
+                                    {% endif %}
+                                </span>
+                            </div>
+                            {% if nintendo_console.unlimited %}
+                            <div class="progress" style="height: 8px;">
+                                <div class="progress-bar bg-warning" role="progressbar" style="width: 100%;" aria-valuenow="100" aria-valuemin="0" aria-valuemax="100"></div>
+                            </div>
+                            <div class="small text-secondary mt-2">No daily limit configured on this console.</div>
+                            {% elif nintendo_console.progress_pct is not none %}
+                            <div class="progress" style="height: 8px;">
+                                <div class="progress-bar {% if nintendo_console.progress_pct >= 90 %}bg-danger{% elif nintendo_console.progress_pct >= 70 %}bg-warning{% else %}bg-success{% endif %}"
+                                    role="progressbar"
+                                    style="width: {{ nintendo_console.progress_pct }}%;"
+                                    aria-valuenow="{{ nintendo_console.progress_pct }}"
+                                    aria-valuemin="0"
+                                    aria-valuemax="100"></div>
+                            </div>
+                            {% else %}
+                            <div class="small text-secondary">Play time data unavailable.</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="d-flex flex-column gap-2 mb-4">
+                            {% if nintendo_console.last_sync_dt %}
+                            <div class="d-flex justify-content-between align-items-center small">
+                                <span class="text-secondary"><i class="fas fa-sync me-1"></i>Last sync</span>
+                                <span class="fw-semibold text-body">{{ (nintendo_console.last_sync_dt|localtime).strftime('%Y-%m-%d %H:%M') }}</span>
+                            </div>
+                            {% endif %}
+                            {% if nintendo_console.timer_mode %}
+                            <div class="d-flex justify-content-between align-items-center small">
+                                <span class="text-secondary"><i class="fas fa-history me-1"></i>Timer mode</span>
+                                <span class="fw-semibold text-body">{{ nintendo_console.timer_mode }}</span>
+                            </div>
+                            {% endif %}
+                            {% if nintendo_console.bedtime %}
+                            <div class="d-flex justify-content-between align-items-center small">
+                                <span class="text-secondary"><i class="fas fa-clock me-1"></i>Bedtime alarm</span>
+                                <span class="fw-semibold text-body">{{ nintendo_console.bedtime }}</span>
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% else %}
+                        <p class="small text-secondary mb-4 fst-italic">
+                            Console details will appear after the first cloud sync.
+                        </p>
+                        {% endif %}
+
+                        <div id="nintendo-sync-error" class="alert alert-danger py-2 px-3 small d-none mb-3" role="alert"></div>
+
+                        <button type="button" class="btn btn-sm btn-outline-warning fw-bold" id="nintendo-sync-btn">
+                            <span class="nintendo-sync-btn-label"><i class="fas fa-sync me-1"></i> Sync Now</span>
+                        </button>
+
+                        <p class="small text-secondary mt-3 mb-0">
+                            <i class="fas fa-info-circle me-1"></i>
+                            The parental controls PIN is set on the Nintendo Switch and is not exposed by Nintendo's cloud API.
+                        </p>
+                    </div>
+                </div>
+                {% endif %}
+
+                {% if xbox_console %}
+                <div class="card shadow-sm border card-accent-success mb-4" id="xbox-console-card">
+                    <div class="card-header py-3 d-flex align-items-center justify-content-between gap-2">
+                        <div class="d-flex align-items-center gap-2">
+                            <div class="bg-success-subtle text-success p-2 rounded d-flex align-items-center justify-content-center"
+                                style="width: 38px; height: 38px;">
+                                <i class="fab fa-xbox fs-5"></i>
+                            </div>
+                            <div>
+                                <h5 class="mb-0 fw-bold card-title-accent">Console Settings</h5>
+                                <span class="text-secondary small fw-medium">Cloud-managed parental controls</span>
+                            </div>
+                        </div>
+                        {% if xbox_console.has_data %}
+                        <span class="badge rounded-pill px-3 py-2 {% if xbox_console.is_stale %}bg-warning-subtle text-warning-emphasis border border-warning-subtle{% else %}bg-success-subtle text-success border border-success-subtle{% endif %}">
+                            {% if xbox_console.is_stale %}
+                            <i class="fas fa-exclamation-circle me-1"></i>Stale{% if xbox_console.sync_age_label %} · {{ xbox_console.sync_age_label }}{% endif %}
+                            {% else %}
+                            <i class="fas fa-check-circle me-1"></i>Synced{% if xbox_console.sync_age_label %} · {{ xbox_console.sync_age_label }}{% endif %}
+                            {% endif %}
+                        </span>
+                        {% endif %}
+                    </div>
+                    <div class="card-body">
+                        {% if xbox_console.has_data %}
+                        <div class="mb-4">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span class="small fw-bold text-uppercase text-secondary">Today's Play Time</span>
+                                <span class="small fw-semibold text-body">
+                                    {{ xbox_console.playtime_summary or 'No play time reported' }}
+                                </span>
+                            </div>
+                        </div>
+
+                        <div class="d-flex flex-column gap-2 mb-4">
+                            {% if xbox_console.last_sync_dt %}
+                            <div class="d-flex justify-content-between align-items-center small">
+                                <span class="text-secondary"><i class="fas fa-sync me-1"></i>Last sync</span>
+                                <span class="fw-semibold text-body">{{ (xbox_console.last_sync_dt|localtime).strftime('%Y-%m-%d %H:%M') }}</span>
+                            </div>
+                            {% endif %}
+                            {% if xbox_console.device_name %}
+                            <div class="d-flex justify-content-between align-items-center small">
+                                <span class="text-secondary"><i class="fas fa-laptop me-1"></i>Console Name</span>
+                                <span class="fw-semibold text-body">{{ xbox_console.device_name }}</span>
+                            </div>
+                            {% endif %}
+                            {% if xbox_console.device_model %}
+                            <div class="d-flex justify-content-between align-items-center small">
+                                <span class="text-secondary"><i class="fas fa-info-circle me-1"></i>Model</span>
+                                <span class="fw-semibold text-body">{{ xbox_console.device_model }}</span>
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% else %}
+                        <p class="small text-secondary mb-4 fst-italic">
+                            Console details will appear after the first cloud sync.
+                        </p>
+                        {% endif %}
+
+                        <div id="xbox-sync-error" class="alert alert-danger py-2 px-3 small d-none mb-3" role="alert"></div>
+
+                        <button type="button" class="btn btn-sm btn-outline-success fw-bold" id="xbox-sync-btn">
+                            <span class="xbox-sync-btn-label"><i class="fas fa-sync me-1"></i> Sync Now</span>
+                        </button>
+
+                        <p class="small text-secondary mt-3 mb-0">
+                            <i class="fas fa-info-circle me-1"></i>
+                            Xbox limits and features are managed through Microsoft Family Safety and are read-only in Guardian.
+                        </p>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
