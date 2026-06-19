@@ -280,7 +280,8 @@
         updateSidebarActive(path);
 
         if (options.pushState !== false) {
-            history.pushState({ spaPath: path }, parsed.title || document.title, path + (options.search || window.location.search));
+            const hash = options.preserveHash === false ? '' : (window.location.hash || '');
+            history.pushState({ spaPath: path }, parsed.title || document.title, path + (options.search || window.location.search) + hash);
         }
 
         window.scrollTo(0, 0);

@@ -336,10 +336,23 @@ api:
   missing_domain_or_username: Missing domain or username
   approval_request_raised: Approval request raised successfully
   login_logged: Login logged successfully
+  blocklists_assignments_updated: Updated browsing shields for {user}
+  blocklists_curated_updated: Updated curated browsing shields for {user}
+  blocklists_curated_failed: Failed to update curated browsing shields
+  blocklists_missing: One or more shield lists could not be found
+  apparmor_policies_updated: Updated app routine locks for {username}
+  apparmor_policies_missing: One or more app policies could not be found
+  apparmor_policies_updated_synced: Updated app routine locks for {username} and synced to online devices
+  apparmor_policies_updated_sync_partial: Updated app routine locks for {username}, but sync failed for some devices
+  apparmor_policies_updated_offline: Updated app routine locks for {username}. Will sync when devices reconnect.
 
 js:
+  save_saving: Saving…
+  save_saved: Changes saved
+  save_failed: Couldn't save — try again
+  save_sync_pending: Saved — syncing to devices when they reconnect
   shell_dialogue_count: "{count} Dialogue"
-  shell_toast_saved: Changes saved successfully!
+  shell_toast_saved: Changes saved
   shell_wizard_step1_title: Choose Platform
   shell_wizard_step1_subtitle: Select the hardware type you wish to enroll under Guardian.
   shell_wizard_step2_title: Setup Instructions
@@ -477,6 +490,17 @@ js:
   wizard_baseline_title: Baseline Summary
   wizard_baseline_preview: Choose a growth milestone and responsibility level to preview your family baseline.
   wizard_baseline_profile: "Baseline Summary: {profile} Profile (Age {age})"
+  profile_sync_none: No browsing shields assigned
+  profile_sync_awaiting_uid: Finishing account setup
+  profile_sync_pending: Sync pending
+  profile_sync_live: Up to date
+  profile_sync_unknown: Unable to check status
+  profile_app_approved: App approved
+  profile_app_revoked: Approval revoked
+  profile_revoke_failed: Failed to revoke approval
+  profile_revoke_confirm: Revoke approval for this app?
+  profile_device_synced: Synced
+  profile_device_sync_pending: Sync pending
   never: Never
 
 settings:
@@ -718,7 +742,13 @@ pages:
   admin_user_edit:
     title: "{username} — Profile Settings - Guardian"
     heading: "{username} — Profile Settings"
-    lead: Fine-tune browsing shields, routine locks, and family dialogue for this child.
+    lead: Fine-tune browsing shields, routine locks, and family dialogue for this child. Changes save automatically as you adjust settings.
+    tab_nav_label: Profile settings sections
+    tab_browsing: Browsing
+    tab_computer: Computer & browser
+    tab_family: Family dialogue
+    tab_apps: Apps
+    autosave_hint: Changes save automatically
     checking_sync: Checking sync
     back_to_children: Back to Children
     child_profile: "Child Profile: {username}"
@@ -739,11 +769,13 @@ pages:
     ages_badge: "Ages: {ages}"
     save_curated_shields: Save Curated Shields
     custom_shield_lists: Custom Shield Lists
-    domains_bullet: "{count} domains • {type}"
+    domains_bullet: "About {count} sites covered"
+    sites_badge: "~{count} sites"
     no_custom_shields: No custom shields yet. Create them under Browsing Shields before assigning.
     save_custom_shields: Save custom shields
     manage_shields: Manage shields
-    account_sync_log: Account Synchronization Log
+    account_sync_log: Sync status by account
+    technical_sync_details: Technical sync details
     sync_status_synced: Up to date
     sync_status_awaiting_uid: Finishing setup
     sync_status_not_configured: Shields not applied yet
@@ -752,20 +784,28 @@ pages:
     sync_hide_details: Hide details
     uid_label: "UID: {uid}"
     last_sync: "Last Sync: {time}"
+    computer_browser: Computer & browser boundaries
+    computer_browser_lead: Limits what your child can change on linked computers and how their browser behaves. Changes save automatically.
+    computer_changes: Computer changes
+    browser_boundaries_sub: Browser boundaries
     device_routine_locks: Device Routine Locks
-    device_routine_lead: System privileges via polkit rules and terminal access control for linked Linux accounts.
+    device_routine_lead: Limit installs, account changes, power actions, and other sensitive changes on linked computers.
     synced: Synced
     sync_pending: Sync pending
+    linux_how_it_works_title: How this works on Linux
+    linux_how_it_works: Requires the Guardian agent on the device. Routine locks apply through standard Linux security hooks; command-line tools can be blocked separately.
     polkit_info: Requires the Guardian agent running as root. Polkit rules apply on common systemd distros; terminal blocking covers common shells and terminal emulators.
-    system_privileges: System privileges (polkit)
+    system_privileges: What they can change on the computer
+    block_extra_app_stores: Block extra app stores
+    block_extra_app_stores_hint: Includes Flatpak and Snap installers on Linux.
     block_install: Block software installation
     block_uninstall: Block software removal
     block_mount: Block removable media mounting
     block_accounts: Block account changes
     block_power: Block reboot / shutdown / suspend
-    block_pkexec: Block pkexec elevation
-    block_flatpak: Block Flatpak installation
-    block_snap: Block Snap installation
+    block_pkexec: Block admin password prompts
+    block_flatpak: Block Flatpak app store installs
+    block_snap: Block Snap app store installs
     connectivity: Connectivity
     disable_bluetooth: Disable Bluetooth
     terminal_access: Terminal access
@@ -773,26 +813,30 @@ pages:
     support_message: Support message
     support_message_hint: Shown when a restricted action is blocked (max 500 characters).
     save_linux_restrictions: Save Linux Device Restrictions
-    link_linux_for_restrictions: Link a Linux device mapping to configure device restrictions.
+    link_computer_for_restrictions: Link a Linux computer to configure computer and browser boundaries.
+    link_linux_for_restrictions: Link a Linux computer to configure computer and browser boundaries.
     browser_boundaries: Browser Boundaries
     browser_boundaries_lead: Enforce browser restrictions across Google Chrome, Chromium, and Brave browsers.
     disable_incognito: Disable Incognito Mode
     enforce_safesearch: Enforce Google SafeSearch
     youtube_restricted: YouTube Restricted Mode
-    youtube_off: Off
+    youtube_off: "Off"
     youtube_moderate: Moderate
     youtube_strict: Strict (Recommended)
     block_extensions: Block all other extensions (only allow Guardian monitor)
-    allowed_extensions: Allowed Extension IDs (comma or space separated)
+    allowed_extensions: Other browser tools you allow
+    allowed_extensions_hint: Only needed if you use tools beyond the Guardian monitor — ask support if unsure.
+    allowed_extensions_placeholder: Tool IDs separated by commas (optional)
+    allow_extra_browser_tools: Allow extra browser tools
     block_genai: Disable browser-native Generative AI features
     save_browser_restrictions: Save Browser Restrictions
-    link_linux_for_browser: Link a Linux device mapping to configure browser restrictions.
+    link_linux_for_browser: Link a Linux computer to configure computer and browser boundaries.
     family_dialogue: Family Dialogue Settings
     family_dialogue_lead: Configure per-device approval modes for app launches, blocked websites, and new account sign-ups.
     app_launches: App Launches
     app_mode_open: Open (no approval overlay)
-    app_mode_allowlist: Require approval (allowlist)
-    app_mode_blocklist: Blocklist with exceptions
+    app_mode_allowlist: Ask me before new apps open
+    app_mode_blocklist: Block specific apps (exceptions allowed)
     websites: Websites
     domain_blocklist_only: Blocklist only
     domain_approval_on_block: Allow requests when blocked
@@ -800,7 +844,7 @@ pages:
     signup_hint: Require approval before signing up on any website.
     signup_prerequisite_title: Browser monitor required
     signup_prerequisite_body: Sign-up blocking and online account tracking need the Guardian browser monitor on Chrome, Brave, or Edge. Enable "Block all other extensions" in Browser Boundaries so only the monitor can run.
-    signup_prerequisite_link: Open Browser Boundaries
+    signup_prerequisite_link: Open Computer & browser tab
     signup_outcome_note: When blocked, your child sees the Guardian Space overlay and can request approval — requests appear in Family Dialogue.
     signup_outcome_link: Open Family Dialogue
     save_approval_settings: Save Approval Settings
@@ -821,7 +865,11 @@ pages:
     app_routine_lead: Assign platform-specific application lock policies to this child.
     linux_policies: Linux / Desktop Policies
     no_linux_device: No Linux/desktop device linked yet. Assign a Linux agent device to enforce these policies.
-    rules_configured: "{count} rules configured"
+    rules_configured: "{count} apps in this lock set"
+    app_details: App details
+    revoke_confirm: Revoke approval for this app?
+    baseline_apply_confirm_title: Apply this safety baseline?
+    baseline_apply_confirm_body: "This will refresh browsing shields, routine locks, device and browser boundaries, family dialogue settings, and Guardian Space overlay tone. You can still adjust individual settings afterward."
     android_policies: Android Policies
     no_android_device: No Android device linked yet. Pair an Android agent to enforce these policies.
     define_app_policies: Please define app policies in App Locks before assigning them here.

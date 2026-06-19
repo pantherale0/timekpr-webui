@@ -3,20 +3,29 @@
 {% from '_macros.html' import csrf_field %}
 {% block title %}{{ t('pages.admin_user_edit.title', username=user.username) }}{% endblock %}
 
+{% macro profile_settings_tabs(mobile=false) %}
+<div class="segmented-control guardian-nav-segmented-tabs admin-user-edit-tabs{% if mobile %} admin-user-edit-tabs--mobile{% endif %}" role="tablist"
+    aria-label="{{ t('pages.admin_user_edit.tab_nav_label') }}">
+    <button type="button" class="segmented-tab-btn active" data-tab-target="#browsing-tab">{{ t('pages.admin_user_edit.tab_browsing') }}</button>
+    <button type="button" class="segmented-tab-btn" data-tab-target="#computer-tab">{{ t('pages.admin_user_edit.tab_computer') }}</button>
+    <button type="button" class="segmented-tab-btn" data-tab-target="#family-tab">{{ t('pages.admin_user_edit.tab_family') }}</button>
+    <button type="button" class="segmented-tab-btn" data-tab-target="#apps-tab">{{ t('pages.admin_user_edit.tab_apps') }}</button>
+</div>
+{% endmacro %}
+
 {% block extra_head %}{% endblock %}
 
 {% block top_nav_center %}
-<span id="blocklist-sync-badge" class="guardian-status-pill" role="status" aria-live="polite">
-    <span id="blocklist-sync-dot" class="guardian-status-dot is-unknown"></span>
-    <i class="fas fa-sync-alt d-none" id="sync-badge-icon"></i>
-    <span id="blocklist-sync-text">{{ t('pages.admin_user_edit.checking_sync') }}</span>
-</span>
+<div class="admin-user-edit-top-nav-desktop d-none d-xl-flex align-items-center gap-2 gap-lg-3 justify-content-center w-100 min-w-0">
+    {{ profile_settings_tabs() }}
+    <span class="guardian-status-pill js-blocklist-sync-badge flex-shrink-0" role="status" aria-live="polite">
+        <span class="guardian-status-dot js-blocklist-sync-dot is-unknown"></span>
+        <span class="js-blocklist-sync-text">{{ t('pages.admin_user_edit.checking_sync') }}</span>
+    </span>
+</div>
 {% endblock %}
 
-{% block top_nav_brand_status %}
-<span id="blocklist-sync-dot-mobile" class="guardian-status-dot is-unknown d-lg-none" role="status"
-    aria-label="{{ t('pages.admin_user_edit.checking_sync') }}" title="{{ t('pages.admin_user_edit.checking_sync') }}"></span>
-{% endblock %}
+{% block top_nav_brand_status %}{% endblock %}
 
 {% block content %}
 <div class="guardian-page-header">
@@ -31,8 +40,7 @@
     </div>
 </div>
 
-<div class="row g-4">
-    <!-- Child Profile Summary Card -->
+<div class="row g-4 mb-4">
     <div class="col-12">
         <div class="card border shadow-sm">
             <div class="card-body p-4 d-flex align-items-center gap-3 flex-wrap">
@@ -60,7 +68,20 @@
         </div>
     </div>
 
-    <!-- Policy Preset Card -->
+    <div class="col-12 d-xl-none">
+        <nav class="admin-user-edit-sub-rail" aria-label="{{ t('pages.admin_user_edit.tab_nav_label') }}">
+            <div class="admin-user-edit-sub-rail__row">
+                <div class="admin-user-edit-sub-rail__scroll">
+                    {{ profile_settings_tabs(mobile=true) }}
+                </div>
+                <span class="guardian-status-pill guardian-status-pill--subrail js-blocklist-sync-badge" role="status" aria-live="polite">
+                    <span class="guardian-status-dot js-blocklist-sync-dot is-unknown"></span>
+                    <span class="js-blocklist-sync-text">{{ t('pages.admin_user_edit.checking_sync') }}</span>
+                </span>
+            </div>
+        </nav>
+    </div>
+
     <div class="col-12">
         <div class="card border shadow-sm guardian-preset-card">
             <div class="card-header py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
@@ -83,17 +104,20 @@
             </div>
         </div>
     </div>
+</div>
 
-    <div class="col-12 col-lg-8">
-        <!-- Internet Blocklists Section -->
-        <div class="card border shadow-sm mb-4">
-            <div class="card-header guardian-card-header py-3">
+<div id="admin-user-edit-root" class="admin-user-edit-panes" data-user-id="{{ user.id }}">
+
+    <!-- Browsing tab -->
+    <div id="browsing-tab" class="tab-pane-custom">
+        <div class="card border shadow-sm">
+            <div class="card-header guardian-card-header py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
                 <h5 class="mb-0 fw-bold"><i class="fas fa-globe me-2 guardian-section-icon"></i>{{ t('pages.admin_user_edit.browsing_shields') }}</h5>
+                <span class="guardian-autosave-status" id="browsing-tab-status" aria-live="polite"></span>
             </div>
             <div class="card-body p-4">
                 <p class="text-secondary small fw-medium mb-4">{{ t('pages.admin_user_edit.browsing_shields_lead') }}</p>
-                
-                <!-- Quick stats -->
+
                 <div class="row g-2 mb-4">
                     <div class="col-4">
                         <div class="bg-body-secondary p-3 rounded text-center border">
@@ -115,13 +139,15 @@
                     </div>
                 </div>
 
-                <!-- Curated Filter Packs (Marketplace) -->
-                <form action="{{ url_for('subscribe_user_marketplace', user_id=user.id) }}" method="POST" class="mb-4">
+                <form id="curated-shields-form" action="{{ url_for('subscribe_user_marketplace', user_id=user.id) }}" method="POST" class="mb-4" onsubmit="return false;">
                     {{ csrf_field() }}
-                    <h6 class="fw-bold mb-3 d-flex align-items-center gap-2 text-dark">
-                        <i class="fas fa-store me-2" style="color: var(--guardian-sage);"></i> {{ t('pages.admin_user_edit.curated_shields') }}
-                    </h6>
-                    <div class="row g-3 mb-3">
+                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                        <h6 class="fw-bold mb-0 d-flex align-items-center gap-2 text-dark">
+                            <i class="fas fa-store me-2" style="color: var(--guardian-sage);"></i> {{ t('pages.admin_user_edit.curated_shields') }}
+                        </h6>
+                        <span class="guardian-autosave-status" id="curated-autosave-status" aria-live="polite"></span>
+                    </div>
+                    <div class="row g-3 mb-0">
                         {% for preset in marketplace_presets %}
                             <div class="col-12 col-md-6">
                                 <div class="border rounded p-3 bg-body-tertiary h-100 d-flex flex-column justify-content-between">
@@ -134,24 +160,22 @@
                                     </div>
                                     <div class="d-flex flex-wrap gap-1 mt-1 ms-4">
                                         <span class="badge bg-primary-subtle text-primary" style="font-size: 0.65rem;">{{ t('pages.admin_user_edit.ages_badge', ages=preset.recommended_ages|join(', ')) }}</span>
-                                        <span class="badge bg-secondary-subtle text-secondary-emphasis" style="font-size: 0.65rem;">{{ preset.approx_domain_count }}</span>
+                                        <span class="badge bg-secondary-subtle text-secondary-emphasis" style="font-size: 0.65rem;">{{ t('pages.admin_user_edit.sites_badge', count=preset.approx_domain_count) }}</span>
                                     </div>
                                 </div>
                             </div>
                         {% endfor %}
                     </div>
-                    
-                    <button type="submit" class="btn btn-sm btn-success fw-bold px-4">
-                        <i class="fas fa-check-circle me-1"></i> {{ t('pages.admin_user_edit.save_curated_shields') }}
-                    </button>
                 </form>
 
-                <!-- Custom Filter Lists -->
-                <form action="{{ url_for('update_user_blocklists', user_id=user.id) }}" method="POST" class="border-top pt-4 border-secondary-subtle">
+                <form id="custom-shields-form" action="{{ url_for('update_user_blocklists', user_id=user.id) }}" method="POST" class="border-top pt-4 border-secondary-subtle" onsubmit="return false;">
                     {{ csrf_field() }}
-                    <h6 class="fw-bold mb-3 d-flex align-items-center gap-2 text-dark">
-                        <i class="fas fa-sliders-h me-2" style="color: var(--guardian-sage);"></i> {{ t('pages.admin_user_edit.custom_shield_lists') }}
-                    </h6>
+                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                        <h6 class="fw-bold mb-0 d-flex align-items-center gap-2 text-dark">
+                            <i class="fas fa-sliders-h me-2" style="color: var(--guardian-sage);"></i> {{ t('pages.admin_user_edit.custom_shield_lists') }}
+                        </h6>
+                        <span class="guardian-autosave-status" id="custom-autosave-status" aria-live="polite"></span>
+                    </div>
                     <div class="row g-3 mb-3">
                         {% for source in blocklist_sources %}
                             <div class="col-12 col-md-6">
@@ -161,7 +185,7 @@
                                         <label class="form-check-label ms-2 cursor-pointer" for="source-{{ source.id }}">
                                             <strong class="text-body d-block lh-sm mb-1" style="font-size: 0.9rem;">{{ source.name }}</strong>
                                             <span class="text-secondary small fw-bold d-block" style="font-size: 0.72rem;">
-                                                {{ t('pages.admin_user_edit.domains_bullet', count=source.domain_count, type=source.source_type|replace('_', ' ')|title) }}
+                                                {{ t('pages.admin_user_edit.domains_bullet', count=source.domain_count) }}
                                             </span>
                                         </label>
                                     </div>
@@ -169,411 +193,415 @@
                             </div>
                         {% endfor %}
                     </div>
-                    
+
                     {% if not blocklist_sources %}
                         <div class="alert alert-info py-2 small mb-3">
                             <i class="fas fa-info-circle me-1"></i> {{ t('pages.admin_user_edit.no_custom_shields') }}
                         </div>
                     {% endif %}
 
-                    <div class="d-flex gap-2">
-                        <button type="submit" class="btn btn-sm btn-primary fw-bold px-4">Save custom shields</button>
-                        <a href="{{ url_for('ui_dashboard.admin_restrictions') }}" class="btn btn-sm btn-outline-secondary fw-bold px-3">Manage shields</a>
-                    </div>
+                    <a href="{{ url_for('ui_dashboard.admin_restrictions') }}" class="btn btn-sm btn-outline-secondary fw-bold px-3">{{ t('pages.admin_user_edit.manage_shields') }}</a>
                 </form>
 
-                <!-- Mapping Sync Details -->
                 {% if blocklist_sync_status.mappings %}
                     <div class="border-top pt-4 mt-4">
-                        <h6 class="text-secondary small fw-bold text-uppercase mb-3" style="font-size: 0.75rem; letter-spacing: 0.05em;">{{ t('pages.admin_user_edit.account_sync_log') }}</h6>
-                        <div class="d-flex flex-column gap-2">
-                            {% for mapping in blocklist_sync_status.mappings %}
-                                <div class="border rounded p-3 bg-body-secondary d-flex justify-content-between align-items-center flex-wrap gap-2">
-                                    <div>
-                                        <strong class="text-body">{{ mapping.linux_username }} on {{ mapping.device_label }}</strong>
-                                        <div class="text-secondary small fw-semibold mt-1">
-                                            {% if mapping.last_synced %}
-                                                {{ t('pages.admin_user_edit.last_sync', time=mapping.last_synced) }}
-                                            {% endif %}
-                                            <button type="button" class="btn btn-link btn-sm p-0 text-secondary small sync-details-toggle"
-                                                data-bs-toggle="collapse" data-bs-target="#sync-details-{{ loop.index }}"
-                                                aria-expanded="false">
-                                                {{ t('pages.admin_user_edit.sync_show_details') }}
-                                            </button>
-                                            <div class="collapse" id="sync-details-{{ loop.index }}">
+                        <button class="btn btn-link btn-sm p-0 text-secondary fw-bold text-uppercase mb-3" type="button"
+                            data-bs-toggle="collapse" data-bs-target="#account-sync-technical" aria-expanded="false">
+                            {{ t('pages.admin_user_edit.technical_sync_details') }}
+                        </button>
+                        <div class="collapse" id="account-sync-technical">
+                            <h6 class="text-secondary small fw-bold text-uppercase mb-3" style="font-size: 0.75rem; letter-spacing: 0.05em;">{{ t('pages.admin_user_edit.account_sync_log') }}</h6>
+                            <div class="d-flex flex-column gap-2">
+                                {% for mapping in blocklist_sync_status.mappings %}
+                                    <div class="border rounded p-3 bg-body-secondary d-flex justify-content-between align-items-center flex-wrap gap-2">
+                                        <div>
+                                            <strong class="text-body">{{ mapping.linux_username }} on {{ mapping.device_label }}</strong>
+                                            <div class="text-secondary small fw-semibold mt-1">
+                                                {% if mapping.last_synced %}
+                                                    {{ t('pages.admin_user_edit.last_sync', time=mapping.last_synced) }}
+                                                {% endif %}
                                                 {% if mapping.linux_uid is not none %}
-                                                {{ t('pages.admin_user_edit.uid_label', uid=mapping.linux_uid) }}
-                                                {% else %}
-                                                {{ t('pages.admin_users.technical_uid_unknown') }}
+                                                    · {{ t('pages.admin_user_edit.uid_label', uid=mapping.linux_uid) }}
                                                 {% endif %}
                                             </div>
                                         </div>
+                                        <span class="badge {% if mapping.status == 'synced' %}bg-success{% elif mapping.status == 'awaiting_uid' %}bg-warning text-dark{% elif mapping.status == 'not_configured' %}bg-secondary{% else %}bg-warning text-dark{% endif %} p-2">
+                                            {% if mapping.status == 'synced' %}
+                                                {{ t('pages.admin_user_edit.sync_status_synced') }}
+                                            {% elif mapping.status == 'awaiting_uid' %}
+                                                {{ t('pages.admin_user_edit.sync_status_awaiting_uid') }}
+                                            {% elif mapping.status == 'not_configured' %}
+                                                {{ t('pages.admin_user_edit.sync_status_not_configured') }}
+                                            {% else %}
+                                                {{ t('pages.admin_user_edit.sync_status_pending') }}
+                                            {% endif %}
+                                        </span>
                                     </div>
-                                    <span class="badge {% if mapping.status == 'synced' %}bg-success{% elif mapping.status == 'awaiting_uid' %}bg-warning text-dark{% elif mapping.status == 'not_configured' %}bg-secondary{% else %}bg-warning text-dark{% endif %} p-2">
-                                        {% if mapping.status == 'synced' %}
-                                            {{ t('pages.admin_user_edit.sync_status_synced') }}
-                                        {% elif mapping.status == 'awaiting_uid' %}
-                                            {{ t('pages.admin_user_edit.sync_status_awaiting_uid') }}
-                                        {% elif mapping.status == 'not_configured' %}
-                                            {{ t('pages.admin_user_edit.sync_status_not_configured') }}
-                                        {% else %}
-                                            {{ t('pages.admin_user_edit.sync_status_pending') }}
-                                        {% endif %}
-                                    </span>
-                                </div>
-                            {% endfor %}
+                                {% endfor %}
+                            </div>
                         </div>
                     </div>
                 {% endif %}
             </div>
         </div>
+    </div>
 
-
-
-        <!-- Linux Device Restrictions -->
-        <div class="card border shadow-sm mb-4">
+    <!-- Computer & browser tab -->
+    <div id="computer-tab" class="tab-pane-custom d-none">
+        <div class="card border shadow-sm" id="browser-boundaries">
             <div class="card-header guardian-card-header py-3">
-                <h5 class="mb-0 fw-bold"><i class="fas fa-desktop me-2 guardian-section-icon"></i>{{ t('pages.admin_user_edit.device_routine_locks') }}</h5>
+                <h5 class="mb-0 fw-bold"><i class="fas fa-desktop me-2 guardian-section-icon"></i>{{ t('pages.admin_user_edit.computer_browser') }}</h5>
             </div>
             <div class="card-body p-4">
-                <p class="text-secondary small fw-medium mb-3">{{ t('pages.admin_user_edit.device_routine_lead') }}</p>
-                {% if linux_device_policy_by_mapping %}
-                    <div class="d-flex flex-column gap-3">
-                        {% for mapping in user.device_mappings %}
-                            {% set linux_policy = linux_device_policy_by_mapping.get(mapping.id) %}
-                            {% if linux_policy %}
-                            <div class="border rounded p-3 bg-body-tertiary linux-device-policy-card" data-mapping-id="{{ mapping.id }}">
-                                <div class="d-flex justify-content-between align-items-start gap-2 mb-2 flex-wrap">
-                                    <strong class="text-body">{{ mapping.linux_username }}@{{ linux_policy.device_label or mapping.system_id }}</strong>
-                                    <span class="badge linux-device-policy-sync-badge {% if linux_policy.is_synced %}bg-success{% else %}bg-warning text-dark{% endif %}" style="font-size: 0.65rem;">
-                                        {% if linux_policy.is_synced %}{{ t('pages.admin_user_edit.synced') }}{% else %}{{ t('pages.admin_user_edit.sync_pending') }}{% endif %}
-                                    </span>
-                                </div>
-                                <div class="alert alert-info py-2 small mb-3">
-                                    <i class="fas fa-info-circle me-1"></i>{{ t('pages.admin_user_edit.polkit_info') }}
-                                </div>
-                                <h6 class="fw-bold small text-muted text-uppercase mb-2" style="font-size: 0.7rem; letter-spacing: 0.05em;">{{ t('pages.admin_user_edit.system_privileges') }}</h6>
-                                <div class="form-check form-switch mb-2">
-                                    <input class="form-check-input linux-install-software" type="checkbox" data-mapping-id="{{ mapping.id }}" id="linux-install-software-{{ mapping.id }}" {% if linux_policy.install_software_disabled %}checked{% endif %}>
-                                    <label class="form-check-label small" for="linux-install-software-{{ mapping.id }}">{{ t('pages.admin_user_edit.block_install') }}</label>
-                                </div>
-                                <div class="form-check form-switch mb-2">
-                                    <input class="form-check-input linux-uninstall-software" type="checkbox" data-mapping-id="{{ mapping.id }}" id="linux-uninstall-software-{{ mapping.id }}" {% if linux_policy.uninstall_software_disabled %}checked{% endif %}>
-                                    <label class="form-check-label small" for="linux-uninstall-software-{{ mapping.id }}">Block software removal</label>
-                                </div>
-                                <div class="form-check form-switch mb-2">
-                                    <input class="form-check-input linux-mount-media" type="checkbox" data-mapping-id="{{ mapping.id }}" id="linux-mount-media-{{ mapping.id }}" {% if linux_policy.mount_removable_media_disabled %}checked{% endif %}>
-                                    <label class="form-check-label small" for="linux-mount-media-{{ mapping.id }}">Block removable media mounting</label>
-                                </div>
-                                <div class="form-check form-switch mb-2">
-                                    <input class="form-check-input linux-modify-accounts" type="checkbox" data-mapping-id="{{ mapping.id }}" id="linux-modify-accounts-{{ mapping.id }}" {% if linux_policy.modify_accounts_disabled %}checked{% endif %}>
-                                    <label class="form-check-label small" for="linux-modify-accounts-{{ mapping.id }}">Block account changes</label>
-                                </div>
-                                <div class="form-check form-switch mb-2">
-                                    <input class="form-check-input linux-power-actions" type="checkbox" data-mapping-id="{{ mapping.id }}" id="linux-power-actions-{{ mapping.id }}" {% if linux_policy.system_power_actions_disabled %}checked{% endif %}>
-                                    <label class="form-check-label small" for="linux-power-actions-{{ mapping.id }}">Block reboot / shutdown / suspend</label>
-                                </div>
-                                <div class="form-check form-switch mb-2">
-                                    <input class="form-check-input linux-pkexec" type="checkbox" data-mapping-id="{{ mapping.id }}" id="linux-pkexec-{{ mapping.id }}" {% if linux_policy.pkexec_elevation_disabled %}checked{% endif %}>
-                                    <label class="form-check-label small" for="linux-pkexec-{{ mapping.id }}">Block pkexec elevation</label>
-                                </div>
-                                <div class="form-check form-switch mb-2">
-                                    <input class="form-check-input linux-flatpak" type="checkbox" data-mapping-id="{{ mapping.id }}" id="linux-flatpak-{{ mapping.id }}" {% if linux_policy.flatpak_install_disabled %}checked{% endif %}>
-                                    <label class="form-check-label small" for="linux-flatpak-{{ mapping.id }}">Block Flatpak installation</label>
-                                </div>
-                                <div class="form-check form-switch mb-2">
-                                    <input class="form-check-input linux-snap" type="checkbox" data-mapping-id="{{ mapping.id }}" id="linux-snap-{{ mapping.id }}" {% if linux_policy.snap_install_disabled %}checked{% endif %}>
-                                    <label class="form-check-label small" for="linux-snap-{{ mapping.id }}">Block Snap installation</label>
-                                </div>
-                                <h6 class="fw-bold small text-muted text-uppercase mt-3 mb-2" style="font-size: 0.7rem; letter-spacing: 0.05em;">Connectivity</h6>
-                                <div class="form-check form-switch mb-2">
-                                    <input class="form-check-input linux-bluetooth" type="checkbox" data-mapping-id="{{ mapping.id }}" id="linux-bluetooth-{{ mapping.id }}" {% if linux_policy.bluetooth_disabled %}checked{% endif %}>
-                                    <label class="form-check-label small" for="linux-bluetooth-{{ mapping.id }}">Disable Bluetooth</label>
-                                </div>
-                                <h6 class="fw-bold small text-muted text-uppercase mt-3 mb-2" style="font-size: 0.7rem; letter-spacing: 0.05em;">Terminal access</h6>
-                                <div class="form-check form-switch mb-2">
-                                    <input class="form-check-input linux-terminal-access" type="checkbox" data-mapping-id="{{ mapping.id }}" id="linux-terminal-access-{{ mapping.id }}" {% if linux_policy.terminal_access_disabled %}checked{% endif %}>
-                                    <label class="form-check-label small" for="linux-terminal-access-{{ mapping.id }}">Block terminal emulators and shells</label>
-                                </div>
-                                <div class="mb-0">
-                                    <label class="form-label fw-bold small text-muted text-uppercase mb-1" style="font-size: 0.7rem;">Support message</label>
-                                    <input type="text" class="form-control form-control-sm linux-support-message" data-mapping-id="{{ mapping.id }}" maxlength="500" value="{{ linux_policy.support_message }}">
-                                    <span class="text-secondary d-block mt-1" style="font-size: 0.65rem;">Shown when a restricted action is blocked (max 500 characters).</span>
-                                </div>
-                            </div>
-                            {% endif %}
-                        {% endfor %}
-                    </div>
-                    <button type="button" class="btn btn-primary btn-sm fw-bold mt-3" onclick="saveLinuxDevicePolicies()">{{ t('pages.admin_user_edit.save_linux_restrictions') }}</button>
-                {% else %}
-                    <p class="text-secondary small mb-0">{{ t('pages.admin_user_edit.link_linux_for_restrictions') }}</p>
-                {% endif %}
-            </div>
-        </div>
-
-        <!-- Chrome Browser Restrictions -->
-        <div class="card border shadow-sm mb-4" id="browser-boundaries">
-            <div class="card-header guardian-card-header py-3">
-                <h5 class="mb-0 fw-bold"><i class="fab fa-chrome me-2 guardian-section-icon"></i>{{ t('pages.admin_user_edit.browser_boundaries') }}</h5>
-            </div>
-            <div class="card-body p-4">
-                <p class="text-secondary small fw-medium mb-3">{{ t('pages.admin_user_edit.browser_boundaries_lead') }}</p>
+                <p class="text-secondary small fw-medium mb-3">{{ t('pages.admin_user_edit.computer_browser_lead') }}</p>
                 {% if linux_device_policy_by_mapping %}
                     <div class="d-flex flex-column gap-3">
                         {% for mapping in user.device_mappings %}
                             {% set linux_policy = linux_device_policy_by_mapping.get(mapping.id) %}
                             {% if linux_policy %}
                             {% set chrome_opts = linux_policy.chrome_policies %}
-                            <div class="border rounded p-3 bg-body-tertiary chrome-device-policy-card" data-mapping-id="{{ mapping.id }}">
-                                <div class="d-flex justify-content-between align-items-start gap-2 mb-2 flex-wrap">
+                            <div class="border rounded p-3 bg-body-tertiary device-policy-card" data-mapping-id="{{ mapping.id }}">
+                                <div class="d-flex justify-content-between align-items-start gap-2 mb-3 flex-wrap">
                                     <strong class="text-body">{{ mapping.linux_username }}@{{ linux_policy.device_label or mapping.system_id }}</strong>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <span class="guardian-autosave-status" aria-live="polite"></span>
+                                        <span class="badge device-policy-sync-badge {% if linux_policy.is_synced %}bg-success{% else %}bg-warning text-dark{% endif %}" style="font-size: 0.65rem;">
+                                            {% if linux_policy.is_synced %}{{ t('pages.admin_user_edit.synced') }}{% else %}{{ t('pages.admin_user_edit.sync_pending') }}{% endif %}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <h6 class="fw-bold small text-muted text-uppercase mb-2" style="font-size: 0.7rem; letter-spacing: 0.05em;">{{ t('pages.admin_user_edit.computer_changes') }}</h6>
+                                <div class="form-check form-switch mb-2">
+                                    <input class="form-check-input linux-install-software" type="checkbox" data-mapping-id="{{ mapping.id }}" id="linux-install-software-{{ mapping.id }}" {% if linux_policy.install_software_disabled %}checked{% endif %}>
+                                    <label class="form-check-label small" for="linux-install-software-{{ mapping.id }}">{{ t('pages.admin_user_edit.block_install') }}</label>
                                 </div>
                                 <div class="form-check form-switch mb-2">
+                                    <input class="form-check-input linux-uninstall-software" type="checkbox" data-mapping-id="{{ mapping.id }}" id="linux-uninstall-software-{{ mapping.id }}" {% if linux_policy.uninstall_software_disabled %}checked{% endif %}>
+                                    <label class="form-check-label small" for="linux-uninstall-software-{{ mapping.id }}">{{ t('pages.admin_user_edit.block_uninstall') }}</label>
+                                </div>
+                                <div class="form-check form-switch mb-2">
+                                    <input class="form-check-input linux-mount-media" type="checkbox" data-mapping-id="{{ mapping.id }}" id="linux-mount-media-{{ mapping.id }}" {% if linux_policy.mount_removable_media_disabled %}checked{% endif %}>
+                                    <label class="form-check-label small" for="linux-mount-media-{{ mapping.id }}">{{ t('pages.admin_user_edit.block_mount') }}</label>
+                                </div>
+                                <div class="form-check form-switch mb-2">
+                                    <input class="form-check-input linux-modify-accounts" type="checkbox" data-mapping-id="{{ mapping.id }}" id="linux-modify-accounts-{{ mapping.id }}" {% if linux_policy.modify_accounts_disabled %}checked{% endif %}>
+                                    <label class="form-check-label small" for="linux-modify-accounts-{{ mapping.id }}">{{ t('pages.admin_user_edit.block_accounts') }}</label>
+                                </div>
+                                <div class="form-check form-switch mb-2">
+                                    <input class="form-check-input linux-power-actions" type="checkbox" data-mapping-id="{{ mapping.id }}" id="linux-power-actions-{{ mapping.id }}" {% if linux_policy.system_power_actions_disabled %}checked{% endif %}>
+                                    <label class="form-check-label small" for="linux-power-actions-{{ mapping.id }}">{{ t('pages.admin_user_edit.block_power') }}</label>
+                                </div>
+                                <div class="form-check form-switch mb-2">
+                                    <input class="form-check-input linux-pkexec" type="checkbox" data-mapping-id="{{ mapping.id }}" id="linux-pkexec-{{ mapping.id }}" {% if linux_policy.pkexec_elevation_disabled %}checked{% endif %}>
+                                    <label class="form-check-label small" for="linux-pkexec-{{ mapping.id }}">{{ t('pages.admin_user_edit.block_pkexec') }}</label>
+                                </div>
+                                <div class="form-check form-switch mb-2">
+                                    <input class="form-check-input linux-flatpak" type="checkbox" data-mapping-id="{{ mapping.id }}" id="linux-flatpak-{{ mapping.id }}" {% if linux_policy.flatpak_install_disabled %}checked{% endif %}>
+                                    <label class="form-check-label small" for="linux-flatpak-{{ mapping.id }}">{{ t('pages.admin_user_edit.block_flatpak') }}</label>
+                                </div>
+                                <div class="form-check form-switch mb-2">
+                                    <input class="form-check-input linux-snap" type="checkbox" data-mapping-id="{{ mapping.id }}" id="linux-snap-{{ mapping.id }}" {% if linux_policy.snap_install_disabled %}checked{% endif %}>
+                                    <label class="form-check-label small" for="linux-snap-{{ mapping.id }}">{{ t('pages.admin_user_edit.block_snap') }}</label>
+                                </div>
+                                <h6 class="fw-bold small text-muted text-uppercase mt-3 mb-2" style="font-size: 0.7rem; letter-spacing: 0.05em;">{{ t('pages.admin_user_edit.connectivity') }}</h6>
+                                <div class="form-check form-switch mb-2">
+                                    <input class="form-check-input linux-bluetooth" type="checkbox" data-mapping-id="{{ mapping.id }}" id="linux-bluetooth-{{ mapping.id }}" {% if linux_policy.bluetooth_disabled %}checked{% endif %}>
+                                    <label class="form-check-label small" for="linux-bluetooth-{{ mapping.id }}">{{ t('pages.admin_user_edit.disable_bluetooth') }}</label>
+                                </div>
+                                <h6 class="fw-bold small text-muted text-uppercase mt-3 mb-2" style="font-size: 0.7rem; letter-spacing: 0.05em;">{{ t('pages.admin_user_edit.terminal_access') }}</h6>
+                                <div class="form-check form-switch mb-2">
+                                    <input class="form-check-input linux-terminal-access" type="checkbox" data-mapping-id="{{ mapping.id }}" id="linux-terminal-access-{{ mapping.id }}" {% if linux_policy.terminal_access_disabled %}checked{% endif %}>
+                                    <label class="form-check-label small" for="linux-terminal-access-{{ mapping.id }}">{{ t('pages.admin_user_edit.block_terminal') }}</label>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold small text-muted text-uppercase mb-1" style="font-size: 0.7rem;" for="linux-support-{{ mapping.id }}">{{ t('pages.admin_user_edit.support_message') }}</label>
+                                    <input type="text" class="form-control form-control-sm linux-support-message" data-mapping-id="{{ mapping.id }}" id="linux-support-{{ mapping.id }}" maxlength="500" value="{{ linux_policy.support_message }}">
+                                    <span class="text-secondary d-block mt-1" style="font-size: 0.65rem;">{{ t('pages.admin_user_edit.support_message_hint') }}</span>
+                                </div>
+
+                                <button class="btn btn-link btn-sm p-0 text-secondary small mb-3" type="button"
+                                    data-bs-toggle="collapse" data-bs-target="#linux-how-{{ mapping.id }}" aria-expanded="false">
+                                    {{ t('pages.admin_user_edit.linux_how_it_works_title') }}
+                                </button>
+                                <div class="collapse mb-3" id="linux-how-{{ mapping.id }}">
+                                    <div class="alert alert-info py-2 small mb-0">
+                                        <i class="fas fa-info-circle me-1"></i>{{ t('pages.admin_user_edit.linux_how_it_works') }}
+                                    </div>
+                                </div>
+
+                                <h6 class="fw-bold small text-muted text-uppercase mb-2" style="font-size: 0.7rem; letter-spacing: 0.05em;">{{ t('pages.admin_user_edit.browser_boundaries_sub') }}</h6>
+                                <div class="form-check form-switch mb-2">
                                     <input class="form-check-input chrome-incognito" type="checkbox" data-mapping-id="{{ mapping.id }}" id="chrome-incognito-{{ mapping.id }}" {% if chrome_opts.incognito_disabled %}checked{% endif %}>
-                                    <label class="form-check-label small" for="chrome-incognito-{{ mapping.id }}">Disable Incognito Mode</label>
+                                    <label class="form-check-label small" for="chrome-incognito-{{ mapping.id }}">{{ t('pages.admin_user_edit.disable_incognito') }}</label>
                                 </div>
                                 <div class="form-check form-switch mb-2">
                                     <input class="form-check-input chrome-safesearch" type="checkbox" data-mapping-id="{{ mapping.id }}" id="chrome-safesearch-{{ mapping.id }}" {% if chrome_opts.safesearch_enforced %}checked{% endif %}>
-                                    <label class="form-check-label small" for="chrome-safesearch-{{ mapping.id }}">Enforce Google SafeSearch</label>
+                                    <label class="form-check-label small" for="chrome-safesearch-{{ mapping.id }}">{{ t('pages.admin_user_edit.enforce_safesearch') }}</label>
                                 </div>
                                 <div class="mb-3">
-                                    <label class="form-label fw-bold small text-muted text-uppercase mb-1" style="font-size: 0.7rem;" for="chrome-youtube-{{ mapping.id }}">YouTube Restricted Mode</label>
+                                    <label class="form-label fw-bold small text-muted text-uppercase mb-1" style="font-size: 0.7rem;" for="chrome-youtube-{{ mapping.id }}">{{ t('pages.admin_user_edit.youtube_restricted') }}</label>
                                     <select class="form-select form-select-sm chrome-youtube" data-mapping-id="{{ mapping.id }}" id="chrome-youtube-{{ mapping.id }}">
-                                        <option value="0" {% if chrome_opts.youtube_restrict == 0 %}selected{% endif %}>Off</option>
-                                        <option value="1" {% if chrome_opts.youtube_restrict == 1 %}selected{% endif %}>Moderate</option>
-                                        <option value="2" {% if chrome_opts.youtube_restrict == 2 %}selected{% endif %}>Strict (Recommended)</option>
+                                        <option value="0" {% if chrome_opts.youtube_restrict == 0 %}selected{% endif %}>{{ t('pages.admin_user_edit.youtube_off') }}</option>
+                                        <option value="1" {% if chrome_opts.youtube_restrict == 1 %}selected{% endif %}>{{ t('pages.admin_user_edit.youtube_moderate') }}</option>
+                                        <option value="2" {% if chrome_opts.youtube_restrict == 2 %}selected{% endif %}>{{ t('pages.admin_user_edit.youtube_strict') }}</option>
                                     </select>
                                 </div>
                                 <div class="form-check form-switch mb-2">
-                                    <input class="form-check-input chrome-block-ext" type="checkbox" data-mapping-id="{{ mapping.id }}" id="chrome-block-ext-{{ mapping.id }}" {% if chrome_opts.block_other_extensions %}checked{% endif %} onchange="toggleChromeAllowedExtsVisibility('{{ mapping.id }}')">
-                                    <label class="form-check-label small" for="chrome-block-ext-{{ mapping.id }}">Block all other extensions (only allow Guardian monitor)</label>
+                                    <input class="form-check-input chrome-block-ext" type="checkbox" data-mapping-id="{{ mapping.id }}" id="chrome-block-ext-{{ mapping.id }}" {% if chrome_opts.block_other_extensions %}checked{% endif %}>
+                                    <label class="form-check-label small" for="chrome-block-ext-{{ mapping.id }}">{{ t('pages.admin_user_edit.block_extensions') }}</label>
                                 </div>
-                                <div class="ms-4 mb-3 {% if not chrome_opts.block_other_extensions %}d-none{% endif %}" id="chrome-allowed-exts-container-{{ mapping.id }}">
-                                    <label class="form-label fw-bold small text-muted text-uppercase mb-1" style="font-size: 0.7rem;" for="chrome-allowed-exts-{{ mapping.id }}">Allowed Extension IDs (comma or space separated)</label>
-                                    <input class="form-control form-control-sm chrome-allowed-exts" type="text" data-mapping-id="{{ mapping.id }}" id="chrome-allowed-exts-{{ mapping.id }}" value="{{ chrome_opts.allowed_extension_ids | join(', ') }}" placeholder="e.g. gcbomnkjlpa..., googletranslateid...">
+                                <div class="ms-2 mb-3 {% if not chrome_opts.block_other_extensions %}d-none{% endif %}" id="chrome-allowed-exts-container-{{ mapping.id }}">
+                                    <button class="btn btn-link btn-sm p-0 text-secondary small" type="button"
+                                        data-bs-toggle="collapse" data-bs-target="#chrome-extra-tools-{{ mapping.id }}" aria-expanded="false">
+                                        {{ t('pages.admin_user_edit.allow_extra_browser_tools') }}
+                                    </button>
+                                    <div class="collapse {% if chrome_opts.block_other_extensions %}show{% endif %}" id="chrome-extra-tools-{{ mapping.id }}">
+                                        <label class="form-label fw-bold small text-muted text-uppercase mb-1 mt-2" style="font-size: 0.7rem;" for="chrome-allowed-exts-{{ mapping.id }}">{{ t('pages.admin_user_edit.allowed_extensions') }}</label>
+                                        <input class="form-control form-control-sm chrome-allowed-exts" type="text" data-mapping-id="{{ mapping.id }}" id="chrome-allowed-exts-{{ mapping.id }}" value="{{ chrome_opts.allowed_extension_ids | join(', ') }}" placeholder="{{ t('pages.admin_user_edit.allowed_extensions_placeholder') }}">
+                                        <span class="text-secondary d-block mt-1" style="font-size: 0.65rem;">{{ t('pages.admin_user_edit.allowed_extensions_hint') }}</span>
+                                    </div>
                                 </div>
                                 <div class="form-check form-switch mb-0">
                                     <input class="form-check-input chrome-block-genai" type="checkbox" data-mapping-id="{{ mapping.id }}" id="chrome-block-genai-{{ mapping.id }}" {% if chrome_opts.block_genai_features %}checked{% endif %}>
-                                    <label class="form-check-label small" for="chrome-block-genai-{{ mapping.id }}">Disable browser-native Generative AI features</label>
+                                    <label class="form-check-label small" for="chrome-block-genai-{{ mapping.id }}">{{ t('pages.admin_user_edit.block_genai') }}</label>
                                 </div>
                             </div>
                             {% endif %}
                         {% endfor %}
                     </div>
-                    <button type="button" class="btn btn-primary btn-sm fw-bold mt-3" onclick="saveLinuxDevicePolicies()">{{ t('pages.admin_user_edit.save_browser_restrictions') }}</button>
                 {% else %}
-                    <p class="text-secondary small mb-0">{{ t('pages.admin_user_edit.link_linux_for_browser') }}</p>
+                    <p class="text-secondary small mb-0">{{ t('pages.admin_user_edit.link_computer_for_restrictions') }}</p>
                 {% endif %}
             </div>
         </div>
-
     </div>
 
-    <!-- Right Sidebar Content: App Locks & Installed Apps -->
-    <div class="col-12 col-lg-4">
-        <!-- Access Approval Policies -->
-        <div class="card border shadow-sm mb-4">
-            <div class="card-header guardian-card-header py-3">
-                <h5 class="mb-0 fw-bold"><i class="fas fa-clipboard-check me-2 guardian-section-icon"></i>{{ t('pages.admin_user_edit.family_dialogue') }}</h5>
-            </div>
-            <div class="card-body p-4">
-                <p class="text-secondary small fw-medium mb-3">{{ t('pages.admin_user_edit.family_dialogue_lead') }}</p>
-                {% if user.device_mappings %}
-                    {% set signup_ns = namespace(has_desktop=false, has_signup=false) %}
-                    {% for mapping in user.device_mappings %}
-                        {% set mapping_platform = ((mapping.device.platform if mapping.device else None) or 'linux') | lower %}
-                        {% if mapping_platform in ('linux', 'windows') %}
-                            {% set signup_ns.has_desktop = true %}
-                            {% set settings_check = approval_settings_by_mapping.get(mapping.id, {}) %}
-                            {% if settings_check.registration_approval_enabled %}
-                                {% set signup_ns.has_signup = true %}
-                            {% endif %}
-                        {% endif %}
-                    {% endfor %}
-                    {% if signup_ns.has_desktop %}
-                    <div class="alert alert-info py-2 small mb-3">
-                        <strong class="d-block mb-1">{{ t('pages.admin_user_edit.signup_prerequisite_title') }}</strong>
-                        <p class="mb-2">{{ t('pages.admin_user_edit.signup_prerequisite_body') }}</p>
-                        <a href="#browser-boundaries" class="fw-bold">{{ t('pages.admin_user_edit.signup_prerequisite_link') }}</a>
+    <!-- Family dialogue tab -->
+    <div id="family-tab" class="tab-pane-custom d-none">
+        <div class="row g-4">
+            <div class="col-12 col-lg-7">
+                <div class="card border shadow-sm">
+                    <div class="card-header guardian-card-header py-3">
+                        <h5 class="mb-0 fw-bold"><i class="fas fa-clipboard-check me-2 guardian-section-icon"></i>{{ t('pages.admin_user_edit.family_dialogue') }}</h5>
                     </div>
-                    {% endif %}
-                    {% if signup_ns.has_signup %}
-                    <div class="alert alert-light border py-2 small mb-3">
-                        <p class="mb-2">{{ t('pages.admin_user_edit.signup_outcome_note') }}</p>
-                        <a href="{{ url_for('ui_dashboard.admin_approvals') }}" class="fw-bold">{{ t('pages.admin_user_edit.signup_outcome_link') }}</a>
-                    </div>
-                    {% endif %}
-                    <div class="d-flex flex-column gap-3">
-                        {% for mapping in user.device_mappings %}
-                            {% set settings = approval_settings_by_mapping.get(mapping.id, {}) %}
-                            <div class="border rounded p-3 bg-body-tertiary" data-mapping-id="{{ mapping.id }}">
-                                <strong class="d-block text-body mb-2">{{ mapping.linux_username }}@{{ settings.device_label or mapping.system_id }}</strong>
-                                <div class="mb-2">
-                                    <label class="form-label fw-bold small text-muted text-uppercase mb-1" style="font-size: 0.7rem;">App Launches</label>
-                                    <select class="form-select form-select-sm approval-app-mode" data-mapping-id="{{ mapping.id }}">
-                                        <option value="open" {% if settings.app_launch_mode == 'open' %}selected{% endif %}>Open (no approval overlay)</option>
-                                        <option value="allowlist" {% if settings.app_launch_mode == 'allowlist' %}selected{% endif %}>Require approval (allowlist)</option>
-                                        <option value="blocklist" {% if settings.app_launch_mode == 'blocklist' %}selected{% endif %}>Blocklist with exceptions</option>
-                                    </select>
-                                </div>
-                                <div class="mb-0">
-                                    <label class="form-label fw-bold small text-muted text-uppercase mb-1" style="font-size: 0.7rem;">Websites</label>
-                                    <select class="form-select form-select-sm approval-domain-mode" data-mapping-id="{{ mapping.id }}">
-                                        <option value="blocklist_only" {% if settings.domain_access_mode == 'blocklist_only' %}selected{% endif %}>Blocklist only</option>
-                                        <option value="approval_on_block" {% if settings.domain_access_mode == 'approval_on_block' %}selected{% endif %}>Allow requests when blocked</option>
-                                    </select>
-                                </div>
+                    <div class="card-body p-4">
+                        <p class="text-secondary small fw-medium mb-3">{{ t('pages.admin_user_edit.family_dialogue_lead') }}</p>
+                        {% if user.device_mappings %}
+                            {% set signup_ns = namespace(has_desktop=false, has_signup=false) %}
+                            {% for mapping in user.device_mappings %}
                                 {% set mapping_platform = ((mapping.device.platform if mapping.device else None) or 'linux') | lower %}
                                 {% if mapping_platform in ('linux', 'windows') %}
-                                <div class="form-check form-switch mt-2 mb-0">
-                                    <input class="form-check-input approval-registration" type="checkbox" data-mapping-id="{{ mapping.id }}" id="approval-registration-{{ mapping.id }}" {% if settings.registration_approval_enabled %}checked{% endif %}>
-                                    <label class="form-check-label small fw-semibold" for="approval-registration-{{ mapping.id }}">{{ t('pages.admin_user_edit.enforce_signup') }}</label>
-                                    <span class="text-secondary d-block mt-0" style="font-size: 0.65rem;">{{ t('pages.admin_user_edit.signup_hint') }}</span>
-                                </div>
-                                {% endif %}
-                            </div>
-                        {% endfor %}
-                    </div>
-                    <button type="button" class="btn btn-primary btn-sm fw-bold mt-3" onclick="saveApprovalSettings()">{{ t('pages.admin_user_edit.save_approval_settings') }}</button>
-                {% else %}
-                    <p class="text-secondary small mb-0">{{ t('pages.admin_user_edit.link_device_for_approval') }}</p>
-                {% endif %}
-            </div>
-        </div>
-
-        
-        <!-- Guardian Space Overlay Settings -->
-        <div class="card border shadow-sm mb-4" id="guardian-overlay-card">
-            <div class="card-header guardian-card-header py-3">
-                <h5 class="mb-0 fw-bold"><i class="fas fa-shield-alt me-2 guardian-section-icon"></i>{{ t('pages.admin_user_edit.guardian_overlay') }}</h5>
-            </div>
-            <div class="card-body p-4">
-                <p class="text-secondary small fw-medium mb-3">{{ t('pages.admin_user_edit.overlay_lead') }}</p>
-                <div class="mb-3">
-                    <label class="form-label fw-bold small text-muted text-uppercase mb-1" style="font-size: 0.7rem;">Age Tier</label>
-                    <select class="form-select form-select-sm" id="overlay-age-tier">
-                        <option value="" {% if not user.overlay_age_tier %}selected{% endif %}>Not set (defaults to 8–12)</option>
-                        <option value="under8" {% if user.overlay_age_tier == 'under8' %}selected{% endif %}>Under 8 — Simple, playful language</option>
-                        <option value="eight12" {% if user.overlay_age_tier == 'eight12' %}selected{% endif %}>8–12 — Clear, friendly language</option>
-                        <option value="teen" {% if user.overlay_age_tier == 'teen' %}selected{% endif %}>Teen — Direct, respectful language</option>
-                    </select>
-                    <div class="form-text small text-secondary mt-1">Controls the tone and wording displayed on the Guardian Space blocked page.</div>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label fw-bold small text-muted text-uppercase mb-1" style="font-size: 0.7rem;">Parent Note</label>
-                    <textarea class="form-control form-control-sm" id="overlay-parent-note" rows="2" maxlength="300" placeholder='e.g. "Hey! Bedtime rules are on. Sleep well — limits refresh in the morning!"'>{{ user.overlay_parent_note or '' }}</textarea>
-                    <div class="form-text small text-secondary mt-1">Optional message shown on the overlay card. Leave blank for the built-in default.</div>
-                </div>
-                <button type="button" class="btn btn-success btn-sm fw-bold" onclick="saveOverlaySettings({{ user.id }})">{{ t('pages.admin_user_edit.save_overlay') }}</button>
-                <span class="ms-2 small text-secondary" id="overlay-save-status"></span>
-            </div>
-        </div>
-
-        <!-- Application Control & Locks -->
-        <div class="card border shadow-sm mb-4">
-            <div class="card-header guardian-card-header py-3">
-                <h5 class="mb-0 fw-bold"><i class="fas fa-lock me-2 guardian-section-icon"></i>{{ t('pages.admin_user_edit.app_routine_locks') }}</h5>
-            </div>
-            <div class="card-body p-4">
-                <p class="text-secondary small fw-medium mb-3">{{ t('pages.admin_user_edit.app_routine_lead') }}</p>
-                <form action="{{ url_for('ui_apparmor.update_user_app_policies', user_id=user.id) }}" method="POST">
-
-                {{ csrf_field() }}                    {% if linux_app_policies %}
-                    <h6 class="fw-bold small text-muted text-uppercase mb-2" style="font-size: 0.7rem; letter-spacing: 0.05em;">Linux / Desktop Policies</h6>
-                    {% if 'linux' not in user_platforms %}
-                    <div class="alert alert-warning py-2 small mb-2">No Linux/desktop device linked yet. Assign a Linux agent device to enforce these policies.</div>
-                    {% endif %}
-                    <div class="d-flex flex-column gap-2 mb-3">
-                        {% for policy in linux_app_policies %}
-                            <div class="border rounded p-3 bg-body-tertiary">
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" name="policy_ids" value="{{ policy.id }}" id="policy-{{ policy.id }}" {% if policy.id in assigned_policy_ids %}checked{% endif %}>
-                                    <label class="form-check-label ms-2" for="policy-{{ policy.id }}">
-                                        <strong class="text-body d-block lh-sm mb-1">{{ policy.name }}</strong>
-                                        <span class="text-secondary small fw-semibold" style="font-size: 0.72rem;">{{ policy.rules|length }} rules configured</span>
-                                    </label>
-                                </div>
-                            </div>
-                        {% endfor %}
-                    </div>
-                    {% endif %}
-
-                    {% if android_app_policies %}
-                    <h6 class="fw-bold small text-muted text-uppercase mb-2" style="font-size: 0.7rem; letter-spacing: 0.05em;">Android Policies</h6>
-                    {% if 'android' not in user_platforms %}
-                    <div class="alert alert-warning py-2 small mb-2">No Android device linked yet. Pair an Android agent to enforce these policies.</div>
-                    {% endif %}
-                    <div class="d-flex flex-column gap-2 mb-3">
-                        {% for policy in android_app_policies %}
-                            <div class="border rounded p-3 bg-body-tertiary">
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" name="policy_ids" value="{{ policy.id }}" id="policy-{{ policy.id }}" {% if policy.id in assigned_policy_ids %}checked{% endif %}>
-                                    <label class="form-check-label ms-2" for="policy-{{ policy.id }}">
-                                        <strong class="text-body d-block lh-sm mb-1">{{ policy.name }}</strong>
-                                        <span class="text-secondary small fw-semibold" style="font-size: 0.72rem;">{{ policy.rules|length }} rules configured</span>
-                                    </label>
-                                </div>
-                            </div>
-                        {% endfor %}
-                    </div>
-                    {% endif %}
-
-                    {% if not app_policies %}
-                        <div class="alert alert-info py-2 small mb-3">
-                            <i class="fas fa-info-circle me-1"></i>Please define app policies in App Locks before assigning them here.
-                        </div>
-                    {% endif %}
-
-                    <div class="d-flex gap-2">
-                        <button type="submit" class="btn btn-primary btn-sm fw-bold">{{ t('pages.admin_user_edit.save_app_policies') }}</button>
-                        <a href="{{ url_for('ui_apparmor.admin_app_policies') }}" class="btn btn-outline-secondary btn-sm fw-bold">{{ t('pages.admin_user_edit.manage_policies') }}</a>
-                    </div>
-                </form>
-            </div>
-        </div>
-
-        <!-- Installed Applications Report -->
-        <div class="card border shadow-sm">
-            <div class="card-header guardian-card-header py-3">
-                <h5 class="mb-0 fw-bold"><i class="fas fa-th me-2 guardian-section-icon"></i>{{ t('pages.admin_user_edit.installed_apps') }}</h5>
-            </div>
-            <div class="card-body p-3" style="max-height: 400px; overflow-y: auto;">
-                {% if installed_apps %}
-                    <div class="d-flex flex-column gap-2">
-                        {% for app in installed_apps %}
-                            <div class="border rounded p-2 bg-body-secondary d-flex align-items-center gap-2">
-                                <div class="flex-shrink-0 d-flex align-items-center justify-content-center bg-white border rounded" style="width: 38px; height: 38px;">
-                                    {% if app.icon_hash %}
-                                        <img src="{{ url_for('api_installed_apps.get_application_icon', content_hash=app.icon_hash) }}" alt="" class="rounded" style="width: 32px; height: 32px; object-fit: contain;">
-                                    {% else %}
-                                        <span class="fs-5">{% if app.platform == 'android' %}📱{% else %}🖥️{% endif %}</span>
+                                    {% set signup_ns.has_desktop = true %}
+                                    {% set settings_check = approval_settings_by_mapping.get(mapping.id, {}) %}
+                                    {% if settings_check.registration_approval_enabled %}
+                                        {% set signup_ns.has_signup = true %}
                                     {% endif %}
-                                </div>
-                                <div class="min-width-0 flex-grow-1" style="min-width: 0;">
-                                    <div class="d-flex align-items-center gap-2 flex-wrap">
-                                        <strong class="text-body text-truncate small mb-0">{{ app.application_name }}</strong>
-                                        {% if app.approval_status == 'approved' %}
-                                            <span class="badge bg-success-subtle text-success border border-success-subtle" style="font-size: 0.65rem;">Approved</span>
-                                        {% elif app.approval_status == 'pending' %}
-                                            <span class="badge bg-warning text-dark" style="font-size: 0.65rem;">Pending</span>
+                                {% endif %}
+                            {% endfor %}
+                            {% if signup_ns.has_desktop %}
+                            <div class="alert alert-info py-2 small mb-3">
+                                <strong class="d-block mb-1">{{ t('pages.admin_user_edit.signup_prerequisite_title') }}</strong>
+                                <p class="mb-2">{{ t('pages.admin_user_edit.signup_prerequisite_body') }}</p>
+                                <a href="#profile-computer" data-profile-tab="computer" class="fw-bold">{{ t('pages.admin_user_edit.signup_prerequisite_link') }}</a>
+                            </div>
+                            {% endif %}
+                            {% if signup_ns.has_signup %}
+                            <div class="alert alert-light border py-2 small mb-3">
+                                <p class="mb-2">{{ t('pages.admin_user_edit.signup_outcome_note') }}</p>
+                                <a href="{{ url_for('ui_dashboard.admin_approvals') }}" class="fw-bold">{{ t('pages.admin_user_edit.signup_outcome_link') }}</a>
+                            </div>
+                            {% endif %}
+                            <div class="d-flex flex-column gap-3">
+                                {% for mapping in user.device_mappings %}
+                                    {% set settings = approval_settings_by_mapping.get(mapping.id, {}) %}
+                                    <div class="border rounded p-3 bg-body-tertiary approval-settings-card" data-mapping-id="{{ mapping.id }}">
+                                        <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                                            <strong class="d-block text-body">{{ mapping.linux_username }}@{{ settings.device_label or mapping.system_id }}</strong>
+                                            <span class="guardian-autosave-status" aria-live="polite"></span>
+                                        </div>
+                                        <div class="mb-2">
+                                            <label class="form-label fw-bold small text-muted text-uppercase mb-1" style="font-size: 0.7rem;">{{ t('pages.admin_user_edit.app_launches') }}</label>
+                                            <select class="form-select form-select-sm approval-app-mode" data-mapping-id="{{ mapping.id }}">
+                                                <option value="open" {% if settings.app_launch_mode == 'open' %}selected{% endif %}>{{ t('pages.admin_user_edit.app_mode_open') }}</option>
+                                                <option value="allowlist" {% if settings.app_launch_mode == 'allowlist' %}selected{% endif %}>{{ t('pages.admin_user_edit.app_mode_allowlist') }}</option>
+                                                <option value="blocklist" {% if settings.app_launch_mode == 'blocklist' %}selected{% endif %}>{{ t('pages.admin_user_edit.app_mode_blocklist') }}</option>
+                                            </select>
+                                        </div>
+                                        <div class="mb-0">
+                                            <label class="form-label fw-bold small text-muted text-uppercase mb-1" style="font-size: 0.7rem;">{{ t('pages.admin_user_edit.websites') }}</label>
+                                            <select class="form-select form-select-sm approval-domain-mode" data-mapping-id="{{ mapping.id }}">
+                                                <option value="blocklist_only" {% if settings.domain_access_mode == 'blocklist_only' %}selected{% endif %}>{{ t('pages.admin_user_edit.domain_blocklist_only') }}</option>
+                                                <option value="approval_on_block" {% if settings.domain_access_mode == 'approval_on_block' %}selected{% endif %}>{{ t('pages.admin_user_edit.domain_approval_on_block') }}</option>
+                                            </select>
+                                        </div>
+                                        {% set mapping_platform = ((mapping.device.platform if mapping.device else None) or 'linux') | lower %}
+                                        {% if mapping_platform in ('linux', 'windows') %}
+                                        <div class="form-check form-switch mt-2 mb-0">
+                                            <input class="form-check-input approval-registration" type="checkbox" data-mapping-id="{{ mapping.id }}" id="approval-registration-{{ mapping.id }}" {% if settings.registration_approval_enabled %}checked{% endif %}>
+                                            <label class="form-check-label small fw-semibold" for="approval-registration-{{ mapping.id }}">{{ t('pages.admin_user_edit.enforce_signup') }}</label>
+                                            <span class="text-secondary d-block mt-0" style="font-size: 0.65rem;">{{ t('pages.admin_user_edit.signup_hint') }}</span>
+                                        </div>
                                         {% endif %}
                                     </div>
-                                    <code class="d-block text-secondary text-truncate" style="font-size: 0.65rem;" title="{{ app.identifier }}">{{ app.identifier }}</code>
-                                    <span class="text-secondary d-block" style="font-size: 0.65rem;">{{ app.device_hostname or app.system_id }}</span>
-                                </div>
-                                <div class="flex-shrink-0 d-flex flex-column gap-1">
-                                    {% if app.approval_status == 'approved' and app.grant_id %}
-                                        <button type="button" class="btn btn-sm btn-outline-danger" style="min-height: 36px;" onclick="revokeAppGrant({{ app.grant_id }})">Revoke</button>
-                                    {% elif app.device_map_id %}
-                                        <button type="button" class="btn btn-sm btn-outline-success" style="min-height: 36px;" onclick="preapproveApp({{ app.device_map_id }}, '{{ app.identifier|e }}', '{{ app.application_name|e }}', '{{ app.platform|e }}')">Approve</button>
-                                    {% endif %}
-                                </div>
+                                {% endfor %}
                             </div>
-                        {% endfor %}
+                        {% else %}
+                            <p class="text-secondary small mb-0">{{ t('pages.admin_user_edit.link_device_for_approval') }}</p>
+                        {% endif %}
                     </div>
-                {% else %}
-                    <p class="text-secondary mb-0 small fw-medium text-center py-4"><i class="fas fa-info-circle me-1"></i>No applications reported yet.</p>
-                {% endif %}
+                </div>
+            </div>
+            <div class="col-12 col-lg-5">
+                <div class="card border shadow-sm" id="guardian-overlay-card">
+                    <div class="card-header guardian-card-header py-3 d-flex justify-content-between align-items-center gap-2">
+                        <h5 class="mb-0 fw-bold"><i class="fas fa-shield-alt me-2 guardian-section-icon"></i>{{ t('pages.admin_user_edit.guardian_overlay') }}</h5>
+                        <span class="guardian-autosave-status" id="overlay-autosave-status" aria-live="polite"></span>
+                    </div>
+                    <div class="card-body p-4">
+                        <p class="text-secondary small fw-medium mb-3">{{ t('pages.admin_user_edit.overlay_lead') }}</p>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold small text-muted text-uppercase mb-1" style="font-size: 0.7rem;">{{ t('pages.admin_user_edit.age_tier') }}</label>
+                            <select class="form-select form-select-sm" id="overlay-age-tier">
+                                <option value="" {% if not user.overlay_age_tier %}selected{% endif %}>{{ t('pages.admin_user_edit.age_not_set') }}</option>
+                                <option value="under8" {% if user.overlay_age_tier == 'under8' %}selected{% endif %}>{{ t('pages.admin_user_edit.age_under8') }}</option>
+                                <option value="eight12" {% if user.overlay_age_tier == 'eight12' %}selected{% endif %}>{{ t('pages.admin_user_edit.age_eight12') }}</option>
+                                <option value="teen" {% if user.overlay_age_tier == 'teen' %}selected{% endif %}>{{ t('pages.admin_user_edit.age_teen') }}</option>
+                            </select>
+                            <div class="form-text small text-secondary mt-1">{{ t('pages.admin_user_edit.age_tier_hint') }}</div>
+                        </div>
+                        <div class="mb-0">
+                            <label class="form-label fw-bold small text-muted text-uppercase mb-1" style="font-size: 0.7rem;">{{ t('pages.admin_user_edit.parent_note') }}</label>
+                            <textarea class="form-control form-control-sm" id="overlay-parent-note" rows="2" maxlength="300" placeholder="{{ t('pages.admin_user_edit.parent_note_placeholder') }}">{{ user.overlay_parent_note or '' }}</textarea>
+                            <div class="form-text small text-secondary mt-1">{{ t('pages.admin_user_edit.parent_note_hint') }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Apps tab -->
+    <div id="apps-tab" class="tab-pane-custom d-none">
+        <div class="row g-4">
+            <div class="col-12 col-lg-6">
+                <div class="card border shadow-sm">
+                    <div class="card-header guardian-card-header py-3 d-flex justify-content-between align-items-center gap-2">
+                        <h5 class="mb-0 fw-bold"><i class="fas fa-lock me-2 guardian-section-icon"></i>{{ t('pages.admin_user_edit.app_routine_locks') }}</h5>
+                        <span class="guardian-autosave-status" id="app-policies-autosave-status" aria-live="polite"></span>
+                    </div>
+                    <div class="card-body p-4">
+                        <p class="text-secondary small fw-medium mb-3">{{ t('pages.admin_user_edit.app_routine_lead') }}</p>
+                        <form id="app-policies-form" action="{{ url_for('ui_apparmor.update_user_app_policies', user_id=user.id) }}" method="POST" onsubmit="return false;">
+                            {{ csrf_field() }}
+                            {% if linux_app_policies %}
+                            <h6 class="fw-bold small text-muted text-uppercase mb-2" style="font-size: 0.7rem; letter-spacing: 0.05em;">{{ t('pages.admin_user_edit.linux_policies') }}</h6>
+                            {% if 'linux' not in user_platforms %}
+                            <div class="alert alert-warning py-2 small mb-2">{{ t('pages.admin_user_edit.no_linux_device') }}</div>
+                            {% endif %}
+                            <div class="d-flex flex-column gap-2 mb-3">
+                                {% for policy in linux_app_policies %}
+                                    <div class="border rounded p-3 bg-body-tertiary">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" name="policy_ids" value="{{ policy.id }}" id="policy-{{ policy.id }}" {% if policy.id in assigned_policy_ids %}checked{% endif %}>
+                                            <label class="form-check-label ms-2" for="policy-{{ policy.id }}">
+                                                <strong class="text-body d-block lh-sm mb-1">{{ policy.name }}</strong>
+                                                <span class="text-secondary small fw-semibold" style="font-size: 0.72rem;">{{ t('pages.admin_user_edit.rules_configured', count=policy.rules|length) }}</span>
+                                            </label>
+                                        </div>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+
+                            {% if android_app_policies %}
+                            <h6 class="fw-bold small text-muted text-uppercase mb-2" style="font-size: 0.7rem; letter-spacing: 0.05em;">{{ t('pages.admin_user_edit.android_policies') }}</h6>
+                            {% if 'android' not in user_platforms %}
+                            <div class="alert alert-warning py-2 small mb-2">{{ t('pages.admin_user_edit.no_android_device') }}</div>
+                            {% endif %}
+                            <div class="d-flex flex-column gap-2 mb-3">
+                                {% for policy in android_app_policies %}
+                                    <div class="border rounded p-3 bg-body-tertiary">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" name="policy_ids" value="{{ policy.id }}" id="policy-android-{{ policy.id }}" {% if policy.id in assigned_policy_ids %}checked{% endif %}>
+                                            <label class="form-check-label ms-2" for="policy-android-{{ policy.id }}">
+                                                <strong class="text-body d-block lh-sm mb-1">{{ policy.name }}</strong>
+                                                <span class="text-secondary small fw-semibold" style="font-size: 0.72rem;">{{ t('pages.admin_user_edit.rules_configured', count=policy.rules|length) }}</span>
+                                            </label>
+                                        </div>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+
+                            {% if not app_policies %}
+                            <div class="alert alert-info py-2 small mb-3">
+                                <i class="fas fa-info-circle me-1"></i>{{ t('pages.admin_user_edit.define_app_policies') }}
+                            </div>
+                            {% endif %}
+
+                            <a href="{{ url_for('ui_apparmor.admin_app_policies') }}" class="btn btn-outline-secondary btn-sm fw-bold">{{ t('pages.admin_user_edit.manage_policies') }}</a>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            <div class="col-12 col-lg-6">
+                <div class="card border shadow-sm">
+                    <div class="card-header guardian-card-header py-3">
+                        <h5 class="mb-0 fw-bold"><i class="fas fa-th me-2 guardian-section-icon"></i>{{ t('pages.admin_user_edit.installed_apps') }}</h5>
+                    </div>
+                    <div class="card-body p-3" style="max-height: 520px; overflow-y: auto;">
+                        {% if installed_apps %}
+                            <div class="d-flex flex-column gap-2">
+                                {% for app in installed_apps %}
+                                    <div class="border rounded p-2 bg-body-secondary">
+                                        <div class="d-flex align-items-center gap-2">
+                                            <div class="flex-shrink-0 d-flex align-items-center justify-content-center bg-white border rounded" style="width: 38px; height: 38px;">
+                                                {% if app.icon_hash %}
+                                                    <img src="{{ url_for('api_installed_apps.get_application_icon', content_hash=app.icon_hash) }}" alt="" class="rounded" style="width: 32px; height: 32px; object-fit: contain;">
+                                                {% else %}
+                                                    <span class="fs-5">{% if app.platform == 'android' %}📱{% else %}🖥️{% endif %}</span>
+                                                {% endif %}
+                                            </div>
+                                            <div class="min-width-0 flex-grow-1" style="min-width: 0;">
+                                                <div class="d-flex align-items-center gap-2 flex-wrap">
+                                                    <strong class="text-body text-truncate small mb-0">{{ app.application_name }}</strong>
+                                                    {% if app.approval_status == 'approved' %}
+                                                        <span class="badge bg-success-subtle text-success border border-success-subtle" style="font-size: 0.65rem;">{{ t('pages.admin_user_edit.approved') }}</span>
+                                                    {% elif app.approval_status == 'pending' %}
+                                                        <span class="badge bg-warning text-dark" style="font-size: 0.65rem;">{{ t('pages.admin_user_edit.pending') }}</span>
+                                                    {% endif %}
+                                                </div>
+                                                <span class="text-secondary d-block" style="font-size: 0.65rem;">{{ app.device_hostname or app.system_id }}</span>
+                                                <button class="btn btn-link btn-sm p-0 text-secondary" type="button"
+                                                    data-bs-toggle="collapse" data-bs-target="#app-details-{{ loop.index }}" aria-expanded="false">
+                                                    {{ t('pages.admin_user_edit.app_details') }}
+                                                </button>
+                                                <div class="collapse" id="app-details-{{ loop.index }}">
+                                                    <code class="d-block text-secondary text-truncate small" title="{{ app.identifier }}">{{ app.identifier }}</code>
+                                                </div>
+                                            </div>
+                                            <div class="flex-shrink-0 d-flex flex-column gap-1">
+                                                {% if app.approval_status == 'approved' and app.grant_id %}
+                                                    <button type="button" class="btn btn-sm btn-outline-danger" style="min-height: 36px;" data-revoke-grant="{{ app.grant_id }}">{{ t('pages.admin_user_edit.revoke') }}</button>
+                                                {% elif app.device_map_id %}
+                                                    <button type="button" class="btn btn-sm btn-outline-success" style="min-height: 36px;"
+                                                        data-preapprove-app
+                                                        data-mapping-id="{{ app.device_map_id }}"
+                                                        data-identifier="{{ app.identifier }}"
+                                                        data-display-label="{{ app.application_name }}"
+                                                        data-platform="{{ app.platform }}">{{ t('pages.admin_user_edit.approve') }}</button>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            <p class="text-secondary mb-0 small fw-medium text-center py-4"><i class="fas fa-info-circle me-1"></i>{{ t('pages.admin_user_edit.no_apps_reported') }}</p>
+                        {% endif %}
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -583,19 +611,21 @@
 <div class="modal fade guardian-wizard-modal" id="policyPresetModal" tabindex="-1" aria-labelledby="policyPresetModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-scrollable">
         <div class="modal-content">
-            <form action="{{ url_for('apply_policy_preset_route', user_id=user.id) }}" method="POST" id="apply-policy-preset-form" onsubmit="return confirmPolicyPresetApply(event)">
+            <form action="{{ url_for('apply_policy_preset_route', user_id=user.id) }}" method="POST" id="apply-policy-preset-form"
+                data-confirm-title="{{ t('pages.admin_user_edit.baseline_apply_confirm_title') }}"
+                data-confirm-body="{{ t('pages.admin_user_edit.baseline_apply_confirm_body') }}">
                 {{ csrf_field() }}
                 <div class="modal-header">
                     <div>
                         <h5 class="modal-title fw-bold mb-1" id="policyPresetModalLabel">{{ t('pages.admin_user_edit.modal_recalibrate') }}</h5>
                         <p class="mb-0 small opacity-75">{{ t('pages.admin_user_edit.modal_recalibrate_lead', username=user.username) }}</p>
                     </div>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{{ t('pages.admin_user_edit.close') }}"></button>
                 </div>
                 <div class="modal-body">
                     <section class="guardian-wizard-step">
-                        <div class="guardian-step-label">Growth milestone</div>
-                        <h2 class="guardian-step-title">Choose a growth milestone</h2>
+                        <div class="guardian-step-label">{{ t('pages.admin_user_edit.growth_milestone') }}</div>
+                        <h2 class="guardian-step-title">{{ t('pages.admin_user_edit.choose_milestone') }}</h2>
                         <div class="row g-2">
                             {% for age_id, age_meta in policy_preset_matrix.age_brackets.items() %}
                             <div class="col-12 col-sm-6">
@@ -614,19 +644,19 @@
                     </section>
 
                     <section class="guardian-wizard-step">
-                        <div class="guardian-step-label">Responsibility</div>
-                        <h2 class="guardian-step-title">Responsibility calibration</h2>
+                        <div class="guardian-step-label">{{ t('pages.admin_user_edit.responsibility') }}</div>
+                        <h2 class="guardian-step-title">{{ t('pages.admin_user_edit.responsibility_calibration') }}</h2>
                         <div class="guardian-slider-wrap">
                             {% set mat_slider_val = {'low': 0, 'medium': 1, 'high': 2}.get(user.policy_maturity_level, 0) %}
                             <input type="range" class="guardian-responsibility-slider form-range" id="edit-responsibility-slider"
-                                min="0" max="2" step="1" value="{{ mat_slider_val }}" aria-label="Responsibility calibration">
+                                min="0" max="2" step="1" value="{{ mat_slider_val }}" aria-label="{{ t('pages.admin_user_edit.responsibility_calibration') }}">
                             <div class="guardian-slider-labels">
-                                <span>Open Dialogue</span>
-                                <span>Balanced Watch</span>
-                                <span>Assisted Steps</span>
+                                <span>{{ t('pages.admin_user_edit.open_dialogue') }}</span>
+                                <span>{{ t('pages.admin_user_edit.balanced_watch') }}</span>
+                                <span>{{ t('pages.admin_user_edit.assisted_steps') }}</span>
                             </div>
                             <p class="mb-1 mt-2 small fw-semibold" style="color: var(--guardian-sage);">
-                                <span id="edit-slider-active-label">Open Dialogue</span>
+                                <span id="edit-slider-active-label">{{ t('pages.admin_user_edit.open_dialogue') }}</span>
                             </p>
                             <div class="guardian-slider-narrative" id="edit-responsibility-narrative"></div>
                             <input type="hidden" name="policy_maturity_level" id="edit-policy-maturity-level"
@@ -635,10 +665,10 @@
                     </section>
 
                     <div class="guardian-summary-seal">
-                        <h3 id="edit-preset-summary-title">Baseline Summary</h3>
+                        <h3 id="edit-preset-summary-title">{{ t('pages.admin_user_edit.baseline_summary') }}</h3>
                         <ul id="edit-preset-summary-details"></ul>
                         <div class="guardian-summary-credit">
-                            <strong>Accountability guarantee:</strong> Backed by the Bypass Credit Programme — see our public ledger for patch transparency.
+                            {{ t('pages.admin_user_edit.accountability_guarantee') }}
                         </div>
                     </div>
                 </div>
@@ -653,274 +683,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script>
-    function setBlocklistSyncStatus(state, label) {
-        const states = ['is-live', 'is-pending', 'is-unknown', 'is-muted'];
-        document.querySelectorAll('#blocklist-sync-dot, #blocklist-sync-dot-mobile').forEach((dot) => {
-            dot.classList.remove(...states);
-            dot.classList.add(state);
-            dot.title = label;
-            dot.setAttribute('aria-label', label);
-        });
-        const blocklistText = document.getElementById('blocklist-sync-text');
-        if (blocklistText) {
-            blocklistText.textContent = label;
-        }
-    }
-
-    function updateSyncStatus() {
-        fetch('/api/user/{{ user.id }}/blocklists/sync-status')
-            .then(response => response.json())
-            .then(blocklistData => {
-                const blocklistSyncedCount = document.getElementById('blocklist-synced-count');
-
-                if (blocklistData?.success) {
-                    if (blocklistSyncedCount) blocklistSyncedCount.textContent = blocklistData.synced_mapping_count;
-
-                    if ((blocklistData.assigned_source_count || 0) === 0) {
-                        setBlocklistSyncStatus('is-muted', 'No blocklists assigned');
-                    } else if (blocklistData.needs_sync) {
-                        if ((blocklistData.awaiting_uid_count || 0) > 0) {
-                            setBlocklistSyncStatus('is-pending', 'Awaiting Linux UID validation');
-                        } else {
-                            setBlocklistSyncStatus('is-pending', 'Sync pending');
-                        }
-                    } else {
-                        setBlocklistSyncStatus('is-live', 'Sync completed');
-                    }
-                } else {
-                    setBlocklistSyncStatus('is-unknown', 'Unable to check status');
-                }
-            })
-            .catch(error => {
-                console.error('Error fetching sync status:', error);
-            });
-    }
-
-
-
-    function updateLinuxDevicePolicyBadge(mappingId, isSynced) {
-        const card = document.querySelector(`.linux-device-policy-card[data-mapping-id="${mappingId}"]`);
-        if (!card) return;
-        const badge = card.querySelector('.linux-device-policy-sync-badge');
-        if (!badge) return;
-        badge.className = `badge linux-device-policy-sync-badge ${isSynced ? 'bg-success' : 'bg-warning text-dark'}`;
-        badge.textContent = isSynced ? 'Synced' : 'Sync pending';
-    }
-
-    function toggleChromeAllowedExtsVisibility(mappingId) {
-        const checkbox = document.querySelector(`.chrome-block-ext[data-mapping-id="${mappingId}"]`);
-        const container = document.getElementById(`chrome-allowed-exts-container-${mappingId}`);
-        if (checkbox && container) {
-            if (checkbox.checked) {
-                container.classList.remove('d-none');
-            } else {
-                container.classList.add('d-none');
-            }
-        }
-    }
-
-    function saveLinuxDevicePolicies() {
-        const mappingIds = new Set();
-        document.querySelectorAll('.linux-device-policy-card, .chrome-device-policy-card').forEach(card => mappingIds.add(card.dataset.mappingId));
-        const requests = Array.from(mappingIds).map(mappingId => {
-            const installSoftware = document.querySelector(`.linux-install-software[data-mapping-id="${mappingId}"]`);
-            const uninstallSoftware = document.querySelector(`.linux-uninstall-software[data-mapping-id="${mappingId}"]`);
-            const mountMedia = document.querySelector(`.linux-mount-media[data-mapping-id="${mappingId}"]`);
-            const modifyAccounts = document.querySelector(`.linux-modify-accounts[data-mapping-id="${mappingId}"]`);
-            const powerActions = document.querySelector(`.linux-power-actions[data-mapping-id="${mappingId}"]`);
-            const pkexec = document.querySelector(`.linux-pkexec[data-mapping-id="${mappingId}"]`);
-            const flatpak = document.querySelector(`.linux-flatpak[data-mapping-id="${mappingId}"]`);
-            const snap = document.querySelector(`.linux-snap[data-mapping-id="${mappingId}"]`);
-            const bluetooth = document.querySelector(`.linux-bluetooth[data-mapping-id="${mappingId}"]`);
-            const terminalAccess = document.querySelector(`.linux-terminal-access[data-mapping-id="${mappingId}"]`);
-            const supportMessage = document.querySelector(`.linux-support-message[data-mapping-id="${mappingId}"]`);
-            
-            const chromeIncognito = document.querySelector(`.chrome-incognito[data-mapping-id="${mappingId}"]`);
-            const chromeSafesearch = document.querySelector(`.chrome-safesearch[data-mapping-id="${mappingId}"]`);
-            const chromeYoutube = document.querySelector(`.chrome-youtube[data-mapping-id="${mappingId}"]`);
-            const chromeBlockExt = document.querySelector(`.chrome-block-ext[data-mapping-id="${mappingId}"]`);
-            const chromeBlockGenai = document.querySelector(`.chrome-block-genai[data-mapping-id="${mappingId}"]`);
-            const chromeAllowedExts = document.querySelector(`.chrome-allowed-exts[data-mapping-id="${mappingId}"]`);
-            
-            return fetch(`/api/mappings/${mappingId}/linux-device-policy`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    install_software_disabled: installSoftware ? installSoftware.checked : false,
-                    uninstall_software_disabled: uninstallSoftware ? uninstallSoftware.checked : false,
-                    mount_removable_media_disabled: mountMedia ? mountMedia.checked : false,
-                    modify_accounts_disabled: modifyAccounts ? modifyAccounts.checked : false,
-                    system_power_actions_disabled: powerActions ? powerActions.checked : false,
-                    pkexec_elevation_disabled: pkexec ? pkexec.checked : false,
-                    flatpak_install_disabled: flatpak ? flatpak.checked : false,
-                    snap_install_disabled: snap ? snap.checked : false,
-                    bluetooth_disabled: bluetooth ? bluetooth.checked : false,
-                    terminal_access_disabled: terminalAccess ? terminalAccess.checked : false,
-                    support_message: supportMessage ? supportMessage.value.trim() : '',
-                    chrome_policies: {
-                        incognito_disabled: chromeIncognito ? chromeIncognito.checked : true,
-                        safesearch_enforced: chromeSafesearch ? chromeSafesearch.checked : true,
-                        youtube_restrict: chromeYoutube ? parseInt(chromeYoutube.value) : 2,
-                        block_other_extensions: chromeBlockExt ? chromeBlockExt.checked : false,
-                        block_genai_features: chromeBlockGenai ? chromeBlockGenai.checked : false,
-                        allowed_extension_ids: chromeAllowedExts ? chromeAllowedExts.value : ''
-                    }
-                }),
-            }).then(response => response.json().then(payload => ({ mappingId, payload })));
-        });
-
-        Promise.all(requests)
-            .then(results => {
-                const failed = results.find(item => !item.payload.success);
-                if (failed) {
-                    showNotification(failed.payload.message || 'Failed to save restrictions', 'error');
-                    return;
-                }
-                results.forEach(({ mappingId, payload }) => {
-                    updateLinuxDevicePolicyBadge(mappingId, !!payload.policy?.is_synced);
-                });
-                const pending = results.some(({ payload }) => !payload.policy?.is_synced);
-                showNotification(
-                    pending
-                        ? 'Browser and device restrictions saved; sync pending until the agent reconnects'
-                        : 'Browser and device restrictions saved and synced',
-                );
-            })
-            .catch(() => showNotification('Failed to save restrictions', 'error'));
-    }
-
-    function saveApprovalSettings() {
-        const mappingIds = new Set();
-        document.querySelectorAll('.approval-app-mode').forEach(select => mappingIds.add(select.dataset.mappingId));
-        const requests = Array.from(mappingIds).map(mappingId => {
-            const appMode = document.querySelector(`.approval-app-mode[data-mapping-id="${mappingId}"]`);
-            const domainMode = document.querySelector(`.approval-domain-mode[data-mapping-id="${mappingId}"]`);
-            const registrationMode = document.querySelector(`.approval-registration[data-mapping-id="${mappingId}"]`);
-            return fetch(`/api/mappings/${mappingId}/approval-settings`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    app_launch_mode: appMode ? appMode.value : 'open',
-                    domain_access_mode: domainMode ? domainMode.value : 'blocklist_only',
-                    registration_approval_enabled: registrationMode ? registrationMode.checked : false,
-                }),
-            }).then(response => response.json());
-        });
-
-        Promise.all(requests)
-            .then(results => {
-                const failed = results.find(item => !item.success);
-                if (failed) {
-                    showNotification(failed.message || 'Failed to save approval settings', 'error');
-                    return;
-                }
-                showNotification('Approval settings saved');
-            })
-            .catch(() => showNotification('Failed to save approval settings', 'error'));
-    }
-
-    function preapproveApp(mappingId, identifier, displayLabel, platform) {
-        const targetKind = (platform === 'linux' || identifier.startsWith('/')) ? 'executable' : 'package';
-        fetch(`/api/mappings/${mappingId}/approval-grants`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                grant_type: 'app_launch',
-                target_kind: targetKind,
-                target_value: identifier,
-                display_label: displayLabel,
-            }),
-        })
-            .then(response => response.json())
-            .then(data => {
-                if (!data.success) {
-                    showNotification(data.message || 'Failed to approve app', 'error');
-                    return;
-                }
-                showNotification('App approved');
-                window.location.reload();
-            })
-            .catch(() => showNotification('Failed to approve app', 'error'));
-    }
-
-    function revokeAppGrant(grantId) {
-        if (!confirm('Revoke approval for this app?')) return;
-        fetch(`/api/approval-grants/${grantId}/revoke`, { method: 'POST' })
-            .then(response => response.json())
-            .then(data => {
-                if (!data.success) {
-                    showNotification(data.message || 'Failed to revoke grant', 'error');
-                    return;
-                }
-                showNotification('Grant revoked');
-                window.location.reload();
-            })
-            .catch(() => showNotification('Failed to revoke grant', 'error'));
-    }
-
-    function saveOverlaySettings(userId) {
-        const ageTier = document.getElementById('overlay-age-tier').value;
-        const parentNote = document.getElementById('overlay-parent-note').value.trim();
-        const statusEl = document.getElementById('overlay-save-status');
-
-        fetch(`/managed-users/${userId}/overlay`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                overlay_age_tier: ageTier || null,
-                overlay_parent_note: parentNote || null,
-            }),
-        })
-            .then(response => response.json())
-            .then(data => {
-                if (!data.success) {
-                    showNotification(data.message || 'Failed to save overlay settings', 'error');
-                    return;
-                }
-                statusEl.textContent = 'Saved';
-                setTimeout(() => { statusEl.textContent = ''; }, 3000);
-                showNotification('Guardian Space overlay settings saved');
-            })
-            .catch(() => showNotification('Failed to save overlay settings', 'error'));
-    }
-
-    document.addEventListener('DOMContentLoaded', function () {
-        updateSyncStatus();
-        setInterval(updateSyncStatus, 15000);
-        if (window.GuardianWizard) {
-            GuardianWizard.bindWizard({
-                matrixDataId: 'policy-preset-matrix-data',
-                presetsDataId: 'marketplace-presets-data',
-                ageSelector: '.edit-policy-age-radio',
-                maturityInputId: 'edit-policy-maturity-level',
-                sliderId: 'edit-responsibility-slider',
-                sliderLabelId: 'edit-slider-active-label',
-                summaryTitleId: 'edit-preset-summary-title',
-                summaryListId: 'edit-preset-summary-details',
-                narrativeId: 'edit-responsibility-narrative',
-            });
-        }
-    });
-
-    function confirmPolicyPresetApply(event) {
-        const msg = [
-            'Apply this safety baseline?',
-            '',
-            'This will refresh:',
-            '• Browsing shields (curated subscriptions)',
-            '• Routine Locks (daily screen-time hours)',
-            '• Device and browser boundaries (per linked account)',
-            '• Family Dialogue Settings',
-            '• Guardian Space overlay tone',
-            '',
-            'You can still adjust individual settings afterward.',
-        ].join('\n');
-        if (!confirm(msg)) {
-            event.preventDefault();
-            return false;
-        }
-        return true;
-    }
-</script>
+<script src="{{ url_for('static', filename='js/admin-user-edit.js') }}"></script>
 {% endblock %}

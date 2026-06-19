@@ -341,8 +341,8 @@ def test_blocklist_catalog_and_assignment_routes(client, db_session):
 
     user_edit_page = client.get(f'/admin/users/{user.id}')
     assert user_edit_page.status_code == 200
-    assert b'Internet Blocklists' in user_edit_page.data
     assert b'School Hours' in user_edit_page.data
+    assert b'Browsing Shields' in user_edit_page.data or b'browsing-tab' in user_edit_page.data
 
     device_page = client.get(f'/devices/{device.system_id}')
     assert device_page.status_code == 200

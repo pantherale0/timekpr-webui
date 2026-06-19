@@ -1,6 +1,7 @@
 import logging
-from flask import Blueprint, session, redirect, url_for, render_template, request
-from src.i18n.catalog import flash_t
+from flask import Blueprint, session, redirect, url_for, render_template, request, jsonify
+from src.i18n.catalog import flash_t, api_message
+from src.helpers import wants_json_response
 from src.database import (
     db,
     ManagedUserDeviceMap,
@@ -247,6 +248,8 @@ def update_user_app_policies(user_id):
     } if selected_ids else {}
 
     if selected_ids and len(valid_policies) != len(selected_ids):
+        if wants_json_response():
+            return jsonify({'success': False, 'message': api_message('apparmor_policies_missing')}), 400
         flash_t('flash.apparmor.policies_missing', 'danger')
         return redirect(url_for('ui_dashboard.edit_user_profile', user_id=user.id))
 
@@ -277,6 +280,22 @@ def update_user_app_policies(user_id):
             sync_count += 1
         elif sync_msg != 'offline':
             fail_count += 1
+
+    sync_pending = fail_count > 0 or (len(user.device_mappings) > 0 and sync_count == 0)
+    if wants_json_response():
+        if sync_count > 0 and fail_count == 0:
+            message = api_message('apparmor_policies_updated_synced', username=user.username)
+        elif fail_count > 0:
+            message = api_message('apparmor_policies_updated_sync_partial', username=user.username)
+        else:
+            message = api_message('apparmor_policies_updated_offline', username=user.username)
+        return jsonify({
+            'success': True,
+            'message': message,
+            'sync_count': sync_count,
+            'fail_count': fail_count,
+            'sync_pending': sync_pending,
+        })
 
     if sync_count > 0 and fail_count == 0:
         flash_t('flash.apparmor.policies_updated_synced', 'success', username=user.username)

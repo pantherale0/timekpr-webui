@@ -84,6 +84,12 @@ def test_spa_fragment_user_profile(auth_client, db_session):
         headers={'X-Guardian-SPA': 'fragment'},
     )
     assert response.status_code == 200
+    assert b'admin-user-edit-tabs' in response.data
+    assert b'admin-user-edit-sub-rail' in response.data
+    assert b'id="browsing-tab"' in response.data
+    assert b'id="computer-tab"' in response.data
+    assert b'admin-user-edit.js' in response.data
+    assert b'guardian-autosave.js' in auth_client.get('/dashboard').data
 
 
 def test_service_worker_route(auth_client):

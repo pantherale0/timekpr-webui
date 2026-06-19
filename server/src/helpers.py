@@ -3,7 +3,7 @@ import json
 import logging
 import pytz
 from datetime import timezone
-from flask import session
+from flask import session, request
 from src.database import AgentDevice
 
 _LOGGER = logging.getLogger(__name__)
@@ -167,4 +167,12 @@ def generate_parental_access_code(secure_token: str, time_step_seconds: int = 18
     binary = struct.unpack(">I", hm_val[offset:offset+4])[0] & 0x7fffffff
     otp = binary % 1000000
     return f"{otp:06d}"
+
+
+def wants_json_response() -> bool:
+    """True when the client expects a JSON body instead of a redirect."""
+    accept = request.headers.get('Accept', '')
+    if 'application/json' in accept:
+        return True
+    return request.headers.get('X-Requested-With') == 'XMLHttpRequest'
 

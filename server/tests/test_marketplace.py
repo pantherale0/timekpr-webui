@@ -101,6 +101,19 @@ def test_subscribe_user_marketplace_api(auth_client, child_user):
     assert 'ai_chat' in pids
     assert 'gambling' in pids
 
+
+def test_subscribe_user_marketplace_api_json(auth_client, child_user):
+    response = auth_client.post(
+        f'/managed-users/{child_user.id}/blocklists/subscribe-marketplace',
+        data={'preset_ids': ['ai_chat']},
+        headers={'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
+    )
+    assert response.status_code == 200
+    assert response.get_json()['success'] is True
+    db.session.expire_all()
+    assert len(child_user.blocklist_assignments) == 1
+    assert child_user.blocklist_assignments[0].source.preset_id == 'ai_chat'
+
 def test_subscribe_preset_users_api(auth_client, db_session, child_user):
     user2 = ManagedUser(username='test_child_2', system_ip='Unassigned', is_valid=True)
     db_session.add(user2)

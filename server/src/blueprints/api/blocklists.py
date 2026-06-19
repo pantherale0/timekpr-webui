@@ -1,7 +1,8 @@
 import logging
 from datetime import datetime, timezone
 from flask import Blueprint, session, request, jsonify, flash, redirect, url_for, abort
-from src.i18n.catalog import flash_t, t
+from src.i18n.catalog import flash_t, t, api_message
+from src.helpers import wants_json_response
 from src.database import db, BlocklistSource, BlocklistDomain, ManagedUserBlocklistAssignment, ManagedUser
 from src.blocklist_helper import (
     validate_external_source_url,
@@ -227,6 +228,8 @@ def update_user_blocklists(user_id):
     } if selected_ids else {}
 
     if selected_ids and len(valid_sources) != len(selected_ids):
+        if wants_json_response():
+            return jsonify({'success': False, 'message': api_message('blocklists_missing')}), 400
         flash_t('flash.blocklists.missing', 'danger')
         return redirect(url_for('ui_dashboard.edit_user_profile', user_id=user.id))
 
@@ -242,6 +245,11 @@ def update_user_blocklists(user_id):
     
     from app import task_manager
     task_manager.notify_domain_policy_hint(reason='blocklist_assignment_updated')
+    if wants_json_response():
+        return jsonify({
+            'success': True,
+            'message': api_message('blocklists_assignments_updated', user=user.username),
+        })
     flash_t('flash.blocklists.assignments_updated', 'success', user=user.username)
     return redirect(url_for('ui_dashboard.edit_user_profile', user_id=user.id))
 
@@ -277,10 +285,21 @@ def subscribe_user_marketplace(user_id):
     from src.marketplace_manager import sync_marketplace_subscriptions
     try:
         sync_marketplace_subscriptions(user, selected_preset_ids)
-        flash_t('flash.blocklists.curated_updated', 'success', user=user.username)
     except Exception as exc:
         _LOGGER.error("Failed to update marketplace subscriptions: %s", exc)
+        if wants_json_response():
+            return jsonify({'success': False, 'message': api_message('blocklists_curated_failed')}), 500
         flash_t('flash.blocklists.curated_failed', 'danger')
+        if redirect_target == 'restrictions':
+            return redirect(url_for('ui_dashboard.admin_restrictions'))
+        return redirect(url_for('ui_dashboard.edit_user_profile', user_id=user.id))
+
+    if wants_json_response():
+        return jsonify({
+            'success': True,
+            'message': api_message('blocklists_curated_updated', user=user.username),
+        })
+    flash_t('flash.blocklists.curated_updated', 'success', user=user.username)
 
     if redirect_target == 'restrictions':
         return redirect(url_for('ui_dashboard.admin_restrictions'))
