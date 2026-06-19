@@ -45,7 +45,13 @@
                         <i class="fas fa-link me-1"></i>{{ t('pages.admin_user_edit.linked_mappings', count=user.device_mappings|length) }}
                     </span>
                 </div>
-                <div>
+                <div class="d-flex flex-wrap gap-2">
+                    <a href="{{ url_for('ui_dashboard.user_stats', user_id=user.id) }}" class="btn btn-outline-secondary fw-bold">
+                        <i class="fas fa-chart-line me-1"></i> {{ t('pages.admin_user_edit.view_activity') }}
+                    </a>
+                    <a href="{{ url_for('ui_dashboard.user_online_accounts', user_id=user.id) }}" class="btn btn-outline-secondary fw-bold">
+                        <i class="fas fa-user-shield me-1"></i> {{ t('pages.admin_user_edit.view_online_accounts') }}
+                    </a>
                     <a href="{{ url_for('ui_schedule.weekly_schedule_user', user_id=user.id) }}" class="btn btn-outline-primary fw-bold">
                         <i class="fas fa-clock me-1"></i> {{ t('pages.admin_user_edit.adjust_limits') }}
                     </a>
@@ -306,7 +312,7 @@
         </div>
 
         <!-- Chrome Browser Restrictions -->
-        <div class="card border shadow-sm mb-4">
+        <div class="card border shadow-sm mb-4" id="browser-boundaries">
             <div class="card-header guardian-card-header py-3">
                 <h5 class="mb-0 fw-bold"><i class="fab fa-chrome me-2 guardian-section-icon"></i>{{ t('pages.admin_user_edit.browser_boundaries') }}</h5>
             </div>
@@ -373,6 +379,30 @@
             <div class="card-body p-4">
                 <p class="text-secondary small fw-medium mb-3">{{ t('pages.admin_user_edit.family_dialogue_lead') }}</p>
                 {% if user.device_mappings %}
+                    {% set signup_ns = namespace(has_desktop=false, has_signup=false) %}
+                    {% for mapping in user.device_mappings %}
+                        {% set mapping_platform = ((mapping.device.platform if mapping.device else None) or 'linux') | lower %}
+                        {% if mapping_platform in ('linux', 'windows') %}
+                            {% set signup_ns.has_desktop = true %}
+                            {% set settings_check = approval_settings_by_mapping.get(mapping.id, {}) %}
+                            {% if settings_check.registration_approval_enabled %}
+                                {% set signup_ns.has_signup = true %}
+                            {% endif %}
+                        {% endif %}
+                    {% endfor %}
+                    {% if signup_ns.has_desktop %}
+                    <div class="alert alert-info py-2 small mb-3">
+                        <strong class="d-block mb-1">{{ t('pages.admin_user_edit.signup_prerequisite_title') }}</strong>
+                        <p class="mb-2">{{ t('pages.admin_user_edit.signup_prerequisite_body') }}</p>
+                        <a href="#browser-boundaries" class="fw-bold">{{ t('pages.admin_user_edit.signup_prerequisite_link') }}</a>
+                    </div>
+                    {% endif %}
+                    {% if signup_ns.has_signup %}
+                    <div class="alert alert-light border py-2 small mb-3">
+                        <p class="mb-2">{{ t('pages.admin_user_edit.signup_outcome_note') }}</p>
+                        <a href="{{ url_for('ui_dashboard.admin_approvals') }}" class="fw-bold">{{ t('pages.admin_user_edit.signup_outcome_link') }}</a>
+                    </div>
+                    {% endif %}
                     <div class="d-flex flex-column gap-3">
                         {% for mapping in user.device_mappings %}
                             {% set settings = approval_settings_by_mapping.get(mapping.id, {}) %}
@@ -397,8 +427,8 @@
                                 {% if mapping_platform in ('linux', 'windows') %}
                                 <div class="form-check form-switch mt-2 mb-0">
                                     <input class="form-check-input approval-registration" type="checkbox" data-mapping-id="{{ mapping.id }}" id="approval-registration-{{ mapping.id }}" {% if settings.registration_approval_enabled %}checked{% endif %}>
-                                    <label class="form-check-label small fw-semibold" for="approval-registration-{{ mapping.id }}">Enforce Sign-up Approvals</label>
-                                    <span class="text-secondary d-block mt-0" style="font-size: 0.65rem;">Require approval before signing up on any website.</span>
+                                    <label class="form-check-label small fw-semibold" for="approval-registration-{{ mapping.id }}">{{ t('pages.admin_user_edit.enforce_signup') }}</label>
+                                    <span class="text-secondary d-block mt-0" style="font-size: 0.65rem;">{{ t('pages.admin_user_edit.signup_hint') }}</span>
                                 </div>
                                 {% endif %}
                             </div>

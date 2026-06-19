@@ -51,6 +51,9 @@
         if (approval.app_launch_mode === 'allowlist') {
             bullets.push('Routine Locks: new apps need your approval before they can launch.');
         }
+        if (approval.registration_approval_enabled) {
+            bullets.push('Family Dialogue Settings: new account sign-ups need your approval — requires the Guardian browser monitor.');
+        }
 
         const linux = bundle.linux_device_policy || {};
         if (linux.terminal_access_disabled) {

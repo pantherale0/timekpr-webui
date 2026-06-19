@@ -638,7 +638,9 @@ pages:
     never: Never
     adjust: Adjust
     limits: Limits
-    history: History
+    activity: Activity
+    activity_web_history: Web & video history
+    activity_online_accounts: Online accounts
     usage_week: Usage This Week
     empty_title: No Child Profiles Configured
     empty_lead: You need to create a child profile and map local device user accounts before you can monitor screen time or apply limits.
@@ -722,6 +724,8 @@ pages:
     child_profile: "Child Profile: {username}"
     linked_mappings: "Linked account mappings: {count}"
     adjust_limits: Adjust Limits & Timeline
+    view_activity: View activity
+    view_online_accounts: Online accounts
     safety_baseline: Safety Baseline
     recalibrate_baseline: Recalibrate Baseline
     baseline_active: A supportive baseline is active. You can still fine-tune any routine lock or browsing shield below.
@@ -784,7 +788,7 @@ pages:
     save_browser_restrictions: Save Browser Restrictions
     link_linux_for_browser: Link a Linux device mapping to configure browser restrictions.
     family_dialogue: Family Dialogue Settings
-    family_dialogue_lead: Configure per-device approval modes for app launches and blocked websites.
+    family_dialogue_lead: Configure per-device approval modes for app launches, blocked websites, and new account sign-ups.
     app_launches: App Launches
     app_mode_open: Open (no approval overlay)
     app_mode_allowlist: Require approval (allowlist)
@@ -794,6 +798,11 @@ pages:
     domain_approval_on_block: Allow requests when blocked
     enforce_signup: Enforce Sign-up Approvals
     signup_hint: Require approval before signing up on any website.
+    signup_prerequisite_title: Browser monitor required
+    signup_prerequisite_body: Sign-up blocking and online account tracking need the Guardian browser monitor on Chrome, Brave, or Edge. Enable "Block all other extensions" in Browser Boundaries so only the monitor can run.
+    signup_prerequisite_link: Open Browser Boundaries
+    signup_outcome_note: When blocked, your child sees the Guardian Space overlay and can request approval — requests appear in Family Dialogue.
+    signup_outcome_link: Open Family Dialogue
     save_approval_settings: Save Approval Settings
     link_device_for_approval: Link a device mapping before configuring approval policies.
     guardian_overlay: Guardian Space Overlay
@@ -871,7 +880,7 @@ pages:
   approvals:
     title: Family Dialogue - Guardian
     heading: Family Dialogue
-    lead: When your child asks to open an app or visit a site, their request lands here for a calm yes-or-no.
+    lead: When your child asks to open an app, visit a site, or sign up for a new account, their request lands here for a calm yes-or-no.
     awaiting_reply: Awaiting Your Reply
     open_count: "{count} open"
     open_requests: Open requests
@@ -1043,7 +1052,7 @@ pages:
   online_accounts:
     title: Online Accounts - {username} - Guardian
     heading: "{username} — Signed-in services"
-    lead: A running list of online accounts and services this child has used
+    lead: A login audit of websites and services this child has signed into — separate from the Family Dialogue approval queue.
     back_to_stats: Back to Stats
     card_title: Online Services & Credentials
     accounts_count: "{count} accounts"
@@ -1051,6 +1060,8 @@ pages:
     loading: Loading online accounts...
     empty_title: No online accounts reported
     empty_lead: Accounts will appear here when the child logs in or registers on websites using monitored browsers.
+    empty_setup_lead: This list fills in when your child signs in on a website using the Guardian browser monitor on a linked Linux or Windows device.
+    empty_setup_cta: Check browser setup
     col_domain: Service Domain
     col_username: Username / Email
     col_first_detected: First Detected
@@ -1073,6 +1084,13 @@ pages:
     lead: "{count} linked device • Usage patterns and gentle alerts"
     lead_plural: "{count} linked devices • Usage patterns and gentle alerts"
     web_video_history: Web & Video History
+    activity_nav_label: Activity views
+    activity_tab_overview: Usage overview
+    activity_tab_web: Web & video history
+    activity_tab_accounts: Online accounts
+    activity_tab_overview_short: Overview
+    activity_tab_web_short: History
+    activity_tab_accounts_short: Accounts
     total_time: Total Time
     daily_average: Daily Average
     per_day: per day
@@ -1181,6 +1199,7 @@ pages:
 
   device_detail:
     title: "{label} - Device Details - Guardian"
+    tab_nav_label: Device views
     tab_overview: Overview
     tab_policies: Control Policies
     tab_policies_short: Policies

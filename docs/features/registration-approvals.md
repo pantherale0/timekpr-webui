@@ -33,12 +33,12 @@ The agent calls `/api/registration/check` on the Guardian server using the devic
 
 ### 3. Block page redirect
 
-If the response indicates the registration is blocked, the extension redirects the tab to a built-in block page (`blocked.html`). The child sees a clear, friendly explanation and two action buttons:
+If the response indicates the registration is blocked, the extension redirects the tab to the Guardian Space overlay (`blockedv2.html`). The child sees a clear, friendly explanation and a **Request Sign-up Approval** button:
 
-- **Request Approval** — sends a `REQUEST_REGISTRATION` message to the agent, which creates a pending `ApprovalRequest` in the Guardian server. The parent sees a *Site Sign-Up* badge in the [Access Requests](../web-ui/access-requests.md) panel.
-- **Check Approval Status** — manually re-queries the agent. The page also polls automatically every **10 seconds** and whenever the browser tab regains focus.
+- **Request Sign-up Approval** — sends a `REQUEST_REGISTRATION` message to the agent, which creates a pending `ApprovalRequest` in the Guardian server. The parent sees a *Site Sign-Up* badge in the [Access Requests](../web-ui/access-requests.md) panel.
+- The page polls automatically every **10 seconds** and whenever the browser tab regains focus to detect approval.
 
-Once the parent approves the request in the admin panel, the block page detects the approval on the next poll and automatically redirects the child back to the original sign-up URL.
+Once the parent approves the request in the admin panel, the overlay detects the approval on the next poll and automatically redirects the child back to the original sign-up URL.
 
 ---
 
@@ -78,7 +78,7 @@ The captured data is forwarded to the agent via a `LOGIN_DETECTED` message, whic
 
 ### Viewing the report
 
-Navigate to **Admin → Users → [child account] → Online Accounts**. The page displays a searchable, sortable table of all recorded accounts. Use the search bar to filter by domain or username.
+Navigate to **Admin → Users → [child account] → Online Accounts**, or open **Activity → Online accounts** from the child's dashboard card. The page displays a searchable, sortable table of all recorded accounts. Use the search bar to filter by domain or username.
 
 ---
 

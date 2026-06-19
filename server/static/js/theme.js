@@ -123,9 +123,11 @@ class ThemeManager {
     }
 }
 
-// Initialize theme manager when DOM is loaded
+// Initialize theme manager when DOM is loaded (singleton — survives SPA navigations)
 document.addEventListener('DOMContentLoaded', () => {
-    window.themeManager = new ThemeManager();
+    if (!window.themeManager) {
+        window.themeManager = new ThemeManager();
+    }
 });
 
 // Export for modules

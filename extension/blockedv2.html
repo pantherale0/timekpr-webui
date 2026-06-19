@@ -860,6 +860,11 @@
         let overlayUi = {};
         let breatheStates = [];
         let presetMessages = {};
+        let blockedSignupDomain = '';
+        let blockedSignupOriginalUrl = '';
+        let signupRequestSent = false;
+        let signupPollInterval = null;
+        let signupApproved = false;
 
         function formatOverlayText(template, params) {
             if (!template) return '';
@@ -931,8 +936,8 @@
                 button.onclick = () => sendQuickRequest(message);
             });
             const signupBtn = document.getElementById('btn-request-signup');
-            if (signupBtn && ui.signup_audit) {
-                signupBtn.onclick = () => sendQuickRequest(ui.signup_audit);
+            if (signupBtn) {
+                signupBtn.onclick = () => requestSignupApproval();
             }
         }
 
@@ -1020,6 +1025,105 @@
 
             // Clean previous toast statuses
             document.getElementById('toast-banner').style.display = 'none';
+        }
+
+        function showSignupToast(message) {
+            const toast = document.getElementById('toast-banner');
+            const text = document.getElementById('toast-text');
+            if (!toast || !text) return;
+            text.innerText = message;
+            toast.style.display = 'flex';
+        }
+
+        function requestSignupApproval() {
+            if (signupRequestSent || signupApproved || !blockedSignupDomain) return;
+
+            const signupBtn = document.getElementById('btn-request-signup');
+            if (signupBtn) signupBtn.disabled = true;
+
+            const pendingMessage = overlayUi.toast_sent
+                ? formatOverlayText(overlayUi.toast_sent, {
+                    message: overlayUi.request_signup || 'Sign-up approval request',
+                })
+                : 'Sign-up approval request sent to your parent.';
+
+            try {
+                if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
+                    chrome.runtime.sendMessage(
+                        { type: 'REQUEST_REGISTRATION', domain: blockedSignupDomain },
+                        () => {
+                            signupRequestSent = true;
+                            showSignupToast(pendingMessage);
+                            startSignupPolling();
+                        }
+                    );
+                } else {
+                    showSignupToast(pendingMessage);
+                }
+            } catch (e) {
+                if (signupBtn) signupBtn.disabled = false;
+            }
+        }
+
+        function checkSignupStatus() {
+            if (signupApproved || !blockedSignupDomain) return;
+
+            try {
+                if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
+                    chrome.runtime.sendMessage(
+                        {
+                            type: 'CHECK_REGISTRATION',
+                            domain: blockedSignupDomain,
+                            url: blockedSignupOriginalUrl,
+                        },
+                        (response) => {
+                            if (chrome.runtime.lastError || !response) return;
+                            if (response.allowed === true) {
+                                handleSignupApproved();
+                            } else if (response.pending === true) {
+                                signupRequestSent = true;
+                                const signupBtn = document.getElementById('btn-request-signup');
+                                if (signupBtn) signupBtn.disabled = true;
+                            }
+                        }
+                    );
+                }
+            } catch (e) {
+                // Extension context invalidated — ignore
+            }
+        }
+
+        function handleSignupApproved() {
+            signupApproved = true;
+            stopSignupPolling();
+            showSignupToast(overlayUi.signup_approved || 'Approved! Returning you to the sign-up page…');
+            setTimeout(() => {
+                if (blockedSignupOriginalUrl) {
+                    window.location.href = blockedSignupOriginalUrl;
+                } else if (blockedSignupDomain) {
+                    window.location.href = `https://${blockedSignupDomain}/`;
+                } else {
+                    window.history.back();
+                }
+            }, 1500);
+        }
+
+        function startSignupPolling() {
+            if (signupPollInterval || currentReason !== 'signup') return;
+            checkSignupStatus();
+            signupPollInterval = setInterval(checkSignupStatus, 10000);
+            document.addEventListener('visibilitychange', () => {
+                if (document.visibilityState === 'visible') {
+                    checkSignupStatus();
+                }
+            });
+        }
+
+        function stopSignupPolling() {
+            if (signupPollInterval) {
+                clearInterval(signupPollInterval);
+                signupPollInterval = null;
+            }
         }
 
         // Send a quick preset request to the parent via the native agent
@@ -1259,6 +1363,9 @@
             if (device || note) {
                 setDeviceInfo(device ? decodeURIComponent(device) : null, note ? decodeURIComponent(note) : null);
             }
+            blockedSignupDomain = device ? decodeURIComponent(device) : '';
+            const originalUrl = params.get('url');
+            blockedSignupOriginalUrl = originalUrl ? decodeURIComponent(originalUrl) : '';
             return loadOverlayI18n(lang);
         }
 
@@ -1269,6 +1376,9 @@
                     applyStaticUi();
                     updateUI();
                     runBreathingLoop();
+                    if (currentReason === 'signup') {
+                        startSignupPolling();
+                    }
                 })
                 .catch(() => {
                     updateUI();

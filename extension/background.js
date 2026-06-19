@@ -90,6 +90,8 @@ function handleCheckRegistration(message, sender, sendResponse) {
                     encodeURIComponent(lang) +
                     "&device=" +
                     encodeURIComponent(message.domain || "") +
+                    "&url=" +
+                    encodeURIComponent((sender && sender.tab && sender.tab.url) || "") +
                     "&note=" +
                     encodeURIComponent(guardianExtI18n('signupBlockNote'));
 

@@ -71,7 +71,7 @@
                             </div>
                             
                             <!-- Actions Row -->
-                            <div class="d-flex gap-2 mb-3">
+                            <div class="d-flex gap-2 mb-2">
                                 <button class="btn btn-sm btn-primary flex-fill py-1 fw-bold" onclick="openTimeAdjustModal({{ user.id }}, '{{ user.username }}')">
                                     <i class="fas fa-clock me-1"></i> {{ t('pages.dashboard.adjust') }}
                                 </button>
@@ -79,7 +79,16 @@
                                     <i class="fas fa-sliders-h me-1"></i> {{ t('pages.dashboard.limits') }}
                                 </a>
                                 <a href="{{ url_for('user_stats', user_id=user.id) }}" class="btn btn-sm btn-outline-secondary flex-fill py-1 fw-bold">
-                                    <i class="fas fa-history me-1"></i> {{ t('pages.dashboard.history') }}
+                                    <i class="fas fa-chart-line me-1"></i> {{ t('pages.dashboard.activity') }}
+                                </a>
+                            </div>
+                            <div class="d-flex flex-wrap gap-2 mb-3 small">
+                                <a href="{{ url_for('ui_dashboard.user_combined_history', user_id=user.id) }}" class="text-secondary text-decoration-none">
+                                    {{ t('pages.dashboard.activity_web_history') }}
+                                </a>
+                                <span class="text-secondary" aria-hidden="true">·</span>
+                                <a href="{{ url_for('ui_dashboard.user_online_accounts', user_id=user.id) }}" class="text-secondary text-decoration-none">
+                                    {{ t('pages.dashboard.activity_online_accounts') }}
                                 </a>
                             </div>
                         </div>

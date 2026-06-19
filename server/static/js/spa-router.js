@@ -242,15 +242,18 @@
             }
 
             const code = (oldScript.textContent || '').trim();
+            oldScript.remove();
             if (!code) {
-                oldScript.remove();
                 return;
             }
 
-            const script = document.createElement('script');
-            // Isolate fragment scripts so const/let can run on each SPA navigation.
-            script.textContent = `(function(){\n${code}\n})();`;
-            oldScript.replaceWith(script);
+            try {
+                // Run in a fresh function scope on every navigation (avoids const redeclaration).
+                const runner = new Function(code);
+                runner();
+            } catch (err) {
+                console.error('GuardianSPA fragment script failed:', err);
+            }
         });
     }
 

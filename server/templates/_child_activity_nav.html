@@ -1,0 +1,21 @@
+{# Per-child activity hub — pass active_tab: 'overview' | 'web_history' | 'online_accounts' #}
+<div class="segmented-control guardian-nav-segmented-tabs" role="navigation" aria-label="{{ t('pages.stats.activity_nav_label') }}">
+    <a href="{{ url_for('ui_dashboard.user_stats', user_id=user.id) }}"
+       class="segmented-tab-link{% if active_tab == 'overview' %} active{% endif %}"
+       data-spa-nav="/stats/{{ user.id }}">
+        <span class="d-none d-xxl-inline">{{ t('pages.stats.activity_tab_overview') }}</span>
+        <span class="d-inline d-xxl-none">{{ t('pages.stats.activity_tab_overview_short') }}</span>
+    </a>
+    <a href="{{ url_for('ui_dashboard.user_combined_history', user_id=user.id) }}"
+       class="segmented-tab-link{% if active_tab == 'web_history' %} active{% endif %}"
+       data-spa-nav="/dashboard/user/{{ user.id }}/history">
+        <span class="d-none d-xxl-inline">{{ t('pages.stats.activity_tab_web') }}</span>
+        <span class="d-inline d-xxl-none">{{ t('pages.stats.activity_tab_web_short') }}</span>
+    </a>
+    <a href="{{ url_for('ui_dashboard.user_online_accounts', user_id=user.id) }}"
+       class="segmented-tab-link{% if active_tab == 'online_accounts' %} active{% endif %}"
+       data-spa-nav="/dashboard/user/{{ user.id }}/online-accounts">
+        <span class="d-none d-xxl-inline">{{ t('pages.stats.activity_tab_accounts') }}</span>
+        <span class="d-inline d-xxl-none">{{ t('pages.stats.activity_tab_accounts_short') }}</span>
+    </a>
+</div>

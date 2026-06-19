@@ -24,6 +24,11 @@
 </style>
 {% endblock %}
 
+{% block top_nav_center %}
+{% set active_tab = 'online_accounts' %}
+{% include '_child_activity_nav.html' %}
+{% endblock %}
+
 {% block content %}
 <div class="guardian-page-header">
     <div class="guardian-page-header__intro">
@@ -33,11 +38,6 @@
         <p class="guardian-page-lead mb-0">
             {{ t('pages.online_accounts.lead') }}
         </p>
-    </div>
-    <div class="guardian-page-header__actions">
-        <a href="{{ url_for('ui_dashboard.user_stats', user_id=user.id) }}" class="btn btn-sm btn-outline-secondary">
-            <i class="fas fa-chevron-left me-1"></i> {{ t('pages.online_accounts.back_to_stats') }}
-        </a>
     </div>
 </div>
 
@@ -66,7 +66,13 @@
                 <div id="accounts-empty" class="p-5 text-center text-secondary" style="display: none;">
                     <i class="fas fa-user-circle fs-1 text-muted mb-3"></i>
                     <h5>{{ t('pages.online_accounts.empty_title') }}</h5>
-                    <p class="small mb-0">{{ t('pages.online_accounts.empty_lead') }}</p>
+                    <p class="small mb-3">{{ t('pages.online_accounts.empty_lead') }}</p>
+                    <div class="alert alert-info py-3 small text-start d-inline-block mx-auto" style="max-width: 28rem;">
+                        <p class="mb-3">{{ t('pages.online_accounts.empty_setup_lead') }}</p>
+                        <a href="{{ url_for('ui_dashboard.edit_user_profile', user_id=user.id) }}#browser-boundaries" class="btn btn-sm btn-outline-primary fw-bold">
+                            {{ t('pages.online_accounts.empty_setup_cta') }}
+                        </a>
+                    </div>
                 </div>
 
                 <div class="table-responsive" id="accounts-table-wrapper" style="display: none;">
@@ -97,6 +103,8 @@
         search: ''
     };
 
+    let accountsAbort = null;
+
     function formatDateTime(isoString) {
         try {
             const d = new Date(isoString);
@@ -113,21 +121,37 @@
     }
 
     async function loadAccounts() {
-        document.getElementById('accounts-loading').style.display = 'block';
-        document.getElementById('accounts-empty').style.display = 'none';
-        document.getElementById('accounts-table-wrapper').style.display = 'none';
+        const loading = document.getElementById('accounts-loading');
+        const empty = document.getElementById('accounts-empty');
+        const wrapper = document.getElementById('accounts-table-wrapper');
+        if (!loading || !empty || !wrapper) {
+            return;
+        }
+
+        accountsAbort?.abort();
+        accountsAbort = new AbortController();
+
+        loading.style.display = 'block';
+        empty.style.display = 'none';
+        wrapper.style.display = 'none';
 
         try {
-            const response = await fetch(`/api/user/${state.userId}/online-accounts`);
+            const response = await fetch(`/api/user/${state.userId}/online-accounts`, {
+                signal: accountsAbort.signal,
+            });
             const data = await response.json();
             if (data.success) {
                 state.accounts = data.accounts || [];
                 renderAccounts();
             }
         } catch (e) {
-            console.error('Failed to load online accounts:', e);
+            if (e.name !== 'AbortError') {
+                console.error('Failed to load online accounts:', e);
+            }
         } finally {
-            document.getElementById('accounts-loading').style.display = 'none';
+            if (!accountsAbort?.signal.aborted) {
+                loading.style.display = 'none';
+            }
         }
     }
 
@@ -136,9 +160,12 @@
         const empty = document.getElementById('accounts-empty');
         const wrapper = document.getElementById('accounts-table-wrapper');
         const badge = document.getElementById('accounts-count-badge');
+        if (!tbody || !empty || !wrapper || !badge) {
+            return;
+        }
 
         tbody.innerHTML = '';
-        
+
         const filtered = state.accounts.filter(acc => {
             const query = state.search.toLowerCase();
             return acc.domain.toLowerCase().includes(query) || acc.username.toLowerCase().includes(query);
@@ -180,13 +207,36 @@
             .replace(/'/g, "&#039;");
     }
 
-    document.addEventListener('DOMContentLoaded', () => {
-        loadAccounts();
+    function teardownOnlineAccountsPage() {
+        accountsAbort?.abort();
+        accountsAbort = null;
+    }
 
-        document.getElementById('accounts-search').addEventListener('input', (e) => {
-            state.search = e.target.value.trim();
-            renderAccounts();
+    function initOnlineAccountsPage() {
+        if (!document.getElementById('accounts-loading')) {
+            return;
+        }
+        teardownOnlineAccountsPage();
+
+        const searchInput = document.getElementById('accounts-search');
+        if (searchInput) {
+            searchInput.addEventListener('input', (e) => {
+                state.search = e.target.value.trim();
+                renderAccounts();
+            });
+        }
+
+        loadAccounts();
+    }
+
+    window.__guardianAccountsTeardown = teardownOnlineAccountsPage;
+    if (!window.__guardianAccountsRouteHook) {
+        window.__guardianAccountsRouteHook = true;
+        document.addEventListener('guardian:route', () => {
+            window.__guardianAccountsTeardown?.();
         });
-    });
+    }
+
+    initOnlineAccountsPage();
 </script>
 {% endblock %}

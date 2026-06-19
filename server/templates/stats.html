@@ -148,36 +148,14 @@
 </style>
 {% endblock %}
 
+{% block top_nav_center %}
+{% set active_tab = 'overview' %}
+{% include '_child_activity_nav.html' %}
+{% endblock %}
+
 {% block top_nav_extra %}
-<li class="nav-item dropdown guardian-nav-date-filter">
-    <button class="btn btn-sm btn-outline-secondary dropdown-toggle guardian-nav-action-btn fw-bold"
-        id="dateFilterDropdown" type="button" data-bs-toggle="dropdown" aria-expanded="false"
-        data-bs-auto-close="outside" aria-label="{{ t('pages.stats.select_date_range') }}">
-        <i class="fas fa-calendar-alt text-primary"></i>
-        <span class="guardian-nav-date-label" id="current-date-range-label">{{ t('pages.stats.last_7_days') }}</span>
-    </button>
-    <div class="dropdown-menu dropdown-menu-end p-3 shadow border" style="width: 280px; font-family: inherit; z-index: 1050;">
-        <h6 class="dropdown-header px-0 mb-2 fw-bold text-uppercase tracking-wider" style="font-size: 0.7rem; color: var(--bs-secondary-color);">{{ t('pages.stats.select_period') }}</h6>
-        <div class="d-flex flex-column gap-1 mb-2">
-            <button class="btn btn-sm text-start py-1.5 px-2 fw-semibold date-preset-btn" data-preset="today">{{ t('pages.stats.today') }}</button>
-            <button class="btn btn-sm text-start py-1.5 px-2 fw-semibold date-preset-btn" data-preset="yesterday">{{ t('pages.stats.yesterday') }}</button>
-            <button class="btn btn-sm text-start py-1.5 px-2 fw-semibold date-preset-btn active" data-preset="7days">{{ t('pages.stats.last_7_days') }}</button>
-            <button class="btn btn-sm text-start py-1.5 px-2 fw-semibold date-preset-btn" data-preset="30days">{{ t('pages.stats.last_30_days') }}</button>
-            <button class="btn btn-sm text-start py-1.5 px-2 fw-semibold date-preset-btn" data-preset="thismonth">{{ t('pages.stats.this_month') }}</button>
-        </div>
-        <div class="dropdown-divider"></div>
-        <h6 class="dropdown-header px-0 my-2 fw-bold text-uppercase tracking-wider" style="font-size: 0.7rem; color: var(--bs-secondary-color);">{{ t('pages.stats.custom_range') }}</h6>
-        <div class="mb-2">
-            <label class="form-label small fw-bold text-secondary mb-1">{{ t('pages.stats.start_date') }}</label>
-            <input type="date" id="filter-start-date" class="form-control form-control-sm">
-        </div>
-        <div class="mb-3">
-            <label class="form-label small fw-bold text-secondary mb-1">{{ t('pages.stats.end_date') }}</label>
-            <input type="date" id="filter-end-date" class="form-control form-control-sm">
-        </div>
-        <button id="apply-custom-date" class="btn btn-sm btn-primary w-100 py-1.5 fw-bold">{{ t('pages.stats.apply_custom') }}</button>
-    </div>
-</li>
+{% set date_filter_i18n_prefix = 'pages.stats' %}
+{% include '_child_activity_date_filter.html' %}
 {% endblock %}
 
 {% block content %}
@@ -187,11 +165,6 @@
         <p class="guardian-page-lead mb-0">
             {% if user.device_mappings|length == 1 %}{{ t('pages.stats.lead', count=user.device_mappings|length) }}{% else %}{{ t('pages.stats.lead_plural', count=user.device_mappings|length) }}{% endif %}
         </p>
-    </div>
-    <div class="guardian-page-header__actions">
-        <a href="{{ url_for('ui_dashboard.user_combined_history', user_id=user.id) }}" class="btn btn-primary fw-bold d-inline-flex align-items-center gap-2">
-            <i class="fas fa-history"></i> {{ t('pages.stats.web_video_history') }}
-        </a>
     </div>
 </div>
 

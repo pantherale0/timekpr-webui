@@ -3,17 +3,15 @@
 {% from '_macros.html' import csrf_field %}
 {% block title %}{{ t('pages.device_detail.title', label=device_label) }}{% endblock %}
 
-{% block top_nav_left %}
-<li class="nav-item d-none d-lg-inline-block ms-2 animate-fade-in">
-    <div class="segmented-control">
-        <button type="button" class="segmented-tab-btn active" data-tab-target="#overview-tab">{{ t('pages.device_detail.tab_overview') }}</button>
-        {% if device.platform in ['android', 'nintendo', 'xbox'] or screenshot_settings is not none %}
-        <button type="button" class="segmented-tab-btn" data-tab-target="#policies-tab">{{ t('pages.device_detail.tab_policies') }}</button>
-        {% endif %}
-        <button type="button" class="segmented-tab-btn" data-tab-target="#activity-tab">{{ t('pages.device_detail.tab_activity') }}</button>
-        <button type="button" class="segmented-tab-btn" data-tab-target="#diagnostics-tab">{{ t('pages.device_detail.tab_diagnostics') }}</button>
-    </div>
-</li>
+{% block top_nav_center %}
+<div class="segmented-control guardian-nav-segmented-tabs" role="tablist" aria-label="{{ t('pages.device_detail.tab_nav_label') }}">
+    <button type="button" class="segmented-tab-btn active" data-tab-target="#overview-tab">{{ t('pages.device_detail.tab_overview') }}</button>
+    {% if device.platform in ['android', 'nintendo', 'xbox'] or screenshot_settings is not none %}
+    <button type="button" class="segmented-tab-btn" data-tab-target="#policies-tab">{{ t('pages.device_detail.tab_policies') }}</button>
+    {% endif %}
+    <button type="button" class="segmented-tab-btn" data-tab-target="#activity-tab">{{ t('pages.device_detail.tab_activity') }}</button>
+    <button type="button" class="segmented-tab-btn" data-tab-target="#diagnostics-tab">{{ t('pages.device_detail.tab_diagnostics') }}</button>
+</div>
 {% endblock %}
 
 {% block content %}
@@ -39,18 +37,6 @@
         <a href="{{ url_for('ui_dashboard.admin_devices') }}" class="btn btn-secondary btn-sm fw-bold">
             <i class="fas fa-arrow-left me-1"></i> {{ t('pages.device_detail.back_to_devices') }}
         </a>
-    </div>
-</div>
-
-<!-- Mobile Tab Navigation Control (d-flex d-lg-none) -->
-<div class="d-flex d-lg-none justify-content-center mb-4">
-    <div class="segmented-control">
-        <button type="button" class="segmented-tab-btn active" data-tab-target="#overview-tab">{{ t('pages.device_detail.tab_overview') }}</button>
-        {% if device.platform in ['android', 'nintendo', 'xbox'] or screenshot_settings is not none %}
-        <button type="button" class="segmented-tab-btn" data-tab-target="#policies-tab">{{ t('pages.device_detail.tab_policies_short') }}</button>
-        {% endif %}
-        <button type="button" class="segmented-tab-btn" data-tab-target="#activity-tab">{{ t('pages.device_detail.tab_activity_short') }}</button>
-        <button type="button" class="segmented-tab-btn" data-tab-target="#diagnostics-tab">{{ t('pages.device_detail.tab_diagnostics') }}</button>
     </div>
 </div>
 
