@@ -16,6 +16,13 @@ pub const CHUNK_SIZE: usize = 100;
 pub const MATCH_TYPE_EXECUTABLE: &str = "executable";
 const ICON_MAX_BYTES: usize = 32 * 1024;
 
+/// Desktop-derived paths used to decide whether an executable is user-facing.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ReportableIndex {
+    pub absolute_paths: HashSet<String>,
+    pub exec_basenames: HashSet<String>,
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct DiscoveredApp {
     pub application_name: String,
@@ -63,7 +70,7 @@ struct AppIconReportMessage<'a> {
 }
 
 #[cfg(target_os = "linux")]
-pub fn discover_for_user(linux_username: &str) -> Vec<DiscoveredApp> {
+fn desktop_dirs_for_user(linux_username: &str) -> Vec<PathBuf> {
     let mut desktop_dirs = vec![
         PathBuf::from("/usr/share/applications"),
         PathBuf::from("/usr/local/share/applications"),
@@ -75,6 +82,13 @@ pub fn discover_for_user(linux_username: &str) -> Vec<DiscoveredApp> {
         desktop_dirs.push(home.join(".local/share/applications"));
         desktop_dirs.push(home.join(".local/share/flatpak/exports/share/applications"));
     }
+
+    desktop_dirs
+}
+
+#[cfg(target_os = "linux")]
+pub fn discover_for_user(linux_username: &str) -> Vec<DiscoveredApp> {
+    let desktop_dirs = desktop_dirs_for_user(linux_username);
 
     let mut by_identifier: HashMap<String, DiscoveredApp> = HashMap::new();
     for dir in desktop_dirs {
@@ -99,6 +113,92 @@ pub fn discover_for_user(linux_username: &str) -> Vec<DiscoveredApp> {
     let mut apps: Vec<DiscoveredApp> = by_identifier.into_values().collect();
     apps.sort_by(|left, right| left.application_name.to_lowercase().cmp(&right.application_name.to_lowercase()));
     apps
+}
+
+#[cfg(target_os = "linux")]
+pub fn exec_basename_from_line(exec_line: &str) -> Option<String> {
+    let first = exec_line.split_whitespace().next()?;
+    Path::new(first)
+        .file_name()
+        .and_then(|name| name.to_str())
+        .map(str::to_string)
+}
+
+#[cfg(target_os = "linux")]
+fn parse_desktop_exec_line(path: &Path) -> Option<String> {
+    let contents = fs::read_to_string(path).ok()?;
+    let mut in_desktop_entry = false;
+    let mut exec: Option<String> = None;
+    let mut hidden = false;
+    let mut no_display = false;
+
+    for line in contents.lines() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() || trimmed.starts_with('#') {
+            continue;
+        }
+        if trimmed == "[Desktop Entry]" {
+            in_desktop_entry = true;
+            continue;
+        }
+        if trimmed.starts_with('[') {
+            if in_desktop_entry {
+                break;
+            }
+            continue;
+        }
+        if !in_desktop_entry {
+            continue;
+        }
+
+        let Some((key, value)) = trimmed.split_once('=') else {
+            continue;
+        };
+        match key.trim() {
+            "Exec" if exec.is_none() => exec = Some(value.trim().to_string()),
+            "Hidden" => hidden = parse_bool(value.trim()),
+            "NoDisplay" => no_display = parse_bool(value.trim()),
+            _ => {}
+        }
+    }
+
+    if hidden || no_display {
+        return None;
+    }
+
+    exec
+}
+
+#[cfg(target_os = "linux")]
+pub fn build_reportable_index(linux_username: &str) -> ReportableIndex {
+    let mut index = ReportableIndex::default();
+
+    for dir in desktop_dirs_for_user(linux_username) {
+        if !dir.is_dir() {
+            continue;
+        }
+        let entries = match fs::read_dir(&dir) {
+            Ok(entries) => entries,
+            Err(_) => continue,
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.extension().and_then(|ext| ext.to_str()) != Some("desktop") {
+                continue;
+            }
+            let Some(exec_line) = parse_desktop_exec_line(&path) else {
+                continue;
+            };
+            if let Some(absolute_path) = normalize_exec_to_path(&exec_line) {
+                index.absolute_paths.insert(absolute_path);
+            }
+            if let Some(basename) = exec_basename_from_line(&exec_line) {
+                index.exec_basenames.insert(basename);
+            }
+        }
+    }
+
+    index
 }
 
 #[cfg(target_os = "linux")]
@@ -367,6 +467,56 @@ mod tests {
     #[test]
     fn resolve_icon_png_rejects_paths_outside_allowed_roots() {
         assert!(read_allowed_png_icon(Path::new("/etc/passwd"), None).is_none());
+    }
+
+    #[test]
+    fn exec_basename_from_line_extracts_command_name() {
+        assert_eq!(
+            exec_basename_from_line("firefox --private-window %u"),
+            Some("firefox".to_string())
+        );
+        assert_eq!(
+            exec_basename_from_line("/usr/bin/firefox %u"),
+            Some("firefox".to_string())
+        );
+    }
+
+    #[test]
+    fn build_reportable_index_collects_paths_and_basenames() {
+        let dir = std::env::temp_dir().join(format!("timekpr-reportable-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        fs::write(
+            dir.join("demo.desktop"),
+            "[Desktop Entry]\nName=Demo\nExec=firefox %u\n",
+        )
+        .unwrap();
+        fs::write(
+            dir.join("absolute.desktop"),
+            "[Desktop Entry]\nName=Absolute\nExec=/usr/bin/demo %u\n",
+        )
+        .unwrap();
+
+        let mut index = ReportableIndex::default();
+        for entry in fs::read_dir(&dir).unwrap().flatten() {
+            let path = entry.path();
+            if path.extension().and_then(|ext| ext.to_str()) != Some("desktop") {
+                continue;
+            }
+            let Some(exec_line) = parse_desktop_exec_line(&path) else {
+                continue;
+            };
+            if let Some(absolute_path) = normalize_exec_to_path(&exec_line) {
+                index.absolute_paths.insert(absolute_path);
+            }
+            if let Some(basename) = exec_basename_from_line(&exec_line) {
+                index.exec_basenames.insert(basename);
+            }
+        }
+
+        assert!(index.exec_basenames.contains("firefox"));
+        assert!(index.absolute_paths.contains("/usr/bin/demo"));
+        let _ = fs::remove_dir_all(&dir);
     }
 
     #[test]

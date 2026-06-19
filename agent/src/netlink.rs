@@ -11,6 +11,8 @@ use crate::apparmor;
 use crate::approval_deduper;
 #[cfg(target_os = "linux")]
 use crate::linux_device_policy;
+#[cfg(target_os = "linux")]
+use crate::reporting_filter;
 
 /// Alert payload ready to be forwarded to the server.
 #[derive(Debug, Clone)]
@@ -524,7 +526,9 @@ mod linux_impl {
                     if let Some(username) = username {
                         // Only send "app_launched" for processes with a concrete executable path
                         // to avoid spamming the server with transient pid-0/unknown alerts.
-                        if !exe_path.is_empty() {
+                        if !exe_path.is_empty()
+                            && reporting_filter::is_reportable_executable(&username, &exe_path)
+                        {
                             let _ = alert_tx.send(AppAlert {
                                 event_type: "app_launched".to_string(),
                                 linux_username: username.clone(),

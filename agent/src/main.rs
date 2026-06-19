@@ -14,6 +14,8 @@ mod firewall;
 mod installed_apps;
 #[cfg(target_os = "linux")]
 mod linux_device_policy;
+#[cfg(target_os = "linux")]
+mod reporting_filter;
 mod screenshot;
 mod local_dns;
 mod netlink;
@@ -1167,6 +1169,8 @@ fn spawn_policy_sync_scheduler(
 }
 
 fn push_inventory_for_user(inventory_tx: &mpsc::UnboundedSender<String>, linux_username: &str) {
+    #[cfg(target_os = "linux")]
+    reporting_filter::refresh_user_index(linux_username);
     let apps = installed_apps::discover_for_user(linux_username);
     let report_id = Uuid::new_v4().to_string();
     for message in installed_apps::build_inventory_messages(linux_username, &apps, &report_id) {
@@ -1525,6 +1529,9 @@ async fn run_linux_main() {
     // Get regular system users and start background tasks
     let users_map = get_system_users_map();
     println!("Found regular system users: {:?}", users_map);
+
+    #[cfg(target_os = "linux")]
+    reporting_filter::refresh_user_indexes(users_map.values().map(String::as_str));
     
     let netlink_config = netlink::MonitorConfig {
         monitored_uids: users_map.clone(),

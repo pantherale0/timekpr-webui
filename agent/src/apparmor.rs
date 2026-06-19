@@ -164,6 +164,37 @@ pub async fn evaluate_exec_event(
     guard.evaluate_exec_event(username, exe_path, argv, cwd)
 }
 
+/// Returns true when `exe_path` matches any configured app-policy rule for the user.
+pub fn executable_matches_configured_policy(username: &str, exe_path: &str) -> bool {
+    let state = match load_persisted_state() {
+        Some(state) => state,
+        None => return false,
+    };
+    let Some(policies) = state.users.get(username) else {
+        return false;
+    };
+
+    let normalized_exe = normalized_executable_match_path(exe_path);
+    for policy in policies {
+        if normalized_match_type(&policy.match_type) == MATCH_TYPE_EXECUTABLE {
+            if normalized_executable_match_path(&policy.executable_path) == normalized_exe {
+                return true;
+            }
+            continue;
+        }
+
+        if normalized_match_type(&policy.match_type) == MATCH_TYPE_PATH_PATTERN {
+            if let Ok(expanded) = expand_path_pattern(username, &policy.executable_path) {
+                if path_pattern_matches(&expanded, &normalized_exe) {
+                    return true;
+                }
+            }
+        }
+    }
+
+    false
+}
+
 pub fn is_apparmor_available() -> bool {
     // Check if AppArmor is enabled in the kernel
     if let Ok(content) = fs::read_to_string("/sys/module/apparmor/parameters/enabled") {
@@ -520,6 +551,15 @@ fn state_path() -> PathBuf {
     let fallback = PathBuf::from(STATE_DIR_FALLBACK);
     let _ = fs::create_dir_all(&fallback);
     fallback.join(STATE_FILENAME)
+}
+
+fn load_persisted_state() -> Option<PersistedAppArmorState> {
+    let path = state_path();
+    if !path.exists() {
+        return None;
+    }
+    let raw = fs::read_to_string(&path).ok()?;
+    serde_json::from_str(&raw).ok()
 }
 
 fn make_profile_name(username: &str, app_name: &str) -> String {
