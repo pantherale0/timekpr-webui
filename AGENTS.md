@@ -194,6 +194,7 @@ i18n/*/extension.yaml       # Browser extension internationalisation configurati
 - Dependencies: Keep minimal and pinned.
 - Breaking changes: Major version bump + clear migration path.
 - Sub-agents: Check for relevant sub-agents based on the requested activity, always pull in and check `.agent/ARCHITECTURE.md` for guidance on their usage. 
+- SQL Migrations: For boolean values always use `sa.false()` or `sa.true()` when representing a default. Not doing so will cause PostgresQL installations to fail.
 
 This document serves as the **north star** for implementation. When in doubt, choose the simpler, more auditable solution that a human can debug and maintain years from now.
 
