@@ -400,30 +400,7 @@
         <!-- Main Content Area (SPA) -->
         <main class="app-main">
             <div class="container-fluid guardian-page-shell px-4 py-4">
-                <div class="flash-messages-container" id="spa-global-flash">
-                    {% with messages = get_flashed_messages(with_categories=true) %}
-                    {% if messages %}
-                    {% for category, message in messages %}
-                    <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show shadow-sm mb-3"
-                        role="alert">
-                        <div class="d-flex align-items-center gap-2">
-                            {% if category == 'success' %}
-                            <i class="fas fa-check-circle text-success fs-5"></i>
-                            {% elif category == 'danger' or category == 'error' %}
-                            <i class="fas fa-exclamation-circle text-danger fs-5"></i>
-                            {% elif category == 'warning' %}
-                            <i class="fas fa-exclamation-triangle text-warning fs-5"></i>
-                            {% else %}
-                            <i class="fas fa-info-circle text-info fs-5"></i>
-                            {% endif %}
-                            <span>{{ message }}</span>
-                        </div>
-                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="{{ t('common.close') }}"></button>
-                    </div>
-                    {% endfor %}
-                    {% endif %}
-                    {% endwith %}
-                </div>
+                <div class="flash-messages-container" id="spa-global-flash"></div>
                 <div id="spa-main" data-initial-path="{{ initial_path|default('/dashboard') }}">
                     {% if initial_fragment %}
                     {{ initial_fragment|safe }}
