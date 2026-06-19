@@ -26,7 +26,7 @@ The Chrome extension uses `chrome.tabs.onUpdated` and `chrome.webNavigation` API
 - Captures page URLs, titles, and extracts root domains.
 - Deduplicates concurrent loads on the same tab index.
 - Filters out internal `chrome://` or local pages.
-- Ignores YouTube video watch pages (which are handled specifically by the content scripts to gather video analytics like duration).
+- Ignores YouTube video watch pages and Shorts (`/shorts/VIDEO_ID`), which are handled specifically by the content scripts to gather video analytics like duration.
 - Packs browsing logs as a `BROWSER_LOG` IPC payload and forwards them via Native Messaging to the Rust agent, which routes them to the server.
 
 ### Building the extension

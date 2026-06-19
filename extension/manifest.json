@@ -26,6 +26,7 @@
         "https://*/*"
       ],
       "js": [
+        "youtube_utils.js",
         "content.js"
       ],
       "run_at": "document_end"

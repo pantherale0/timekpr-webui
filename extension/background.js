@@ -1,7 +1,7 @@
 // Service worker to handle background YouTube and Web log shipping with local offline buffering,
 // plus registration detection enforcement and login audit forwarding.
 
-importScripts('i18n.js');
+importScripts('i18n.js', 'youtube_utils.js');
 
 // Flush queues on startup
 chrome.runtime.onInstalled.addListener(() => {
@@ -126,7 +126,7 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
         // Skip YouTube watch pages since they are handled separately by content.js
         try {
             const parsedUrl = new URL(urlString);
-            if (parsedUrl.hostname.includes('youtube.com') && parsedUrl.searchParams.has('v')) {
+            if (parsedUrl.hostname.includes('youtube.com') && parseYoutubeVideoId(urlString)) {
                 return;
             }
 

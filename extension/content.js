@@ -11,16 +11,27 @@ let lastTick = Date.now();
 let monitorInterval = null;
 
 function getVideoId() {
-    const params = new URLSearchParams(window.location.search);
-    return params.get('v');
+    return parseYoutubeVideoId(window.location.href);
+}
+
+function isShortsPage() {
+    return window.location.pathname.startsWith('/shorts/') ||
+        document.querySelector('ytd-shorts, ytd-reel-player-overlay-renderer') !== null;
 }
 
 function parseVideoDetails() {
+    const onShorts = isShortsPage();
+
     // Title
     let title = "";
-    const titleEl = document.querySelector('ytd-watch-metadata h1') || 
-                    document.querySelector('h1.ytd-watch-metadata') ||
-                    document.querySelector('#container > h1 > yt-formatted-string');
+    const titleEl = onShorts
+        ? (document.querySelector('ytd-reel-player-header-renderer h2') ||
+           document.querySelector('h2.ytd-reel-player-header-renderer') ||
+           document.querySelector('ytd-reel-player-overlay-renderer #title') ||
+           document.querySelector('#title'))
+        : (document.querySelector('ytd-watch-metadata h1') ||
+           document.querySelector('h1.ytd-watch-metadata') ||
+           document.querySelector('#container > h1 > yt-formatted-string'));
     if (titleEl) {
         title = titleEl.textContent.trim();
     } else {
@@ -30,9 +41,12 @@ function parseVideoDetails() {
     // Channel Name and Channel ID
     let channelName = "";
     let channelId = "";
-    const channelEl = document.querySelector('ytd-video-owner-renderer #channel-name a') ||
-                      document.querySelector('#upload-info #channel-name a') ||
-                      document.querySelector('#owner-text a');
+    const channelEl = onShorts
+        ? (document.querySelector('ytd-reel-player-overlay-renderer ytd-channel-name a') ||
+           document.querySelector('.ytd-reel-player-overlay-renderer #channel-name a'))
+        : (document.querySelector('ytd-video-owner-renderer #channel-name a') ||
+           document.querySelector('#upload-info #channel-name a') ||
+           document.querySelector('#owner-text a'));
     if (channelEl) {
         channelName = channelEl.textContent.trim();
         const href = channelEl.getAttribute('href') || "";
