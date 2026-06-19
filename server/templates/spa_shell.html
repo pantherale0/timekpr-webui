@@ -1,0 +1,1781 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <title>{% block title %}Guardian Family Safety{% endblock %}</title>
+    <meta name="description"
+        content="Guardian Family Safety console. Calm routines, browsing shields, and family dialogue for your household.">
+
+    <!-- PWA -->
+    <link rel="manifest" href="{{ url_for('static', filename='manifest.webmanifest') }}">
+    <meta name="theme-color" content="#4A6B5D">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="Guardian">
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/apple-touch-icon.png') }}">
+
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="Guardian Family Safety">
+    <meta property="og:description"
+        content="Guardian Family Safety console. Calm routines, browsing shields, and family dialogue for your household.">
+
+    <!-- Bootstrap 5.3 & AdminLTE 4 & FontAwesome 6 via jsDelivr CDN -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/admin-lte@4.0.0/dist/css/adminlte.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap"
+        rel="stylesheet">
+
+    <!-- Custom Stylesheet -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/guardian-wizard.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/guardian-routine.css') }}">
+
+    <!-- Theme Manager -->
+    <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+    <script src="{{ url_for('static', filename='js/guardian-routine.js') }}"></script>
+    <script>
+        (function () {
+            const originalFetch = window.fetch;
+            window.fetch = function (input, init) {
+                init = init || {};
+                const method = String(init.method || 'GET').toUpperCase();
+                if (!['GET', 'HEAD', 'OPTIONS', 'TRACE'].includes(method)) {
+                    const token = document.querySelector('meta[name="csrf-token"]')?.content;
+                    if (token) {
+                        const headers = new Headers(init.headers || {});
+                        if (!headers.has('X-CSRFToken')) {
+                            headers.set('X-CSRFToken', token);
+                        }
+                        init.headers = headers;
+                    }
+                }
+                return originalFetch(input, init);
+            };
+        })();
+    </script>
+
+    <style>
+        .sidebar-footer .btn-xs {
+            padding: 0.25rem 0.5rem;
+            font-size: 0.75rem;
+            border-radius: 0.25rem;
+        }
+
+        .flash-messages-container {
+            position: relative;
+            z-index: 1050;
+        }
+
+        /* Wizard Stepper Styling */
+        .wizard-stepper {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 2rem;
+            position: relative;
+        }
+
+        .wizard-stepper::before {
+            content: '';
+            position: absolute;
+            top: 15px;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background-color: var(--bs-border-color);
+            z-index: 1;
+        }
+
+        .step-node {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background-color: var(--bs-secondary-bg);
+            border: 2px solid var(--bs-border-color);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 0.85rem;
+            z-index: 2;
+            position: relative;
+            color: var(--bs-secondary-color);
+            transition: all 0.2s ease;
+        }
+
+        .step-node.active {
+            background-color: var(--guardian-sage);
+            border-color: var(--guardian-sage);
+            color: var(--guardian-text-inverse);
+            box-shadow: 0 0 0 3px rgba(74, 107, 93, 0.22);
+        }
+
+        .step-node.completed {
+            background-color: var(--guardian-sage-light);
+            border-color: var(--guardian-sage-light);
+            color: var(--guardian-text-inverse);
+        }
+
+        .platform-card {
+            border: 2px solid var(--bs-border-color);
+            border-radius: 0.5rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .platform-card:hover:not(.disabled) {
+            border-color: var(--guardian-sage);
+            transform: translateY(-2px);
+            background-color: var(--guardian-sage-subtle);
+        }
+
+        .platform-card.selected {
+            border-color: var(--guardian-sage);
+            background-color: var(--guardian-sage-subtle);
+        }
+
+        .platform-card.disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .platform-icon {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+        }
+    </style>
+    {% block extra_head %}{% endblock %}
+</head>
+
+<body class="layout-fixed sidebar-expand-lg sidebar-mini bg-body-tertiary">
+    <div class="app-wrapper">
+        <!-- Top Navbar Header -->
+        <nav class="app-header navbar navbar-expand bg-body shadow-sm" aria-label="Main navigation">
+            <div class="container-fluid guardian-nav-shell">
+                <!-- Brand context (left) -->
+                <div class="guardian-nav-brand">
+                    <ul class="navbar-nav flex-row align-items-center">
+                        <li class="nav-item">
+                            <a class="nav-link guardian-nav-toggle" data-lte-toggle="sidebar" href="#" role="button"
+                                aria-label="Toggle sidebar">
+                                <i class="fas fa-bars"></i>
+                            </a>
+                        </li>
+                        <li class="nav-item d-none d-md-inline-block" id="spa-slot-top-nav-left" data-spa-nav-slot="top_nav_left">
+                            <span class="navbar-text guardian-nav-workspace-label">Family Home</span>
+                        </li>
+                        <li class="nav-item" id="spa-slot-top-nav-brand-status" data-spa-nav-slot="top_nav_brand_status"></li>
+                    </ul>
+                </div>
+
+                <!-- System status (center, desktop) -->
+                <div class="guardian-nav-center d-none d-lg-flex align-items-center">
+                    <div id="spa-slot-top-nav-center" data-spa-nav-slot="top_nav_center"></div>
+                    <span class="guardian-nav-alert-badge badge rounded-pill bg-warning text-dark"
+                        id="navbar-approvals-badge" style="display: none; cursor: pointer;" aria-live="polite"
+                        onclick="location.href='{{ url_for('ui_dashboard.admin_approvals') }}'">
+                        <i class="fas fa-clipboard-check"></i>
+                        <span class="guardian-nav-alert-text"><span id="navbar-approvals-count">0</span> Dialogue</span>
+                    </span>
+                    <span class="guardian-nav-alert-badge badge rounded-pill bg-danger text-white"
+                        id="navbar-task-badge" style="display: none; cursor: pointer;"
+                        onclick="location.href='{{ url_for('settings') }}'">
+                        <span class="task-status-indicator-dot danger"></span>
+                        <span class="guardian-nav-alert-text">Tasks Offline</span>
+                    </span>
+                </div>
+
+                <!-- Form & utility actions (right) -->
+                <div class="guardian-nav-actions">
+                    <ul class="navbar-nav flex-row align-items-center">
+                        <li class="nav-item d-lg-none">
+                            <span class="guardian-nav-alert-badge badge rounded-pill bg-warning text-dark"
+                                id="navbar-approvals-badge-mobile" style="display: none; cursor: pointer;"
+                                aria-live="polite"
+                                onclick="location.href='{{ url_for('ui_dashboard.admin_approvals') }}'"
+                                title="Pending dialogue">
+                                <i class="fas fa-clipboard-check"></i>
+                            </span>
+                        </li>
+                        <li class="nav-item d-lg-none">
+                            <span class="guardian-nav-alert-badge badge rounded-pill bg-danger text-white"
+                                id="navbar-task-badge-mobile" style="display: none; cursor: pointer;"
+                                onclick="location.href='{{ url_for('settings') }}'" title="Tasks offline">
+                                <span class="task-status-indicator-dot danger"></span>
+                            </span>
+                        </li>
+                        <li class="nav-item d-none d-lg-flex">
+                            <button type="button" class="btn btn-sm guardian-btn-sage guardian-nav-action-btn"
+                                onclick="openOnboardingWizard()">
+                                <i class="fas fa-plus"></i>
+                                <span>Add Device</span>
+                            </button>
+                        </li>
+                        <li class="nav-item d-none d-lg-flex" id="spa-slot-top-nav-secondary" data-spa-nav-slot="top_nav_secondary">
+                            {% if session.get('logged_in') and policy_preset_matrix is defined %}
+                            <button type="button" class="btn btn-sm guardian-btn-sage guardian-nav-action-btn"
+                                data-bs-toggle="modal" data-bs-target="#createProfileModal">
+                                <i class="fas fa-user-plus"></i>
+                                <span>Create Managed Profile</span>
+                            </button>
+                            {% endif %}
+                        </li>
+                        <li class="nav-item d-none d-lg-flex" id="spa-slot-top-nav-extra" data-spa-nav-slot="top_nav_extra" style="display: none;"></li>
+                        <li class="nav-item" id="spa-slot-top-nav-primary" data-spa-nav-slot="top_nav_primary" style="display: none;"></li>
+                        <li class="nav-item dropdown guardian-nav-actions-menu d-lg-none">
+                            <button type="button"
+                                class="btn btn-sm btn-outline-secondary guardian-nav-action-btn guardian-nav-actions-trigger"
+                                data-bs-toggle="dropdown" aria-expanded="false" aria-label="Open actions menu">
+                                <i class="fas fa-ellipsis-v"></i>
+                                <span class="guardian-nav-actions-trigger-label">Actions</span>
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end guardian-nav-actions-dropdown shadow border">
+                                <li>
+                                    <button type="button" class="dropdown-item" onclick="openOnboardingWizard()">
+                                        <i class="fas fa-plus me-2 text-secondary"></i>Add Device
+                                    </button>
+                                </li>
+                                <li id="spa-slot-top-nav-overflow" data-spa-nav-slot="top_nav_overflow">
+                                {% if session.get('logged_in') and policy_preset_matrix is defined %}
+                                    <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#createProfileModal">
+                                        <i class="fas fa-user-plus me-2 text-secondary"></i>Create Managed Profile
+                                    </button>
+                                {% endif %}
+                                </li>
+                            </ul>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Sidebar Navigation Drawer -->
+        <aside class="app-sidebar guardian-sidebar shadow" data-bs-theme="dark" data-enable-persistence="true">
+            <div class="sidebar-brand">
+                <a href="/dashboard" class="brand-link" data-spa-nav="/dashboard">
+                    <i class="fas fa-shield-alt brand-icon-shield flex-shrink-0" aria-hidden="true"></i>
+                    <span class="brand-text">
+                        <span class="d-block fw-bold lh-1">Guardian</span>
+                        <span class="d-block guardian-brand-subtitle">Family Safety</span>
+                    </span>
+                </a>
+            </div>
+
+            <div class="sidebar-wrapper d-flex flex-column justify-content-between">
+                <nav>
+                    <ul class="nav sidebar-menu flex-column" data-lte-toggle="treeview" role="menu"
+                        data-accordion="false">
+                        <li class="nav-header guardian-nav-section-header">MAIN</li>
+                        <li class="nav-item">
+                            <a href="/dashboard" data-spa-nav="/dashboard"
+                                class="nav-link{% if initial_path == '/dashboard' %} active{% endif %}">
+                                <i class="nav-icon fas fa-chart-pie"></i>
+                                <p>Dashboard</p>
+                            </a>
+                        </li>
+
+                        <li class="nav-header guardian-nav-section-header mt-2">SAFETY &amp; ROUTINES
+                        </li>
+                        <li class="nav-item">
+                            <a href="/weekly-schedule" data-spa-nav="/weekly-schedule"
+                                class="nav-link{% if initial_path and initial_path.startswith('/weekly-schedule') %} active{% endif %}">
+                                <i class="nav-icon fas fa-clock"></i>
+                                <p>Routine Locks &amp; Time</p>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="/admin/restrictions" data-spa-nav="/admin/restrictions"
+                                class="nav-link{% if initial_path and initial_path.startswith('/admin/restrictions') %} active{% endif %}">
+                                <i class="nav-icon fas fa-globe"></i>
+                                <p>Browsing Shields</p>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="/admin/app-policies" data-spa-nav="/admin/app-policies"
+                                class="nav-link{% if initial_path and initial_path.startswith('/admin/app-policies') %} active{% endif %}">
+                                <i class="nav-icon fas fa-lock"></i>
+                                <p>App Routine Locks</p>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="/admin/approvals" data-spa-nav="/admin/approvals"
+                                class="nav-link{% if initial_path and initial_path.startswith('/admin/approvals') %} active{% endif %}">
+                                <i class="nav-icon fas fa-clipboard-check"></i>
+                                <p class="d-flex align-items-center justify-content-between w-100 mb-0">
+                                    <span>Family Dialogue</span>
+                                    <span class="badge bg-warning text-dark ms-2" id="sidebar-approvals-badge"
+                                        style="display: none;">0</span>
+                                </p>
+                            </a>
+                        </li>
+
+                        <li class="nav-header guardian-nav-section-header mt-2">YOUR FAMILY</li>
+                        <li class="nav-item">
+                            <a href="/admin/devices" data-spa-nav="/admin/devices"
+                                class="nav-link{% if initial_path and initial_path.startswith('/admin/devices') %} active{% endif %}">
+                                <i class="nav-icon fas fa-laptop"></i>
+                                <p>Devices</p>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="/admin/users" data-spa-nav="/admin/users"
+                                class="nav-link{% if initial_path and (initial_path.startswith('/admin/users') or initial_path == '/admin') %} active{% endif %}">
+                                <i class="nav-icon fas fa-users"></i>
+                                <p>Child Profiles</p>
+                            </a>
+                        </li>
+
+                        <li class="nav-header guardian-nav-section-header mt-2">SYSTEM</li>
+                        <li class="nav-item">
+                            <a href="/settings" data-spa-nav="/settings"
+                                class="nav-link{% if initial_path and initial_path.startswith('/settings') %} active{% endif %}">
+                                <i class="nav-icon fas fa-cog"></i>
+                                <p>Settings</p>
+                            </a>
+                        </li>
+                    </ul>
+                </nav>
+
+                <!-- User Control Hub -->
+                {% set profile_username = session_user.username if session_user else 'admin' %}
+                {% set profile_email = session_user.email if session_user and session_user.email else profile_username %}
+                {% set profile_subtitle = session_user.name if session_user and session_user.name else 'Primary Account' %}
+                {% set profile_initial = profile_username[:1]|upper %}
+                <div class="guardian-profile-hub">
+                    <button type="button" class="guardian-profile-node" id="guardian-profile-node-trigger"
+                        aria-haspopup="true" aria-expanded="false" aria-controls="guardian-profile-popout">
+                        <span class="guardian-profile-avatar" aria-hidden="true">{{ profile_initial }}</span>
+                        <span class="guardian-profile-node-copy">
+                            <span class="guardian-profile-email">{{ profile_email }}</span>
+                            <span class="guardian-profile-subtitle">{{ profile_subtitle }}</span>
+                        </span>
+                        <i class="fas fa-chevron-up guardian-profile-node-chevron" aria-hidden="true"></i>
+                    </button>
+
+                    <div class="guardian-profile-popout" id="guardian-profile-popout" role="menu"
+                        aria-label="Account and session controls" hidden>
+                        <div class="guardian-profile-popout-header">
+                            <p class="guardian-profile-popout-kicker">User settings overlay</p>
+                            <p class="guardian-profile-popout-title">
+                                <i class="fas fa-user-circle me-1" aria-hidden="true"></i>Admin account profile
+                            </p>
+                            <p class="guardian-profile-popout-meta">{{ profile_email }}</p>
+                            <p class="guardian-profile-popout-meta">Workspace: Family Home</p>
+                        </div>
+                        <div class="guardian-profile-popout-actions">
+                            <a href="{{ url_for('settings') }}" class="guardian-profile-popout-link" role="menuitem">
+                                <i class="fas fa-cog" aria-hidden="true"></i>
+                                <span>Manage account preferences</span>
+                            </a>
+                            <a href="{{ url_for('settings') }}#admin-credentials" class="guardian-profile-popout-link"
+                                role="menuitem">
+                                <i class="fas fa-key" aria-hidden="true"></i>
+                                <span>{% if oidc_enabled %}View authentication settings{% else %}Change administrative password{% endif %}</span>
+                            </a>
+                            <a href="https://github.com/pantherale0/timekpr-webui/issues"
+                                class="guardian-profile-popout-link" role="menuitem" target="_blank"
+                                rel="noopener noreferrer">
+                                <i class="fas fa-receipt" aria-hidden="true"></i>
+                                <span>View live ledger &amp; billing stack</span>
+                            </a>
+                        </div>
+                        <div class="guardian-profile-popout-divider" role="separator"></div>
+                        <a href="{{ url_for('logout') }}"
+                            class="guardian-profile-popout-link guardian-profile-popout-link--logout" role="menuitem">
+                            <i class="fas fa-sign-out-alt" aria-hidden="true"></i>
+                            <span>Terminate session (Logout)</span>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content Area (SPA) -->
+        <main class="app-main">
+            <div class="container-fluid guardian-page-shell px-4 py-4">
+                <div class="flash-messages-container" id="spa-global-flash">
+                    {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                    {% for category, message in messages %}
+                    <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show shadow-sm mb-3"
+                        role="alert">
+                        <div class="d-flex align-items-center gap-2">
+                            {% if category == 'success' %}
+                            <i class="fas fa-check-circle text-success fs-5"></i>
+                            {% elif category == 'danger' or category == 'error' %}
+                            <i class="fas fa-exclamation-circle text-danger fs-5"></i>
+                            {% elif category == 'warning' %}
+                            <i class="fas fa-exclamation-triangle text-warning fs-5"></i>
+                            {% else %}
+                            <i class="fas fa-info-circle text-info fs-5"></i>
+                            {% endif %}
+                            <span>{{ message }}</span>
+                        </div>
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                    {% endfor %}
+                    {% endif %}
+                    {% endwith %}
+                </div>
+                <div id="spa-main" data-initial-path="{{ initial_path|default('/dashboard') }}">
+                    {% if initial_fragment %}
+                    {{ initial_fragment|safe }}
+                    {% else %}
+                    <div class="text-center py-5 text-muted" id="spa-loading">
+                        <div class="spinner-border text-secondary mb-3" role="status" aria-hidden="true"></div>
+                        <p class="mb-0">Loading your home…</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- GLOBAL DEVICE ONBOARDING WIZARD MODAL -->
+    <div class="modal fade" id="onboardingWizardModal" tabindex="-1" aria-labelledby="onboardingWizardModalLabel"
+        aria-hidden="true" data-bs-backdrop="static">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content shadow-lg">
+                <div class="modal-header guardian-modal-header">
+                    <h5 class="modal-title" id="onboardingWizardModalLabel"><i
+                            class="fas fa-laptop me-2"></i>Add a Family Device</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"
+                        onclick="closeWizard()"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <!-- Wizard Stepper Progress -->
+                    <div class="wizard-stepper">
+                        <div class="step-node active" id="step-node-1">1</div>
+                        <div class="step-node" id="step-node-2">2</div>
+                        <div class="step-node" id="step-node-3">3</div>
+                        <div class="step-node" id="step-node-4">4</div>
+                        <div class="step-node" id="step-node-5">5</div>
+                    </div>
+
+                    <div class="text-center mb-3">
+                        <h4 class="fw-bold" id="step-title">Choose a device</h4>
+                        <p class="text-muted small" id="step-subtitle">Pick the platform your child uses — we'll walk you through connecting it safely.</p>
+                    </div>
+
+                    <!-- STEP 1: Select Platform -->
+                    <div class="wizard-step-panel" id="step-panel-1">
+                        <div class="row g-3 justify-content-center">
+                            <div class="col-sm-6 col-md-4">
+                                <div class="platform-card p-3 text-center h-100" onclick="selectPlatform('linux')">
+                                    <div class="platform-icon text-primary"><i class="fab fa-linux"></i></div>
+                                    <h5 class="fw-bold mb-1">Linux PC</h5>
+                                    <span class="small text-muted">Ubuntu, Debian, Fedora, Arch</span>
+                                </div>
+                            </div>
+                            <div class="col-sm-6 col-md-4">
+                                <div class="platform-card p-3 text-center h-100" onclick="selectPlatform('android')">
+                                    <div class="platform-icon text-success"><i class="fab fa-android"></i></div>
+                                    <h5 class="fw-bold mb-1">Android</h5>
+                                    <span class="small text-muted">Phone, Tablet, Chromebook</span>
+                                </div>
+                            </div>
+                            <div class="col-sm-6 col-md-4">
+                                <div class="platform-card p-3 text-center h-100" onclick="selectPlatform('windows')">
+                                    <div class="platform-icon text-info"><i class="fab fa-windows"></i></div>
+                                    <h5 class="fw-bold mb-1">Windows PC</h5>
+                                    <span class="small text-muted">Windows 10, 11 (64-bit)</span>
+                                </div>
+                            </div>
+                            <div class="col-sm-6 col-md-4">
+                                 <div class="platform-card p-3 text-center h-100" onclick="selectPlatform('nintendo')">
+                                     <div class="platform-icon text-warning"><i class="fas fa-gamepad"></i></div>
+                                     <h5 class="fw-bold mb-1">Nintendo Switch</h5>
+                                     <span class="small text-muted">Cloud Parental Controls</span>
+                                 </div>
+                            </div>
+                            <div class="col-sm-6 col-md-4">
+                                 <div class="platform-card p-3 text-center h-100" onclick="selectPlatform('xbox')">
+                                     <div class="platform-icon text-danger"><i class="fab fa-xbox"></i></div>
+                                     <h5 class="fw-bold mb-1">Xbox Console</h5>
+                                     <span class="small text-muted">Cloud Parental Controls</span>
+                                 </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- STEP 2: Platform Setup Instructions -->
+                    <div class="wizard-step-panel d-none" id="step-panel-2">
+                        <!-- Linux Instructions -->
+                        <div id="setup-instruction-linux" class="d-none">
+                            <p class="mb-3">On the Linux computer, open a terminal and run this one-line installer to connect Guardian:</p>
+                            <div class="position-relative mb-3">
+                                <pre class="guardian-code-block p-3 text-wrap font-monospace"
+                                    style="font-size: 0.85rem;"
+                                    id="linux-install-cmd">curl -sSL http://yourserver/scripts/install-agent.sh | sudo bash -s -- --url ws://yourserver/ws</pre>
+                                <button class="btn btn-sm btn-outline-light position-absolute top-0 end-0 m-2"
+                                    onclick="copyLinuxCommand()">Copy</button>
+                            </div>
+                            <p class="text-muted small"><i class="fas fa-info-circle me-1"></i>Guardian installs quietly in the background and starts a secure pairing handshake with this console.</p>
+                        </div>
+
+                        <!-- Android Instructions -->
+                        <div id="setup-instruction-android" class="d-none">
+                            <ul class="nav nav-tabs mb-3" id="androidTab" role="tablist">
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link active" id="qr-tab" data-bs-toggle="tab"
+                                        data-bs-target="#qr-pane" type="button" role="tab" aria-controls="qr-pane"
+                                        aria-selected="true">Standard Pairing QR</button>
+                                </li>
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link" id="mdm-tab" data-bs-toggle="tab"
+                                        data-bs-target="#mdm-pane" type="button" role="tab" aria-controls="mdm-pane"
+                                        aria-selected="false">MDM Provisioning QR</button>
+                                </li>
+                            </ul>
+                            <div class="tab-content" id="androidTabContent">
+                                <div class="tab-pane fade show active text-center" id="qr-pane" role="tabpanel"
+                                    aria-labelledby="qr-tab">
+                                    <p class="mb-2">Download the Guardian APK, open it on the child's Android device,
+                                        and scan the QR code to connect:</p>
+                                    <img id="android-qr-img" src="" alt="Pairing QR"
+                                        class="img-fluid border rounded p-2 bg-white mb-2" style="max-height: 200px;">
+                                    <div class="small"><code id="android-ws-url"></code></div>
+                                </div>
+                                <div class="tab-pane fade text-center" id="mdm-pane" role="tabpanel"
+                                    aria-labelledby="mdm-tab">
+                                    <p class="mb-2">For a fresh setup, tap the welcome screen 6 times, scan the QR code
+                                        below to enroll as Device Owner:</p>
+                                    <div id="mdm-qr-container">
+                                        <img id="android-mdm-qr-img" src="" alt="MDM QR"
+                                            class="img-fluid border rounded p-2 bg-white mb-2"
+                                            style="max-height: 200px;">
+                                    </div>
+                                    <div class="alert alert-warning small py-2 d-none" id="mdm-unavailable-alert">
+                                        MDM provisioning is unavailable. Make sure an Android APK has been uploaded in
+                                        Settings.
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Windows Instructions -->
+                        <div id="setup-instruction-windows" class="d-none">
+                            <p class="mb-3">On the Windows computer, open PowerShell as Administrator and paste this command to install Guardian:</p>
+                            <div class="position-relative mb-3">
+                                <pre class="guardian-code-block p-3 text-wrap font-monospace" id="windows-install-cmd">powershell -ExecutionPolicy Bypass -Command "..."</pre>
+                                <button class="btn btn-sm btn-outline-light position-absolute top-0 end-0 m-2" onclick="copyWindowsCommand()">Copy</button>
+                            </div>
+                            <p class="mb-3">Alternatively, you can download the MSI installer package directly and run it:</p>
+                            <div class="text-center mb-3">
+                                <a id="windows-download-link" href="#" class="btn btn-outline-primary fw-bold" download><i class="fas fa-download me-2"></i>Download MSI Installer</a>
+                            </div>
+                            <p class="text-muted small"><i class="fas fa-info-circle me-1"></i>The installer registers the background monitoring service and configures autostart components for user sessions.</p>
+                        </div>
+
+                        <!-- Nintendo Instructions -->
+                        <div id="setup-instruction-nintendo" class="d-none">
+                            <div id="nintendo-link-expired-alert" class="alert alert-warning py-2 small d-none mb-3 mx-auto" style="max-width: 500px;">
+                                Your Nintendo Account session has expired. Link again to continue adding consoles.
+                            </div>
+                            <p class="mb-3">Link your Nintendo Account to enable console monitoring:</p>
+                            <ol class="text-start mb-3 mx-auto" style="max-width: 500px;">
+                                <li>Click the button below to sign in to Nintendo.</li>
+                                <li>Log in, and on the final <b>"Select this person"</b> screen, right-click (or tap and hold) the button, copy its link address, and paste it below.</li>
+                            </ol>
+                            <div class="text-center mb-3">
+                                <a href="#" id="nintendo-login-btn" target="_blank" class="btn btn-outline-primary fw-bold"><i class="fas fa-external-link-alt me-2"></i>Sign In to Nintendo Account</a>
+                            </div>
+                            <div class="form-group text-start mx-auto mb-3" style="max-width: 500px;">
+                                <label for="nintendo-redirect-url" class="form-label fw-bold small text-muted">REDIRECT LINK ADDRESS</label>
+                                <input type="text" id="nintendo-redirect-url" class="form-control" placeholder="Paste npf... redirect URL here">
+                            </div>
+                            <div class="text-center mt-4">
+                                <button class="btn btn-secondary me-2" onclick="setWizardStep(1)">Back</button>
+                                <button class="btn btn-success" onclick="submitNintendoAuth()">Link Account &amp; Continue</button>
+                            </div>
+                        </div>
+
+                        <!-- Xbox Instructions -->
+                        <div id="setup-instruction-xbox" class="d-none">
+                            <div id="xbox-link-expired-alert" class="alert alert-warning py-2 small d-none mb-3 mx-auto" style="max-width: 500px;">
+                                Your Xbox Live/Microsoft session has expired. Link again to continue adding consoles.
+                            </div>
+                            <p class="mb-3">Link your Microsoft Xbox Live Account to enable console monitoring:</p>
+                            <ol class="text-start mb-3 mx-auto" style="max-width: 500px;">
+                                <li>Click the button below to sign in to Microsoft Live.</li>
+                                <li>Log in, and on the final blank screen (after clicking Yes/Accept), copy the complete address/URL of the page, and paste it below.</li>
+                            </ol>
+                            <div class="text-center mb-3">
+                                <a href="#" id="xbox-login-btn" target="_blank" class="btn btn-outline-primary fw-bold"><i class="fas fa-external-link-alt me-2"></i>Sign In to Microsoft Account</a>
+                            </div>
+                            <div class="form-group text-start mx-auto mb-3" style="max-width: 500px;">
+                                <label for="xbox-redirect-url" class="form-label fw-bold small text-muted">REDIRECT LINK ADDRESS</label>
+                                <input type="text" id="xbox-redirect-url" class="form-control" placeholder="Paste Microsoft redirect URL here">
+                            </div>
+                            <div class="text-center mt-4">
+                                <button class="btn btn-secondary me-2" onclick="setWizardStep(1)">Back</button>
+                                <button class="btn btn-success" onclick="submitXboxAuth()">Link Account &amp; Continue</button>
+                            </div>
+                        </div>
+
+                        <div class="text-center mt-4" id="setup-standard-footer-btns">
+                            <button class="btn btn-secondary me-2" onclick="setWizardStep(1)">Back</button>
+                            <button class="btn btn-primary" onclick="goToStep3()">I have run/scanned it</button>
+                        </div>
+                    </div>
+
+                    <!-- STEP 3: Detecting / Approving Device -->
+                    <div class="wizard-step-panel d-none text-center" id="step-panel-3">
+                        <div id="detect-loading">
+                            <div class="spinner-border text-primary mb-3" style="width: 3rem; height: 3rem;"
+                                role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p class="lead">Scanning for new agent connections...</p>
+                            <p class="text-muted small">Guardian is waiting for the device client to connect to the
+                                WebSocket hub. This usually takes a few seconds.</p>
+                        </div>
+
+                        <div id="detect-success" class="d-none">
+                            <div class="text-success fs-1 mb-2"><i class="fas fa-check-circle"></i></div>
+                            <h5 class="fw-bold mb-3" id="detected-device-text">Device Connected!</h5>
+
+                            <div class="form-group text-start mx-auto" style="max-width: 400px;">
+                                <label for="wizard-device-label" class="form-label fw-bold small text-muted">ASSIGN A
+                                    DEVICE LABEL</label>
+                                <input type="text" id="wizard-device-label" class="form-control"
+                                    placeholder="e.g. Jordan's Laptop">
+                            </div>
+
+                            <div class="text-center mt-4">
+                                <button class="btn btn-primary" onclick="goToStep4()">Approve &amp; Continue</button>
+                            </div>
+                        </div>
+
+                        <!-- Nintendo Device Select Panel -->
+                        <div id="nintendo-device-select-panel" class="d-none text-start mx-auto" style="max-width: 500px;">
+                            <div class="text-success fs-1 mb-2 text-center"><i class="fas fa-gamepad"></i></div>
+                            <h5 class="fw-bold mb-3 text-center">Nintendo Console Found</h5>
+                            
+                            <div class="form-group mb-3">
+                                <label for="wizard-nintendo-device-select" class="form-label fw-bold small text-muted">SELECT SWITCH CONSOLE</label>
+                                <select id="wizard-nintendo-device-select" class="form-select" onchange="onNintendoConsoleChange()">
+                                    <!-- Will populate with Switch devices -->
+                                </select>
+                            </div>
+
+                            <div class="form-group mb-3">
+                                <label for="wizard-nintendo-device-label" class="form-label fw-bold small text-muted">ASSIGN A DEVICE LABEL</label>
+                                <input type="text" id="wizard-nintendo-device-label" class="form-control" placeholder="e.g. Living Room Switch">
+                            </div>
+
+                            <div class="text-center mt-4">
+                                <button class="btn btn-primary" onclick="importNintendoDevice()">Link Console &amp; Continue</button>
+                            </div>
+                        </div>
+
+                        <!-- Xbox Device Select Panel -->
+                        <div id="xbox-device-select-panel" class="d-none text-start mx-auto" style="max-width: 500px;">
+                            <div class="text-danger fs-1 mb-2 text-center"><i class="fab fa-xbox"></i></div>
+                            <h5 class="fw-bold mb-3 text-center">Xbox Console Found</h5>
+                            
+                            <div class="form-group mb-3">
+                                <label for="wizard-xbox-device-select" class="form-label fw-bold small text-muted">SELECT XBOX CONSOLE</label>
+                                <select id="wizard-xbox-device-select" class="form-select" onchange="onXboxConsoleChange()">
+                                    <!-- Will populate with Xbox devices -->
+                                </select>
+                            </div>
+
+                            <div class="form-group mb-3">
+                                <label for="wizard-xbox-device-label" class="form-label fw-bold small text-muted">ASSIGN A DEVICE LABEL</label>
+                                <input type="text" id="wizard-xbox-device-label" class="form-control" placeholder="e.g. Family Room Xbox">
+                            </div>
+
+                            <div class="text-center mt-4">
+                                <button class="btn btn-primary" onclick="importXboxDevice()">Link Console &amp; Continue</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- STEP 4: Child Profile Assignment -->
+                    <div class="wizard-step-panel d-none" id="step-panel-4">
+                        <div style="max-width: 500px; margin: 0 auto;">
+                            <div class="form-check mb-3">
+                                <input class="form-check-input" type="checkbox" id="wizard-new-user-checkbox"
+                                    onchange="toggleNewUserField()">
+                                <label class="form-check-label fw-bold" for="wizard-new-user-checkbox">
+                                    Create a new child profile for this device
+                                </label>
+                            </div>
+
+                            <!-- Select Existing User -->
+                            <div class="form-group mb-3" id="wizard-existing-user-group">
+                                <label for="wizard-user-select" class="form-label fw-bold small text-muted">SELECT CHILD
+                                    PROFILE</label>
+                                <select id="wizard-user-select" class="form-select">
+                                    <option value="" disabled selected>Select child account</option>
+                                </select>
+                            </div>
+
+                            <!-- Create New User Inline -->
+                            <div class="form-group mb-3 d-none" id="wizard-new-user-group">
+                                <label for="wizard-user-input" class="form-label fw-bold small text-muted">NEW CHILD
+                                    PROFILE NAME</label>
+                                <input type="text" id="wizard-user-input" class="form-control"
+                                    placeholder="e.g. Jordan">
+                            </div>
+
+                            <div class="text-center mt-4">
+                                <button class="btn btn-secondary me-2" onclick="setWizardStep(2)">Back</button>
+                                <button class="btn btn-primary" id="wizard-profile-next-btn"
+                                    onclick="goToStep5()">Next</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- STEP 5: Account Mapping -->
+                    <div class="wizard-step-panel d-none" id="step-panel-5">
+                        <div style="max-width: 500px; margin: 0 auto;">
+                            <!-- Mappings Info -->
+                            <div id="wizard-mapping-section">
+                                <p class="mb-3 text-center" id="wizard-mapping-instructions">Guardian found the
+                                    following local accounts on the device. Select which local user account should be
+                                    locked under this profile:</p>
+                                <div class="form-group mb-3">
+                                    <label for="wizard-linux-user-select" class="form-label fw-bold small text-muted"
+                                        id="wizard-user-select-label">LOCAL OS USERNAME</label>
+                                    <select id="wizard-linux-user-select" class="form-select">
+                                        <!-- Will populate dynamically -->
+                                    </select>
+                                </div>
+                                <div class="form-group mb-3">
+                                    <label for="wizard-linux-uid" class="form-label fw-bold small text-muted"
+                                        id="wizard-uid-label">LINUX UID (OPTIONAL)</label>
+                                    <input type="text" id="wizard-linux-uid" class="form-control"
+                                        placeholder="e.g. 1000">
+                                </div>
+                            </div>
+
+                            <div class="text-center mt-4">
+                                <button class="btn btn-secondary me-2" onclick="setWizardStep(4)">Back</button>
+                                <button class="btn btn-success" onclick="completeOnboarding()">Complete
+                                    Onboarding</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="notification-toast" class="notification-toast">
+        <div class="toast-content">
+            <svg class="toast-icon" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                <path
+                    d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zm-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.061L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z" />
+            </svg>
+            <span class="toast-message">Changes saved successfully!</span>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/admin-lte@4.0.0/dist/js/adminlte.min.js"></script>
+
+    <!-- Background Task Poller & Onboarding Wizard Controller -->
+    <script>
+        function showNotification(message, type = 'success') {
+            const toast = document.getElementById('notification-toast');
+            if (!toast) return;
+            const messageEl = toast.querySelector('.toast-message');
+            const iconEl = toast.querySelector('.toast-icon path');
+            if (!messageEl || !iconEl) return;
+
+            messageEl.textContent = message;
+            toast.className = `notification-toast ${type}`;
+
+            if (type === 'success') {
+                iconEl.setAttribute('d', 'M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zm-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.061L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z');
+            } else if (type === 'error') {
+                iconEl.setAttribute('d', 'M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zM5.354 4.646a.5.5 0 1 0-.708.708L7.293 8l-2.647 2.646a.5.5 0 0 0 .708.708L8 8.707l2.646 2.647a.5.5 0 0 0 .708-.708L8.707 8l2.647-2.646a.5.5 0 0 0-.708-.708L8 7.293 5.354 4.646z');
+            }
+
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 2500);
+        }
+
+        function updateApprovalsBadges(pendingApprovals) {
+            const total = pendingApprovals && typeof pendingApprovals.total === 'number'
+                ? pendingApprovals.total
+                : 0;
+            const navbarBadge = document.getElementById('navbar-approvals-badge');
+            const navbarBadgeMobile = document.getElementById('navbar-approvals-badge-mobile');
+            const navbarCount = document.getElementById('navbar-approvals-count');
+            const sidebarBadge = document.getElementById('sidebar-approvals-badge');
+            const displayValue = total > 0 ? 'inline-flex' : 'none';
+
+            if (navbarBadge && navbarCount) {
+                navbarBadge.style.display = displayValue;
+                navbarCount.textContent = String(total);
+            }
+            if (navbarBadgeMobile) {
+                navbarBadgeMobile.style.display = displayValue;
+            }
+
+            if (sidebarBadge) {
+                if (total > 0) {
+                    sidebarBadge.style.display = 'inline-flex';
+                    sidebarBadge.textContent = String(total);
+                } else {
+                    sidebarBadge.style.display = 'none';
+                    sidebarBadge.textContent = '0';
+                }
+            }
+        }
+
+        function updateApprovalsBadgesFromApi() {
+            fetch('/api/dashboard')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success && data.pending_approvals) {
+                        updateApprovalsBadges(data.pending_approvals);
+                    }
+                })
+                .catch(() => { });
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            updateApprovalsBadgesFromApi();
+            setInterval(updateApprovalsBadgesFromApi, 30000);
+
+            function checkGlobalTaskStatus() {
+                fetch('/api/task-status')
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            const badge = document.getElementById('navbar-task-badge');
+                            const badgeMobile = document.getElementById('navbar-task-badge-mobile');
+                            const status = data.status;
+                            const hasIssues = !status.running || !status.thread_alive || status.last_error;
+                            const displayValue = hasIssues ? 'inline-flex' : 'none';
+
+                            if (badge) {
+                                badge.style.display = displayValue;
+                            }
+                            if (badgeMobile) {
+                                badgeMobile.style.display = displayValue;
+                            }
+                        }
+                    })
+                    .catch(error => console.error('Error fetching global task status:', error));
+            }
+            checkGlobalTaskStatus();
+            setInterval(checkGlobalTaskStatus, 15000);
+
+            const profileTrigger = document.getElementById('guardian-profile-node-trigger');
+            const profilePopout = document.getElementById('guardian-profile-popout');
+            if (profileTrigger && profilePopout) {
+                function isSidebarIconRail() {
+                    const sidebar = document.querySelector('.guardian-sidebar');
+                    if (!sidebar || !document.body.classList.contains('sidebar-collapse')) {
+                        return false;
+                    }
+                    return sidebar.getBoundingClientRect().width < 120;
+                }
+
+                function resetProfilePopoutPosition() {
+                    profilePopout.style.position = '';
+                    profilePopout.style.left = '';
+                    profilePopout.style.right = '';
+                    profilePopout.style.bottom = '';
+                    profilePopout.style.top = '';
+                    profilePopout.style.width = '';
+                }
+
+                function positionProfilePopout() {
+                    if (!isSidebarIconRail()) {
+                        resetProfilePopoutPosition();
+                        return;
+                    }
+                    const rect = profileTrigger.getBoundingClientRect();
+                    profilePopout.style.position = 'fixed';
+                    profilePopout.style.left = `${Math.round(rect.right + 10)}px`;
+                    profilePopout.style.bottom = `${Math.round(window.innerHeight - rect.bottom)}px`;
+                    profilePopout.style.top = 'auto';
+                    profilePopout.style.right = 'auto';
+                    profilePopout.style.width = '17rem';
+                }
+
+                function closeProfilePopout() {
+                    profilePopout.hidden = true;
+                    profileTrigger.setAttribute('aria-expanded', 'false');
+                    resetProfilePopoutPosition();
+                }
+
+                profileTrigger.addEventListener('click', (event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    const willOpen = profilePopout.hidden;
+                    profilePopout.hidden = !willOpen;
+                    profileTrigger.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+                    if (willOpen) {
+                        positionProfilePopout();
+                    } else {
+                        resetProfilePopoutPosition();
+                    }
+                });
+
+                window.addEventListener('resize', () => {
+                    if (!profilePopout.hidden) {
+                        positionProfilePopout();
+                    }
+                });
+
+                document.addEventListener('click', (event) => {
+                    if (profilePopout.hidden) {
+                        return;
+                    }
+                    if (profilePopout.contains(event.target) || profileTrigger.contains(event.target)) {
+                        return;
+                    }
+                    closeProfilePopout();
+                });
+
+                document.addEventListener('keydown', (event) => {
+                    if (event.key === 'Escape') {
+                        closeProfilePopout();
+                    }
+                });
+            }
+        });
+
+        // ── ONBOARDING WIZARD CODE ──────────────────────────────────────────
+        let wizardModal = null;
+        let wizardState = {
+            step: 1,
+            platform: '',
+            wsUrl: '',
+            pairingPayload: '',
+            pendingDevices: [],
+            detectedDevice: null,
+            users: []
+        };
+        let discoveryInterval = null;
+
+        function openOnboardingWizard() {
+            if (!wizardModal) {
+                wizardModal = new bootstrap.Modal(document.getElementById('onboardingWizardModal'));
+            }
+            resetWizard();
+            wizardModal.show();
+        }
+
+        function closeWizard() {
+            if (discoveryInterval) {
+                clearInterval(discoveryInterval);
+                discoveryInterval = null;
+            }
+        }
+
+        function resetWizard() {
+            wizardState = {
+                step: 1,
+                platform: '',
+                wsUrl: '',
+                pairingPayload: '',
+                pendingDevices: [],
+                detectedDevice: null,
+                users: []
+            };
+            if (discoveryInterval) {
+                clearInterval(discoveryInterval);
+                discoveryInterval = null;
+            }
+            setWizardStep(1);
+
+            // Clean up inputs
+            document.getElementById('wizard-device-label').value = '';
+            document.getElementById('wizard-user-input').value = '';
+
+            const uidInput = document.getElementById('wizard-linux-uid');
+            const uidLabel = document.getElementById('wizard-uid-label');
+            const uidGroup = uidInput ? (uidInput.closest('.form-group') || uidInput.parentElement) : null;
+            if (uidInput) {
+                uidInput.value = '';
+                uidInput.classList.remove('d-none');
+            }
+            if (uidLabel) {
+                uidLabel.classList.remove('d-none');
+            }
+            if (uidGroup) {
+                uidGroup.classList.remove('d-none');
+            }
+
+            const nintendoPanel = document.getElementById('nintendo-device-select-panel');
+            if (nintendoPanel) {
+                nintendoPanel.classList.add('d-none');
+            }
+            const nintendoRedirect = document.getElementById('nintendo-redirect-url');
+            if (nintendoRedirect) {
+                nintendoRedirect.value = '';
+            }
+
+            const xboxPanel = document.getElementById('xbox-device-select-panel');
+            if (xboxPanel) {
+                xboxPanel.classList.add('d-none');
+            }
+            const xboxRedirect = document.getElementById('xbox-redirect-url');
+            if (xboxRedirect) {
+                xboxRedirect.value = '';
+            }
+
+            document.getElementById('wizard-new-user-checkbox').checked = false;
+            toggleNewUserField();
+        }
+
+        function setWizardStep(step) {
+            wizardState.step = step;
+
+            // Update stepper nodes
+            for (let i = 1; i <= 5; i++) {
+                const node = document.getElementById(`step-node-${i}`);
+                node.className = 'step-node';
+                if (i < step) {
+                    node.classList.add('completed');
+                    node.innerHTML = '<i class="fas fa-check"></i>';
+                } else if (i === step) {
+                    node.classList.add('active');
+                    node.innerHTML = i;
+                } else {
+                    node.innerHTML = i;
+                }
+            }
+
+            // Hide all panels
+            document.querySelectorAll('.wizard-step-panel').forEach(p => p.classList.add('d-none'));
+            document.getElementById(`step-panel-${step}`).classList.remove('d-none');
+
+            // Update title/subtitle
+            const titleEl = document.getElementById('step-title');
+            const subtitleEl = document.getElementById('step-subtitle');
+
+            if (step === 1) {
+                titleEl.textContent = 'Choose Platform';
+                subtitleEl.textContent = 'Select the hardware type you wish to enroll under Guardian.';
+            } else if (step === 2) {
+                titleEl.textContent = 'Setup Instructions';
+                let platformName = 'Linux PC';
+                if (wizardState.platform === 'android') platformName = 'Android Device';
+                else if (wizardState.platform === 'windows') platformName = 'Windows PC';
+                else if (wizardState.platform === 'nintendo') platformName = 'Nintendo Account';
+                else if (wizardState.platform === 'xbox') platformName = 'Xbox Live Account';
+                subtitleEl.textContent = `Follow these steps to configure your ${platformName}.`;
+            } else if (step === 3) {
+                titleEl.textContent = 'Detecting Device';
+                subtitleEl.textContent = 'Waiting for your device agent client to make contact with the server.';
+            } else if (step === 4) {
+                titleEl.textContent = 'Select Child Profile';
+                subtitleEl.textContent = 'Assign this hardware device to a child profile.';
+            } else if (step === 5) {
+                titleEl.textContent = 'Account Mappings';
+                subtitleEl.textContent = 'Map the local hardware accounts to this profile.';
+            }
+        }
+
+        function selectPlatform(platform) {
+            wizardState.platform = platform;
+
+            // Highlight card
+            document.querySelectorAll('.platform-card').forEach(c => c.classList.remove('selected'));
+
+            // Load Pairing Details via AJAX
+            fetch('/api/pairing/config')
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success) {
+                        wizardState.wsUrl = data.payload.server_url;
+                        wizardState.pairingPayload = JSON.stringify(data.payload);
+
+                        // Setup step 2 instructions based on platform
+                        document.getElementById('setup-instruction-linux').classList.add('d-none');
+                        document.getElementById('setup-instruction-android').classList.add('d-none');
+                        document.getElementById('setup-instruction-windows').classList.add('d-none');
+                        document.getElementById('setup-instruction-nintendo').classList.add('d-none');
+                        document.getElementById('setup-instruction-xbox').classList.add('d-none');
+                        document.getElementById('setup-standard-footer-btns').classList.remove('d-none');
+
+                        if (platform === 'linux') {
+                            document.getElementById('setup-instruction-linux').classList.remove('d-none');
+                            document.getElementById('linux-install-cmd').textContent =
+                                `wget -qO- ${window.location.origin}/scripts/install-agent.sh | sudo bash -s -- --url "${wizardState.wsUrl}"`;
+                        } else if (platform === 'android') {
+                            document.getElementById('setup-instruction-android').classList.remove('d-none');
+                            document.getElementById('android-qr-img').src = '/api/pairing/qr.png';
+                            document.getElementById('android-ws-url').textContent = wizardState.wsUrl;
+
+                            // Load MDM Provisioning details
+                            fetch('/api/pairing/provisioning/config')
+                                .then(r => r.json())
+                                .then(pData => {
+                                    const mdrQr = document.getElementById('android-mdm-qr-img');
+                                    const mdmAlert = document.getElementById('mdm-unavailable-alert');
+                                    if (pData.success && pData.provisioning_ready) {
+                                        mdrQr.src = '/api/pairing/provisioning/qr.png';
+                                        mdrQr.classList.remove('d-none');
+                                        mdmAlert.classList.add('d-none');
+                                    } else {
+                                        mdrQr.classList.add('d-none');
+                                        mdmAlert.classList.remove('d-none');
+                                    }
+                                });
+                        } else if (platform === 'windows') {
+                            document.getElementById('setup-instruction-windows').classList.remove('d-none');
+                            const psCmd = `powershell -ExecutionPolicy Bypass -Command "Invoke-WebRequest -Uri '${window.location.origin}/api/pairing/windows/msi' -OutFile 'setup.msi'; Start-Process msiexec.exe -ArgumentList '/i setup.msi SERVER_URL=\\"${window.location.origin}/api/pairing/windows/msi' -OutFile 'setup.msi'; Start-Process msiexec.exe -ArgumentList '/i setup.msi SERVER_URL=\\"${wizardState.wsUrl}\\" REGISTRATION_TOKEN=\\"${data.payload.registration_token || ''}\\" /qn' -Wait"`;
+                            document.getElementById('windows-install-cmd').textContent = psCmd;
+                            document.getElementById('windows-download-link').href = `${window.location.origin}/api/pairing/windows/msi`;
+                        } else if (platform === 'nintendo') {
+                            prepareNintendoWizardStep();
+                        } else if (platform === 'xbox') {
+                            prepareXboxWizardStep();
+                        }
+
+                        if (platform !== 'nintendo' && platform !== 'xbox') {
+                            setWizardStep(2);
+                        }
+                    }
+                })
+                .catch(err => console.error('Failed to load pairing configuration', err));
+        }
+
+        function prepareNintendoLoginForm(showExpiredWarning) {
+            document.getElementById('setup-instruction-nintendo').classList.remove('d-none');
+            document.getElementById('setup-standard-footer-btns').classList.add('d-none');
+            const expiredAlert = document.getElementById('nintendo-link-expired-alert');
+            if (expiredAlert) {
+                expiredAlert.classList.toggle('d-none', !showExpiredWarning);
+            }
+            fetch('/api/nintendo/login-url')
+                .then(r => r.json())
+                .then(res => {
+                    if (res.success) {
+                        document.getElementById('nintendo-login-btn').href = res.login_url;
+                    } else {
+                        alert('Failed to get Nintendo login URL: ' + res.message);
+                    }
+                })
+                .catch(err => console.error('Error fetching Nintendo login URL', err));
+            setWizardStep(2);
+        }
+
+        function prepareNintendoWizardStep() {
+            fetch('/api/nintendo/account-status?validate=1')
+                .then(r => r.json())
+                .then(status => {
+                    if (status.success && status.linked && status.token_valid !== false) {
+                        goToNintendoStep3();
+                        return;
+                    }
+                    prepareNintendoLoginForm(Boolean(status.success && status.linked && status.token_valid === false));
+                })
+                .catch(err => {
+                    console.error('Error checking Nintendo account status', err);
+                    prepareNintendoLoginForm(false);
+                });
+        }
+
+        function prepareXboxLoginForm(showExpiredWarning) {
+            document.getElementById('setup-instruction-xbox').classList.remove('d-none');
+            document.getElementById('setup-standard-footer-btns').classList.add('d-none');
+            const expiredAlert = document.getElementById('xbox-link-expired-alert');
+            if (expiredAlert) {
+                expiredAlert.classList.toggle('d-none', !showExpiredWarning);
+            }
+            fetch('/api/xbox/login-url')
+                .then(r => r.json())
+                .then(res => {
+                    if (res.success) {
+                        document.getElementById('xbox-login-btn').href = res.login_url;
+                    } else {
+                        alert('Failed to get Xbox login URL: ' + res.message);
+                    }
+                })
+                .catch(err => console.error('Error fetching Xbox login URL', err));
+            setWizardStep(2);
+        }
+
+        function prepareXboxWizardStep() {
+            fetch('/api/xbox/account-status?validate=1')
+                .then(r => r.json())
+                .then(status => {
+                    if (status.success && status.linked && status.token_valid !== false) {
+                        goToXboxStep3();
+                        return;
+                    }
+                    prepareXboxLoginForm(Boolean(status.success && status.linked && status.token_valid === false));
+                })
+                .catch(err => {
+                    console.error('Error checking Xbox account status', err);
+                    prepareXboxLoginForm(false);
+                });
+        }
+
+        function copyLinuxCommand() {
+            const cmdText = document.getElementById('linux-install-cmd').innerText;
+            navigator.clipboard.writeText(cmdText).then(() => {
+                alert('Command copied to clipboard!');
+            });
+        }
+
+        function copyWindowsCommand() {
+            const cmdText = document.getElementById('windows-install-cmd').innerText;
+            navigator.clipboard.writeText(cmdText).then(() => {
+                alert('Command copied to clipboard!');
+            });
+        }
+
+        function goToStep3() {
+            setWizardStep(3);
+            document.getElementById('detect-loading').classList.remove('d-none');
+            document.getElementById('detect-success').classList.add('d-none');
+
+            // Poll for pending devices
+            discoveryInterval = setInterval(pollPendingDevices, 3000);
+            pollPendingDevices();
+        }
+
+        function pollPendingDevices() {
+            fetch('/api/devices/pending')
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success && data.devices.length > 0) {
+                        // Filter by selected platform if possible
+                        let device = data.devices.find(d => d.platform === wizardState.platform);
+                        if (!device) device = data.devices[0]; // fallback
+
+                        wizardState.detectedDevice = device;
+                        clearInterval(discoveryInterval);
+                        discoveryInterval = null;
+
+                        document.getElementById('detect-loading').classList.add('d-none');
+                        document.getElementById('detect-success').classList.remove('d-none');
+                        document.getElementById('wizard-device-label').value = device.display_name;
+                        document.getElementById('detected-device-text').textContent = `Device Connected: ${device.display_name} (${device.system_ip})`;
+                    }
+                })
+                .catch(err => console.error('Error polling pending devices', err));
+        }
+
+        function toggleNewUserField() {
+            const checked = document.getElementById('wizard-new-user-checkbox').checked;
+            if (checked) {
+                document.getElementById('wizard-new-user-group').classList.remove('d-none');
+                document.getElementById('wizard-existing-user-group').classList.add('d-none');
+            } else {
+                document.getElementById('wizard-new-user-group').classList.add('d-none');
+                document.getElementById('wizard-existing-user-group').classList.remove('d-none');
+            }
+        }
+
+        function goToStep4() {
+            // Load child profiles via AJAX
+            fetch('/api/users')
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success) {
+                        const select = document.getElementById('wizard-user-select');
+                        select.innerHTML = '<option value="" disabled selected>Select child account</option>';
+                        data.users.forEach(u => {
+                            const opt = document.createElement('option');
+                            opt.value = u.id;
+                            opt.textContent = u.username;
+                            select.appendChild(opt);
+                        });
+                        setWizardStep(4);
+                    }
+                });
+        }
+
+        function goToStep5() {
+            const checked = document.getElementById('wizard-new-user-checkbox').checked;
+            const select = document.getElementById('wizard-user-select');
+            const newName = document.getElementById('wizard-user-input').value.trim();
+
+            if (!checked && !select.value) {
+                alert('Please select an existing child profile or check the box to create one.');
+                return;
+            }
+            if (checked && !newName) {
+                alert('Please enter a profile name.');
+                return;
+            }
+
+            setWizardStep(5);
+
+            const instructions = document.getElementById('wizard-mapping-instructions');
+            const selectLabel = document.getElementById('wizard-user-select-label');
+            const uidLabel = document.getElementById('wizard-uid-label');
+            const usersSelect = document.getElementById('wizard-linux-user-select');
+            const uidInput = document.getElementById('wizard-linux-uid');
+            const uidGroup = uidInput ? (uidInput.closest('.form-group') || uidInput.parentElement) : null;
+
+            usersSelect.innerHTML = '';
+            
+            if (wizardState.platform === 'nintendo' || wizardState.platform === 'xbox') {
+                instructions.textContent = wizardState.platform === 'nintendo'
+                    ? 'Select which Nintendo Switch player profile should be mapped to this child account:'
+                    : 'Select which Xbox Live member profile should be mapped to this child account:';
+                selectLabel.textContent = wizardState.platform === 'nintendo' ? 'NINTENDO PLAYER PROFILE' : 'XBOX MEMBER PROFILE';
+                if (uidLabel) uidLabel.classList.add('d-none');
+                if (uidInput) {
+                    uidInput.classList.add('d-none');
+                    uidInput.value = '';
+                }
+                if (uidGroup) uidGroup.classList.add('d-none');
+
+                const players = wizardState.detectedDevice.players || [];
+                if (players.length === 0) {
+                    const opt = document.createElement('option');
+                    opt.value = '';
+                    opt.textContent = 'No player profiles found.';
+                    usersSelect.appendChild(opt);
+                } else {
+                    players.forEach(p => {
+                        const opt = document.createElement('option');
+                        opt.value = p.player_id;
+                        opt.textContent = p.nickname;
+                        usersSelect.appendChild(opt);
+                    });
+                }
+                usersSelect.onchange = null;
+            } else {
+                if (uidLabel) uidLabel.classList.remove('d-none');
+                if (uidInput) uidInput.classList.remove('d-none');
+                if (uidGroup) uidGroup.classList.remove('d-none');
+
+                const detectedUsers = wizardState.detectedDevice.linux_users || [];
+
+                if (wizardState.platform === 'linux') {
+                    instructions.textContent = 'Guardian found the following local accounts on the device. Select which local user account should be locked under this profile:';
+                    selectLabel.textContent = 'LOCAL OS USERNAME';
+                    if (uidLabel) uidLabel.textContent = 'LINUX UID (OPTIONAL)';
+                    if (uidInput) uidInput.placeholder = 'e.g. 1000';
+                } else {
+                    instructions.textContent = 'Guardian found the following Android profiles on the device. Select which Android profile should be locked under this child account:';
+                    selectLabel.textContent = 'ANDROID PROFILE';
+                    if (uidLabel) uidLabel.textContent = 'ANDROID USER ID (UID)';
+                    if (uidInput) uidInput.placeholder = 'e.g. 0';
+                }
+
+                if (detectedUsers.length === 0) {
+                    const opt = document.createElement('option');
+                    opt.value = '';
+                    opt.textContent = wizardState.platform === 'linux'
+                        ? 'No local accounts reported. Type username manually below'
+                        : 'No Android profiles reported.';
+                    usersSelect.appendChild(opt);
+                } else {
+                    detectedUsers.forEach(u => {
+                        const opt = document.createElement('option');
+                        opt.value = u.username;
+                        opt.textContent = `${u.username} (UID: ${u.uid})`;
+                        opt.dataset.uid = u.uid;
+                        usersSelect.appendChild(opt);
+                    });
+                }
+
+                // Auto fill UID on change
+                usersSelect.onchange = () => {
+                    const opt = usersSelect.options[usersSelect.selectedIndex];
+                    uidInput.value = opt ? (opt.dataset.uid || '') : '';
+                };
+
+                // Set initial UID if user exists
+                if (detectedUsers.length > 0) {
+                    uidInput.value = detectedUsers[0].uid;
+                } else {
+                    uidInput.value = '';
+                }
+            }
+        }
+
+        function completeOnboarding() {
+            const isNewUser = document.getElementById('wizard-new-user-checkbox').checked;
+            const newName = document.getElementById('wizard-user-input').value.trim();
+            const existingUserId = document.getElementById('wizard-user-select').value;
+            const deviceName = document.getElementById('wizard-device-label').value.trim();
+
+            let userPromise;
+            if (isNewUser) {
+                // Create user profile via AJAX
+                userPromise = fetch('/api/user/create', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: newName })
+                })
+                    .then(r => r.json())
+                    .then(data => {
+                        if (!data.success) throw new Error(data.message);
+                        return data.user.id;
+                    });
+            } else {
+                userPromise = Promise.resolve(existingUserId);
+            }
+
+            userPromise
+                .then(userId => {
+                    // 1. Approve device with display label
+                    if (wizardState.platform === 'nintendo' || wizardState.platform === 'xbox') {
+                        return userId;
+                    }
+                    return fetch(`/api/device/approve/${wizardState.detectedDevice.system_id}`, { method: 'POST' })
+                        .then(r => r.json())
+                        .then(data => {
+                            if (!data.success) throw new Error(data.message);
+                            return userId;
+                        });
+                })
+                .then(userId => {
+                    // 2. Link account mapping
+                    const mappingData = new FormData();
+                    mappingData.append('system_id', wizardState.detectedDevice.system_id);
+
+                    const mappedUser = document.getElementById('wizard-linux-user-select').value;
+                    const mappedUid = document.getElementById('wizard-linux-uid').value.trim();
+
+                    mappingData.append('linux_username', mappedUser || (wizardState.platform === 'android' ? 'android-agent' : ''));
+                    if (mappedUid) {
+                        mappingData.append('linux_uid', mappedUid);
+                    }
+
+                    return fetch(`/managed-users/${userId}/mappings/add`, {
+                        method: 'POST',
+                        body: mappingData
+                    })
+                        .then(r => {
+                            // Redirect handles verification down the line
+                            // Since redirect yields HTML, we assume success or check status
+                            return userId;
+                        });
+                })
+                .then(userId => {
+                    // 3. Trigger validation check to finalize sync
+                    alert('Device paired and child account linked successfully!');
+                    window.location.reload();
+                })
+                .catch(err => {
+                    alert(`Error completing onboarding: ${err.message}`);
+                });
+        }
+
+        // ── NINTENDO SWITCH SPECIFIC ONBOARDING FLOW ────────────────────────
+        let nintendoConsoles = [];
+
+        function submitNintendoAuth() {
+            const redirectUrl = document.getElementById('nintendo-redirect-url').value.trim();
+            if (!redirectUrl) {
+                alert('Please paste the redirect URL from the Nintendo login process.');
+                return;
+            }
+
+            fetch('/api/nintendo/authenticate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ response_url: redirectUrl })
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    showNotification(data.message, 'success');
+                    goToNintendoStep3();
+                } else {
+                    alert('Authentication failed: ' + data.message);
+                }
+            })
+            .catch(err => {
+                console.error('Authentication error', err);
+                alert('Failed to connect to authentication API.');
+            });
+        }
+
+        function goToNintendoStep3() {
+            setWizardStep(3);
+            
+            // Hide standard detection blocks
+            document.getElementById('detect-loading').classList.add('d-none');
+            document.getElementById('detect-success').classList.add('d-none');
+            
+            // Show Nintendo device select panel
+            const nintendoPanel = document.getElementById('nintendo-device-select-panel');
+            nintendoPanel.classList.remove('d-none');
+            
+            // Show loading placeholder inside dropdown
+            const select = document.getElementById('wizard-nintendo-device-select');
+            select.innerHTML = '<option value="" disabled selected>Loading Nintendo consoles...</option>';
+            
+            // Call API to list devices
+            fetch('/api/nintendo/devices')
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success && data.devices && data.devices.length > 0) {
+                        nintendoConsoles = data.devices;
+                        const available = data.devices.filter(dev => !dev.enrolled);
+                        if (available.length === 0) {
+                            select.innerHTML = '<option value="" disabled selected>All consoles are already enrolled</option>';
+                            return;
+                        }
+                        select.innerHTML = '<option value="" disabled selected>Select a console</option>';
+                        available.forEach(dev => {
+                            const opt = document.createElement('option');
+                            opt.value = dev.device_id;
+                            opt.textContent = `${dev.name} (${dev.model})`;
+                            select.appendChild(opt);
+                        });
+                    } else {
+                        select.innerHTML = '<option value="" disabled selected>No consoles found or failed to fetch</option>';
+                        if (data.message) {
+                            alert('Failed to load consoles: ' + data.message);
+                        }
+                    }
+                })
+                .catch(err => {
+                    console.error('Error fetching Nintendo devices', err);
+                    select.innerHTML = '<option value="" disabled selected>Error loading consoles</option>';
+                });
+        }
+
+        function onNintendoConsoleChange() {
+            const select = document.getElementById('wizard-nintendo-device-select');
+            const selectedId = select.value;
+            const consoleObj = nintendoConsoles.find(c => c.device_id === selectedId);
+            if (consoleObj) {
+                document.getElementById('wizard-nintendo-device-label').value = consoleObj.name || 'Nintendo Switch';
+            }
+        }
+
+        function importNintendoDevice() {
+            const select = document.getElementById('wizard-nintendo-device-select');
+            const selectedId = select.value;
+            if (!selectedId) {
+                alert('Please select a Nintendo Switch console.');
+                return;
+            }
+            
+            const consoleObj = nintendoConsoles.find(c => c.device_id === selectedId);
+            const label = document.getElementById('wizard-nintendo-device-label').value.trim() || consoleObj.name || 'Nintendo Switch';
+            
+            // Call API to import the device
+            fetch('/api/nintendo/import-device', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ device_id: selectedId, name: label })
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    showNotification(data.message, 'success');
+                    
+                    // Set up detectedDevice state to match standard flow in Step 4 and 5
+                    wizardState.detectedDevice = {
+                        system_id: selectedId,
+                        display_name: label,
+                        players: consoleObj.players || []
+                    };
+                    
+                    goToStep4();
+                } else {
+                    alert('Failed to import device: ' + data.message);
+                }
+            })
+            .catch(err => {
+                console.error('Error importing device', err);
+                alert('Error importing device.');
+            });
+        }
+
+        // ── XBOX LIVE SPECIFIC ONBOARDING FLOW ────────────────────────
+        let xboxConsoles = [];
+
+        function submitXboxAuth() {
+            const redirectUrl = document.getElementById('xbox-redirect-url').value.trim();
+            if (!redirectUrl) {
+                alert('Please paste the redirect URL from the Microsoft login process.');
+                return;
+            }
+
+            fetch('/api/xbox/authenticate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ response_url: redirectUrl })
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    showNotification(data.message, 'success');
+                    goToXboxStep3();
+                } else {
+                    alert('Authentication failed: ' + data.message);
+                }
+            })
+            .catch(err => {
+                console.error('Authentication error', err);
+                alert('Failed to connect to authentication API.');
+            });
+        }
+
+        function goToXboxStep3() {
+            setWizardStep(3);
+            
+            // Hide standard detection blocks
+            document.getElementById('detect-loading').classList.add('d-none');
+            document.getElementById('detect-success').classList.add('d-none');
+            
+            // Show Xbox device select panel
+            const xboxPanel = document.getElementById('xbox-device-select-panel');
+            if (xboxPanel) xboxPanel.classList.remove('d-none');
+            
+            // Show loading placeholder inside dropdown
+            const select = document.getElementById('wizard-xbox-device-select');
+            if (select) select.innerHTML = '<option value="" disabled selected>Loading Xbox consoles...</option>';
+            
+            // Call API to list devices
+            fetch('/api/xbox/devices')
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success && data.devices && data.devices.length > 0) {
+                        xboxConsoles = data.devices;
+                        const available = data.devices.filter(dev => !dev.enrolled);
+                        if (available.length === 0) {
+                            if (select) select.innerHTML = '<option value="" disabled selected>All consoles are already enrolled</option>';
+                            return;
+                        }
+                        if (select) {
+                            select.innerHTML = '<option value="" disabled selected>Select a console</option>';
+                            available.forEach(dev => {
+                                const opt = document.createElement('option');
+                                opt.value = dev.device_id;
+                                opt.textContent = `${dev.name} (${dev.model})`;
+                                select.appendChild(opt);
+                            });
+                        }
+                    } else {
+                        if (select) select.innerHTML = '<option value="" disabled selected>No consoles found or failed to fetch</option>';
+                        if (data.message) {
+                            alert('Failed to load consoles: ' + data.message);
+                        }
+                    }
+                })
+                .catch(err => {
+                    console.error('Error fetching Xbox devices', err);
+                    if (select) select.innerHTML = '<option value="" disabled selected>Error loading consoles</option>';
+                });
+        }
+
+        function onXboxConsoleChange() {
+            const select = document.getElementById('wizard-xbox-device-select');
+            if (!select) return;
+            const selectedId = select.value;
+            const consoleObj = xboxConsoles.find(c => c.device_id === selectedId);
+            if (consoleObj) {
+                document.getElementById('wizard-xbox-device-label').value = consoleObj.name || 'Xbox Console';
+            }
+        }
+
+        function importXboxDevice() {
+            const select = document.getElementById('wizard-xbox-device-select');
+            if (!select) return;
+            const selectedId = select.value;
+            if (!selectedId) {
+                alert('Please select an Xbox console.');
+                return;
+            }
+            
+            const consoleObj = xboxConsoles.find(c => c.device_id === selectedId);
+            const label = document.getElementById('wizard-xbox-device-label').value.trim() || consoleObj.name || 'Xbox Console';
+            
+            // Call API to import the device
+            fetch('/api/xbox/import-device', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ device_id: selectedId, name: label })
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    showNotification(data.message, 'success');
+                    
+                    // Set up detectedDevice state to match standard flow in Step 4 and 5
+                    wizardState.detectedDevice = {
+                        system_id: selectedId,
+                        display_name: label,
+                        players: consoleObj.players || []
+                    };
+                    
+                    goToStep4();
+                } else {
+                    alert('Failed to import device: ' + data.message);
+                }
+            })
+            .catch(err => {
+                console.error('Error importing device', err);
+                alert('Error importing device.');
+            });
+        }
+    </script>
+    {% if session.get('logged_in') and policy_preset_matrix is defined %}
+    {% include '_create_profile_wizard.html' %}
+    <script type="application/json" id="policy-preset-matrix-data">{{ policy_preset_matrix | tojson }}</script>
+    <script type="application/json" id="marketplace-presets-data">{{ marketplace_presets | tojson }}</script>
+    <script src="{{ url_for('static', filename='js/guardian-wizard.js') }}"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            if (!window.GuardianWizard) return;
+            GuardianWizard.bindWizard({
+                matrixDataId: 'policy-preset-matrix-data',
+                presetsDataId: 'marketplace-presets-data',
+                ageSelector: '.policy-age-radio',
+                maturityInputId: 'create-policy-maturity-level',
+                sliderId: 'create-responsibility-slider',
+                sliderLabelId: 'create-slider-active-label',
+                summaryTitleId: 'create-preset-summary-title',
+                summaryListId: 'create-preset-summary-details',
+                narrativeId: 'create-responsibility-narrative',
+            });
+            GuardianWizard.bindCreateStepper({
+                modalId: 'createProfileModal',
+                formId: 'create-child-form',
+                prevBtnId: 'create-wizard-prev',
+                nextBtnId: 'create-wizard-next',
+                submitBtnId: 'create-wizard-submit',
+                usernameInputId: 'username',
+                totalSteps: 4,
+                onStepChange(step) {
+                    if (step === 4 && window.guardianRefreshWizardSummary) {
+                        window.guardianRefreshWizardSummary();
+                    }
+                },
+            });
+        });
+    </script>
+    {% endif %}
+
+    <!-- Add to Home Screen prompt -->
+    <div id="guardian-a2hs-banner" class="guardian-a2hs-banner" hidden role="region" aria-label="Add to home screen">
+        <div class="guardian-a2hs-banner__content">
+            <i class="fas fa-mobile-alt guardian-a2hs-banner__icon" aria-hidden="true"></i>
+            <div class="guardian-a2hs-banner__text">
+                <strong>Add Guardian to your home screen</strong>
+                <span id="guardian-a2hs-message">Quick access to routines and family dialogue.</span>
+            </div>
+            <div class="guardian-a2hs-banner__actions">
+                <button type="button" class="btn btn-sm guardian-btn-sage" id="guardian-a2hs-install" hidden>Install</button>
+                <button type="button" class="btn btn-sm btn-link text-secondary" id="guardian-a2hs-dismiss" aria-label="Dismiss">Not now</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/spa-router.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/pwa-install.js') }}"></script>
+</body>
+
+</html>

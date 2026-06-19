@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+{% extends "_spa_fragment.html" %}
 
 {% block title %}Web & Video History - {{ user.username }} - Guardian{% endblock %}
 
@@ -659,86 +659,130 @@
         }
     }
 
-    // Event Handlers
-    document.addEventListener('DOMContentLoaded', () => {
-        // Initialize date bounds
+    // Event Handlers — init on SPA fragment load (DOMContentLoaded already fired)
+    let historyPageAbort = null;
+
+    function teardownHistoryPage() {
+        if (historyPageAbort) {
+            historyPageAbort.abort();
+            historyPageAbort = null;
+        }
+        if (state.domainsChart) {
+            state.domainsChart.destroy();
+            state.domainsChart = null;
+        }
+        if (state.channelsChart) {
+            state.channelsChart.destroy();
+            state.channelsChart = null;
+        }
+    }
+
+    function initWebVideoHistoryPage() {
+        if (!document.querySelector('.history-main')) {
+            return;
+        }
+        teardownHistoryPage();
+        historyPageAbort = new AbortController();
+        const { signal } = historyPageAbort;
+
+        state.page = 1;
+        state.search = '';
+        state.type = 'all';
+        state.preset = '7days';
         updateDateBounds();
-        
-        // Fetch first batch
         fetchHistory();
 
-        // Preset buttons
-        document.querySelectorAll('.date-preset-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                document.querySelectorAll('.date-preset-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.date-preset-btn').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.date-preset-btn').forEach((b) => b.classList.remove('active'));
                 btn.classList.add('active');
-                
+
                 state.preset = btn.getAttribute('data-preset');
                 document.getElementById('current-date-range-label').innerText = btn.innerText;
-                
+
                 updateDateBounds();
                 state.page = 1;
                 fetchHistory();
-            });
+            }, { signal });
         });
 
-        // Apply custom range
-        document.getElementById('apply-custom-date').addEventListener('click', () => {
-            const startVal = document.getElementById('filter-start-date').value;
-            const endVal = document.getElementById('filter-end-date').value;
-            
-            if (startVal && endVal) {
-                state.preset = 'custom';
-                state.startDate = startVal;
-                state.endDate = endVal;
-                
-                document.getElementById('current-date-range-label').innerText = `${startVal} to ${endVal}`;
-                
-                // Remove active styling from preset buttons
-                document.querySelectorAll('.date-preset-btn').forEach(b => b.classList.remove('active'));
-                
+        const applyCustomBtn = document.getElementById('apply-custom-date');
+        if (applyCustomBtn) {
+            applyCustomBtn.addEventListener('click', () => {
+                const startVal = document.getElementById('filter-start-date').value;
+                const endVal = document.getElementById('filter-end-date').value;
+
+                if (startVal && endVal) {
+                    state.preset = 'custom';
+                    state.startDate = startVal;
+                    state.endDate = endVal;
+
+                    document.getElementById('current-date-range-label').innerText = `${startVal} to ${endVal}`;
+                    document.querySelectorAll('.date-preset-btn').forEach((b) => b.classList.remove('active'));
+
+                    state.page = 1;
+                    fetchHistory();
+
+                    const dropdownBtn = document.getElementById('dateFilterDropdown');
+                    const dropdownInstance = bootstrap.Dropdown.getInstance(dropdownBtn);
+                    if (dropdownInstance) {
+                        dropdownInstance.hide();
+                    }
+                }
+            }, { signal });
+        }
+
+        const typeFilter = document.getElementById('history-type-filter');
+        if (typeFilter) {
+            typeFilter.addEventListener('change', (e) => {
+                state.type = e.target.value;
                 state.page = 1;
                 fetchHistory();
-                
-                // Hide dropdown bootstrap menu
-                const dropdownBtn = document.getElementById('dateFilterDropdown');
-                const dropdownMenu = dropdownBtn.nextElementSibling;
-                bootstrap.Dropdown.getInstance(dropdownBtn).hide();
-            }
-        });
+            }, { signal });
+        }
 
-        // Type Filter
-        document.getElementById('history-type-filter').addEventListener('change', (e) => {
-            state.type = e.target.value;
-            state.page = 1;
-            fetchHistory();
-        });
-
-        // Debounced Search Input
         let searchTimeout;
-        document.getElementById('history-search-input').addEventListener('input', (e) => {
-            clearTimeout(searchTimeout);
-            searchTimeout = setTimeout(() => {
-                state.search = e.target.value.trim();
-                state.page = 1;
-                fetchHistory();
-            }, 300);
-        });
+        const searchInput = document.getElementById('history-search-input');
+        if (searchInput) {
+            searchInput.addEventListener('input', (e) => {
+                clearTimeout(searchTimeout);
+                searchTimeout = setTimeout(() => {
+                    state.search = e.target.value.trim();
+                    state.page = 1;
+                    fetchHistory();
+                }, 300);
+            }, { signal });
+        }
 
-        // Pagination buttons
-        document.getElementById('btn-prev-page').addEventListener('click', () => {
-            if (state.page > 1) {
-                state.page--;
+        const btnPrev = document.getElementById('btn-prev-page');
+        if (btnPrev) {
+            btnPrev.addEventListener('click', () => {
+                if (state.page > 1) {
+                    state.page--;
+                    fetchHistory();
+                    document.getElementById('history-list-container').scrollIntoView({ behavior: 'smooth' });
+                }
+            }, { signal });
+        }
+
+        const btnNext = document.getElementById('btn-next-page');
+        if (btnNext) {
+            btnNext.addEventListener('click', () => {
+                state.page++;
                 fetchHistory();
                 document.getElementById('history-list-container').scrollIntoView({ behavior: 'smooth' });
-            }
-        });
+            }, { signal });
+        }
+    }
 
-        document.getElementById('btn-next-page').addEventListener('click', () => {
-            state.page++;
-            fetchHistory();
-            document.getElementById('history-list-container').scrollIntoView({ behavior: 'smooth' });
+    window.__guardianHistoryTeardown = teardownHistoryPage;
+    if (!window.__guardianHistoryRouteHook) {
+        window.__guardianHistoryRouteHook = true;
+        document.addEventListener('guardian:route', () => {
+            window.__guardianHistoryTeardown?.();
         });
-    });
+    }
+
+    initWebVideoHistoryPage();
 </script>
 {% endblock %}

@@ -1,0 +1,54 @@
+{# Fragment response: injected into #spa-main by spa-router.js #}
+<!-- spa-title:{% block title %}Guardian Family Safety{% endblock %} -->
+<!-- spa-region:extra_head -->
+{% block extra_head %}{% endblock %}
+<!-- /spa-region:extra_head -->
+<!-- spa-region:top_nav_left -->
+{% block top_nav_left %}{% endblock %}
+<!-- /spa-region:top_nav_left -->
+<!-- spa-region:top_nav_brand_status -->
+{% block top_nav_brand_status %}{% endblock %}
+<!-- /spa-region:top_nav_brand_status -->
+<!-- spa-region:top_nav_center -->
+{% block top_nav_center %}{% endblock %}
+<!-- /spa-region:top_nav_center -->
+<!-- spa-region:top_nav_secondary -->
+{% block top_nav_secondary %}{% endblock %}
+<!-- /spa-region:top_nav_secondary -->
+<!-- spa-region:top_nav_extra -->
+{% block top_nav_extra %}{% endblock %}
+<!-- /spa-region:top_nav_extra -->
+<!-- spa-region:top_nav_primary -->
+{% block top_nav_primary %}{% endblock %}
+<!-- /spa-region:top_nav_primary -->
+<!-- spa-region:top_nav_overflow -->
+{% block top_nav_overflow %}{% endblock %}
+<!-- /spa-region:top_nav_overflow -->
+<div class="flash-messages-container">
+    {% block flash_messages %}
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    {% for category, message in messages %}
+    <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show shadow-sm mb-3"
+        role="alert">
+        <div class="d-flex align-items-center gap-2">
+            {% if category == 'success' %}
+            <i class="fas fa-check-circle text-success fs-5"></i>
+            {% elif category == 'danger' or category == 'error' %}
+            <i class="fas fa-exclamation-circle text-danger fs-5"></i>
+            {% elif category == 'warning' %}
+            <i class="fas fa-exclamation-triangle text-warning fs-5"></i>
+            {% else %}
+            <i class="fas fa-info-circle text-info fs-5"></i>
+            {% endif %}
+            <span>{{ message }}</span>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+    {% endfor %}
+    {% endif %}
+    {% endwith %}
+    {% endblock %}
+</div>
+{% block content %}{% endblock %}
+{% block extra_js %}{% endblock %}

@@ -38,8 +38,14 @@ class ThemeManager {
             Chart.defaults.borderColor = isDark ? '#334155' : '#e2e8f0';
             Chart.defaults.backgroundColor = isDark ? '#1E293B' : '#ffffff';
             
-            // Update existing charts
-            Chart.instances.forEach(chart => {
+            // Update existing charts (Chart.js 3.x stores instances in an object map)
+            const charts = typeof Chart.instances === 'object'
+                ? Object.values(Chart.instances)
+                : [];
+            charts.forEach((chart) => {
+                if (!chart || typeof chart.update !== 'function') {
+                    return;
+                }
                 if (chart.options.scales) {
                     const gridColor = isDark ? '#334155' : '#e2e8f0';
                     const tickColor = isDark ? '#94A3B8' : '#64748B';

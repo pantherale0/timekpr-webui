@@ -156,6 +156,7 @@ from src.blueprints import (
     ui_dashboard_bp,
     ui_schedule_bp,
     ui_apparmor_bp,
+    ui_spa_bp,
     api_devices_bp,
     api_users_bp,
     api_schedule_bp,
@@ -181,6 +182,7 @@ app.register_blueprint(ui_auth_bp)
 app.register_blueprint(ui_dashboard_bp)
 app.register_blueprint(ui_schedule_bp)
 app.register_blueprint(ui_apparmor_bp)
+app.register_blueprint(ui_spa_bp)
 app.register_blueprint(api_devices_bp)
 app.register_blueprint(api_users_bp)
 app.register_blueprint(api_schedule_bp)
@@ -220,6 +222,15 @@ def fallback_handler(error, endpoint, values):
 
 
 app.url_build_error_handlers.append(fallback_handler)
+
+
+@app.route('/sw.js')
+def service_worker():
+    """Serve the service worker from site root for full-scope PWA install."""
+    response = app.make_response(app.send_static_file('sw.js'))
+    response.headers['Content-Type'] = 'application/javascript; charset=utf-8'
+    response.headers['Service-Worker-Allowed'] = '/'
+    return response
 
 
 def _expected_schema_tables():

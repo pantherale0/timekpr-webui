@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+{% extends "_spa_fragment.html" %}
 
 {% block title %}Family Home - Guardian{% endblock %}
 
@@ -196,9 +196,22 @@
         return { dates, labels, values };
     }
 
+    function destroyAllCharts() {
+        Object.values(window._chartInstances || {}).forEach((chart) => {
+            if (chart && typeof chart.destroy === 'function') {
+                chart.destroy();
+            }
+        });
+        window._chartInstances = {};
+    }
+
     function createChart(userId, data) {
         const canvas = document.getElementById('chart-' + userId);
         if (!canvas) return null;
+        const existing = typeof Chart !== 'undefined' ? Chart.getChart(canvas) : null;
+        if (existing) {
+            existing.destroy();
+        }
         const ctx = canvas.getContext('2d');
         const { dates, labels, values } = data;
         const { max: yAxisMax, stepSize } = calculateYAxisScale(Math.max(...values, 1));
@@ -289,8 +302,15 @@
         const series = buildChartSeries(user.usage_data);
         window._chartData[user.id] = series;
 
-        const chart = window._chartInstances[user.id];
-        if (!chart) {
+        const canvas = document.getElementById('chart-' + user.id);
+        if (!canvas) return;
+
+        const liveChart = typeof Chart !== 'undefined' ? Chart.getChart(canvas) : null;
+        const chart = liveChart || window._chartInstances[user.id];
+        if (!chart || chart.canvas !== canvas) {
+            if (chart && typeof chart.destroy === 'function') {
+                chart.destroy();
+            }
             window._chartInstances[user.id] = createChart(user.id, series);
             return;
         }
@@ -398,11 +418,13 @@
         }
     }
 
-    (function initializeCharts() {
+    function initializeCharts() {
+        destroyAllCharts();
         for (const [userId, data] of Object.entries(window._chartData || {})) {
             window._chartInstances[userId] = createChart(userId, data);
         }
-    })();
+        updateChartsYAxis();
+    }
 
     let dashboardEventSource = null;
     let reconnectAttempts = 0;
@@ -488,25 +510,66 @@
         };
     }
 
-    document.addEventListener('visibilitychange', () => {
-        if (document.hidden) {
-            if (dashboardEventSource) {
-                dashboardEventSource.close();
-                dashboardEventSource = null;
-            }
-            clearDashboardTimers();
+    let dashboardPageAbort = null;
+
+    function teardownDashboardPage() {
+        clearDashboardTimers();
+        if (dashboardEventSource) {
+            dashboardEventSource.close();
+            dashboardEventSource = null;
+        }
+        if (dashboardPageAbort) {
+            dashboardPageAbort.abort();
+            dashboardPageAbort = null;
+        }
+        destroyAllCharts();
+    }
+
+    function initDashboardPage() {
+        if (!document.getElementById('dashboard-live-indicator')) {
             return;
         }
+        teardownDashboardPage();
+        dashboardPageAbort = new AbortController();
+        const { signal } = dashboardPageAbort;
 
-        reconnectAttempts = 0;
-        if (fallbackPollTimer) {
-            clearInterval(fallbackPollTimer);
-            fallbackPollTimer = null;
-        }
+        initializeCharts();
         connectDashboardEvents();
-    });
 
-    connectDashboardEvents();
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                if (dashboardEventSource) {
+                    dashboardEventSource.close();
+                    dashboardEventSource = null;
+                }
+                clearDashboardTimers();
+                return;
+            }
+
+            reconnectAttempts = 0;
+            if (fallbackPollTimer) {
+                clearInterval(fallbackPollTimer);
+                fallbackPollTimer = null;
+            }
+            connectDashboardEvents();
+        }, { signal });
+    }
+
+    window.__guardianDashboardTeardown = teardownDashboardPage;
+    if (!window.__guardianDashboardRouteHook) {
+        window.__guardianDashboardRouteHook = true;
+        document.addEventListener('guardian:route', () => {
+            window.__guardianDashboardTeardown?.();
+        });
+    }
+
+    window.openTimeAdjustModal = openTimeAdjustModal;
+    window.closeTimeAdjustModal = closeTimeAdjustModal;
+    window.adjustTime = adjustTime;
+    window.resetTime = resetTime;
+    window.submitTimeAdjustment = submitTimeAdjustment;
+
+    initDashboardPage();
 
     // Time adjustment modal management
     let currentUserId = null;

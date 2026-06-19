@@ -63,26 +63,9 @@ def sync_policy_to_all_assigned_users(policy):
 
 @ui_apparmor_bp.route('/admin/app-policies', methods=['GET'])
 def admin_app_policies():
-    """Visual admin panel for reusable App Policies."""
-    if not session.get('logged_in'):
-        flash('Please login first', 'warning')
-        return redirect(url_for('ui_auth.login'))
-
-    policies = AppPolicy.query.order_by(AppPolicy.name.asc()).all()
-    managed_users = ManagedUser.query.order_by(ManagedUser.username.asc()).all()
-    curated_options = CURATED_APPARMOR_APPS
-    discovered_apps_by_policy = {
-        policy.id: list_discovered_apps_for_platform(policy.platform)
-        for policy in policies
-    }
-
-    return render_template(
-        'restrictions_app.html',
-        policies=policies,
-        managed_users=managed_users,
-        curated_options=curated_options,
-        discovered_apps_by_policy=discovered_apps_by_policy,
-    )
+    """Serve the visual admin panel for reusable App Policies."""
+    from src.blueprints.ui.spa import render_spa_shell
+    return render_spa_shell('admin/app-policies')
 
 
 @ui_apparmor_bp.route('/admin/app-policies/create', methods=['POST'])

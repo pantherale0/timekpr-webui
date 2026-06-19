@@ -297,7 +297,11 @@
         const track = document.getElementById('bulk-window-track');
         const handleStart = document.getElementById('bulk-window-handle-start');
         const handleEnd = document.getElementById('bulk-window-handle-end');
-        if (!track || !handleStart || !handleEnd || track.dataset.rangeBound === '1') {
+        if (!track || !handleStart || !handleEnd) {
+            return;
+        }
+        if (track.dataset.rangeBound === '1') {
+            updateDualRangeFill();
             return;
         }
         track.dataset.rangeBound = '1';
@@ -821,19 +825,19 @@
             });
     }
 
-    function bindWizardControls() {
+    function bindWizardControls(signal) {
         const hoursSlider = document.getElementById('bulk-hours-slider');
         if (hoursSlider) {
             hoursSlider.addEventListener('input', () => {
                 updateBulkHoursDisplay();
                 setBulkHoursFromSlider();
-            });
+            }, { signal });
         }
 
         document.querySelectorAll('.guardian-milestone-pill').forEach((pill) => {
             pill.addEventListener('click', () => {
                 applyMilestoneHours(Number(pill.dataset.hours));
-            });
+            }, { signal });
         });
 
         document.querySelectorAll('[data-bulk-target]').forEach((button) => {
@@ -842,39 +846,51 @@
                 document.querySelectorAll('[data-bulk-target]').forEach((item) => {
                     item.classList.toggle('active', item === button);
                 });
-            });
+            }, { signal });
         });
 
         initDualRangeControl();
 
         const applyWindowBtn = document.getElementById('apply-bulk-window');
         if (applyWindowBtn) {
-            applyWindowBtn.addEventListener('click', applyBulkWindow);
+            applyWindowBtn.addEventListener('click', applyBulkWindow, { signal });
         }
 
         document.querySelectorAll('.day-hours-input').forEach((input) => {
-            input.addEventListener('input', updateSummaryMetrics);
+            input.addEventListener('input', updateSummaryMetrics, { signal });
         });
 
         const saveBtn = document.getElementById('save-routine-btn');
         if (saveBtn) {
-            saveBtn.addEventListener('click', saveAll);
+            saveBtn.addEventListener('click', saveAll, { signal });
         }
 
         document.querySelectorAll('.js-reset-routine').forEach((button) => {
-            button.addEventListener('click', resetForm);
+            button.addEventListener('click', resetForm, { signal });
         });
     }
 
+    let syncIntervalId = null;
+    let routineAbort = null;
+
     function initRoutineBlueprint() {
-        bindWizardControls();
+        if (routineAbort) {
+            routineAbort.abort();
+        }
+        routineAbort = new AbortController();
+
+        if (syncIntervalId) {
+            clearInterval(syncIntervalId);
+            syncIntervalId = null;
+        }
+        bindWizardControls(routineAbort.signal);
         updateBulkHoursDisplay();
         updateSummaryMetrics();
         renderAllTimelines();
         loadIntervals()
             .catch((error) => showNotification(`Error loading intervals: ${error.message}`, 'error'))
             .finally(updateSyncStatus);
-        setInterval(updateSyncStatus, 15000);
+        syncIntervalId = setInterval(updateSyncStatus, 15000);
     }
 
     window.GuardianRoutine = {
@@ -883,9 +899,24 @@
         resetForm,
     };
 
-    document.addEventListener('DOMContentLoaded', () => {
+    function maybeInitRoutineBlueprint() {
         if (document.getElementById('routine-blueprint-root')) {
             initRoutineBlueprint();
         }
-    });
+    }
+
+    function teardownRoutineBlueprint() {
+        if (routineAbort) {
+            routineAbort.abort();
+            routineAbort = null;
+        }
+        if (syncIntervalId) {
+            clearInterval(syncIntervalId);
+            syncIntervalId = null;
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', maybeInitRoutineBlueprint);
+    document.addEventListener('guardian:page-ready', maybeInitRoutineBlueprint);
+    document.addEventListener('guardian:route', teardownRoutineBlueprint);
 })();

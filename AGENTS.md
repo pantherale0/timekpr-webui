@@ -181,6 +181,10 @@ android-agent/              # Kotlin agent wrapper
 scripts/                    # install-agent.sh, provisioning helpers
 docs/                       # Service documentation (for both users and developers)
 extension/                  # Files related to the web browser extension
+i18n/                       # Internationalisation configuration files and UI strings, sorted by language folders (ISO 639-1), split into yaml files for each service
+i18n/*/server.yaml          # Server internationalisation configuration
+i18n/*/agent.yaml           # Agent internationalisation configuration
+i18n/*/extension.yaml       # Browser extension internationalisation configuration
 ```
 
 **Additional Rules for Contributors / AI Agents**

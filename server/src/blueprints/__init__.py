@@ -3,6 +3,7 @@ from src.blueprints.ui import (
     ui_dashboard_bp,
     ui_schedule_bp,
     ui_apparmor_bp,
+    ui_spa_bp,
 )
 from src.blueprints.api import (
     api_devices_bp,
@@ -31,6 +32,7 @@ __all__ = [
     'ui_dashboard_bp',
     'ui_schedule_bp',
     'ui_apparmor_bp',
+    'ui_spa_bp',
     'api_devices_bp',
     'api_users_bp',
     'api_schedule_bp',

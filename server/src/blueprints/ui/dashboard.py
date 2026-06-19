@@ -1,17 +1,7 @@
 import logging
-from flask import Blueprint, render_template, request, redirect, url_for, flash, session
-from src.database import db, ManagedUser, AgentDevice, Settings, AppPolicy
+from flask import Blueprint, request, redirect, url_for, flash, session
+from src.database import AgentDevice, Settings
 from src.agent_helper import AgentConnectionManager, refresh_installed_apps
-from src.installed_apps_manager import list_installed_apps_for_device, list_installed_apps_for_managed_user
-from src.helpers import _get_device_label_map, generate_parental_access_code
-from src.dashboard_helper import build_dashboard_snapshot
-from src.alerts_manager import _build_user_alert_groups, _build_device_alert_entries
-from src.apparmor_manager import _get_apparmor_usage_summary
-from src.blocklists_manager import (
-    _get_user_assigned_blocklist_source_ids,
-    _build_user_blocklist_sync_status,
-    _get_blocklist_sources,
-)
 from src.settings_manager import (
     _get_agent_websocket_url,
     _get_alert_webhook_settings,
@@ -24,19 +14,11 @@ from src.settings_manager import (
     _get_youtube_history_retention_days,
     _get_web_history_retention_days,
 )
-from src.nintendo_sync import build_nintendo_console_view_context
-from src.blueprints.api.nintendo import get_nintendo_account_summary
-from src.xbox_sync import build_xbox_console_view_context
-from src.blueprints.api.xbox import get_xbox_account_summary
+from src.blueprints.ui.spa import render_spa_shell
 from src.pairing_helper import (
-    build_agent_websocket_url,
-    get_server_version,
     has_uploaded_android_apk,
     normalize_agent_websocket_url,
-    pairing_payload_json,
     remove_uploaded_android_apk,
-    render_pairing_qr_data_uri,
-    resolve_android_provisioning,
     save_uploaded_android_apk,
 )
 
@@ -47,18 +29,8 @@ ui_dashboard_bp = Blueprint('ui_dashboard', __name__)
 
 @ui_dashboard_bp.route('/dashboard')
 def dashboard():
-    """Render the main dashboard with user status and recent usage data."""
-    if not session.get('logged_in'):
-        flash('Please login first', 'warning')
-        return redirect(url_for('ui_auth.login'))
-    
-    db.session.expire_all()
-    snapshot = build_dashboard_snapshot()
-    return render_template(
-        'dashboard.html',
-        users=snapshot['users'],
-        pending_adjustments=snapshot['pending_adjustments'],
-    )
+    """Serve the SPA shell with the family home dashboard."""
+    return render_spa_shell('dashboard')
 
 
 @ui_dashboard_bp.route('/admin')
@@ -72,217 +44,32 @@ def admin():
 
 @ui_dashboard_bp.route('/admin/users')
 def admin_users():
-    """Render the administration page for users and mappings."""
-    if not session.get('logged_in'):
-        flash('Please login first', 'warning')
-        return redirect(url_for('ui_auth.login'))
-    
-    users = ManagedUser.query.order_by(ManagedUser.username.asc()).all()
-    device_labels = _get_device_label_map()
-    approved_devices = AgentDevice.query.filter_by(status='approved').all()
-    
-    return render_template(
-        'admin_users.html',
-        users=users,
-        approved_devices=approved_devices,
-        device_labels=device_labels,
-    )
+    """Serve the child profiles administration page."""
+    return render_spa_shell('admin/users')
 
 
 @ui_dashboard_bp.route('/admin/users/<int:user_id>')
 def edit_user_profile(user_id):
-    """Render the user profile modification dashboard."""
-    if not session.get('logged_in'):
-        flash('Please login first', 'warning')
-        return redirect(url_for('ui_auth.login'))
-    
-    user = ManagedUser.query.get_or_404(user_id)
-    blocklist_sync_status = _build_user_blocklist_sync_status(user)
-    blocklist_sources = _get_blocklist_sources(include_domains=False, enabled_only=True)
-    blocklist_sources = [s for s in blocklist_sources if not s.get('is_marketplace')]
-
-    from src.marketplace_manager import load_marketplace_presets
-    from src.policy_preset_manager import get_matrix_metadata_for_ui
-    marketplace_presets = load_marketplace_presets()
-    policy_preset_matrix = get_matrix_metadata_for_ui()
-    subscribed_preset_ids = [
-        assignment.source.preset_id
-        for assignment in user.blocklist_assignments
-        if assignment.source and assignment.source.is_marketplace and assignment.source.preset_id
-    ]
-    app_policies = AppPolicy.query.order_by(AppPolicy.name.asc()).all()
-    linux_app_policies = [policy for policy in app_policies if policy.platform == AppPolicy.PLATFORM_LINUX]
-    android_app_policies = [policy for policy in app_policies if policy.platform == AppPolicy.PLATFORM_ANDROID]
-    assigned_policy_ids = {assignment.policy_id for assignment in user.app_policy_assignments}
-    installed_apps = list_installed_apps_for_managed_user(user.id)
-    user_platforms = set()
-    device_labels = _get_device_label_map()
-    for mapping in user.device_mappings:
-        platform = (mapping.device.platform if mapping.device else None) or AppPolicy.PLATFORM_LINUX
-        if platform == AppPolicy.PLATFORM_ANDROID:
-            user_platforms.add(AppPolicy.PLATFORM_ANDROID)
-        else:
-            user_platforms.add(AppPolicy.PLATFORM_LINUX)
-
-    from src.linux_device_policy_manager import get_or_create_policy as get_or_create_linux_policy
-    from src.database import MappingLinuxDevicePolicy
-    from src.approvals_manager import get_or_create_settings, grant_status_for_apps
-    from src.installed_apps_manager import list_installed_apps_for_device
-
-    approval_settings_by_mapping = {}
-    linux_device_policy_by_mapping = {}
-    installed_apps_enriched = []
-    seen_apps = set()
-    for mapping in user.device_mappings:
-        settings = get_or_create_settings(mapping)
-        approval_settings_by_mapping[mapping.id] = {
-            'app_launch_mode': settings.app_launch_mode,
-            'domain_access_mode': settings.domain_access_mode,
-            'registration_approval_enabled': settings.registration_approval_enabled,
-            'device_label': device_labels.get(mapping.system_id, mapping.system_id),
-        }
-        mapping_platform = (mapping.device.platform if mapping.device else None) or AppPolicy.PLATFORM_LINUX
-        if mapping_platform != AppPolicy.PLATFORM_ANDROID:
-            try:
-                linux_policy = get_or_create_linux_policy(mapping)
-                linux_device_policy_by_mapping[mapping.id] = {
-                    'device_label': device_labels.get(mapping.system_id, mapping.system_id),
-                    'install_software_disabled': linux_policy.install_software_disabled,
-                    'uninstall_software_disabled': linux_policy.uninstall_software_disabled,
-                    'mount_removable_media_disabled': linux_policy.mount_removable_media_disabled,
-                    'modify_accounts_disabled': linux_policy.modify_accounts_disabled,
-                    'system_power_actions_disabled': linux_policy.system_power_actions_disabled,
-                    'pkexec_elevation_disabled': linux_policy.pkexec_elevation_disabled,
-                    'bluetooth_disabled': linux_policy.bluetooth_disabled,
-                    'flatpak_install_disabled': linux_policy.flatpak_install_disabled,
-                    'snap_install_disabled': linux_policy.snap_install_disabled,
-                    'terminal_access_disabled': linux_policy.terminal_access_disabled,
-                    'chrome_policies': linux_policy.chrome_policies,
-                    'support_message': (
-                        linux_policy.support_message
-                        or MappingLinuxDevicePolicy.DEFAULT_SUPPORT_MESSAGE
-                    ),
-                    'is_synced': linux_policy.is_synced,
-                    'last_sync_error': linux_policy.last_sync_error,
-                }
-            except ValueError:
-                pass
-        mapping_apps = list_installed_apps_for_device(
-            mapping.system_id,
-            linux_username=mapping.linux_username,
-        )
-        status_map = grant_status_for_apps(mapping, mapping_apps)
-        for app in mapping_apps:
-            dedupe_key = (app.system_id, app.linux_username, app.identifier, app.match_type)
-            if dedupe_key in seen_apps:
-                continue
-            seen_apps.add(dedupe_key)
-            status_entry = status_map.get(app.identifier, {'status': 'none', 'grant_id': None})
-            payload = app.to_dict()
-            payload['device_map_id'] = mapping.id
-            payload['device_hostname'] = mapping.device.system_hostname if mapping.device else None
-            payload['approval_status'] = status_entry.get('status', 'none')
-            payload['grant_id'] = status_entry.get('grant_id')
-            installed_apps_enriched.append(payload)
-
-    installed_apps_enriched.sort(
-        key=lambda item: (item['application_name'].lower(), item['identifier']),
-    )
-    
-    return render_template(
-        'admin_user_edit.html',
-        user=user,
-        blocklist_sources=blocklist_sources,
-        blocklist_sync_status=blocklist_sync_status,
-        marketplace_presets=marketplace_presets,
-        subscribed_preset_ids=subscribed_preset_ids,
-        app_policies=app_policies,
-        linux_app_policies=linux_app_policies,
-        android_app_policies=android_app_policies,
-        assigned_policy_ids=assigned_policy_ids,
-        installed_apps=installed_apps_enriched or installed_apps,
-        user_platforms=user_platforms,
-        approval_settings_by_mapping=approval_settings_by_mapping,
-        linux_device_policy_by_mapping=linux_device_policy_by_mapping,
-        device_labels=device_labels,
-        policy_preset_matrix=policy_preset_matrix,
-    )
+    """Serve the user profile modification dashboard."""
+    return render_spa_shell(f'admin/users/{user_id}')
 
 
 @ui_dashboard_bp.route('/admin/approvals')
 def admin_approvals():
-    """Render the access approval request queue."""
-    if not session.get('logged_in'):
-        flash('Please login first', 'warning')
-        return redirect(url_for('ui_auth.login'))
-
-    from src.approvals_manager import build_request_summary, list_pending_requests
-
-    pending_rows = list_pending_requests(limit=100)
-    device_labels = _get_device_label_map()
-    pending_approvals = []
-    for row in pending_rows:
-        summary = build_request_summary(row)
-        # Keep datetime for Jinja localtime filter; API consumers use isoformat.
-        summary['requested_at'] = row.requested_at
-        pending_approvals.append(summary)
-    return render_template(
-        'approvals.html',
-        pending_approvals=pending_approvals,
-        pending_count=len(pending_rows),
-        device_labels=device_labels,
-    )
+    """Serve the access approval request queue."""
+    return render_spa_shell('admin/approvals')
 
 
 @ui_dashboard_bp.route('/admin/devices')
 def admin_devices():
-    """Render the administration page for agent devices."""
-    if not session.get('logged_in'):
-        flash('Please login first', 'warning')
-        return redirect(url_for('ui_auth.login'))
-    
-    device_labels = _get_device_label_map()
-    approved_devices = AgentDevice.query.filter_by(status='approved').all()
-    pending_devices = AgentDevice.query.filter_by(status='pending').all()
-    return render_template(
-        'admin_devices.html',
-        approved_devices=approved_devices,
-        pending_devices=pending_devices,
-        device_labels=device_labels,
-        AgentConnectionManager=AgentConnectionManager,
-    )
+    """Serve the administration page for agent devices."""
+    return render_spa_shell('admin/devices')
 
 
 @ui_dashboard_bp.route('/admin/restrictions')
 def admin_restrictions():
-    """Render the dedicated Internet Restrictions page."""
-    if not session.get('logged_in'):
-        flash('Please login first', 'warning')
-        return redirect(url_for('ui_auth.login'))
-    
-    blocklist_sources = _get_blocklist_sources(include_domains=True)
-    custom_sources = [s for s in blocklist_sources if not s.get('is_marketplace')]
-
-    from src.marketplace_manager import load_marketplace_presets
-    marketplace_presets = load_marketplace_presets()
-    
-    users = ManagedUser.query.order_by(ManagedUser.username.asc()).all()
-    subscribed_map = {preset['id']: [] for preset in marketplace_presets}
-    
-    for u in users:
-        for assignment in u.blocklist_assignments:
-            if assignment.source and assignment.source.is_marketplace and assignment.source.preset_id:
-                pid = assignment.source.preset_id
-                if pid in subscribed_map:
-                    subscribed_map[pid].append(u.id)
-
-    return render_template(
-        'restrictions.html',
-        blocklist_sources=custom_sources,
-        marketplace_presets=marketplace_presets,
-        users=users,
-        subscribed_map=subscribed_map,
-    )
+    """Serve the dedicated Internet Restrictions page."""
+    return render_spa_shell('admin/restrictions')
 
 
 @ui_dashboard_bp.route('/settings', methods=['GET', 'POST'])
@@ -448,181 +235,20 @@ def settings():
                 flash('Password updated successfully', 'success')
                 return redirect(url_for('ui_dashboard.settings'))
 
-    # Pairing/provisioning always uses the persisted URL; the form field may show
-    # a rejected submission while validation errors are displayed.
-    server_url = build_agent_websocket_url(
-        request,
-        configured_url=_get_agent_websocket_url(),
-    )
-    registration_token = AgentConnectionManager.registration_token
-    pairing_payload = pairing_payload_json(server_url, registration_token)
-    pairing_qr_data_uri = render_pairing_qr_data_uri(pairing_payload)
+                return redirect(url_for('ui_dashboard.settings'))
 
-    provisioning = resolve_android_provisioning(
-        server_url,
-        get_server_version(),
-        checksum_override=android_agent_signature_checksum,
-        registration_token=registration_token,
-    )
-    provisioning_qr_data_uri = None
-    if provisioning['provisioning_ready'] and provisioning['payload_json']:
-        provisioning_qr_data_uri = render_pairing_qr_data_uri(provisioning['payload_json'])
-
-    nintendo_account = get_nintendo_account_summary()
-    xbox_account = get_xbox_account_summary()
-
-    return render_template(
-        'settings.html',
-        alert_webhook_settings=alert_webhook_settings,
-        time_sync_tolerance=time_sync_tolerance,
-        alert_retention_days=alert_retention_days,
-        agent_websocket_url=agent_websocket_url,
-        pairing_server_url=server_url,
-        pairing_qr_data_uri=pairing_qr_data_uri,
-        pairing_payload=pairing_payload,
-        android_agent_apk_filename=android_agent_apk_filename,
-        android_agent_apk_uploaded=android_agent_apk_uploaded,
-        android_agent_signature_checksum=android_agent_signature_checksum,
-        provisioning=provisioning,
-        provisioning_qr_data_uri=provisioning_qr_data_uri,
-        server_version=get_server_version(),
-        nintendo_account=nintendo_account,
-        xbox_account=xbox_account,
-        youtube_api_key_set=bool(_get_youtube_api_key_encrypted()),
-        youtube_history_retention_days=_get_youtube_history_retention_days(),
-        web_history_retention_days=_get_web_history_retention_days(),
-    )
+    return render_spa_shell('settings')
 
 
 @ui_dashboard_bp.route('/stats/<int:user_id>')
 def user_stats(user_id):
-    """Display extended usage history for a single user"""
-    if not session.get('logged_in'):
-        flash('Please login first', 'warning')
-        return redirect(url_for('ui_auth.login'))
-
-    user = ManagedUser.query.get_or_404(user_id)
-
-    daily_30   = user.get_recent_usage(days=30)
-    weekly_13  = user.get_usage_weekly_grouped(weeks=13)
-    monthly_12 = user.get_usage_monthly_grouped(months=12)
-    all_monthly = user.get_all_usage_monthly()
-    alert_search = (request.args.get('alert_search') or '').strip()
-    alert_groups, alert_entries, alert_summary = _build_user_alert_groups(user, search_query=alert_search)
-    device_labels = _get_device_label_map()
-
-    return render_template('stats.html',
-        user=user,
-        daily_30=daily_30,
-        weekly_13=weekly_13,
-        monthly_12=monthly_12,
-        all_monthly=all_monthly,
-        alert_search=alert_search,
-        alert_groups=alert_groups,
-        alert_entries=alert_entries,
-        alert_summary=alert_summary,
-        device_labels=device_labels,
-    )
+    """Serve extended usage history for a single user."""
+    return render_spa_shell(f'stats/{user_id}')
 
 
 @ui_dashboard_bp.route('/devices/<system_id>')
 def device_detail(system_id):
-    if not session.get('logged_in'):
-        flash('Please login first', 'warning')
-        return redirect(url_for('ui_auth.login'))
-
-    device = AgentDevice.query.get_or_404(system_id)
-    alert_search = (request.args.get('alert_search') or '').strip()
-    alert_entries, alert_summary = _build_device_alert_entries(device, search_query=alert_search)
-    device_labels = _get_device_label_map()
-    mapped_accounts = sorted(
-        device.user_mappings,
-        key=lambda mapping: (
-            mapping.managed_user.username.lower() if mapping.managed_user else '',
-            mapping.linux_username.lower(),
-            mapping.id,
-        ),
-    )
-    blocklist_contributors = []
-    for mapping in mapped_accounts:
-        user = mapping.managed_user
-        if not user:
-            continue
-        assigned_source_ids = _get_user_assigned_blocklist_source_ids(user)
-        if not assigned_source_ids:
-            continue
-        status = _build_user_blocklist_sync_status(user)
-        blocklist_contributors.append({
-            'managed_user': user.username,
-            'linux_username': mapping.linux_username,
-            'linux_uid': mapping.linux_uid,
-            'assigned_source_count': status['assigned_source_count'],
-            'effective_domain_count': status['effective_domain_count'],
-            'sync_status': next(
-                (
-                    item['status']
-                    for item in status['mappings']
-                    if item['mapping_id'] == mapping.id
-                ),
-                'pending',
-            ),
-        })
-
-    usage_summaries = {}
-    installed_apps_by_mapping = {}
-    for mapping in mapped_accounts:
-        usage_summaries[mapping.id] = _get_apparmor_usage_summary(mapping.id)
-        installed_apps_by_mapping[mapping.id] = list_installed_apps_for_device(
-            mapping.system_id,
-            linux_username=mapping.linux_username,
-        )
-
-    android_device_policy = None
-    parental_access_code = None
-    android_recovery_ws_url = None
-    nintendo_console = build_nintendo_console_view_context(device, mapped_accounts)
-    xbox_console = build_xbox_console_view_context(device, mapped_accounts)
-    screenshot_settings = None
-    if (device.platform or 'linux').strip().lower() not in {'android', 'nintendo', 'xbox'}:
-        from src.screenshot_settings_manager import get_or_create_settings
-        try:
-            screenshot_settings = get_or_create_settings(device)
-        except ValueError:
-            pass
-    if (device.platform or '').strip().lower() == 'android':
-        from src.android_device_policy_manager import get_or_create_policy as get_or_create_android_policy
-        try:
-            android_device_policy = get_or_create_android_policy(device)
-        except ValueError:
-            pass
-        if device.status == 'approved' and device.secure_token:
-            parental_access_code = generate_parental_access_code(device.secure_token)
-            android_recovery_ws_url = build_agent_websocket_url(
-                request,
-                configured_url=_get_agent_websocket_url(),
-            )
-
-    return render_template(
-        'device_detail.html',
-        device=device,
-        device_label=device_labels.get(system_id, device.display_name),
-        mapped_accounts=mapped_accounts,
-        blocklist_contributors=blocklist_contributors,
-        alert_search=alert_search,
-        alert_entries=alert_entries,
-        alert_summary=alert_summary,
-        usage_summaries=usage_summaries,
-        installed_apps_by_mapping=installed_apps_by_mapping,
-        android_device_policy=android_device_policy,
-        agent_online=AgentConnectionManager.is_online(system_id),
-        fcm_available=bool((device.fcm_token or '').strip()),
-        parental_access_code=parental_access_code,
-        android_recovery_ws_url=android_recovery_ws_url,
-        has_managed_profiles=device.has_managed_profiles,
-        nintendo_console=nintendo_console,
-        xbox_console=xbox_console,
-        screenshot_settings=screenshot_settings,
-    )
+    return render_spa_shell(f'devices/{system_id}')
 
 
 @ui_dashboard_bp.route('/devices/<system_id>/installed-apps/refresh', methods=['POST'])
@@ -656,30 +282,17 @@ def refresh_device_installed_apps_ui(system_id):
 @ui_dashboard_bp.route('/dashboard/user/<int:user_id>/youtube')
 def user_youtube_history(user_id):
     """Legacy redirect to the combined Web & Video history view."""
-    if not session.get('logged_in'):
-        flash('Please login first', 'warning')
-        return redirect(url_for('ui_auth.login'))
     return redirect(url_for('ui_dashboard.user_combined_history', user_id=user_id))
 
 
 @ui_dashboard_bp.route('/dashboard/user/<int:user_id>/history')
 def user_combined_history(user_id):
-    """Render the unified Web & Video history tracking dashboard for a user."""
-    if not session.get('logged_in'):
-        flash('Please login first', 'warning')
-        return redirect(url_for('ui_auth.login'))
-    
-    user = ManagedUser.query.get_or_404(user_id)
-    return render_template('web_video_history.html', user=user)
+    """Serve the unified Web & Video history dashboard for a user."""
+    return render_spa_shell(f'dashboard/user/{user_id}/history')
 
 
 @ui_dashboard_bp.route('/dashboard/user/<int:user_id>/online-accounts')
 def user_online_accounts(user_id):
-    """Render the online accounts report dashboard for a user."""
-    if not session.get('logged_in'):
-        flash('Please login first', 'warning')
-        return redirect(url_for('ui_auth.login'))
-    
-    user = ManagedUser.query.get_or_404(user_id)
-    return render_template('online_accounts.html', user=user)
+    """Serve the online accounts report dashboard for a user."""
+    return render_spa_shell(f'dashboard/user/{user_id}/online-accounts')
 
