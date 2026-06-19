@@ -28,7 +28,7 @@
         };
     }
 
-    let tabHashListener = null;
+    let deviceDetailAbort = null;
 
     /** Soft-refresh via SPA so nav chrome and mobile tab rail stay in sync (avoids full reload). */
     function refreshDeviceDetailPreserveTab() {
@@ -43,15 +43,10 @@
         window.location.href = window.location.pathname + window.location.search + hash;
     }
 
-    function bindTabs() {
+    function bindTabs(signal) {
         const tabButtons = document.querySelectorAll('.device-detail-tabs .segmented-tab-btn');
         const tabPanes = document.querySelectorAll('.device-detail-main .tab-pane-custom');
         if (!tabButtons.length || !tabPanes.length) return;
-
-        if (tabHashListener) {
-            window.removeEventListener('hashchange', tabHashListener);
-            tabHashListener = null;
-        }
 
         function switchTab(targetId) {
             const activePane = document.querySelector(targetId);
@@ -79,22 +74,22 @@
                 const targetId = btn.getAttribute('data-tab-target');
                 const slug = Object.entries(TAB_ALIASES).find(([, id]) => id === targetId)?.[0] || 'overview';
                 window.location.hash = slug;
-            });
+            }, { signal });
         });
 
-        tabHashListener = () => {
+        const tabHashListener = () => {
             const mapped = hashToTabId(window.location.hash);
             switchTab(mapped || '#overview-tab');
         };
 
-        window.addEventListener('hashchange', tabHashListener);
+        window.addEventListener('hashchange', tabHashListener, { signal });
         tabHashListener();
     }
 
     function teardownDeviceDetailPage() {
-        if (tabHashListener) {
-            window.removeEventListener('hashchange', tabHashListener);
-            tabHashListener = null;
+        if (deviceDetailAbort) {
+            deviceDetailAbort.abort();
+            deviceDetailAbort = null;
         }
     }
 
@@ -103,7 +98,14 @@
         if (!config) return;
         const systemId = config.systemId;
         const deviceLabel = config.deviceLabel;
-        bindTabs();
+
+        if (deviceDetailAbort) {
+            deviceDetailAbort.abort();
+        }
+        deviceDetailAbort = new AbortController();
+        const signal = deviceDetailAbort.signal;
+
+        bindTabs(signal);
 
 const nintendoSyncBtn = document.getElementById('nintendo-sync-btn');
         const nintendoSyncError = document.getElementById('nintendo-sync-error');
@@ -925,7 +927,7 @@ const form = document.getElementById('android-policy-form');
                 event.preventDefault();
                 if (nextBtn) nextBtn.click();
             }
-        });
+        }, { signal });
 
         document.getElementById('screen-history-save-btn')?.addEventListener('click', async () => {
             const saveBtn = document.getElementById('screen-history-save-btn');
@@ -1028,13 +1030,17 @@ const form = document.getElementById('android-policy-form');
         init();
     }
 
+    if (window.deviceDetailScriptLoaded) {
+        boot();
+        return;
+    }
+    window.deviceDetailScriptLoaded = true;
+
     if (window.GuardianSPA && typeof window.GuardianSPA.onRoute === 'function') {
-        window.GuardianSPA.onRoute(() => {
-            teardownDeviceDetailPage();
-            boot();
-        });
+        window.GuardianSPA.onRoute(teardownDeviceDetailPage);
     }
     document.addEventListener('guardian:page-ready', boot);
+    document.addEventListener('guardian:route', teardownDeviceDetailPage);
     if (document.readyState !== 'loading') boot();
     else document.addEventListener('DOMContentLoaded', boot);
 })();
