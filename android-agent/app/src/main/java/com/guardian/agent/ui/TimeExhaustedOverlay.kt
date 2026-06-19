@@ -34,6 +34,7 @@ object TimeExhaustedOverlay {
     enum class Mode {
         TIME_EXHAUSTED,
         OWNER_LOCKDOWN,
+        CLOCK_TAMPER,
     }
 
     private const val TAG = "TimeExhaustedOverlay"
@@ -47,13 +48,14 @@ object TimeExhaustedOverlay {
     private var currentMode: Mode? = null
 
     fun show(context: Context, showCallButton: Boolean, mode: Mode = Mode.TIME_EXHAUSTED) {
-        if (mode == Mode.TIME_EXHAUSTED) {
+        if (mode == Mode.TIME_EXHAUSTED || mode == Mode.CLOCK_TAMPER) {
             // Launch the full Guardian Space overlay for richer UX.
             // The banner below acts as a supplementary reminder at the top of the screen.
             try {
+                val overlayReason = if (mode == Mode.CLOCK_TAMPER) "clock_tamper" else "sleep"
                 val overlayIntent = GuardianOverlayActivity.buildIntent(
                     context = context.applicationContext,
-                    reason = "sleep",
+                    reason = overlayReason,
                     ageTier = null,   // server will push the correct tier via show_overlay command
                     parentNote = null,
                     deviceName = android.os.Build.MODEL,
@@ -132,6 +134,10 @@ object TimeExhaustedOverlay {
                 titleView.setText(R.string.owner_lockdown_title)
                 bodyView.setText(R.string.owner_lockdown_body)
             }
+            Mode.CLOCK_TAMPER -> {
+                titleView.setText(R.string.clock_tamper_title)
+                bodyView.setText(R.string.clock_tamper_body)
+            }
         }
         updateCallButton(overlayView, showCallButton, context)
         setupParentAccessButton(overlayView, context, mode)
@@ -154,6 +160,9 @@ object TimeExhaustedOverlay {
         parentButton.setOnClickListener {
             val intent = Intent(context, OtpLockActivity::class.java).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                if (mode == Mode.CLOCK_TAMPER) {
+                    putExtra(OtpLockActivity.EXTRA_CLOCK_TAMPER_UNLOCK, true)
+                }
             }
             context.startActivity(intent)
         }
@@ -178,6 +187,9 @@ object TimeExhaustedOverlay {
         val manager = ensureChannel(context)
         val intent = Intent(context, OtpLockActivity::class.java).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+            if (mode == Mode.CLOCK_TAMPER) {
+                putExtra(OtpLockActivity.EXTRA_CLOCK_TAMPER_UNLOCK, true)
+            }
         }
         val pendingIntent = android.app.PendingIntent.getActivity(
             context,
@@ -189,10 +201,12 @@ object TimeExhaustedOverlay {
         val titleRes = when (mode) {
             Mode.TIME_EXHAUSTED -> R.string.time_exhausted_title
             Mode.OWNER_LOCKDOWN -> R.string.owner_lockdown_title
+            Mode.CLOCK_TAMPER -> R.string.clock_tamper_title
         }
         val bodyRes = when (mode) {
             Mode.TIME_EXHAUSTED -> R.string.time_exhausted_body
             Mode.OWNER_LOCKDOWN -> R.string.owner_lockdown_body
+            Mode.CLOCK_TAMPER -> R.string.clock_tamper_body
         }
 
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)

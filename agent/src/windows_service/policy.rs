@@ -165,6 +165,32 @@ pub async fn handle_windows_command(
             let _ = clear_on_unenroll();
             (true, "Device unenrolled locally; agent token cleared".to_string(), json!({}))
         }
+        "clear_clock_tamper" => {
+            crate::windows_service::tamper_state::set_clock_tamper_otp_override(true);
+            crate::windows_service::overlay::dismiss();
+            crate::windows_service::process_monitor::request_immediate_pass();
+            (
+                true,
+                "Clock tamper override applied".to_string(),
+                json!({}),
+            )
+        }
+        "show_overlay" => {
+            crate::windows_service::overlay::show(args);
+            (
+                true,
+                "Guardian overlay shown".to_string(),
+                json!({}),
+            )
+        }
+        "dismiss_overlay" => {
+            crate::windows_service::overlay::dismiss();
+            (
+                true,
+                "Guardian overlay dismissed".to_string(),
+                json!({}),
+            )
+        }
         _ => (false, format!("Unknown Windows action '{}'", action), json!({})),
     }
 }

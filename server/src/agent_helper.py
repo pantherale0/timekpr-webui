@@ -43,6 +43,7 @@ ALLOWED_AGENT_ALERT_TYPES = {
     'app_usage',
     'access_requested',
     'terminal_command',
+    'clock_tamper',
 }
 
 

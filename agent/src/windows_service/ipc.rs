@@ -19,13 +19,15 @@ pub fn unregister_ipc_client(id: u32) {
 }
 
 pub fn broadcast_toast_notification(title: &str, message: &str) {
-    let payload = serde_json::json!({
+    broadcast_json(&serde_json::json!({
         "type": "toast",
         "title": title,
         "message": message
-    });
-    
-    if let Ok(serialized) = serde_json::to_string(&payload) {
+    }));
+}
+
+pub fn broadcast_json(payload: &serde_json::Value) {
+    if let Ok(serialized) = serde_json::to_string(payload) {
         let guard = get_ipc_connections().lock().unwrap();
         for tx in guard.values() {
             let _ = tx.send(serialized.clone());

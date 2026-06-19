@@ -1,6 +1,8 @@
 // UniFFI scaffolding for Android JNI bindings
 uniffi::setup_scaffolding!();
 
+pub mod clock_integrity;
+
 use hmac::{Hmac, Mac};
 use sha2::Sha256;
 use std::collections::HashSet;

@@ -1046,6 +1046,8 @@ pages:
     filter_all: All Activities
     filter_alerts: Alerts Only
     filter_commands: Terminal Commands Only
+    clock_tamper_event: Device clock may have been changed
+    clock_tamper_feed: Clock tamper detected on a managed device
     prune_activities: Prune Old Activities
     loading_feed: Loading activity feed...
     loading_older: Loading older activities...

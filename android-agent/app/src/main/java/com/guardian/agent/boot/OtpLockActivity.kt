@@ -30,10 +30,11 @@ import com.guardian.agent.util.ParentalAccessOtp
 import kotlinx.coroutines.*
 
 class OtpLockActivity : AppCompatActivity() {
-    private companion object {
-        const val TAG = "OtpLockActivity"
-        const val COUNTDOWN_MAX_MS = 5000L
-        const val STEP_MS = 100L
+    companion object {
+        const val EXTRA_CLOCK_TAMPER_UNLOCK = "clock_tamper_unlock"
+        private const val TAG = "OtpLockActivity"
+        private const val COUNTDOWN_MAX_MS = 5000L
+        private const val STEP_MS = 100L
     }
 
     private lateinit var otpEntryField: EditText
@@ -84,19 +85,35 @@ class OtpLockActivity : AppCompatActivity() {
         val isSecondaryMode = configStore.load().managementMode == com.guardian.agent.config.AgentConfigStore.MANAGEMENT_MODE_SECONDARY_USERS
         val isPrimaryUser = Process.myUid() / 100_000 == 0
 
+        val clockTamperUnlock = intent.getBooleanExtra(EXTRA_CLOCK_TAMPER_UNLOCK, false)
+
         if (!isPrimaryUser || !isSecondaryMode) {
-            Log.d(TAG, "Not primary user or not in secondary user mode, exiting.")
-            finish()
-            return
+            if (!clockTamperUnlock) {
+                Log.d(TAG, "Not primary user or not in secondary user mode, exiting.")
+                finish()
+                return
+            }
         }
 
-        startLockTaskMode()
-        startCountdown()
+        if (!clockTamperUnlock) {
+            startLockTaskMode()
+            startCountdown()
+        } else {
+            isOtpMode = true
+            otpContainerCard.visibility = View.VISIBLE
+            keypadGrid.visibility = View.VISIBLE
+            countdownProgress.visibility = View.GONE
+            countdownText.visibility = View.GONE
+            btnPrimaryAction.text = getString(R.string.verify_otp)
+            btnSecondaryAction.visibility = View.GONE
+        }
     }
 
     override fun onResume() {
         super.onResume()
-        startLockTaskMode()
+        if (!intent.getBooleanExtra(EXTRA_CLOCK_TAMPER_UNLOCK, false)) {
+            startLockTaskMode()
+        }
     }
 
     private fun startLockTaskMode() {
@@ -206,7 +223,12 @@ class OtpLockActivity : AppCompatActivity() {
             return
         }
 
-        val isValid = ParentalAccessOtp.verifyOtp(enteredCode, agentToken)
+        val isValid = if (intent.getBooleanExtra(EXTRA_CLOCK_TAMPER_UNLOCK, false)) {
+            val trustedMs = com.guardian.agent.integrity.ClockIntegrityStore(this).trustedWallMs()
+            ParentalAccessOtp.verifyOtp(enteredCode, agentToken, trustedMs)
+        } else {
+            ParentalAccessOtp.verifyOtp(enteredCode, agentToken)
+        }
         if (!isValid) {
             Toast.makeText(this, "Incorrect OTP. Please try again.", Toast.LENGTH_LONG).show()
             pinBuffer.clear()
@@ -215,6 +237,15 @@ class OtpLockActivity : AppCompatActivity() {
         }
 
         // OTP is correct!
+        if (intent.getBooleanExtra(EXTRA_CLOCK_TAMPER_UNLOCK, false)) {
+            com.guardian.agent.enforcement.EnforcementController(
+                this,
+                GuardianApplication.from(this).appPolicyStore,
+            ).onClockTamperOtpUnlocked()
+            finish()
+            return
+        }
+
         if (!DeviceOwnerProvisioner.hasUsageAccess(this)) {
             TimeExemptionResolver.tempExemptSettingsUntil = System.currentTimeMillis() + 120_000
             val dpm = getSystemService(DevicePolicyManager::class.java)

@@ -108,6 +108,10 @@
                     Value="&quot;[INSTALLFOLDER]guardian-agent.exe&quot; --user-agent"
                     KeyPath="yes" />
             </Component>
+
+            <Component Id="OverlayHtml" Guid="c4b27670-3df1-4322-87eb-12df713f01ac">
+                <File Id="BlockedV2Html" Source="$(var.SourceDir)\blockedv2.html" KeyPath="yes" />
+            </Component>
         </ComponentGroup>
     </Fragment>
 </Wix>

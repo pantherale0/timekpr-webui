@@ -24,6 +24,7 @@ import com.guardian.agent.policy.PolicyStorePayloadPush
 import com.guardian.agent.policy.ProfileProvisioningStore
 import com.guardian.agent.ui.TimeExhaustedOverlay
 import com.guardian.agent.ui.GuardianOverlayActivity
+import com.guardian.agent.integrity.ClockIntegrityStore
 import com.guardian.agent.util.AgentLog
 import com.guardian.agent.util.AndroidUsers
 import com.guardian.agent.vpn.DomainBlockVpnService
@@ -42,6 +43,7 @@ class EnforcementController(
     private val enforcementPrefs =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     private val lastTimeExhaustionSuspendedByUser = mutableMapOf<String, Set<String>>()
+    private val lastClockTamperSuspendedByUser = mutableMapOf<String, Set<String>>()
     private var lastOwnerLockdownSuspended = emptySet<String>()
     private var ownerLockdownActive = false
 
@@ -119,6 +121,11 @@ class EnforcementController(
         val dpm = userContext.getSystemService(DevicePolicyManager::class.java) ?: return
         if (!dpm.isAdminActive(adminComponent)) return
 
+        if (ClockIntegrityStore(context).isTamperActive()) {
+            enforceClockTamperForUser(username, uid, dpm)
+            return
+        }
+
         val configStore = GuardianApplication.from(context).configStore
         val isParentUser = uid == 0 && configStore.load().managementMode == AgentConfigStore.MANAGEMENT_MODE_SECONDARY_USERS
 
@@ -194,6 +201,73 @@ class EnforcementController(
         setPackagesSuspended(dpm, toSuspend.toTypedArray(), true)
         lastTimeExhaustionSuspendedByUser[username] = toSuspend
         persistTimeExhaustionSuspended()
+    }
+
+    fun enforceClockTamperForActiveUser() {
+        val activeUid = AndroidUsers.activeUserUid(context)
+        val username = AndroidUsers.usernameForUid(
+            context,
+            activeUid,
+            GuardianApplication.from(context).timeLimitStore,
+        )
+        val userContext = AndroidUsers.getUserContext(context, activeUid) ?: context
+        val dpm = userContext.getSystemService(DevicePolicyManager::class.java) ?: return
+        if (!dpm.isAdminActive(adminComponent)) return
+        enforceClockTamperForUser(username, activeUid, dpm)
+    }
+
+    fun clearClockTamperForActiveUser() {
+        val activeUid = AndroidUsers.activeUserUid(context)
+        val username = AndroidUsers.usernameForUid(
+            context,
+            activeUid,
+            GuardianApplication.from(context).timeLimitStore,
+        )
+        val userContext = AndroidUsers.getUserContext(context, activeUid) ?: context
+        val dpm = userContext.getSystemService(DevicePolicyManager::class.java) ?: return
+        if (!dpm.isAdminActive(adminComponent)) return
+        clearClockTamperForUser(username, activeUid, dpm)
+    }
+
+    fun onClockTamperOtpUnlocked() {
+        ClockIntegrityStore(context).setOtpOverride(true)
+        clearClockTamperForActiveUser()
+        reconcileAllUsers()
+    }
+
+    private fun enforceClockTamperForUser(username: String, uid: Int, dpm: DevicePolicyManager) {
+        val showCallButton = PhoneCallExemption.canMakeCalls(context)
+        if (uid == AndroidUsers.activeUserUid(context)) {
+            try {
+                val overlayIntent = GuardianOverlayActivity.buildIntent(
+                    context = context.applicationContext,
+                    reason = "clock_tamper",
+                    ageTier = null,
+                    parentNote = null,
+                    deviceName = android.os.Build.MODEL,
+                    linuxUsername = username,
+                )
+                context.startActivity(overlayIntent)
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to launch GuardianOverlayActivity for clock tamper", e)
+            }
+            TimeExhaustedOverlay.show(context, showCallButton, TimeExhaustedOverlay.Mode.CLOCK_TAMPER)
+        }
+
+        val exempt = timeExemptionResolver.exemptPackages(username)
+        val toSuspend = launcherPackagesForUser(uid) - exempt
+        setPackagesSuspended(dpm, toSuspend.toTypedArray(), true)
+        lastClockTamperSuspendedByUser[username] = toSuspend
+    }
+
+    private fun clearClockTamperForUser(username: String, uid: Int, dpm: DevicePolicyManager) {
+        if (uid == AndroidUsers.activeUserUid(context)) {
+            TimeExhaustedOverlay.dismiss(context)
+        }
+        val previouslySuspended = lastClockTamperSuspendedByUser.remove(username) ?: emptySet()
+        if (previouslySuspended.isNotEmpty()) {
+            setPackagesSuspended(dpm, previouslySuspended.toTypedArray(), false)
+        }
     }
 
     private fun clearTimeExhaustionForUser(username: String, uid: Int, dpm: DevicePolicyManager) {
@@ -551,6 +625,14 @@ class EnforcementController(
     }
 
     fun suspendBlockedLaunch(packageName: String, username: String): Boolean {
+        if (ClockIntegrityStore(context).isTamperActive()) {
+            if (packageName !in timeExemptionResolver.exemptPackages(username)) {
+                enforceClockTamperForActiveUser()
+                return true
+            }
+            return false
+        }
+
         if (!timeLimitStore.isAccessAllowed(username)) {
             if (packageName !in timeExemptionResolver.exemptPackages(username)) {
                 applyTimePolicies(username)

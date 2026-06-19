@@ -38,6 +38,9 @@ strings:
   managed_secondary_profile_status: This profile is managed by Guardian
   managed_secondary_profile_waiting: Waiting for the main profile to finish setup. Open Guardian on the primary account first.
   time_exhausted_parent_access: Parental Access
+  clock_tamper_title: Device clock was changed
+  clock_tamper_body: Screen time stays paused until the clock is fixed or a parent enters their code.
+  verify_otp: Verify code
   parental_access_notification_action: Enter Access Code
   owner_lockdown_title: Parent access required
   owner_lockdown_body: This owner profile is locked. Enter the parental access code from the dashboard to unlock it.
@@ -144,4 +147,8 @@ desktop:
   domain_blocked_body: "{domain} is blocked. A request was sent to your parent. You can ask them to approve access in Guardian."
   app_blocked_title: App Blocked
   app_blocked_body: "'{app}' has been closed because usage limits are reached."
+  clock_tamper_title: Device clock was changed
+  clock_tamper_body: Access is paused until the clock is fixed or a parent approves override.
+  clock_tamper_cleared_title: Clock restored
+  clock_tamper_cleared_body: The device clock looks correct again. Normal access can resume.
   notification_fallback_title: Guardian Notification

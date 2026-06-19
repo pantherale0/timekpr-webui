@@ -26,6 +26,8 @@ mod extension_policy;
 mod ipc;
 #[cfg(target_os = "linux")]
 mod overlay;
+#[cfg(target_os = "linux")]
+mod clock_integrity_monitor;
 
 #[cfg(target_os = "windows")]
 pub mod windows_service;
@@ -1362,6 +1364,7 @@ async fn run_session_listener(
 async fn run_sleep_listener(
     tx: mpsc::UnboundedSender<ClientMessage>,
     mut shutdown: watch::Receiver<bool>,
+    resume_tx: Option<mpsc::UnboundedSender<()>>,
 ) {
     let connection = match Connection::system().await {
         Ok(connection) => connection,
@@ -1411,6 +1414,11 @@ async fn run_sleep_listener(
                         });
                         if tx.send(build_alert_message(event_type, None, details)).is_err() {
                             break;
+                        }
+                        if !args.start {
+                            if let Some(resume) = resume_tx.as_ref() {
+                                let _ = resume.send(());
+                            }
                         }
                     }
                     Err(e) => {
@@ -1488,10 +1496,11 @@ async fn run_shutdown_listener(
 fn spawn_logind_listeners(
     tx: mpsc::UnboundedSender<ClientMessage>,
     shutdown_rx: watch::Receiver<bool>,
+    resume_tx: Option<mpsc::UnboundedSender<()>>,
 ) -> Vec<JoinHandle<()>> {
     vec![
         tokio::spawn(run_session_listener(tx.clone(), shutdown_rx.clone())),
-        tokio::spawn(run_sleep_listener(tx.clone(), shutdown_rx.clone())),
+        tokio::spawn(run_sleep_listener(tx.clone(), shutdown_rx.clone(), resume_tx)),
         tokio::spawn(run_shutdown_listener(tx, shutdown_rx)),
     ]
 }
@@ -1523,7 +1532,13 @@ async fn run_linux_main() {
     netlink::register_alert_sender(alert_tx.clone());
     tokio::spawn(netlink::run_process_monitor(netlink_config, alert_tx.clone()));
     tokio::spawn(audit_monitor::run_audit_monitor(users_map.clone(), alert_tx.clone()));
-    tokio::spawn(terminal_monitor::run_terminal_monitor(users_map, alert_tx));
+    tokio::spawn(terminal_monitor::run_terminal_monitor(users_map.clone(), alert_tx));
+
+    let (clock_resume_tx, clock_resume_rx) = mpsc::unbounded_channel();
+    let clock_monitor = Arc::new(clock_integrity_monitor::ClockIntegrityMonitor::new(users_map));
+    clock_integrity_monitor::spawn_periodic_monitor(clock_monitor.clone());
+    clock_integrity_monitor::spawn_resume_hook(clock_monitor, clock_resume_rx);
+    clock_integrity_monitor::spawn_logind_resume_listener(clock_resume_tx);
 
     // Channel forwarder that forwards background AppAlerts to current websocket sender
     let active_client_tx = Arc::new(Mutex::new(None::<mpsc::UnboundedSender<ClientMessage>>));
@@ -1762,7 +1777,7 @@ pub(crate) async fn start_agent_reconnect_loop(
                 #[cfg(target_os = "windows")]
                 let _ = shutdown_rx;
                 #[cfg(target_os = "linux")]
-                let listener_handles = spawn_logind_listeners(client_tx.clone(), shutdown_rx);
+                let listener_handles = spawn_logind_listeners(client_tx.clone(), shutdown_rx, None);
                 #[cfg(target_os = "windows")]
                 let listener_handles: Vec<JoinHandle<()>> = Vec::new();
                 let (policy_sync_tx, policy_sync_rx) = mpsc::unbounded_channel::<()>();

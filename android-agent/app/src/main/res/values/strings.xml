@@ -34,6 +34,9 @@
     <string name="managed_secondary_profile_status">This profile is managed by Guardian</string>
     <string name="managed_secondary_profile_waiting">Waiting for the main profile to finish setup. Open Guardian on the primary account first.</string>
     <string name="time_exhausted_parent_access">Parental Access</string>
+    <string name="clock_tamper_title">Device clock was changed</string>
+    <string name="clock_tamper_body">Screen time stays paused until the clock is fixed or a parent enters their code.</string>
+    <string name="verify_otp">Verify code</string>
     <string name="parental_access_notification_action">Enter Access Code</string>
     <string name="owner_lockdown_title">Parent access required</string>
     <string name="owner_lockdown_body">This owner profile is locked. Enter the parental access code from the dashboard to unlock it.</string>

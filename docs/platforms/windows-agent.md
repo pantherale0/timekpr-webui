@@ -9,7 +9,7 @@ Two processes cooperate on each PC:
 | Process | Role |
 |---------|------|
 | **Windows service** (`TimeKprAgent`) | Runs as SYSTEM; WebSocket loop, DNS proxy, process monitor, policy catalog |
-| **Per-session user agent** | Runs in each logged-in user session; named-pipe IPC for toast notifications |
+| Per-session user agent | Runs in each logged-in user session; named-pipe IPC for toast notifications and full-screen overlay (`blockedv2.html` via Edge kiosk mode) |
 
 The service exposes a named pipe at `\\.\pipe\timekpr_ipc` and broadcasts JSON events (for example block notifications) to user-session agents.
 
@@ -17,6 +17,7 @@ The service exposes a named pipe at `\\.\pipe\timekpr_ipc` and broadcasts JSON e
 
 - **DNS proxy** — redirects adapters to `127.0.0.1` for domain blocklists; outbound UDP/53 firewall rule reduces bypass
 - **Process monitor** — ToolHelp snapshot loop; terminates blocked executables and enforces time lockouts
+- **Clock integrity** — periodic wall-clock tamper detection via `QueryInterruptTime` cross-check and SNTP; triggers process lockout, parent alerts, and a full-screen Edge overlay on tamper
 - **Policy store** — Windows user enumeration (RID ≥ 1000); AppArmor-like app rules per mapped username
 
 On service stop, DNS settings and policies are restored.

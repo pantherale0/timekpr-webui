@@ -21,6 +21,7 @@ import com.guardian.agent.admin.DeviceOwnerProvisioner
 import com.guardian.agent.admin.SecondaryUserProvisioner
 import com.guardian.agent.boot.SecondaryUserInitService
 import com.guardian.agent.enforcement.EnforcementController
+import com.guardian.agent.integrity.ClockIntegrityMonitor
 import com.guardian.agent.policy.PolicyPayloadPush
 import com.guardian.agent.policy.PolicyStorePayloadPush
 import com.guardian.agent.vpn.DomainBlockVpnService
@@ -50,6 +51,7 @@ class UsageMonitorService : Service() {
     private val activeSessions = mutableMapOf<String, Long>()
     private val processedResumeKeys = LinkedHashSet<String>()
     private var capabilityCheckCounter = 0
+    private var clockIntegrityCounter = 0
     private var lastBootstrappedForegroundUser = -1
 
     private var lastTimeLimitsModified = 0L
@@ -74,6 +76,8 @@ class UsageMonitorService : Service() {
         startForeground(NOTIFICATION_ID, buildNotification())
         packageChangeMonitor.register()
         monitorJob?.cancel()
+        ClockIntegrityMonitor.tickOnce(this)
+        ClockIntegrityMonitor.scheduleAlarmFallback(this)
         monitorJob = scope.launch { monitorLoop() }
         return START_STICKY
     }
@@ -166,6 +170,10 @@ class UsageMonitorService : Service() {
             }
             if (++capabilityCheckCounter % 15 == 0) {
                 enforceManagedCapabilities(userContext)
+            }
+
+            if (++clockIntegrityCounter % 30 == 0) {
+                ClockIntegrityMonitor.tickOnce(this@UsageMonitorService)
             }
 
             if (callingUserId == 0 && activeUid != callingUserId) {

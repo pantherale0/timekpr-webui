@@ -70,6 +70,10 @@ The Windows agent handles `show_overlay` and `dismiss_overlay` commands via the 
 
 The Android agent launches `GuardianOverlayActivity`, a full-screen `Activity` that loads the bundled `blockedv2.html` asset inside a `WebView`.
 
+### Windows
+
+The Windows service broadcasts overlay IPC messages to the per-session user agent. The user agent launches Microsoft Edge in kiosk app mode, loading `blockedv2.html` from `C:\Program Files\Guardian\` (bundled in the MSI). Clock tamper lockdown uses `reason=clock_tamper`; parent override uses the `clear_clock_tamper` server command.
+
 - Intent extras (`guardian_reason`, `guardian_age_tier`, `guardian_parent_note`, `guardian_device_name`) are passed when launching the activity.
 - The `WebView` injects runtime values via JavaScript after page load: `setAge(...)`, `setReason(...)`, `setDeviceInfo(...)`.
 - A `JavascriptInterface` named `guardianBridge` exposes `sendAccessRequest(reason, message)` so that preset buttons and the free-text field in the HTML page can reach the server via `AlertEventBus`.

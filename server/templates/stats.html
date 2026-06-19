@@ -527,6 +527,17 @@
             `;
         }
 
+        // 4b. Clock tamper
+        if (type === 'clock_tamper') {
+            const skew = details.skew_seconds != null ? `${details.skew_seconds}s` : 'unknown';
+            const source = details.detection_source || 'boottime';
+            return `
+                <div style="font-size: 0.85rem;" class="text-danger">
+                    <i class="fas fa-clock me-1.5"></i>Device clock may have been changed (skew ${escapeHtml(String(skew))}, detected via ${escapeHtml(String(source))}).
+                </div>
+            `;
+        }
+
         // 5. System startups/shutdowns/resume etc
         if (type.startsWith('system_')) {
             const systemActions = {
@@ -978,7 +989,7 @@
             } else {
                 // Render alert events (e.g. blocklist blocks, app locks, etc.)
                 let iconClass = 'fas fa-info-circle bg-secondary text-white';
-                if (event.event_type.includes('blocked') || event.event_type.includes('violation') || event.event_type.includes('lock')) {
+                if (event.event_type.includes('blocked') || event.event_type.includes('violation') || event.event_type.includes('lock') || event.event_type.includes('tamper')) {
                     iconClass = 'fas fa-shield-alt bg-danger text-white';
                 } else if (event.event_type.includes('alert') || event.event_type.includes('warning')) {
                     iconClass = 'fas fa-exclamation-triangle bg-warning text-dark';

@@ -440,6 +440,21 @@ def test_normalize_agent_alert_payload():
         normalize_agent_alert_payload("sys-1", {"event_type": "system_startup", "occurred_at": "2026-05-25T21:05:00Z", "details": []})
 
 
+def test_clock_tamper_alert_type():
+    payload = normalize_agent_alert_payload("sys-1", {
+        "type": "alert_event",
+        "event_type": "clock_tamper",
+        "occurred_at": "2026-06-06T21:00:00Z",
+        "linux_username": "alice",
+        "details": {
+            "skew_seconds": 420,
+            "detection_source": "both",
+        },
+    })
+    assert payload["event_type"] == "clock_tamper"
+    assert payload["details"]["skew_seconds"] == 420
+
+
 def test_terminal_command_alert_type():
     payload = normalize_agent_alert_payload("sys-1", {
         "type": "alert_event",

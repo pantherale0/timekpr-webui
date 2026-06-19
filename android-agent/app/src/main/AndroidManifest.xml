@@ -22,6 +22,7 @@
         android:protectionLevel="signature" />
     <uses-permission android:name="android.permission.MANAGE_USERS"
         tools:ignore="ProtectedPermissions" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
 
     <application
         android:name=".GuardianApplication"
@@ -140,6 +141,10 @@
                 <action android:name="android.intent.action.USER_UNLOCKED" />
             </intent-filter>
         </receiver>
+
+        <receiver
+            android:name=".integrity.ClockIntegrityAlarmReceiver"
+            android:exported="false" />
 
         <receiver
             android:name=".discovery.PackageChangeReceiver"

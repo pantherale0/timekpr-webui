@@ -340,6 +340,16 @@ def ws_agent_handler(ws):
                                     system_id,
                                     exc,
                                 )
+                        elif alert.event_type == 'clock_tamper':
+                            try:
+                                from src.dashboard_events import notify_dashboard_changed
+                                notify_dashboard_changed('clock_tamper')
+                            except Exception as exc:
+                                _LOGGER.error(
+                                    "Failed to notify dashboard of clock tamper from %s: %s",
+                                    system_id,
+                                    exc,
+                                )
                     except ValueError as exc:
                         _LOGGER.warning(
                             "Rejected invalid alert payload from %s: %s",

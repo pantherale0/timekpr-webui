@@ -293,6 +293,9 @@ jobs:
             VERSION="0.0.0"
           fi
           echo "Building MSI with version $VERSION"
+
+          cp agent/overlay_resources/blockedv2.html \
+            agent/target/x86_64-pc-windows-msvc/release/blockedv2.html
           
           WIX_BIN="${WIX}bin"
           WIX_BIN_UNIX="$(echo "$WIX_BIN" | tr '\\' '/')"
