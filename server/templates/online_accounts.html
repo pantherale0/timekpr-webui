@@ -1,6 +1,6 @@
 {% extends "_spa_fragment.html" %}
 
-{% block title %}Online Accounts - {{ user.username }} - Guardian{% endblock %}
+{% block title %}{{ t('pages.online_accounts.title', username=user.username) }}{% endblock %}
 
 {% block extra_head %}
 <style>
@@ -28,15 +28,15 @@
 <div class="guardian-page-header">
     <div class="guardian-page-header__intro">
         <h1 class="guardian-page-title mb-1">
-            <i class="fas fa-user-shield text-primary me-1"></i> {{ user.username }} &mdash; Signed-in services
+            <i class="fas fa-user-shield text-primary me-1"></i> {{ t('pages.online_accounts.heading', username=user.username) }}
         </h1>
         <p class="guardian-page-lead mb-0">
-            A running list of online accounts and services this child has used
+            {{ t('pages.online_accounts.lead') }}
         </p>
     </div>
     <div class="guardian-page-header__actions">
         <a href="{{ url_for('ui_dashboard.user_stats', user_id=user.id) }}" class="btn btn-sm btn-outline-secondary">
-            <i class="fas fa-chevron-left me-1"></i> Back to Stats
+            <i class="fas fa-chevron-left me-1"></i> {{ t('pages.online_accounts.back_to_stats') }}
         </a>
     </div>
 </div>
@@ -45,46 +45,41 @@
     <div class="col-12">
         <div class="card card-accounts shadow-sm">
             <div class="card-header py-3 bg-body-secondary d-flex justify-content-between align-items-center flex-wrap gap-2">
-                <h5 class="mb-0 fw-bold">Online Services &amp; Credentials</h5>
-                <span class="badge bg-secondary px-3 py-1.5 rounded-pill" id="accounts-count-badge">0 accounts</span>
+                <h5 class="mb-0 fw-bold">{{ t('pages.online_accounts.card_title') }}</h5>
+                <span class="badge bg-secondary px-3 py-1.5 rounded-pill" id="accounts-count-badge">{{ t('pages.online_accounts.accounts_count', count=0) }}</span>
             </div>
             <div class="card-body p-0">
-                <!-- Search Toolbar -->
                 <div class="p-3 border-bottom d-flex gap-2 align-items-center">
                     <div class="flex-grow-1" style="max-width: 400px;">
                         <div class="input-group input-group-sm">
                             <span class="input-group-text bg-body-secondary border"><i class="fas fa-search"></i></span>
-                            <input type="text" id="accounts-search" class="form-control" placeholder="Search service domain or username...">
+                            <input type="text" id="accounts-search" class="form-control" placeholder="{{ t('pages.online_accounts.search_placeholder') }}">
                         </div>
                     </div>
                 </div>
 
-                <!-- Loader -->
                 <div id="accounts-loading" class="p-5 text-center">
                     <div class="spinner-border text-primary mb-3" role="status"></div>
-                    <p class="text-secondary small mb-0">Loading online accounts...</p>
+                    <p class="text-secondary small mb-0">{{ t('pages.online_accounts.loading') }}</p>
                 </div>
 
-                <!-- Empty State -->
                 <div id="accounts-empty" class="p-5 text-center text-secondary" style="display: none;">
                     <i class="fas fa-user-circle fs-1 text-muted mb-3"></i>
-                    <h5>No online accounts reported</h5>
-                    <p class="small mb-0">Accounts will appear here when the child logs in or registers on websites using monitored browsers.</p>
+                    <h5>{{ t('pages.online_accounts.empty_title') }}</h5>
+                    <p class="small mb-0">{{ t('pages.online_accounts.empty_lead') }}</p>
                 </div>
 
-                <!-- Accounts Table -->
                 <div class="table-responsive" id="accounts-table-wrapper" style="display: none;">
                     <table class="table table-striped align-middle mb-0" style="font-size: 0.95rem;">
                         <thead>
                             <tr class="table-light">
-                                <th class="ps-3 text-secondary fw-bold" style="font-size: 0.75rem; text-transform: uppercase;">Service Domain</th>
-                                <th class="text-secondary fw-bold" style="font-size: 0.75rem; text-transform: uppercase;">Username / Email</th>
-                                <th class="text-secondary fw-bold" style="font-size: 0.75rem; text-transform: uppercase;">First Detected</th>
-                                <th class="pe-3 text-secondary fw-bold text-end" style="font-size: 0.75rem; text-transform: uppercase;">Last Active</th>
+                                <th class="ps-3 text-secondary fw-bold" style="font-size: 0.75rem; text-transform: uppercase;">{{ t('pages.online_accounts.col_domain') }}</th>
+                                <th class="text-secondary fw-bold" style="font-size: 0.75rem; text-transform: uppercase;">{{ t('pages.online_accounts.col_username') }}</th>
+                                <th class="text-secondary fw-bold" style="font-size: 0.75rem; text-transform: uppercase;">{{ t('pages.online_accounts.col_first_detected') }}</th>
+                                <th class="pe-3 text-secondary fw-bold text-end" style="font-size: 0.75rem; text-transform: uppercase;">{{ t('pages.online_accounts.col_last_active') }}</th>
                             </tr>
                         </thead>
                         <tbody id="accounts-tbody">
-                            <!-- JS injects rows here -->
                         </tbody>
                     </table>
                 </div>

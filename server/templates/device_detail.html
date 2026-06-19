@@ -1,17 +1,17 @@
 {% extends "_spa_fragment.html" %}
 
 {% from '_macros.html' import csrf_field %}
-{% block title %}{{ device_label }} - Device Details - Guardian{% endblock %}
+{% block title %}{{ t('pages.device_detail.title', label=device_label) }}{% endblock %}
 
 {% block top_nav_left %}
 <li class="nav-item d-none d-lg-inline-block ms-2 animate-fade-in">
     <div class="segmented-control">
-        <button type="button" class="segmented-tab-btn active" data-tab-target="#overview-tab">Overview</button>
+        <button type="button" class="segmented-tab-btn active" data-tab-target="#overview-tab">{{ t('pages.device_detail.tab_overview') }}</button>
         {% if device.platform in ['android', 'nintendo', 'xbox'] or screenshot_settings is not none %}
-        <button type="button" class="segmented-tab-btn" data-tab-target="#policies-tab">Control Policies</button>
+        <button type="button" class="segmented-tab-btn" data-tab-target="#policies-tab">{{ t('pages.device_detail.tab_policies') }}</button>
         {% endif %}
-        <button type="button" class="segmented-tab-btn" data-tab-target="#activity-tab">Activity &amp; Apps</button>
-        <button type="button" class="segmented-tab-btn" data-tab-target="#diagnostics-tab">Diagnostics</button>
+        <button type="button" class="segmented-tab-btn" data-tab-target="#activity-tab">{{ t('pages.device_detail.tab_activity') }}</button>
+        <button type="button" class="segmented-tab-btn" data-tab-target="#diagnostics-tab">{{ t('pages.device_detail.tab_diagnostics') }}</button>
     </div>
 </li>
 {% endblock %}
@@ -32,12 +32,12 @@
             {{ device_label }}
         </h1>
         <p class="guardian-page-lead mb-0">
-            Accounts, apps, and gentle alerts for this device.
+            {{ t('pages.device_detail.lead') }}
         </p>
     </div>
     <div class="guardian-page-header__actions">
         <a href="{{ url_for('ui_dashboard.admin_devices') }}" class="btn btn-secondary btn-sm fw-bold">
-            <i class="fas fa-arrow-left me-1"></i> Back to Devices
+            <i class="fas fa-arrow-left me-1"></i> {{ t('pages.device_detail.back_to_devices') }}
         </a>
     </div>
 </div>
@@ -45,12 +45,12 @@
 <!-- Mobile Tab Navigation Control (d-flex d-lg-none) -->
 <div class="d-flex d-lg-none justify-content-center mb-4">
     <div class="segmented-control">
-        <button type="button" class="segmented-tab-btn active" data-tab-target="#overview-tab">Overview</button>
+        <button type="button" class="segmented-tab-btn active" data-tab-target="#overview-tab">{{ t('pages.device_detail.tab_overview') }}</button>
         {% if device.platform in ['android', 'nintendo', 'xbox'] or screenshot_settings is not none %}
-        <button type="button" class="segmented-tab-btn" data-tab-target="#policies-tab">Policies</button>
+        <button type="button" class="segmented-tab-btn" data-tab-target="#policies-tab">{{ t('pages.device_detail.tab_policies_short') }}</button>
         {% endif %}
-        <button type="button" class="segmented-tab-btn" data-tab-target="#activity-tab">Activity</button>
-        <button type="button" class="segmented-tab-btn" data-tab-target="#diagnostics-tab">Diagnostics</button>
+        <button type="button" class="segmented-tab-btn" data-tab-target="#activity-tab">{{ t('pages.device_detail.tab_activity_short') }}</button>
+        <button type="button" class="segmented-tab-btn" data-tab-target="#diagnostics-tab">{{ t('pages.device_detail.tab_diagnostics') }}</button>
     </div>
 </div>
 
@@ -66,7 +66,7 @@
             <div class="col-12 col-sm-6 col-md-3">
                 <div class="card border shadow-sm h-100 text-center p-3">
                     <span class="text-secondary small fw-bold text-uppercase d-block mb-1"
-                        style="font-size: 0.7rem; letter-spacing: 0.05em;">System ID</span>
+                        style="font-size: 0.7rem; letter-spacing: 0.05em;">{{ t('pages.device_detail.system_id') }}</span>
                     <strong class="small text-body font-monospace text-truncate d-block" title="{{ device.system_id }}">{{
                         device.system_id }}</strong>
                 </div>
@@ -75,7 +75,7 @@
             <div class="col-12 col-sm-6 col-md-3">
                 <div class="card border shadow-sm h-100 text-center p-3">
                     <span class="text-secondary small fw-bold text-uppercase d-block mb-1"
-                        style="font-size: 0.7rem; letter-spacing: 0.05em;">Trust Status</span>
+                        style="font-size: 0.7rem; letter-spacing: 0.05em;">{{ t('pages.device_detail.trust_status') }}</span>
                     <strong class="fs-4 text-success d-block lh-1 fw-bold">{{ device.status|title }}</strong>
                 </div>
             </div>
@@ -84,11 +84,11 @@
                 <div class="card border shadow-sm h-100 text-center p-3">
                     {% if device.platform == 'nintendo' or device.platform == 'xbox' %}
                     <span class="text-secondary small fw-bold text-uppercase d-block mb-1"
-                        style="font-size: 0.7rem; letter-spacing: 0.05em;">Connection Type</span>
-                    <strong class="fs-4 text-warning d-block lh-1 fw-bold">Cloud Managed</strong>
+                        style="font-size: 0.7rem; letter-spacing: 0.05em;">{{ t('pages.device_detail.connection_type') }}</span>
+                    <strong class="fs-4 text-warning d-block lh-1 fw-bold">{{ t('pages.device_detail.cloud_managed') }}</strong>
                     {% else %}
                     <span class="text-secondary small fw-bold text-uppercase d-block mb-1"
-                        style="font-size: 0.7rem; letter-spacing: 0.05em;">Last IP Address</span>
+                        style="font-size: 0.7rem; letter-spacing: 0.05em;">{{ t('pages.device_detail.last_ip') }}</span>
                     <code class="fs-4 text-body d-block lh-1 fw-bold"
                         style="font-family: monospace;">{{ device.system_ip or 'Offline' }}</code>
                     {% endif %}
@@ -98,8 +98,8 @@
             <div class="col-12 col-sm-6 col-md-3">
                 <div class="card border shadow-sm h-100 text-center p-3">
                     <span class="text-secondary small fw-bold text-uppercase d-block mb-1"
-                        style="font-size: 0.7rem; letter-spacing: 0.05em;">Host Logs</span>
-                    <strong class="fs-4 text-warning d-block lh-1 fw-bold">{{ alert_summary.total }} alerts</strong>
+                        style="font-size: 0.7rem; letter-spacing: 0.05em;">{{ t('pages.device_detail.host_logs') }}</span>
+                    <strong class="fs-4 text-warning d-block lh-1 fw-bold">{{ t('pages.device_detail.alerts_count', count=alert_summary.total) }}</strong>
                 </div>
             </div>
         </div>
@@ -114,7 +114,7 @@
                             style="width: 38px; height: 38px;">
                             <i class="fas fa-users-cog fs-5"></i>
                         </div>
-                        <h5 class="mb-0 fw-bold">Linked Managed Accounts</h5>
+                        <h5 class="mb-0 fw-bold">{{ t('pages.device_detail.linked_accounts') }}</h5>
                     </div>
                     <div class="card-body">
                         {% if mapped_accounts %}
@@ -146,7 +146,7 @@
                                 <div>
                                     <a href="{{ url_for('ui_dashboard.edit_user_profile', user_id=mapping.managed_user.id) }}"
                                         class="btn btn-sm btn-outline-primary fw-bold">
-                                        <i class="fas fa-shield-alt me-1"></i> Application Policies
+                                        <i class="fas fa-shield-alt me-1"></i> {{ t('pages.device_detail.application_policies') }}
                                     </a>
                                 </div>
                             </div>
@@ -157,10 +157,10 @@
                             <svg class="empty-state-svg" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M18 18.72a6 6 0 00-3.44-5.32m2.84-2.24A6 6 0 1010.5 3.5m.75 18l3.75-3.75m0 0L11.25 14m3.75 3.75h-9"></path>
                             </svg>
-                            <h6 class="empty-state-title">No Profiles Linked</h6>
-                            <p class="empty-state-desc">Associate a child account with this device to monitor screen time and apply restrictions.</p>
+                            <h6 class="empty-state-title">{{ t('pages.device_detail.no_profiles_title') }}</h6>
+                            <p class="empty-state-desc">{{ t('pages.device_detail.no_profiles_desc') }}</p>
                             <button type="button" class="btn btn-sm btn-primary fw-bold" onclick="openOnboardingWizard()">
-                                <i class="fas fa-link me-1"></i> Link Account Now
+                                <i class="fas fa-link me-1"></i> {{ t('pages.device_detail.link_account') }}
                             </button>
                         </div>
                         {% endif %}
@@ -174,7 +174,7 @@
                             style="width: 38px; height: 38px;">
                             <i class="fas fa-globe fs-5"></i>
                         </div>
-                        <h5 class="mb-0 fw-bold">Domain Policy Contributors</h5>
+                        <h5 class="mb-0 fw-bold">{{ t('pages.device_detail.domain_contributors') }}</h5>
                     </div>
                     <div class="card-body">
                         {% if blocklist_contributors %}
@@ -202,8 +202,8 @@
                             <svg class="empty-state-svg" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.57-.599-3.75A11.902 11.902 0 0112 2.744z"></path>
                             </svg>
-                            <h6 class="empty-state-title">No Filter Contributors</h6>
-                            <p class="empty-state-desc">There are no active content filtering source profiles mapped to accounts on this machine.</p>
+                            <h6 class="empty-state-title">{{ t('pages.device_detail.no_contributors_title') }}</h6>
+                            <p class="empty-state-desc">{{ t('pages.device_detail.no_contributors_desc') }}</p>
                         </div>
                         {% endif %}
                     </div>
@@ -220,8 +220,8 @@
                             <i class="fas fa-key fs-5"></i>
                         </div>
                         <div>
-                            <h5 class="mb-0 fw-bold">Parental Access Code</h5>
-                            <span class="text-white-50 text-wrap small fw-medium">Use offline to reset lock screen PIN</span>
+                            <h5 class="mb-0 fw-bold">{{ t('pages.device_detail.parental_access_code') }}</h5>
+                            <span class="text-white-50 text-wrap small fw-medium">{{ t('pages.device_detail.access_code_hint') }}</span>
                         </div>
                     </div>
                     <div class="card-body text-center">
@@ -229,8 +229,7 @@
                             {{ parental_access_code }}
                         </div>
                         <p class="small text-secondary mb-0">
-                            Enter this 6-digit code on the device lock screen. It rotates every 30 minutes.
-                            If the current code fails, try the codes from the previous one or two windows as well.
+                            {{ t('pages.device_detail.access_code_help') }}
                         </p>
                     </div>
                 </div>
@@ -244,8 +243,8 @@
                             <i class="fas fa-exclamation-triangle fs-5"></i>
                         </div>
                         <div>
-                            <h5 class="mb-0 fw-bold card-title-accent">Device Management</h5>
-                            <span class="text-secondary small fw-medium">Remove this device from family management</span>
+                            <h5 class="mb-0 fw-bold card-title-accent">{{ t('pages.device_detail.device_management') }}</h5>
+                            <span class="text-secondary small fw-medium">{{ t('pages.device_detail.device_management_lead') }}</span>
                         </div>
                     </div>
                     <div class="card-body">
@@ -279,7 +278,7 @@
                             {% endif %}
                         </p>
                         <button type="button" id="unenroll-device-btn" class="btn btn-outline-danger fw-bold w-100 mb-3">
-                            <i class="fas fa-unlink me-1"></i> Unenroll Device
+                            <i class="fas fa-unlink me-1"></i> {{ t('pages.device_detail.unenroll_device') }}
                         </button>
 
                         {% if device.platform == 'android' %}
@@ -291,7 +290,7 @@
                         </p>
                         <button type="button" id="factory-reset-device-btn" class="btn btn-danger fw-bold w-100"
                             data-device-label="{{ device_label }}">
-                            <i class="fas fa-eraser me-1"></i> Factory Reset Device
+                            <i class="fas fa-eraser me-1"></i> {{ t('pages.device_detail.factory_reset_device') }}
                         </button>
                         {% endif %}
 
@@ -321,8 +320,8 @@
                                     <i class="fab fa-android fs-5"></i>
                                 </div>
                                 <div>
-                                    <h5 class="mb-0 fw-bold">Android Device Policy</h5>
-                                    <span class="text-secondary small fw-medium">Manage hardware access, system settings, and restrictions.</span>
+                                    <h5 class="mb-0 fw-bold">{{ t('pages.device_detail.android_policy') }}</h5>
+                                    <span class="text-secondary small fw-medium">{{ t('pages.device_detail.android_policy_lead') }}</span>
                                 </div>
                             </div>
                             <div>
@@ -330,9 +329,9 @@
                                     class="badge {% if android_device_policy and android_device_policy.is_synced %}bg-success-subtle text-success border border-success-subtle{% else %}bg-warning-subtle text-warning border border-warning-subtle{% endif %} px-2.5 py-1.5 fw-bold"
                                     style="font-size: 0.75rem;">
                                     {% if android_device_policy and android_device_policy.is_synced %}
-                                    <i class="fas fa-check-circle me-1"></i> Synced to Device
+                                    <i class="fas fa-check-circle me-1"></i> {{ t('pages.device_detail.synced_to_device') }}
                                     {% else %}
-                                    <i class="fas fa-sync me-1"></i> Sync Pending
+                                    <i class="fas fa-sync me-1"></i> {{ t('pages.device_detail.sync_pending') }}
                                     {% endif %}
                                 </span>
                             </div>
@@ -346,7 +345,7 @@
                                 <!-- Category: Hardware & Connectivity -->
                                 <h6 class="fw-bold text-secondary text-uppercase mb-3 pb-1 border-bottom"
                                     style="font-size: 0.75rem; letter-spacing: 0.05em;">
-                                    <i class="fas fa-microchip me-1 text-primary"></i> Hardware & Connectivity
+                                    <i class="fas fa-microchip me-1 text-primary"></i> {{ t('pages.device_detail.hardware_connectivity') }}
                                 </h6>
                                 <div class="row g-3 mb-4">
                                     <div class="col-12 col-md-6">
@@ -615,7 +614,7 @@
                                 <!-- Save Action -->
                                 <div class="d-flex justify-content-end">
                                     <button type="submit" id="save-policy-btn" class="btn btn-primary fw-bold">
-                                        <i class="fas fa-save me-1"></i> Save Restrictions
+                                        <i class="fas fa-save me-1"></i> {{ t('pages.device_detail.save_restrictions') }}
                                     </button>
                                 </div>
                             </form>
@@ -929,8 +928,8 @@
                             <i class="fas fa-film fs-5"></i>
                         </div>
                         <div>
-                            <h5 class="mb-0 fw-bold">Captured Screen History</h5>
-                            <span class="text-secondary small fw-semibold">Review periodic desktop screenshot logs from this device.</span>
+                            <h5 class="mb-0 fw-bold">{{ t('pages.device_detail.captured_screen_history') }}</h5>
+                            <span class="text-secondary small fw-semibold">{{ t('pages.device_detail.screen_history_lead') }}</span>
                         </div>
                     </div>
                     <div class="card-body">
@@ -945,11 +944,11 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z"></path>
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0zM18.75 10.5h.008v.008h-.008V10.5z"></path>
                             </svg>
-                            <h6 class="empty-state-title">No Screenshots Logged</h6>
-                            <p class="empty-state-desc">Periodic desktop screens will show up here once a monitoring session is running and capturing is enabled.</p>
+                            <h6 class="empty-state-title">{{ t('pages.device_detail.no_screenshots_title') }}</h6>
+                            <p class="empty-state-desc">{{ t('pages.device_detail.no_screenshots_desc') }}</p>
                             {% if agent_online %}
                             <button type="button" class="btn btn-sm btn-primary fw-bold" onclick="document.getElementById('screen-history-capture-btn')?.click()">
-                                <i class="fas fa-camera me-1"></i> Capture Now
+                                <i class="fas fa-camera me-1"></i> {{ t('pages.device_detail.capture_now_btn') }}
                             </button>
                             {% endif %}
                         </div>
@@ -1044,7 +1043,7 @@
                                 <i class="fas fa-th-list fs-5"></i>
                             </div>
                             <div>
-                                <h5 class="mb-0 fw-bold">Installed Applications</h5>
+                                <h5 class="mb-0 fw-bold">{{ t('pages.device_detail.installed_applications') }}</h5>
                                 <span class="text-secondary small fw-semibold">
                                     {% if device.installed_apps_last_reported %}
                                     Last inventory: {{ device.installed_apps_last_reported|localtime }} ({{ device.installed_apps_count or 0 }} apps)
@@ -1060,7 +1059,7 @@
                             {{ csrf_field() }} 
                             <input type="hidden" name="linux_username" value="{{ mapped_accounts[0].linux_username }}">
                             <button type="submit" class="btn btn-sm btn-primary fw-bold">
-                                <i class="fas fa-sync-alt me-1"></i> Refresh Inventory
+                                                <i class="fas fa-sync-alt me-1"></i> {{ t('pages.device_detail.refresh_inventory') }}
                             </button>
                         </form>
                         {% elif mapped_accounts %}
@@ -1120,8 +1119,8 @@
                                     <svg class="empty-state-svg" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z"></path>
                                     </svg>
-                                    <h6 class="empty-state-title">No Applications Inventory</h6>
-                                    <p class="empty-state-desc">The application list has not been collected from this client yet.</p>
+                                    <h6 class="empty-state-title">{{ t('pages.device_detail.no_inventory_title') }}</h6>
+                                    <p class="empty-state-desc">{{ t('pages.device_detail.no_inventory_desc') }}</p>
                                 </div>
                             {% endif %}
                         {% else %}
@@ -1129,8 +1128,8 @@
                             <svg class="empty-state-svg" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244m6.513-2.513L12 12"></path>
                             </svg>
-                            <h6 class="empty-state-title">No Link Available</h6>
-                            <p class="empty-state-desc">Associate a child account first in the Overview tab to load the device application inventory.</p>
+                            <h6 class="empty-state-title">{{ t('pages.device_detail.no_link_title') }}</h6>
+                            <p class="empty-state-desc">{{ t('pages.device_detail.no_link_desc') }}</p>
                         </div>
                         {% endif %}
                     </div>
@@ -1144,7 +1143,7 @@
                             <i class="fas fa-chart-line fs-5"></i>
                         </div>
                         <div>
-                            <h5 class="mb-0 fw-bold">Application Runtime Tracker (Last 7 Days)</h5>
+                            <h5 class="mb-0 fw-bold">{{ t('pages.device_detail.runtime_tracker') }}</h5>
                         </div>
                     </div>
                     <div class="card-body">
@@ -1187,8 +1186,8 @@
                             <svg class="empty-state-svg" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                             </svg>
-                            <h6 class="empty-state-title">No Usage Logged</h6>
-                            <p class="empty-state-desc">No active runtime statistics have been reported for the mapped accounts in the last 7 days.</p>
+                            <h6 class="empty-state-title">{{ t('pages.device_detail.no_usage_title') }}</h6>
+                            <p class="empty-state-desc">{{ t('pages.device_detail.no_usage_desc') }}</p>
                         </div>
                         {% endif %}
                         {% else %}
@@ -1196,8 +1195,8 @@
                             <svg class="empty-state-svg" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z"></path>
                             </svg>
-                            <h6 class="empty-state-title">Analytics Unassigned</h6>
-                            <p class="empty-state-desc">No mapped accounts are available to track on this device.</p>
+                            <h6 class="empty-state-title">{{ t('pages.device_detail.analytics_unassigned_title') }}</h6>
+                            <p class="empty-state-desc">{{ t('pages.device_detail.analytics_unassigned_desc') }}</p>
                         </div>
                         {% endif %}
                     </div>
@@ -1222,15 +1221,15 @@
                             <i class="fas fa-terminal fs-5"></i>
                         </div>
                         <div>
-                            <h5 class="mb-0 fw-bold">Locked Device Recovery</h5>
-                            <span class="text-white-50 text-wrap small fw-medium">Use when the phone cannot unlock after reboot</span>
+                            <h5 class="mb-0 fw-bold">{{ t('pages.device_detail.locked_recovery') }}</h5>
+                            <span class="text-white-50 text-wrap small fw-medium">{{ t('pages.device_detail.locked_recovery_lead') }}</span>
                         </div>
                     </div>
                     <div class="card-body">
                         <p class="small text-secondary">
                             The <strong>device token</strong> below is not the 6-digit code. It is the secret the agent uses to sync with this server. Run these commands from a computer with ADB access:
                         </p>
-                        <label class="form-label small fw-bold text-secondary mb-1">Device token</label>
+                        <label class="form-label small fw-bold text-secondary mb-1">{{ t('pages.device_detail.device_token') }}</label>
                         <div class="font-monospace small bg-body-secondary border rounded p-2 mb-3 user-select-all">{{
                             device.secure_token }}</div>
                         <label class="form-label small fw-bold text-secondary mb-1">Recovery commands</label>
@@ -1256,7 +1255,7 @@ adb reboot</pre>
                                 <i class="fas fa-bug fs-5"></i>
                             </div>
                             <div>
-                                <h5 class="mb-0 fw-bold">Diagnostic Alert History</h5>
+                                <h5 class="mb-0 fw-bold">{{ t('pages.device_detail.diagnostic_alerts') }}</h5>
                                 <span class="text-secondary small fw-medium">Outbound connection alerts and system exceptions generated by this client</span>
                             </div>
                         </div>
@@ -1321,7 +1320,8 @@ adb reboot</pre>
                             <svg class="empty-state-svg" style="color: var(--success-color); opacity: 0.85;" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                             </svg>
-                            <h6 class="empty-state-title">No Audit Records Found</h6>
+                            <h6 class="empty-state-title">{{ t('pages.device_detail.no_audit_title') }}</h6>
+                            <p class="empty-state-desc">{{ t('pages.device_detail.no_audit_desc') }}</p>
                             <p class="empty-state-desc">This client is connection-healthy. No connection diagnostic alerts match your filters.</p>
                         </div>
 

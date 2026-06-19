@@ -2,8 +2,12 @@
  * Guardian profile wizard — live summary and responsibility slider.
  */
 (function () {
+    function i18n(key, params) {
+        return typeof window.guardianI18n === 'function' ? window.guardianI18n(key, params) : key;
+    }
+
     const MATURITY_FROM_SLIDER = ['low', 'medium', 'high'];
-    const SLIDER_LABELS = ['Open Dialogue', 'Balanced Watch', 'Assisted Steps'];
+    const SLIDER_LABEL_KEYS = ['wizard_slider_open', 'wizard_slider_balanced', 'wizard_slider_assisted'];
 
     function friendlyPackName(id, presetNameById) {
         const names = {
@@ -97,7 +101,7 @@
             maturityInput.value = maturity;
             if (sliderLabelId) {
                 const labelEl = document.getElementById(sliderLabelId);
-                if (labelEl) labelEl.textContent = SLIDER_LABELS[idx] || '';
+                if (labelEl) labelEl.textContent = i18n(SLIDER_LABEL_KEYS[idx] || '');
             }
         }
 
@@ -117,14 +121,17 @@
         }
 
         if (!bundle || !ageMeta) {
-            titleEl.textContent = 'Baseline Summary';
-            listEl.innerHTML = '<li>Choose a growth milestone and responsibility level to preview your family baseline.</li>';
+            titleEl.textContent = i18n('wizard_baseline_title');
+            listEl.innerHTML = `<li>${i18n('wizard_baseline_preview')}</li>`;
             return;
         }
 
         const profileTitle = ageMeta.profile_title || ageMeta.label;
         const ageLabel = ageMeta.label || age;
-        titleEl.textContent = `Baseline Summary: ${profileTitle} Profile (Age ${ageLabel})`;
+        titleEl.textContent = i18n('wizard_baseline_profile', {
+            profile: profileTitle,
+            age: ageLabel,
+        });
 
         const bullets = buildSummaryBullets(bundle, ageMeta, matMeta, presetNameById);
         listEl.innerHTML = bullets.map(line => `<li>${line}</li>`).join('');

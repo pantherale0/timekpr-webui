@@ -1,6 +1,6 @@
 {% extends "_spa_fragment.html" %}
 
-{% block title %}Usage History - {{ user.username }} - Guardian{% endblock %}
+{% block title %}{{ t('pages.stats.title', username=user.username) }}{% endblock %}
 
 {% block extra_head %}
 <!-- Include Chart.js for analytics tab visualization -->
@@ -152,30 +152,30 @@
 <li class="nav-item dropdown guardian-nav-date-filter">
     <button class="btn btn-sm btn-outline-secondary dropdown-toggle guardian-nav-action-btn fw-bold"
         id="dateFilterDropdown" type="button" data-bs-toggle="dropdown" aria-expanded="false"
-        data-bs-auto-close="outside" aria-label="Select date range">
+        data-bs-auto-close="outside" aria-label="{{ t('pages.stats.select_date_range') }}">
         <i class="fas fa-calendar-alt text-primary"></i>
-        <span class="guardian-nav-date-label" id="current-date-range-label">Last 7 Days</span>
+        <span class="guardian-nav-date-label" id="current-date-range-label">{{ t('pages.stats.last_7_days') }}</span>
     </button>
     <div class="dropdown-menu dropdown-menu-end p-3 shadow border" style="width: 280px; font-family: inherit; z-index: 1050;">
-        <h6 class="dropdown-header px-0 mb-2 fw-bold text-uppercase tracking-wider" style="font-size: 0.7rem; color: var(--bs-secondary-color);">Select Period</h6>
+        <h6 class="dropdown-header px-0 mb-2 fw-bold text-uppercase tracking-wider" style="font-size: 0.7rem; color: var(--bs-secondary-color);">{{ t('pages.stats.select_period') }}</h6>
         <div class="d-flex flex-column gap-1 mb-2">
-            <button class="btn btn-sm text-start py-1.5 px-2 fw-semibold date-preset-btn" data-preset="today">Today</button>
-            <button class="btn btn-sm text-start py-1.5 px-2 fw-semibold date-preset-btn" data-preset="yesterday">Yesterday</button>
-            <button class="btn btn-sm text-start py-1.5 px-2 fw-semibold date-preset-btn active" data-preset="7days">Last 7 Days</button>
-            <button class="btn btn-sm text-start py-1.5 px-2 fw-semibold date-preset-btn" data-preset="30days">Last 30 Days</button>
-            <button class="btn btn-sm text-start py-1.5 px-2 fw-semibold date-preset-btn" data-preset="thismonth">This Month</button>
+            <button class="btn btn-sm text-start py-1.5 px-2 fw-semibold date-preset-btn" data-preset="today">{{ t('pages.stats.today') }}</button>
+            <button class="btn btn-sm text-start py-1.5 px-2 fw-semibold date-preset-btn" data-preset="yesterday">{{ t('pages.stats.yesterday') }}</button>
+            <button class="btn btn-sm text-start py-1.5 px-2 fw-semibold date-preset-btn active" data-preset="7days">{{ t('pages.stats.last_7_days') }}</button>
+            <button class="btn btn-sm text-start py-1.5 px-2 fw-semibold date-preset-btn" data-preset="30days">{{ t('pages.stats.last_30_days') }}</button>
+            <button class="btn btn-sm text-start py-1.5 px-2 fw-semibold date-preset-btn" data-preset="thismonth">{{ t('pages.stats.this_month') }}</button>
         </div>
         <div class="dropdown-divider"></div>
-        <h6 class="dropdown-header px-0 my-2 fw-bold text-uppercase tracking-wider" style="font-size: 0.7rem; color: var(--bs-secondary-color);">Custom Range</h6>
+        <h6 class="dropdown-header px-0 my-2 fw-bold text-uppercase tracking-wider" style="font-size: 0.7rem; color: var(--bs-secondary-color);">{{ t('pages.stats.custom_range') }}</h6>
         <div class="mb-2">
-            <label class="form-label small fw-bold text-secondary mb-1">Start Date</label>
+            <label class="form-label small fw-bold text-secondary mb-1">{{ t('pages.stats.start_date') }}</label>
             <input type="date" id="filter-start-date" class="form-control form-control-sm">
         </div>
         <div class="mb-3">
-            <label class="form-label small fw-bold text-secondary mb-1">End Date</label>
+            <label class="form-label small fw-bold text-secondary mb-1">{{ t('pages.stats.end_date') }}</label>
             <input type="date" id="filter-end-date" class="form-control form-control-sm">
         </div>
-        <button id="apply-custom-date" class="btn btn-sm btn-primary w-100 py-1.5 fw-bold">Apply Custom Range</button>
+        <button id="apply-custom-date" class="btn btn-sm btn-primary w-100 py-1.5 fw-bold">{{ t('pages.stats.apply_custom') }}</button>
     </div>
 </li>
 {% endblock %}
@@ -183,14 +183,14 @@
 {% block content %}
 <div class="guardian-page-header">
     <div class="guardian-page-header__intro">
-        <h1 class="guardian-page-title mb-1">{{ user.username }} &mdash; Activity story</h1>
+        <h1 class="guardian-page-title mb-1">{{ t('pages.stats.heading', username=user.username) }}</h1>
         <p class="guardian-page-lead mb-0">
-            {{ user.device_mappings|length }} linked device{{ 's' if user.device_mappings|length != 1 else '' }} &bull; Usage patterns and gentle alerts
+            {% if user.device_mappings|length == 1 %}{{ t('pages.stats.lead', count=user.device_mappings|length) }}{% else %}{{ t('pages.stats.lead_plural', count=user.device_mappings|length) }}{% endif %}
         </p>
     </div>
     <div class="guardian-page-header__actions">
         <a href="{{ url_for('ui_dashboard.user_combined_history', user_id=user.id) }}" class="btn btn-primary fw-bold d-inline-flex align-items-center gap-2">
-            <i class="fas fa-history"></i> Web &amp; Video History
+            <i class="fas fa-history"></i> {{ t('pages.stats.web_video_history') }}
         </a>
     </div>
 </div>
@@ -200,21 +200,21 @@
     <div class="row g-3 mb-4">
         <div class="col-12 col-md-4">
             <div class="card shadow-sm border text-center p-3 mb-0 h-100">
-                <span class="text-secondary small fw-bold text-uppercase d-block mb-1" style="font-size: 0.7rem; letter-spacing: 0.05em;">Total Time</span>
+                <span class="text-secondary small fw-bold text-uppercase d-block mb-1" style="font-size: 0.7rem; letter-spacing: 0.05em;">{{ t('pages.stats.total_time') }}</span>
                 <strong class="fs-2 text-primary d-block lh-1 fw-bold" id="stat-total">—</strong>
                 <span class="small text-muted fw-bold mt-2 d-block" id="stat-total-sub"></span>
             </div>
         </div>
         <div class="col-12 col-md-4">
             <div class="card shadow-sm border text-center p-3 mb-0 h-100">
-                <span class="text-secondary small fw-bold text-uppercase d-block mb-1" style="font-size: 0.7rem; letter-spacing: 0.05em;">Daily Average</span>
+                <span class="text-secondary small fw-bold text-uppercase d-block mb-1" style="font-size: 0.7rem; letter-spacing: 0.05em;">{{ t('pages.stats.daily_average') }}</span>
                 <strong class="fs-2 text-body d-block lh-1 fw-bold" id="stat-avg">—</strong>
-                <span class="small text-muted fw-bold mt-2 d-block" id="stat-avg-sub">per day</span>
+                <span class="small text-muted fw-bold mt-2 d-block" id="stat-avg-sub">{{ t('pages.stats.per_day') }}</span>
             </div>
         </div>
         <div class="col-12 col-md-4">
             <div class="card shadow-sm border text-center p-3 mb-0 h-100">
-                <span class="text-secondary small fw-bold text-uppercase d-block mb-1" style="font-size: 0.7rem; letter-spacing: 0.05em;">Peak Usage</span>
+                <span class="text-secondary small fw-bold text-uppercase d-block mb-1" style="font-size: 0.7rem; letter-spacing: 0.05em;">{{ t('pages.stats.peak_usage') }}</span>
                 <strong class="fs-2 text-warning d-block lh-1 fw-bold" id="stat-peak">—</strong>
                 <span class="small text-muted fw-bold mt-2 d-block" id="stat-peak-label"></span>
             </div>
@@ -224,13 +224,13 @@
     <!-- Daily usage trend chart -->
     <div class="card shadow-sm border mb-4">
         <div class="card-header py-3 bg-body-secondary d-flex justify-content-between align-items-center">
-            <h6 class="mb-0 fw-bold text-secondary text-uppercase tracking-wider" style="font-size: 0.75rem; letter-spacing: 0.05em;">Daily usage trend</h6>
+            <h6 class="mb-0 fw-bold text-secondary text-uppercase tracking-wider" style="font-size: 0.75rem; letter-spacing: 0.05em;">{{ t('pages.stats.daily_trend') }}</h6>
             <div id="trend-period-label" class="small text-muted fw-bold"></div>
         </div>
         <div class="card-body">
             <div id="chart-loading" class="text-center py-5" style="display: none;">
                 <div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div>
-                <span class="small text-secondary fw-semibold">Loading chart trend...</span>
+                <span class="small text-secondary fw-semibold">{{ t('pages.stats.loading_chart') }}</span>
             </div>
             <div id="chart-wrapper" style="height: 280px; position: relative;">
                 <canvas id="chart-daily-trend"></canvas>
@@ -241,13 +241,13 @@
     <!-- Per-Application Usage Card -->
     <div id="app-usage-card" class="card shadow-sm border mb-4">
         <div class="card-header py-3 bg-body-secondary">
-            <h5 class="mb-0 fw-bold">Per-Application Usage</h5>
-            <span class="text-secondary small fw-medium">Time spent inside verified active applications for the selected period</span>
+            <h5 class="mb-0 fw-bold">{{ t('pages.stats.per_app_usage') }}</h5>
+            <span class="text-secondary small fw-medium">{{ t('pages.stats.per_app_lead') }}</span>
         </div>
         <div class="card-body">
             <div id="app-usage-loading" class="text-center py-5" style="display: none;">
                 <div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div>
-                <span class="small text-secondary fw-semibold">Loading application analytics...</span>
+                <span class="small text-secondary fw-semibold">{{ t('pages.stats.loading_apps') }}</span>
             </div>
             <div id="app-usage-container" class="row g-4 align-items-center">
                 <!-- Left Column: Doughnut Chart -->
@@ -261,7 +261,7 @@
                     <div class="d-flex mb-3">
                         <div class="input-group input-group-sm">
                             <span class="input-group-text bg-body-secondary border"><i class="fas fa-search"></i></span>
-                            <input type="text" id="app-search-input" class="form-control" placeholder="Search applications...">
+                            <input type="text" id="app-search-input" class="form-control" placeholder="{{ t('pages.stats.search_apps') }}">
                         </div>
                     </div>
                     <div class="table-responsive" style="max-height: 280px; overflow-y: auto;">
@@ -269,9 +269,9 @@
                             <thead class="sticky-top" style="background-color: var(--bs-secondary-bg); z-index: 2;">
                                 <tr>
                                     <th style="width: 8%;"></th>
-                                    <th style="width: 47%;">Application</th>
-                                    <th style="width: 25%;">Platform / Details</th>
-                                    <th style="width: 20%;" class="text-end">Time Spent</th>
+                                    <th style="width: 47%;">{{ t('pages.stats.col_application') }}</th>
+                                    <th style="width: 25%;">{{ t('pages.stats.col_platform') }}</th>
+                                    <th style="width: 20%;" class="text-end">{{ t('pages.stats.col_time_spent') }}</th>
                                 </tr>
                             </thead>
                             <tbody id="app-usage-tbody">
@@ -282,7 +282,7 @@
                 </div>
             </div>
             <div id="app-usage-empty" class="text-center text-secondary py-5 fw-medium" style="display: none;">
-                No application usage records found for this period.
+                {{ t('pages.stats.no_app_usage') }}
             </div>
         </div>
     </div>
@@ -291,8 +291,8 @@
     <div class="card shadow-sm border mb-4">
         <div class="card-header py-3 bg-body-secondary d-flex justify-content-between align-items-center flex-wrap gap-2">
             <div>
-                <h5 class="mb-0 fw-bold">Activity Feed</h5>
-                <span class="text-secondary small fw-medium">A gentle feed of alerts — shield blocks, app pauses, and routine notices</span>
+                <h5 class="mb-0 fw-bold">{{ t('pages.stats.activity_feed') }}</h5>
+                <span class="text-secondary small fw-medium">{{ t('pages.stats.activity_feed_lead') }}</span>
             </div>
             <div id="timeline-summary-stats">
                 <!-- Injected dynamically -->
@@ -302,22 +302,22 @@
             <!-- Timeline toolbar -->
             <div class="d-flex gap-2 mb-4 flex-wrap align-items-center justify-content-between border-bottom pb-3">
                 <div class="d-flex gap-2 flex-wrap flex-grow-1">
-                    <input type="text" id="timeline-search-input" class="form-control form-control-sm" placeholder="Search activities..." style="max-width: 250px;">
+                    <input type="text" id="timeline-search-input" class="form-control form-control-sm" placeholder="{{ t('pages.stats.search_activities') }}" style="max-width: 250px;">
                     <select id="timeline-category-filter" class="form-select form-select-sm" style="max-width: 200px;">
-                        <option value="all">All Activities</option>
-                        <option value="alerts">Alerts Only</option>
-                        <option value="commands">Terminal Commands Only</option>
+                        <option value="all">{{ t('pages.stats.filter_all') }}</option>
+                        <option value="alerts">{{ t('pages.stats.filter_alerts') }}</option>
+                        <option value="commands">{{ t('pages.stats.filter_commands') }}</option>
                     </select>
                 </div>
                 <div>
-                    <button id="timeline-prune-btn" class="btn btn-sm btn-outline-danger fw-bold"><i class="fas fa-trash-alt me-1"></i> Prune Old Activities</button>
+                    <button id="timeline-prune-btn" class="btn btn-sm btn-outline-danger fw-bold"><i class="fas fa-trash-alt me-1"></i> {{ t('pages.stats.prune_activities') }}</button>
                 </div>
             </div>
 
             <!-- Loader -->
             <div id="timeline-loading" class="text-center py-5" style="display: none;">
                 <div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div>
-                <span class="small text-secondary fw-semibold">Loading activity feed...</span>
+                <span class="small text-secondary fw-semibold">{{ t('pages.stats.loading_feed') }}</span>
             </div>
 
             <!-- Timeline Outer Container -->
@@ -329,13 +329,13 @@
                 <!-- Infinite Scroll Loader at bottom -->
                 <div id="timeline-bottom-loader" class="text-center py-3" style="display: none;">
                     <div class="spinner-border spinner-border-sm text-primary me-1" role="status"></div>
-                    <span class="small text-secondary fw-semibold">Loading older activities...</span>
+                    <span class="small text-secondary fw-semibold">{{ t('pages.stats.loading_older') }}</span>
                 </div>
             </div>
 
             <!-- Empty state -->
             <div id="timeline-empty" class="text-center text-secondary py-5 fw-medium" style="display: none;">
-                No activities found matching the current criteria.
+                {{ t('pages.stats.no_activities') }}
             </div>
         </div>
     </div>

@@ -27,6 +27,7 @@ from src.helpers import (
     localtime_filter,
     inject_timezone,
     inject_create_profile_wizard,
+    inject_i18n,
     TIMEZONE_STR,
     LOCAL_TIMEZONE,
     ADMIN_USERNAME,
@@ -149,6 +150,23 @@ app.context_processor(inject_oidc_status)
 app.template_filter('localtime')(localtime_filter)
 app.context_processor(inject_timezone)
 app.context_processor(inject_create_profile_wizard)
+app.context_processor(inject_i18n)
+
+
+@app.before_request
+def _resolve_request_locale():
+    """Resolve active UI locale for this request."""
+    from flask import g, request, session
+    from src.database import Settings
+    from src.i18n.catalog import resolve_locale
+
+    household_default = None
+    try:
+        household_default = Settings.get_value('default_locale')
+    except Exception:
+        household_default = None
+    g.locale = resolve_locale(session, request.headers.get('Accept-Language'), household_default)
+
 
 # Import and register blueprints
 from src.blueprints import (

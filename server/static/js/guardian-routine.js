@@ -4,6 +4,23 @@
 (function () {
     'use strict';
 
+    function i18n(key, params) {
+        return typeof window.guardianI18n === 'function' ? window.guardianI18n(key, params) : key;
+    }
+
+    function dayLabel(day) {
+        const keys = {
+            1: 'routine_day_monday',
+            2: 'routine_day_tuesday',
+            3: 'routine_day_wednesday',
+            4: 'routine_day_thursday',
+            5: 'routine_day_friday',
+            6: 'routine_day_saturday',
+            7: 'routine_day_sunday',
+        };
+        return i18n(keys[day] || '');
+    }
+
     const SEGMENTS_PER_DAY = 96;
     const MINUTES_PER_SEGMENT = 15;
     const DAY_NUMBERS = [1, 2, 3, 4, 5, 6, 7];
@@ -17,15 +34,6 @@
         5: 'friday',
         6: 'saturday',
         7: 'sunday',
-    };
-    const DAY_LABELS = {
-        1: 'Monday',
-        2: 'Tuesday',
-        3: 'Wednesday',
-        4: 'Thursday',
-        5: 'Friday',
-        6: 'Saturday',
-        7: 'Sunday',
     };
     const INTERVAL_STEP_MINUTES = 15;
     const INTERVAL_STEP_SECONDS = INTERVAL_STEP_MINUTES * 60;
@@ -196,13 +204,13 @@
         const weekdayEl = document.getElementById('summary-weekday-avg');
         const weekendEl = document.getElementById('summary-weekend-avg');
         if (totalEl) {
-            totalEl.textContent = `${formatHours(weekTotal)} allowed`;
+            totalEl.textContent = `${formatHours(weekTotal)}${i18n('routine_allowed_suffix')}`;
         }
         if (weekdayEl) {
-            weekdayEl.textContent = `${formatHours(weekdayAvg)} / day`;
+            weekdayEl.textContent = `${formatHours(weekdayAvg)}${i18n('routine_per_day_suffix')}`;
         }
         if (weekendEl) {
-            weekendEl.textContent = `${formatHours(weekendAvg)} / day`;
+            weekendEl.textContent = `${formatHours(weekendAvg)}${i18n('routine_per_day_suffix')}`;
         }
     }
 
@@ -222,9 +230,9 @@
         }
         const hours = (Number(slider.value) || 0) / 2;
         if (hours >= 24) {
-            display.textContent = 'No limit';
+            display.textContent = i18n('routine_no_limit');
         } else if (hours === 0) {
-            display.textContent = 'Hard lock';
+            display.textContent = i18n('routine_hard_lock');
         } else {
             display.textContent = `${hours.toFixed(1)}h`;
         }
@@ -387,7 +395,10 @@
 
         const startTime = minutesToTimeValue(start * MINUTES_PER_SEGMENT);
         const endTime = minutesToTimeValue(end * MINUTES_PER_SEGMENT);
-        hint.innerHTML = `🕒 Devices are unlocked and usable between <strong>${formatDisplayTime(startTime)}</strong> and <strong>${formatDisplayTime(endTime)}</strong>. Standard kernel filtering remains active in the background during all operational windows.`;
+        hint.innerHTML = i18n('routine_window_hint', {
+            start: formatDisplayTime(startTime),
+            end: formatDisplayTime(endTime),
+        });
     }
 
     function applyBulkWindow() {
@@ -397,7 +408,7 @@
             [start, end] = [end, start];
         }
         if (start === end) {
-            showNotification('Choose a window with a start and end time.', 'error');
+            showNotification(i18n('routine_choose_window'), 'error');
             return;
         }
 
@@ -427,20 +438,20 @@
         const blockedOvernight = segments.slice(0, 24).every((allowed) => !allowed)
             || segments.slice(84).every((allowed) => !allowed);
         if (blockedOvernight) {
-            markers.push('Bedtime');
+            markers.push(i18n('routine_marker_bedtime'));
         }
 
         const schoolWindow = segments.slice(32, 60);
         const schoolAllowedRatio = schoolWindow.filter(Boolean).length / schoolWindow.length;
         if (!isWeekend && schoolAllowedRatio >= 0.5) {
-            markers.push('School / morning hours');
+            markers.push(i18n('routine_marker_school'));
         } else if (isWeekend && schoolAllowedRatio >= 0.4) {
-            markers.push('Family time');
+            markers.push(i18n('routine_marker_family'));
         }
 
         const eveningBlocked = segments.slice(84, 96).filter((allowed) => !allowed).length;
         if (eveningBlocked >= 8) {
-            markers.push('Bedtime peace');
+            markers.push(i18n('routine_marker_bedtime_peace'));
         }
 
         return markers;
@@ -567,7 +578,7 @@
             return;
         }
         if (!dayIntervals.length) {
-            summary.textContent = 'Unrestricted (24/7)';
+            summary.textContent = i18n('routine_unrestricted');
             return;
         }
         if (dayIntervals.length === 1) {
@@ -589,7 +600,7 @@
         listEl.innerHTML = '';
 
         if (!dayIntervals.length) {
-            listEl.innerHTML = '<p class="small text-secondary mb-0">No clock ranges — devices may connect any time unless limited elsewhere.</p>';
+            listEl.innerHTML = `<p class="small text-secondary mb-0">${i18n('routine_no_clock_ranges')}</p>`;
             updateIntervalSummary(day);
             return;
         }
@@ -643,16 +654,16 @@
             const endMinutes = timeValueToMinutes(interval.end_time);
 
             if (!Number.isFinite(startMinutes) || !Number.isFinite(endMinutes)) {
-                return `Invalid time value for ${DAY_LABELS[day]}.`;
+                return `Invalid time value for ${dayLabel(day)}.`;
             }
             if ((startMinutes % INTERVAL_STEP_MINUTES) !== 0 || (endMinutes % INTERVAL_STEP_MINUTES) !== 0) {
-                return `${DAY_LABELS[day]} intervals must use ${INTERVAL_STEP_MINUTES}-minute increments.`;
+                return `${dayLabel(day)} intervals must use ${INTERVAL_STEP_MINUTES}-minute increments.`;
             }
             if (startMinutes >= endMinutes) {
-                return `${DAY_LABELS[day]} has an interval where the start time is not before the end time.`;
+                return `${dayLabel(day)} has an interval where the start time is not before the end time.`;
             }
             if (previousEnd !== null && startMinutes < previousEnd) {
-                return `${DAY_LABELS[day]} intervals cannot overlap.`;
+                return `${dayLabel(day)} intervals cannot overlap.`;
             }
             previousEnd = endMinutes;
         }
@@ -714,7 +725,7 @@
                 return saveIntervals(false);
             })
             .then(() => {
-                showNotification('Routine adjustments saved successfully!');
+                showNotification(i18n('routine_save_success'));
                 updateSyncStatus();
             })
             .catch((error) => {
@@ -772,7 +783,7 @@
     }
 
     function resetForm() {
-        if (confirm('Reset to the last saved baseline?')) {
+        if (confirm(i18n('routine_reset_confirm'))) {
             window.location.reload();
         }
     }
@@ -810,18 +821,18 @@
                 );
 
                 if (!hasSchedule && !hasIntervals) {
-                    setRoutineSyncStatus('is-muted', 'Not configured');
+                    setRoutineSyncStatus('is-muted', i18n('routine_sync_not_configured'));
                     return;
                 }
 
                 if (needsSync) {
-                    setRoutineSyncStatus('is-pending', 'Sync pending');
+                    setRoutineSyncStatus('is-pending', i18n('routine_sync_pending'));
                 } else {
-                    setRoutineSyncStatus('is-live', 'Online');
+                    setRoutineSyncStatus('is-live', i18n('routine_sync_online'));
                 }
             })
             .catch(() => {
-                setRoutineSyncStatus('is-unknown', 'Status unknown');
+                setRoutineSyncStatus('is-unknown', i18n('routine_sync_unknown'));
             });
     }
 

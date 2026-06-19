@@ -61,15 +61,19 @@
         }
 
         if (mode === 'ios') {
+            const banner = document.getElementById('guardian-a2hs-banner');
             if (message) {
-                message.textContent = 'Tap Share, then "Add to Home Screen" for quick access.';
+                message.textContent = (banner && banner.dataset.messageIos)
+                    || message.textContent;
             }
             if (installBtn) {
                 installBtn.hidden = true;
             }
         } else if (mode === 'android') {
+            const banner = document.getElementById('guardian-a2hs-banner');
             if (message) {
-                message.textContent = 'Quick access to routines and family dialogue.';
+                message.textContent = (banner && banner.dataset.messageAndroid)
+                    || message.textContent;
             }
             if (installBtn) {
                 installBtn.hidden = false;

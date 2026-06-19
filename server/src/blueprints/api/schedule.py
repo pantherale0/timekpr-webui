@@ -1,6 +1,7 @@
 import logging
 from datetime import timezone
-from flask import Blueprint, session, request, jsonify, flash, redirect, url_for
+from flask import Blueprint, session, request, jsonify, redirect, url_for
+from src.i18n.catalog import flash_t, api_message
 from sqlalchemy.exc import SQLAlchemyError
 from src.database import db, ManagedUser, UserWeeklySchedule, UserDailyTimeInterval
 from src.schedule_manager import (
@@ -19,18 +20,18 @@ api_schedule_bp = Blueprint('api_schedule', __name__)
 def update_weekly_schedule():
     """Update weekly schedule for a user"""
     if not session.get('logged_in'):
-        return jsonify({'success': False, 'message': 'Not authenticated'}), 401
+        return jsonify({'success': False, 'message': api_message('not_authenticated')}), 401
     
     user_id = request.form.get('user_id')
     
     if not user_id:
-        flash('User ID is required', 'danger')
+        flash_t('flash.schedule.user_id_required', 'danger')
         return redirect(url_for('ui_dashboard.admin'))
     
     try:
         user_id = int(user_id)
     except ValueError:
-        flash('Invalid user ID', 'danger')
+        flash_t('flash.schedule.user_id_invalid', 'danger')
         return redirect(url_for('ui_dashboard.admin'))
     
     user = ManagedUser.query.get_or_404(user_id)
@@ -63,10 +64,10 @@ def update_weekly_schedule():
     
     try:
         db.session.commit()
-        flash(f'Weekly schedule updated for {user.username}', 'success')
+        flash_t('flash.schedule.updated', 'success', username=user.username)
     except SQLAlchemyError as exc:
         db.session.rollback()
-        flash(f'Error updating schedule: {exc}', 'danger')
+        flash_t('flash.schedule.update_failed', 'danger', error=str(exc))
     
     return redirect(url_for('ui_schedule.weekly_schedule_user', user_id=user.id))
 
@@ -75,7 +76,7 @@ def update_weekly_schedule():
 def get_user_intervals(user_id):
     """API endpoint to get user time intervals"""
     if not session.get('logged_in'):
-        return jsonify({'success': False, 'message': 'Not authenticated'}), 401
+        return jsonify({'success': False, 'message': api_message('not_authenticated')}), 401
     
     user = ManagedUser.query.get_or_404(user_id)
     
@@ -102,18 +103,18 @@ def get_user_intervals(user_id):
 def update_user_intervals(user_id):
     """API endpoint to update user time intervals"""
     if not session.get('logged_in'):
-        return jsonify({'success': False, 'message': 'Not authenticated'}), 401
+        return jsonify({'success': False, 'message': api_message('not_authenticated')}), 401
     
     user = ManagedUser.query.get_or_404(user_id)
     
     try:
         data = request.get_json()
         if not data:
-            return jsonify({'success': False, 'message': 'No data provided'}), 400
+            return jsonify({'success': False, 'message': api_message('no_data')}), 400
         
         intervals_data = data.get('intervals')
         if not isinstance(intervals_data, dict):
-            return jsonify({'success': False, 'message': 'Intervals payload must be an object'}), 400
+            return jsonify({'success': False, 'message': api_message('intervals_invalid')}), 400
 
         replacement_map = {}
         for day_str, raw_entries in intervals_data.items():
@@ -122,7 +123,7 @@ def update_user_intervals(user_id):
             except (TypeError, ValueError):
                 return jsonify({
                     'success': False,
-                    'message': f'Invalid day value: {day_str}'
+                    'message': api_message('invalid_day', day=day_str),
                 }), 400
 
             try:
@@ -130,7 +131,7 @@ def update_user_intervals(user_id):
             except (ValueError, TypeError) as e:
                 return jsonify({
                     'success': False,
-                    'message': str(e)
+                    'message': api_message('validation_error', error=str(e)),
                 }), 400
 
         for day_of_week, new_intervals in replacement_map.items():
@@ -152,7 +153,7 @@ def update_user_intervals(user_id):
         
         return jsonify({
             'success': True,
-            'message': f'Time intervals updated for {user.username}',
+            'message': api_message('intervals_updated', username=user.username),
             'username': user.username
         })
         
@@ -160,7 +161,7 @@ def update_user_intervals(user_id):
         db.session.rollback()
         return jsonify({
             'success': False,
-            'message': f'Error updating intervals: {exc}'
+            'message': api_message('intervals_error', error=str(exc)),
         }), 500
 
 
@@ -168,7 +169,7 @@ def update_user_intervals(user_id):
 def get_intervals_sync_status(user_id):
     """Get sync status of user's time intervals"""
     if not session.get('logged_in'):
-        return jsonify({'success': False, 'message': 'Not authenticated'}), 401
+        return jsonify({'success': False, 'message': api_message('not_authenticated')}), 401
     
     user = ManagedUser.query.get_or_404(user_id)
     
@@ -203,7 +204,7 @@ def get_intervals_sync_status(user_id):
 def get_schedule_sync_status(user_id):
     """Get the sync status of a user's weekly schedule"""
     if not session.get('logged_in'):
-        return jsonify({'success': False, 'message': 'Not authenticated'}), 401
+        return jsonify({'success': False, 'message': api_message('not_authenticated')}), 401
     
     user = ManagedUser.query.get_or_404(user_id)
     

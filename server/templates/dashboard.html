@@ -1,6 +1,6 @@
 {% extends "_spa_fragment.html" %}
 
-{% block title %}Family Home - Guardian{% endblock %}
+{% block title %}{{ t('pages.dashboard.title') }}{% endblock %}
 
 {% block extra_head %}
 <!-- Include Chart.js for data visualization -->
@@ -10,13 +10,13 @@
 {% block content %}
 <div class="guardian-page-header">
     <div class="guardian-page-header__intro">
-        <h1 class="guardian-page-title mb-1">Family Home</h1>
-        <p class="guardian-page-lead mb-0">A calm overview of your children's routines, devices, and daily balance.</p>
+        <h1 class="guardian-page-title mb-1">{{ t('pages.dashboard.heading') }}</h1>
+        <p class="guardian-page-lead mb-0">{{ t('pages.dashboard.lead') }}</p>
     </div>
     <div class="guardian-page-header__actions">
         <div id="dashboard-live-indicator" class="badge bg-secondary d-inline-flex align-items-center gap-2 p-2" style="font-size: 0.75rem;">
             <span id="dashboard-live-dot" class="guardian-live-dot"></span>
-            <span id="dashboard-live-text">Connecting</span>
+            <span id="dashboard-live-text">{{ t('pages.dashboard.connecting') }}</span>
         </div>
     </div>
 </div>
@@ -28,19 +28,19 @@
                 <div class="card card-outline card-primary shadow-sm h-100" id="user-card-{{ user.id }}">
                     <div class="card-header d-flex justify-content-between align-items-center py-3">
                         <div class="d-flex align-items-center gap-2">
-                            <span id="status-dot-{{ user.id }}" class="status-dot rounded-circle" style="display: inline-block; width: 10px; height: 10px; background-color: {{ 'var(--guardian-status-connected)' if user.is_online else 'var(--guardian-text-secondary)' }};" title="{{ 'Agent Online' if user.is_online else 'Agent Offline' }}"></span>
+                            <span id="status-dot-{{ user.id }}" class="status-dot rounded-circle" style="display: inline-block; width: 10px; height: 10px; background-color: {{ 'var(--guardian-status-connected)' if user.is_online else 'var(--guardian-text-secondary)' }};" title="{{ t('pages.dashboard.agent_online') if user.is_online else t('pages.dashboard.agent_offline') }}"></span>
                             <h5 class="mb-0 fw-bold text-truncate" style="max-width: 150px;">{{ user.username }}</h5>
                         </div>
                         <div class="d-flex flex-column gap-1 align-items-end">
                             <span id="pending-badge-{{ user.id }}" class="badge bg-warning text-dark" style="font-size: 0.7rem;{% if user.id|string not in pending_adjustments %} display: none;{% endif %}">
-                                Pending: <span id="pending-badge-text-{{ user.id }}">{{ pending_adjustments[user.id|string] if user.id|string in pending_adjustments else '' }}</span>
+                                {{ t('pages.dashboard.pending') }} <span id="pending-badge-text-{{ user.id }}">{{ pending_adjustments[user.id|string] if user.id|string in pending_adjustments else '' }}</span>
                             </span>
                             <span id="approval-badge-{{ user.id }}" class="badge bg-info text-dark" style="font-size: 0.7rem; display: none;">
-                                <span id="approval-badge-text-{{ user.id }}">0</span> request(s)
+                                <span id="approval-badge-text-{{ user.id }}">0</span> {{ t('pages.dashboard.requests') }}
                             </span>
                             <span id="sync-status-{{ user.id }}" class="badge bg-warning text-dark align-items-center gap-1" style="{% if user.schedule_is_synced %}display: none;{% else %}display: inline-flex;{% endif %}">
                                 <i class="fas fa-exclamation-triangle" style="font-size: 0.75rem;"></i>
-                                <span id="sync-text-{{ user.id }}">Unsynced</span>
+                                <span id="sync-text-{{ user.id }}">{{ t('pages.dashboard.unsynced') }}</span>
                             </span>
                         </div>
                     </div>
@@ -49,22 +49,22 @@
                         <div>
                             <!-- Mappings Info -->
                             <p id="mapping-summary-{{ user.id }}" class="text-secondary small fw-semibold mb-3">
-                                {{ user.mapping_count }} device mapping(s) ({{ user.online_mapping_count }} online)
+                                {{ t('pages.dashboard.mapping_summary', count=user.mapping_count, online=user.online_mapping_count) }}
                             </p>
                             
                             <!-- Quick Stats Row -->
                             <div class="row g-2 mb-3">
                                 <div class="col-6">
                                     <div class="bg-body-secondary p-2 rounded text-center border">
-                                        <span class="text-secondary small fw-bold text-uppercase d-block mb-1" style="font-size: 0.65rem; letter-spacing: 0.05em;">Routine Left Today</span>
+                                        <span class="text-secondary small fw-bold text-uppercase d-block mb-1" style="font-size: 0.65rem; letter-spacing: 0.05em;">{{ t('pages.dashboard.routine_left') }}</span>
                                         <strong id="time-left-{{ user.id }}" class="fs-5 text-primary d-block lh-1">{{ user.time_left }}</strong>
                                     </div>
                                 </div>
                                 <div class="col-6">
                                     <div class="bg-body-secondary p-2 rounded text-center border">
-                                        <span class="text-secondary small fw-bold text-uppercase d-block mb-1" style="font-size: 0.65rem; letter-spacing: 0.05em;">Last Checked</span>
+                                        <span class="text-secondary small fw-bold text-uppercase d-block mb-1" style="font-size: 0.65rem; letter-spacing: 0.05em;">{{ t('pages.dashboard.last_checked') }}</span>
                                         <strong id="last-updated-{{ user.id }}" class="small text-truncate d-block" style="font-size: 0.8rem; line-height: 1.5;">
-                                            {{ user.last_checked_display or 'Never' }}
+                                            {{ user.last_checked_display or t('pages.dashboard.never') }}
                                         </strong>
                                     </div>
                                 </div>
@@ -73,20 +73,20 @@
                             <!-- Actions Row -->
                             <div class="d-flex gap-2 mb-3">
                                 <button class="btn btn-sm btn-primary flex-fill py-1 fw-bold" onclick="openTimeAdjustModal({{ user.id }}, '{{ user.username }}')">
-                                    <i class="fas fa-clock me-1"></i> Adjust
+                                    <i class="fas fa-clock me-1"></i> {{ t('pages.dashboard.adjust') }}
                                 </button>
                                 <a href="{{ url_for('weekly_schedule_user', user_id=user.id) }}" class="btn btn-sm btn-outline-secondary flex-fill py-1 fw-bold">
-                                    <i class="fas fa-sliders-h me-1"></i> Limits
+                                    <i class="fas fa-sliders-h me-1"></i> {{ t('pages.dashboard.limits') }}
                                 </a>
                                 <a href="{{ url_for('user_stats', user_id=user.id) }}" class="btn btn-sm btn-outline-secondary flex-fill py-1 fw-bold">
-                                    <i class="fas fa-history me-1"></i> History
+                                    <i class="fas fa-history me-1"></i> {{ t('pages.dashboard.history') }}
                                 </a>
                             </div>
                         </div>
 
                         <!-- Weekly Usage Chart -->
                         <div class="border-top pt-3 mt-2">
-                            <h6 class="text-secondary small fw-bold text-uppercase mb-2" style="font-size: 0.7rem; letter-spacing: 0.05em;">Usage This Week</h6>
+                            <h6 class="text-secondary small fw-bold text-uppercase mb-2" style="font-size: 0.7rem; letter-spacing: 0.05em;">{{ t('pages.dashboard.usage_week') }}</h6>
                             <div class="chart-container" style="height: 140px; position: relative;">
                                 <canvas id="chart-{{ user.id }}"></canvas>
                             </div>
@@ -98,7 +98,12 @@
             <script>
                 (function() {
                     window._chartData = window._chartData || {};
-                    const shortWeekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+                    const i18n = JSON.parse(document.getElementById('i18n-data')?.textContent || '{}');
+                    const shortWeekdays = [
+                        i18n.dashboard_weekday_sun, i18n.dashboard_weekday_mon, i18n.dashboard_weekday_tue,
+                        i18n.dashboard_weekday_wed, i18n.dashboard_weekday_thu, i18n.dashboard_weekday_fri,
+                        i18n.dashboard_weekday_sat
+                    ];
                     const dates = [], labels = [], values = [];
                     {% for date, time_spent in user.usage_data.items() %}
                         dates.push('{{ date }}');
@@ -115,13 +120,13 @@
                 <div class="bg-body-secondary text-secondary rounded-circle d-flex align-items-center justify-content-center mx-auto mb-4" style="width: 80px; height: 80px;">
                     <i class="fas fa-users-slash fs-2"></i>
                 </div>
-                <h3 class="fw-bold mb-2">No Child Profiles Configured</h3>
+                <h3 class="fw-bold mb-2">{{ t('pages.dashboard.empty_title') }}</h3>
                 <p class="text-secondary mx-auto mb-4" style="max-width: 480px;">
-                    You need to create a child profile and map local device user accounts before you can monitor screen time or apply limits.
+                    {{ t('pages.dashboard.empty_lead') }}
                 </p>
                 <div class="d-flex justify-content-center gap-2">
-                    <button class="btn btn-primary" onclick="openOnboardingWizard()"><i class="fas fa-plus me-1"></i> Onboard New Device</button>
-                    <a href="{{ url_for('ui_dashboard.admin_users') }}" class="btn btn-outline-secondary"><i class="fas fa-user-plus me-1"></i> Create Profile Only</a>
+                    <button class="btn btn-primary" onclick="openOnboardingWizard()"><i class="fas fa-plus me-1"></i> {{ t('pages.dashboard.onboard_device') }}</button>
+                    <a href="{{ url_for('ui_dashboard.admin_users') }}" class="btn btn-outline-secondary"><i class="fas fa-user-plus me-1"></i> {{ t('pages.dashboard.create_profile_only') }}</a>
                 </div>
             </div>
         </div>
@@ -133,32 +138,32 @@
     <div class="modal-dialog modal-dialog-centered" style="max-width: 400px;">
         <div class="modal-content shadow-lg">
             <div class="modal-header guardian-card-header py-3">
-                <h5 class="modal-title fw-bold" id="timeAdjustModalLabel"><i class="fas fa-stopwatch text-warning me-2"></i>Adjust Time</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close" onclick="closeTimeAdjustModal()"></button>
+                <h5 class="modal-title fw-bold" id="timeAdjustModalLabel"><i class="fas fa-stopwatch text-warning me-2"></i>{{ t('pages.dashboard.adjust_time_title') }}</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="{{ t('common.close') }}" onclick="closeTimeAdjustModal()"></button>
             </div>
             <div class="modal-body p-4 text-center">
-                <p class="text-secondary mb-1">Select time adjustment for:</p>
+                <p class="text-secondary mb-1">{{ t('pages.dashboard.adjust_time_lead') }}</p>
                 <h4 class="fw-bold mb-4" id="modalUsername"></h4>
                 
                 <div class="mb-4">
-                    <span class="text-muted small fw-bold text-uppercase d-block mb-1" style="font-size: 0.7rem; letter-spacing: 0.05em;">Current Offset</span>
+                    <span class="text-muted small fw-bold text-uppercase d-block mb-1" style="font-size: 0.7rem; letter-spacing: 0.05em;">{{ t('pages.dashboard.current_offset') }}</span>
                     <div class="d-flex justify-content-center align-items-center">
                         <span id="timeAdjustment" class="fw-bold display-4 text-body" style="font-size: 3.5rem;">0</span>
-                        <span class="fs-4 text-secondary ms-2">mins</span>
+                        <span class="fs-4 text-secondary ms-2">{{ t('common.mins') }}</span>
                     </div>
                 </div>
                 
                 <div class="d-flex justify-content-center gap-2 mb-3">
                     <button class="btn btn-outline-secondary px-3" onclick="adjustTime(-15)">-15m</button>
-                    <button class="btn btn-light border px-3" onclick="resetTime()">Reset</button>
+                    <button class="btn btn-light border px-3" onclick="resetTime()">{{ t('common.reset') }}</button>
                     <button class="btn btn-outline-secondary px-3" onclick="adjustTime(15)">+15m</button>
                 </div>
                 
                 <div id="modalStatus" class="fw-bold small py-1" style="min-height: 24px; color: var(--bs-secondary-color);"></div>
             </div>
             <div class="modal-footer py-2">
-                <button class="btn btn-sm btn-secondary" onclick="closeTimeAdjustModal()">Cancel</button>
-                <button class="btn btn-sm btn-primary" onclick="submitTimeAdjustment()">Apply Changes</button>
+                <button class="btn btn-sm btn-secondary" onclick="closeTimeAdjustModal()">{{ t('common.cancel') }}</button>
+                <button class="btn btn-sm btn-primary" onclick="submitTimeAdjustment()">{{ t('pages.dashboard.apply_changes') }}</button>
             </div>
         </div>
     </div>
@@ -168,10 +173,22 @@
 
 {% block extra_js %}
 <script>
+    const i18n = JSON.parse(document.getElementById('i18n-data')?.textContent || '{}');
+    const fmt = (key, params) => (window.guardianI18n ? window.guardianI18n(key, params) : i18n[key] || key);
+
     window._chartData = window._chartData || {};
     window._chartInstances = window._chartInstances || {};
 
-    const SHORT_WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const SHORT_WEEKDAYS = [
+        i18n.dashboard_weekday_sun, i18n.dashboard_weekday_mon, i18n.dashboard_weekday_tue,
+        i18n.dashboard_weekday_wed, i18n.dashboard_weekday_thu, i18n.dashboard_weekday_fri,
+        i18n.dashboard_weekday_sat
+    ];
+    const WEEKDAY_NAMES = [
+        i18n.dashboard_weekday_sunday, i18n.dashboard_weekday_monday, i18n.dashboard_weekday_tuesday,
+        i18n.dashboard_weekday_wednesday, i18n.dashboard_weekday_thursday, i18n.dashboard_weekday_friday,
+        i18n.dashboard_weekday_saturday
+    ];
     const UNSYNCED_ICON = 'M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767L8.982 1.566zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5zm.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2z';
 
     function calculateYAxisScale(maxValue) {
@@ -186,7 +203,7 @@
 
     function getWeekdayName(dateStr) {
         const date = new Date(dateStr + 'T00:00:00');
-        return ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][date.getDay()];
+        return WEEKDAY_NAMES[date.getDay()];
     }
 
     function buildChartSeries(usageData) {
@@ -215,23 +232,25 @@
         const ctx = canvas.getContext('2d');
         const { dates, labels, values } = data;
         const { max: yAxisMax, stepSize } = calculateYAxisScale(Math.max(...values, 1));
+        const hoursShort = i18n.hours_short || 'h';
+        const minutesShort = i18n.minutes_short || 'm';
 
         return new Chart(ctx, {
             type: 'bar',
             data: {
                 labels: labels,
                 datasets: [{
-                    label: 'Hours Used',
+                    label: i18n.dashboard_chart_hours || 'Hours Used',
                     data: values,
                     backgroundColor: function(context) {
                         const weekday = labels[context.dataIndex];
-                        return (weekday === 'Sat' || weekday === 'Sun')
+                        return (weekday === i18n.dashboard_weekday_sat || weekday === i18n.dashboard_weekday_sun)
                             ? 'rgba(245, 158, 11, 0.6)'
                             : 'rgba(13, 110, 253, 0.6)';
                     },
                     borderColor: function(context) {
                         const weekday = labels[context.dataIndex];
-                        return (weekday === 'Sat' || weekday === 'Sun')
+                        return (weekday === i18n.dashboard_weekday_sat || weekday === i18n.dashboard_weekday_sun)
                             ? 'rgb(245, 158, 11)'
                             : 'rgb(13, 110, 253)';
                     },
@@ -252,10 +271,10 @@
                             stepSize: stepSize,
                             font: { size: 9, weight: 'bold' },
                             callback: function(value) {
-                                if (value === 0) return '0h';
-                                if (value < 1) return Math.round(value * 60) + 'm';
-                                if (value % 1 === 0) return value + 'h';
-                                return Math.floor(value) + 'h' + Math.round((value % 1) * 60) + 'm';
+                                if (value === 0) return '0' + hoursShort;
+                                if (value < 1) return Math.round(value * 60) + minutesShort;
+                                if (value % 1 === 0) return value + hoursShort;
+                                return Math.floor(value) + hoursShort + Math.round((value % 1) * 60) + minutesShort;
                             }
                         },
                         grid: { drawBorder: false }
@@ -277,7 +296,7 @@
                                 const hours = context.parsed.y;
                                 const wholeHours = Math.floor(hours);
                                 const minutes = Math.round((hours % 1) * 60);
-                                return wholeHours + 'h ' + minutes + 'm';
+                                return wholeHours + hoursShort + ' ' + minutes + minutesShort;
                             }
                         }
                     }
@@ -328,7 +347,7 @@
         if (!user.schedule_is_synced) {
             statusBadge.className = 'badge bg-warning text-dark align-items-center gap-1';
             statusBadge.style.display = 'inline-flex';
-            syncText.textContent = 'Unsynced';
+            syncText.textContent = i18n.dashboard_unsynced || 'Unsynced';
         } else {
             statusBadge.style.display = 'none';
         }
@@ -354,12 +373,17 @@
         const statusDot = document.getElementById('status-dot-' + user.id);
         if (statusDot) {
             statusDot.style.backgroundColor = user.is_online ? 'var(--guardian-status-connected)' : 'var(--guardian-text-secondary)';
-            statusDot.title = user.is_online ? 'Agent Online' : 'Agent Offline';
+            statusDot.title = user.is_online
+                ? (i18n.dashboard_agent_online || 'Agent Online')
+                : (i18n.dashboard_agent_offline || 'Agent Offline');
         }
 
         const mappingSummary = document.getElementById('mapping-summary-' + user.id);
         if (mappingSummary) {
-            mappingSummary.textContent = `${user.mapping_count} device mapping(s) (${user.online_mapping_count} online)`;
+            mappingSummary.textContent = fmt('dashboard_mapping_summary', {
+                count: user.mapping_count,
+                online: user.online_mapping_count
+            });
         }
 
         const pendingBadge = document.getElementById('pending-badge-' + user.id);
@@ -380,7 +404,7 @@
 
         const lastUpdated = document.getElementById('last-updated-' + user.id);
         if (lastUpdated) {
-            lastUpdated.textContent = user.last_checked_display || 'Never';
+            lastUpdated.textContent = user.last_checked_display || (i18n.never || 'Never');
         }
 
         updateSyncStatusBadge(user);
@@ -409,12 +433,12 @@
 
         if (state === 'connected') {
             dot.classList.add('is-connected');
-            text.textContent = 'Live';
+            text.textContent = i18n.dashboard_live || 'Live';
         } else if (state === 'reconnecting') {
             dot.classList.add('is-reconnecting');
-            text.textContent = 'Reconnecting';
+            text.textContent = i18n.dashboard_reconnecting || 'Reconnecting';
         } else {
-            text.textContent = 'Offline';
+            text.textContent = i18n.dashboard_offline || 'Offline';
         }
     }
 
@@ -622,7 +646,7 @@
     
     function submitTimeAdjustment() {
         if (timeAdjustment === 0) {
-            showNotification('No time adjustment specified', 'error');
+            showNotification(i18n.dashboard_no_adjustment || 'No time adjustment specified', 'error');
             return;
         }
         
@@ -631,7 +655,7 @@
         const absoluteSeconds = Math.abs(seconds);
         
         const statusEl = document.getElementById('modalStatus');
-        statusEl.textContent = 'Applying changes...';
+        statusEl.textContent = i18n.dashboard_applying || 'Applying changes...';
         statusEl.className = 'status-loading';
         
         const formData = new FormData();
@@ -646,21 +670,21 @@
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                statusEl.textContent = 'Success! Adjusted successfully.';
+                statusEl.textContent = i18n.dashboard_adjust_success || 'Success! Adjusted successfully.';
                 statusEl.className = 'status-success';
-                showNotification('Time modified successfully!');
+                showNotification(i18n.dashboard_time_modified || 'Time modified successfully!');
                 
                 setTimeout(() => {
                     closeTimeAdjustModal();
                     fetchDashboardFallback();
                 }, 1200);
             } else {
-                statusEl.textContent = `Error: ${data.message}`;
+                statusEl.textContent = fmt('dashboard_error_prefix', { message: data.message });
                 statusEl.className = 'status-error';
             }
         })
         .catch(error => {
-            statusEl.textContent = `Error: ${error.message}`;
+            statusEl.textContent = fmt('dashboard_error_prefix', { message: error.message });
             statusEl.className = 'status-error';
         });
     }

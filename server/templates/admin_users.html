@@ -1,15 +1,15 @@
 {% extends "_spa_fragment.html" %}
 
 {% from '_macros.html' import csrf_field %}
-{% block title %}Child Profiles - Guardian{% endblock %}
+{% block title %}{{ t('pages.admin_users.title') }}{% endblock %}
 
 {% block extra_head %}{% endblock %}
 
 {% block content %}
 <div class="guardian-page-header">
     <div class="guardian-page-header__intro">
-        <h1 class="guardian-page-title mb-1">Child Profiles</h1>
-        <p class="guardian-page-lead mb-0">Each profile keeps its own routines, browsing shields, and activity story.</p>
+        <h1 class="guardian-page-title mb-1">{{ t('pages.admin_users.heading') }}</h1>
+        <p class="guardian-page-lead mb-0">{{ t('pages.admin_users.lead') }}</p>
     </div>
 
     <div class="guardian-page-header__actions">
@@ -17,17 +17,16 @@
             <span class="guardian-search-field__icon">
                 <i class="fas fa-search"></i>
             </span>
-            <input type="text" id="user-search" class="form-control rounded-pill" placeholder="Search child accounts...">
+            <input type="text" id="user-search" class="form-control rounded-pill" placeholder="{{ t('pages.admin_users.search_placeholder') }}">
         </div>
     </div>
 </div>
 
 <div class="row g-4">
-    <!-- Managed Users & Account Mappings -->
     <div class="col-12">
         <div class="d-flex align-items-center justify-content-between mb-3">
-            <h4 class="fw-bold mb-0"><i class="fas fa-link me-2"></i>Link Device Accounts</h4>
-            <span class="badge bg-secondary p-2" id="user-count-badge">{{ users|length }} active</span>
+            <h4 class="fw-bold mb-0"><i class="fas fa-link me-2"></i>{{ t('pages.admin_users.link_device_accounts') }}</h4>
+            <span class="badge bg-secondary p-2" id="user-count-badge">{{ t('pages.admin_users.active_count', count=users|length) }}</span>
         </div>
 
         <div id="users-cards-container" class="row g-4">
@@ -35,7 +34,6 @@
             {% for user in users %}
             <div class="col-12 user-card-item" data-username="{{ user.username|lower }}">
                 <div class="card border shadow-sm">
-                    <!-- User Card Header -->
                     <div
                         class="card-header bg-body-secondary d-flex justify-content-between align-items-center p-3 flex-wrap gap-2">
                         <div class="d-flex align-items-center gap-3">
@@ -47,45 +45,41 @@
                                 <h5 class="mb-0 fw-bold">{{ user.username }}</h5>
                                 <span class="text-secondary small fw-semibold">
                                     <i class="fas fa-link me-1"></i>
-                                    {{ user.device_mappings|length }} linked device accounts ({{
-                                    user.device_mappings|selectattr('is_valid')|list|length }} verified)
+                                    {{ t('pages.admin_users.linked_device_accounts', count=user.device_mappings|length, verified=user.device_mappings|selectattr('is_valid')|list|length) }}
                                 </span>
                             </div>
                         </div>
                         <div class="d-flex gap-2">
                             <a href="{{ url_for('ui_dashboard.edit_user_profile', user_id=user.id) }}"
                                 class="btn btn-sm btn-primary fw-bold px-3">
-                                <i class="fas fa-edit me-1"></i> Edit Profile
+                                <i class="fas fa-edit me-1"></i> {{ t('pages.admin_users.edit_profile') }}
                             </a>
                             <a href="{{ url_for('validate_user', user_id=user.id) }}"
                                 class="btn btn-sm btn-outline-secondary fw-bold px-3">
-                                <i class="fas fa-sync me-1"></i> Verify
+                                <i class="fas fa-sync me-1"></i> {{ t('pages.admin_users.verify') }}
                             </a>
                             <form action="{{ url_for('delete_user', user_id=user.id) }}" method="POST"
-                                onsubmit="return confirm('Delete managed user {{ user.username }} and all account mappings?')"
+                                onsubmit="return confirm({{ t('pages.admin_users.delete_confirm', username=user.username)|tojson }})"
                                 class="m-0">
 
                                 {{ csrf_field() }} <button type="submit"                                 class="btn btn-sm btn-outline-danger fw-bold px-3"><i
-                                        class="fas fa-trash me-1"></i> Remove</button>
+                                        class="fas fa-trash me-1"></i> {{ t('pages.admin_users.remove') }}</button>
                             </form>
                         </div>
                     </div>
 
-                    <!-- Card Body -->
                     <div class="card-body p-3">
-                        <!-- Create Mapping Block -->
                         <div class="bg-body-secondary border rounded p-3 mb-3">
                             <h6 class="fw-bold text-secondary text-uppercase mb-3"
                                 style="font-size: 0.75rem; letter-spacing: 0.05em;"><i
-                                    class="fas fa-plus-circle me-1"></i>Link New Hardware Account Mapping</h6>
+                                    class="fas fa-plus-circle me-1"></i>{{ t('pages.admin_users.link_new_mapping') }}</h6>
                             <form action="{{ url_for('add_user_mapping', user_id=user.id) }}" method="POST"
                                 class="row g-3 align-items-end">
 
                                 {{ csrf_field() }} <div class="col-12 col-md-3">
-                                    <label class="form-label fw-bold text-muted" style="font-size: 0.7rem;">Target
-                                        Device</label>
+                                    <label class="form-label fw-bold text-muted" style="font-size: 0.7rem;">{{ t('pages.admin_users.target_device') }}</label>
                                     <select name="system_id" class="form-select target-device-select" required>
-                                        <option value="" disabled selected>Select hardware</option>
+                                        <option value="" disabled selected>{{ t('pages.admin_users.select_hardware') }}</option>
                                         {% for device in approved_devices %}
                                         <option value="{{ device.system_id }}"
                                             data-linux-users="{{ device.linux_users|tojson|forceescape }}"
@@ -95,7 +89,7 @@
                                             {{ device_labels.get(device.system_id, device.display_name) }} ({{
                                             device.system_ip }})
                                             {% else %}
-                                            {{ device_labels.get(device.system_id, device.display_name) }} (Cloud)
+                                            {{ device_labels.get(device.system_id, device.display_name) }} ({{ t('pages.admin_users.cloud_suffix') }})
                                             {% endif %}
                                         </option>
                                         {% endfor %}
@@ -103,7 +97,7 @@
                                 </div>
                                 <div class="col-12 col-md-3">
                                     <label class="form-label fw-bold text-muted linux-username-label"
-                                        style="font-size: 0.7rem;">Local OS Username</label>
+                                        style="font-size: 0.7rem;">{{ t('pages.admin_users.local_os_username') }}</label>
                                     <input type="text" name="linux_username" class="form-control linux-username-input"
                                         placeholder="e.g. jordan" required list="linux-users-list-{{ user.id }}"
                                         autocomplete="off">
@@ -114,47 +108,44 @@
                                     <datalist id="linux-users-list-{{ user.id }}"></datalist>
                                 </div>
                                 <div class="col-12 col-md-2 linux-uid-container">
-                                    <label class="form-label fw-bold text-muted" style="font-size: 0.7rem;">Linux UID
-                                        (Optional)</label>
+                                    <label class="form-label fw-bold text-muted" style="font-size: 0.7rem;">{{ t('pages.admin_users.linux_uid_optional') }}</label>
                                     <input type="text" name="linux_uid" class="form-control linux-uid-input"
                                         placeholder="e.g. 1000">
                                 </div>
                                 <div class="col-12 col-md-2 profile-provision-container" style="display: none;">
-                                    <label class="form-label fw-bold text-muted" style="font-size: 0.7rem;">Profile
-                                        Provisioning</label>
+                                    <label class="form-label fw-bold text-muted" style="font-size: 0.7rem;">{{ t('pages.admin_users.profile_provisioning') }}</label>
                                     <select name="android_profile_type"
                                         class="form-select form-select-sm profile-provision-select">
-                                        <option value="">Map to Existing</option>
-                                        <option value="restricted">Create Restricted Profile</option>
-                                        <option value="standard">Create Standard User</option>
+                                        <option value="">{{ t('pages.admin_users.map_to_existing') }}</option>
+                                        <option value="restricted">{{ t('pages.admin_users.create_restricted_profile') }}</option>
+                                        <option value="standard">{{ t('pages.admin_users.create_standard_user') }}</option>
                                     </select>
                                 </div>
                                 <div class="col-12 col-md-2 ms-auto">
                                     <button type="submit" class="btn btn-sm btn-primary w-100 fw-bold py-2"><i
-                                            class="fas fa-link me-1"></i> Link Mapping</button>
+                                            class="fas fa-link me-1"></i> {{ t('pages.admin_users.link_mapping') }}</button>
                                 </div>
                             </form>
                         </div>
 
-                        <!-- Current Mappings Table -->
                         {% if user.device_mappings %}
                         <div class="table-responsive">
                             <table class="table table-striped align-middle mb-0" style="font-size: 0.9rem;">
                                 <thead>
                                     <tr class="table-light border-bottom">
                                         <th class="ps-3 text-secondary fw-bold"
-                                            style="font-size: 0.75rem; text-transform: uppercase;">Device User</th>
+                                            style="font-size: 0.75rem; text-transform: uppercase;">{{ t('pages.admin_users.col_device_user') }}</th>
                                         <th class="text-secondary fw-bold"
-                                            style="font-size: 0.75rem; text-transform: uppercase;">Target Device</th>
+                                            style="font-size: 0.75rem; text-transform: uppercase;">{{ t('pages.admin_users.col_target_device') }}</th>
                                         <th class="text-secondary fw-bold text-center"
-                                            style="font-size: 0.75rem; text-transform: uppercase;">UID</th>
+                                            style="font-size: 0.75rem; text-transform: uppercase;">{{ t('pages.admin_users.col_uid') }}</th>
                                         <th class="text-secondary fw-bold text-center"
-                                            style="font-size: 0.75rem; text-transform: uppercase;">Status</th>
+                                            style="font-size: 0.75rem; text-transform: uppercase;">{{ t('pages.admin_users.col_status') }}</th>
                                         <th class="text-secondary fw-bold"
-                                            style="font-size: 0.75rem; text-transform: uppercase;">Last Connection Check
+                                            style="font-size: 0.75rem; text-transform: uppercase;">{{ t('pages.admin_users.col_last_check') }}
                                         </th>
                                         <th class="pe-3 text-secondary fw-bold text-end"
-                                            style="font-size: 0.75rem; text-transform: uppercase;">Actions</th>
+                                            style="font-size: 0.75rem; text-transform: uppercase;">{{ t('pages.admin_users.col_actions') }}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -173,12 +164,11 @@
                                                         style="color: var(--bs-body-color);">{{ mapping.display_linux_username }}</code>
                                                     {% if mapped_player %}
                                                     <div class="text-secondary small mt-1" style="font-size: 0.7rem;">
-                                                        <i class="fas fa-gamepad text-warning"></i> Nintendo Player
+                                                        <i class="fas fa-gamepad text-warning"></i> {{ t('pages.admin_users.nintendo_player') }}
                                                     </div>
                                                     {% elif mapping.android_profile_type %}
                                                     <div class="text-secondary small mt-1" style="font-size: 0.7rem;">
-                                                        <i class="fab fa-android text-success"></i> Programmatic: {{
-                                                        mapping.android_profile_type|title }}
+                                                        <i class="fab fa-android text-success"></i> {{ t('pages.admin_users.programmatic', type=mapping.android_profile_type|title) }}
                                                     </div>
                                                     {% endif %}
                                                 </div>
@@ -199,33 +189,33 @@
                                         <td class="text-center">
                                             {% if mapping.is_valid %}
                                             <span
-                                                class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1">Verified</span>
+                                                class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1">{{ t('pages.admin_users.verified') }}</span>
                                             {% else %}
                                             <span
-                                                class="badge bg-warning-subtle text-warning border border-warning-subtle px-2 py-1">Unverified</span>
+                                                class="badge bg-warning-subtle text-warning border border-warning-subtle px-2 py-1">{{ t('pages.admin_users.unverified') }}</span>
                                             {% endif %}
                                         </td>
                                         <td class="text-secondary small">
                                             {% if mapping.last_checked %}
                                             {{ (mapping.last_checked|localtime).strftime('%Y-%m-%d %H:%M') }}
                                             {% else %}
-                                            Never checked
+                                            {{ t('pages.admin_users.never_checked') }}
                                             {% endif %}
                                         </td>
                                         <td class="pe-3 text-end">
                                             <div class="d-inline-flex gap-2">
                                                 <a href="{{ url_for('validate_mapping', user_id=user.id, mapping_id=mapping.id) }}"
                                                     class="btn btn-xs btn-outline-secondary fw-bold px-2 py-1"
-                                                    style="font-size: 0.75rem;">Verify</a>
+                                                    style="font-size: 0.75rem;">{{ t('pages.admin_users.verify') }}</a>
                                                 <form
                                                     action="{{ url_for('delete_mapping', user_id=user.id, mapping_id=mapping.id) }}"
                                                     method="POST"
-                                                    onsubmit="return confirm('Revoke account mapping for {{ mapping.display_linux_username }}?')"
+                                                    onsubmit="return confirm({{ t('pages.admin_users.revoke_mapping_confirm', username=mapping.display_linux_username)|tojson }})"
                                                     class="m-0">
 
                                                     {{ csrf_field() }} <button type="submit"
                                                         class="btn btn-xs btn-outline-danger fw-bold px-2 py-1"
-                                                        style="font-size: 0.75rem;">Remove</button>
+                                                        style="font-size: 0.75rem;">{{ t('pages.admin_users.remove') }}</button>
                                                 </form>
                                             </div>
                                         </td>
@@ -236,8 +226,7 @@
                         </div>
                         {% else %}
                         <p class="text-secondary mb-0 small fw-semibold text-center py-2"><i
-                                class="fas fa-exclamation-circle me-1"></i>No active device mappings linked. Link one
-                            above or use the wizard to begin tracking screen time.</p>
+                                class="fas fa-exclamation-circle me-1"></i>{{ t('pages.admin_users.no_mappings') }}</p>
                         {% endif %}
                     </div>
                 </div>
@@ -250,10 +239,10 @@
                         style="width: 64px; height: 64px;">
                         <i class="fas fa-users fs-3"></i>
                     </div>
-                    <h5 class="fw-bold mb-2">No Child Profiles Yet</h5>
-                    <p class="text-secondary mx-auto mb-3" style="max-width: 420px;">Tap <strong>Create Managed Profile</strong> in the header to set up a supportive safety baseline — then link device accounts below.</p>
+                    <h5 class="fw-bold mb-2">{{ t('pages.admin_users.empty_title') }}</h5>
+                    <p class="text-secondary mx-auto mb-3" style="max-width: 420px;">{{ t('pages.admin_users.empty_lead') }}</p>
                     <button type="button" class="btn guardian-btn-sage fw-bold" data-bs-toggle="modal" data-bs-target="#createProfileModal">
-                        <i class="fas fa-plus me-1"></i> Create Managed Profile
+                        <i class="fas fa-plus me-1"></i> {{ t('pages.admin_users.create_managed_profile') }}
                     </button>
                 </div>
             </div>
@@ -269,6 +258,7 @@
         const searchInput = document.getElementById('user-search');
         const userCards = document.querySelectorAll('.user-card-item');
         const userCountBadge = document.getElementById('user-count-badge');
+        const foundLabel = {{ t('pages.admin_users.found_count', count='__COUNT__')|tojson }};
 
         if (searchInput) {
             searchInput.addEventListener('input', (e) => {
@@ -286,12 +276,11 @@
                 });
 
                 if (userCountBadge) {
-                    userCountBadge.textContent = `${visibleCount} found`;
+                    userCountBadge.textContent = foundLabel.replace('__COUNT__', visibleCount);
                 }
             });
         }
 
-        // ── Linux User Sync Logic ──────────────────────────────────────────
         const deviceSelects = document.querySelectorAll('.target-device-select');
 
         function setLinuxUsernameMode(form, platform) {
@@ -302,7 +291,7 @@
             const isNintendo = platform === 'nintendo';
 
             if (usernameLabel) {
-                usernameLabel.textContent = isNintendo ? 'Player Profile' : 'Local OS Username';
+                usernameLabel.textContent = isNintendo ? 'Player Profile' : {{ t('pages.admin_users.local_os_username')|tojson }};
             }
             if (usernameInput) {
                 usernameInput.classList.toggle('d-none', isNintendo);
@@ -344,7 +333,6 @@
 
                 setLinuxUsernameMode(form, platform);
 
-                // Toggle Profile Provisioning Dropdown
                 const provisionContainer = form.querySelector('.profile-provision-container');
                 const provisionSelect = form.querySelector('.profile-provision-select');
                 if (provisionContainer) {
@@ -358,7 +346,6 @@
                     }
                 }
 
-                // Clear existing options
                 datalist.innerHTML = '';
                 if (nintendoSelect) {
                     nintendoSelect.innerHTML = '<option value="" disabled selected>Select player profile</option>';
@@ -384,7 +371,6 @@
                             datalist.appendChild(option);
                         });
 
-                        // Listener to auto-fill UID when username is selected from list or typed
                         usernameInput.addEventListener('input', () => {
                             const val = usernameInput.value;
                             const matchedUser = users.find(u => u.username === val);

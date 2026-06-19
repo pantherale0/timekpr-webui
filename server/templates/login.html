@@ -1,14 +1,14 @@
 <!DOCTYPE html>
-<html lang="en" data-bs-theme="light">
+<html lang="{{ locale }}" data-bs-theme="light">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login - Guardian</title>
-    <meta name="description" content="Sign in to Guardian Family Safety — calm routines, browsing shields, and family dialogue.">
+    <title>{{ t('login.title') }}</title>
+    <meta name="description" content="{{ t('login.meta_description') }}">
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website">
-    <meta property="og:title" content="Login - Guardian">
-    <meta property="og:description" content="Secure administrative login console for Guardian parental controls. Log in to manage screen time, user limits, schedules, and application locks.">
+    <meta property="og:title" content="{{ t('login.og_title') }}">
+    <meta property="og:description" content="{{ t('login.og_description') }}">
     
     <!-- Bootstrap 5.3 & AdminLTE 4 & FontAwesome 6 via jsDelivr CDN -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -46,13 +46,13 @@
     <div class="login-box">
         <div class="text-center mb-4">
             <i class="fas fa-shield-alt brand-icon-shield"></i>
-            <h3 class="fw-bold mb-1">Guardian</h3>
-            <span class="text-secondary small fw-bold text-uppercase tracking-wider" style="font-size: 0.75rem; letter-spacing: 0.05em;">Parental Control Console</span>
+            <h3 class="fw-bold mb-1">{{ t('nav.brand_guardian') }}</h3>
+            <span class="text-secondary small fw-bold text-uppercase tracking-wider" style="font-size: 0.75rem; letter-spacing: 0.05em;">{{ t('login.brand_subtitle') }}</span>
         </div>
 
         <div class="card shadow-lg border-0">
             <div class="card-body login-card-body p-4">
-                <p class="login-box-msg text-center text-muted mb-4 fw-medium">Sign in to start your parent session</p>
+                <p class="login-box-msg text-center text-muted mb-4 fw-medium">{{ t('login.sign_in_lead') }}</p>
 
                 {% with messages = get_flashed_messages(with_categories=true) %}
                     {% if messages %}
@@ -60,7 +60,7 @@
                             <div class="alert alert-{{ 'danger' if category == 'error' or category == 'danger' else 'warning' if category == 'warning' else 'success' }} alert-dismissible fade show small" role="alert">
                                 <i class="fas {% if category == 'success' %}fa-check-circle{% elif category == 'warning' %}fa-exclamation-triangle{% else %}fa-times-circle{% endif %} me-1"></i>
                                 {{ message }}
-                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="{{ t('common.close') }}"></button>
                             </div>
                         {% endfor %}
                     {% endif %}
@@ -68,24 +68,24 @@
 
                 <div class="alert alert-warning border-0 small mb-4 py-2" role="alert">
                     <i class="fas fa-exclamation-triangle me-1"></i>
-                    <strong>Local Fallback Mode:</strong> Outbound OIDC is unconfigured. Login using local parent credentials.
+                    <strong>{{ t('login.local_fallback') }}</strong> {{ t('login.local_fallback_detail') }}
                 </div>
 
                 <form method="POST" action="{{ url_for('login') }}" class="m-0">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <div class="input-group mb-3 shadow-sm rounded">
-                        <input type="text" id="username" name="username" class="form-control" placeholder="Parent username" required autocomplete="username">
+                        <input type="text" id="username" name="username" class="form-control" placeholder="{{ t('login.username_placeholder') }}" required autocomplete="username">
                         <span class="input-group-text bg-body text-secondary"><i class="fas fa-user"></i></span>
                     </div>
                     <div class="input-group mb-4 shadow-sm rounded">
-                        <input type="password" id="password" name="password" class="form-control" placeholder="Password" required autocomplete="current-password">
+                        <input type="password" id="password" name="password" class="form-control" placeholder="{{ t('login.password_placeholder') }}" required autocomplete="current-password">
                         <span class="input-group-text bg-body text-secondary"><i class="fas fa-lock"></i></span>
                     </div>
 
                     <div class="row">
                         <div class="col-12">
                             <button type="submit" class="btn btn-primary btn-cta w-100 fw-bold py-2 shadow-sm">
-                                <i class="fas fa-sign-in-alt me-1"></i> Sign in
+                                <i class="fas fa-sign-in-alt me-1"></i> {{ t('login.sign_in_btn') }}
                             </button>
                         </div>
                     </div>
@@ -93,7 +93,7 @@
 
                 <div class="text-center mt-4 pt-3 border-top">
                     <p class="small text-muted mb-0 fw-medium">
-                        Default fallback keys: <code class="bg-body-secondary px-2 py-0.5 rounded">admin</code> / <code class="bg-body-secondary px-2 py-0.5 rounded">admin</code>
+                        {{ t('login.default_keys') }} <code class="bg-body-secondary px-2 py-0.5 rounded">admin</code> / <code class="bg-body-secondary px-2 py-0.5 rounded">admin</code>
                     </p>
                 </div>
             </div>

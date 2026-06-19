@@ -1,6 +1,6 @@
 {% extends "_spa_fragment.html" %}
 
-{% block title %}Web & Video History - {{ user.username }} - Guardian{% endblock %}
+{% block title %}{{ t('pages.web_video_history.title', username=user.username) }}{% endblock %}
 
 {% block extra_head %}
 <!-- Include Chart.js for analytics tab visualization -->
@@ -96,30 +96,30 @@
 <li class="nav-item dropdown guardian-nav-date-filter">
     <button class="btn btn-sm btn-outline-secondary dropdown-toggle guardian-nav-action-btn fw-bold"
         id="dateFilterDropdown" type="button" data-bs-toggle="dropdown" aria-expanded="false"
-        data-bs-auto-close="outside" aria-label="Select date range">
+        data-bs-auto-close="outside" aria-label="{{ t('pages.web_video_history.select_date_range') }}">
         <i class="fas fa-calendar-alt text-primary"></i>
-        <span class="guardian-nav-date-label" id="current-date-range-label">Last 7 Days</span>
+        <span class="guardian-nav-date-label" id="current-date-range-label">{{ t('pages.web_video_history.last_7_days') }}</span>
     </button>
     <div class="dropdown-menu dropdown-menu-end p-3 shadow border" style="width: 280px; font-family: inherit; z-index: 1050;">
-        <h6 class="dropdown-header px-0 mb-2 fw-bold text-uppercase tracking-wider" style="font-size: 0.7rem; color: var(--bs-secondary-color);">Select Period</h6>
+        <h6 class="dropdown-header px-0 mb-2 fw-bold text-uppercase tracking-wider" style="font-size: 0.7rem; color: var(--bs-secondary-color);">{{ t('pages.web_video_history.select_period') }}</h6>
         <div class="d-flex flex-column gap-1 mb-2">
-            <button class="btn btn-sm text-start py-1.5 px-2 fw-semibold date-preset-btn" data-preset="today">Today</button>
-            <button class="btn btn-sm text-start py-1.5 px-2 fw-semibold date-preset-btn" data-preset="yesterday">Yesterday</button>
-            <button class="btn btn-sm text-start py-1.5 px-2 fw-semibold date-preset-btn active" data-preset="7days">Last 7 Days</button>
-            <button class="btn btn-sm text-start py-1.5 px-2 fw-semibold date-preset-btn" data-preset="30days">Last 30 Days</button>
-            <button class="btn btn-sm text-start py-1.5 px-2 fw-semibold date-preset-btn" data-preset="thismonth">This Month</button>
+            <button class="btn btn-sm text-start py-1.5 px-2 fw-semibold date-preset-btn" data-preset="today">{{ t('pages.web_video_history.today') }}</button>
+            <button class="btn btn-sm text-start py-1.5 px-2 fw-semibold date-preset-btn" data-preset="yesterday">{{ t('pages.web_video_history.yesterday') }}</button>
+            <button class="btn btn-sm text-start py-1.5 px-2 fw-semibold date-preset-btn active" data-preset="7days">{{ t('pages.web_video_history.last_7_days') }}</button>
+            <button class="btn btn-sm text-start py-1.5 px-2 fw-semibold date-preset-btn" data-preset="30days">{{ t('pages.web_video_history.last_30_days') }}</button>
+            <button class="btn btn-sm text-start py-1.5 px-2 fw-semibold date-preset-btn" data-preset="thismonth">{{ t('pages.web_video_history.this_month') }}</button>
         </div>
         <div class="dropdown-divider"></div>
-        <h6 class="dropdown-header px-0 my-2 fw-bold text-uppercase tracking-wider" style="font-size: 0.7rem; color: var(--bs-secondary-color);">Custom Range</h6>
+        <h6 class="dropdown-header px-0 my-2 fw-bold text-uppercase tracking-wider" style="font-size: 0.7rem; color: var(--bs-secondary-color);">{{ t('pages.web_video_history.custom_range') }}</h6>
         <div class="mb-2">
-            <label class="form-label small fw-bold text-secondary mb-1">Start Date</label>
+            <label class="form-label small fw-bold text-secondary mb-1">{{ t('pages.web_video_history.start_date') }}</label>
             <input type="date" id="filter-start-date" class="form-control form-control-sm">
         </div>
         <div class="mb-3">
-            <label class="form-label small fw-bold text-secondary mb-1">End Date</label>
+            <label class="form-label small fw-bold text-secondary mb-1">{{ t('pages.web_video_history.end_date') }}</label>
             <input type="date" id="filter-end-date" class="form-control form-control-sm">
         </div>
-        <button id="apply-custom-date" class="btn btn-sm btn-primary w-100 py-1.5 fw-bold">Apply Custom Range</button>
+        <button id="apply-custom-date" class="btn btn-sm btn-primary w-100 py-1.5 fw-bold">{{ t('pages.web_video_history.apply_custom') }}</button>
     </div>
 </li>
 {% endblock %}
@@ -128,15 +128,15 @@
 <div class="guardian-page-header">
     <div class="guardian-page-header__intro">
         <h1 class="guardian-page-title mb-1">
-            <i class="fas fa-history text-primary me-1"></i> {{ user.username }} &mdash; Browsing &amp; video story
+            <i class="fas fa-history text-primary me-1"></i> {{ t('pages.web_video_history.heading', username=user.username) }}
         </h1>
         <p class="guardian-page-lead mb-0">
-            One calm timeline of websites visited and videos watched
+            {{ t('pages.web_video_history.lead') }}
         </p>
     </div>
     <div class="guardian-page-header__actions">
         <a href="{{ url_for('ui_dashboard.user_stats', user_id=user.id) }}" class="btn btn-sm btn-outline-secondary">
-            <i class="fas fa-chevron-left me-1"></i> Back to Stats
+            <i class="fas fa-chevron-left me-1"></i> {{ t('pages.web_video_history.back_to_stats') }}
         </a>
     </div>
 </div>
@@ -146,23 +146,23 @@
     <div class="row g-3 mb-4">
         <div class="col-12 col-md-4">
             <div class="card shadow-sm border text-center p-3 mb-0 h-100 border-web">
-                <span class="text-secondary small fw-bold text-uppercase d-block mb-1" style="font-size: 0.7rem; letter-spacing: 0.05em;">Web Pages Visited</span>
+                <span class="text-secondary small fw-bold text-uppercase d-block mb-1" style="font-size: 0.7rem; letter-spacing: 0.05em;">{{ t('pages.web_video_history.web_pages') }}</span>
                 <strong class="fs-2 text-primary d-block lh-1 fw-bold" id="stat-web-count">—</strong>
-                <span class="small text-muted fw-bold mt-2 d-block">total visits</span>
+                <span class="small text-muted fw-bold mt-2 d-block">{{ t('pages.web_video_history.total_visits') }}</span>
             </div>
         </div>
         <div class="col-12 col-md-4">
             <div class="card shadow-sm border text-center p-3 mb-0 h-100 border-youtube">
-                <span class="text-secondary small fw-bold text-uppercase d-block mb-1" style="font-size: 0.7rem; letter-spacing: 0.05em;">Videos Watched</span>
+                <span class="text-secondary small fw-bold text-uppercase d-block mb-1" style="font-size: 0.7rem; letter-spacing: 0.05em;">{{ t('pages.web_video_history.videos_watched') }}</span>
                 <strong class="fs-2 text-danger d-block lh-1 fw-bold" id="stat-video-count">—</strong>
                 <span class="small text-muted fw-bold mt-2 d-block" id="stat-video-time">—</span>
             </div>
         </div>
         <div class="col-12 col-md-4">
             <div class="card shadow-sm border text-center p-3 mb-0 h-100">
-                <span class="text-secondary small fw-bold text-uppercase d-block mb-1" style="font-size: 0.7rem; letter-spacing: 0.05em;">Domains &amp; Creators</span>
+                <span class="text-secondary small fw-bold text-uppercase d-block mb-1" style="font-size: 0.7rem; letter-spacing: 0.05em;">{{ t('pages.web_video_history.domains_creators') }}</span>
                 <strong class="fs-2 text-warning d-block lh-1 fw-bold" id="stat-dest-count">—</strong>
-                <span class="small text-muted fw-bold mt-2 d-block">distinct destinations</span>
+                <span class="small text-muted fw-bold mt-2 d-block">{{ t('pages.web_video_history.distinct_destinations') }}</span>
             </div>
         </div>
     </div>
@@ -173,18 +173,18 @@
             <!-- Web Domains Chart Card -->
             <div class="card shadow-sm border mb-4">
                 <div class="card-header py-3 bg-body-secondary">
-                    <h6 class="mb-0 fw-bold text-secondary text-uppercase tracking-wider" style="font-size: 0.75rem; letter-spacing: 0.05em;">Top 10 Visited Domains</h6>
+                    <h6 class="mb-0 fw-bold text-secondary text-uppercase tracking-wider" style="font-size: 0.75rem; letter-spacing: 0.05em;">{{ t('pages.web_video_history.top_domains') }}</h6>
                 </div>
                 <div class="card-body">
                     <div id="domains-chart-loading" class="text-center py-4">
                         <div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div>
-                        <span class="small text-secondary fw-semibold">Loading domains...</span>
+                        <span class="small text-secondary fw-semibold">{{ t('pages.web_video_history.loading_domains') }}</span>
                     </div>
                     <div id="domains-chart-wrapper" style="height: 250px; position: relative; display: none;">
                         <canvas id="chart-web-domains"></canvas>
                     </div>
                     <div id="domains-chart-empty" class="text-center py-5 text-muted small" style="display: none;">
-                        No browsing history available for this period.
+                        {{ t('pages.web_video_history.no_browsing') }}
                     </div>
                 </div>
             </div>
@@ -192,18 +192,18 @@
             <!-- Top Channels Chart Card -->
             <div class="card shadow-sm border mb-4">
                 <div class="card-header py-3 bg-body-secondary">
-                    <h6 class="mb-0 fw-bold text-secondary text-uppercase tracking-wider" style="font-size: 0.75rem; letter-spacing: 0.05em;">Top 10 YouTube Channels by Watch Time</h6>
+                    <h6 class="mb-0 fw-bold text-secondary text-uppercase tracking-wider" style="font-size: 0.75rem; letter-spacing: 0.05em;">{{ t('pages.web_video_history.top_channels') }}</h6>
                 </div>
                 <div class="card-body">
                     <div id="channels-chart-loading" class="text-center py-4">
                         <div class="spinner-border spinner-border-sm text-danger me-2" role="status"></div>
-                        <span class="small text-secondary fw-semibold">Loading channels...</span>
+                        <span class="small text-secondary fw-semibold">{{ t('pages.web_video_history.loading_channels') }}</span>
                     </div>
                     <div id="channels-chart-wrapper" style="height: 250px; position: relative; display: none;">
                         <canvas id="chart-youtube-channels"></canvas>
                     </div>
                     <div id="channels-chart-empty" class="text-center py-5 text-muted small" style="display: none;">
-                        No channel data available for this period.
+                        {{ t('pages.web_video_history.no_channels') }}
                     </div>
                 </div>
             </div>
@@ -213,8 +213,8 @@
         <div class="col-12 col-lg-7">
             <div class="card shadow-sm border">
                 <div class="card-header py-3 bg-body-secondary d-flex justify-content-between align-items-center flex-wrap gap-2">
-                    <h5 class="mb-0 fw-bold">Combined Activity Timeline</h5>
-                    <span class="text-secondary small fw-medium" id="history-total-label">0 entries found</span>
+                    <h5 class="mb-0 fw-bold">{{ t('pages.web_video_history.combined_timeline') }}</h5>
+                    <span class="text-secondary small fw-medium" id="history-total-label">{{ t('pages.web_video_history.entries_found', count=0) }}</span>
                 </div>
                 <div class="card-body p-0">
                     <!-- Filters toolbar -->
@@ -222,14 +222,14 @@
                         <div class="flex-grow-1" style="min-width: 200px;">
                             <div class="input-group input-group-sm">
                                 <span class="input-group-text bg-body-secondary border"><i class="fas fa-search"></i></span>
-                                <input type="text" id="history-search-input" class="form-control" placeholder="Search page titles, domains or videos...">
+                                <input type="text" id="history-search-input" class="form-control" placeholder="{{ t('pages.web_video_history.search_placeholder') }}">
                             </div>
                         </div>
                         <div style="min-width: 150px;">
                             <select id="history-type-filter" class="form-select form-select-sm">
-                                <option value="all">All Activities</option>
-                                <option value="web">Web Pages Only</option>
-                                <option value="youtube">YouTube Videos Only</option>
+                                <option value="all">{{ t('pages.web_video_history.filter_all') }}</option>
+                                <option value="web">{{ t('pages.web_video_history.filter_web') }}</option>
+                                <option value="youtube">{{ t('pages.web_video_history.filter_youtube') }}</option>
                             </select>
                         </div>
                     </div>
@@ -237,14 +237,14 @@
                     <!-- Loader -->
                     <div id="history-loading" class="p-5 text-center">
                         <div class="spinner-border text-primary mb-3" role="status"></div>
-                        <p class="text-secondary small mb-0">Loading activity feed...</p>
+                        <p class="text-secondary small mb-0">{{ t('pages.web_video_history.loading_feed') }}</p>
                     </div>
 
                     <!-- Empty state -->
                     <div id="history-empty" class="p-5 text-center text-secondary" style="display: none;">
                         <i class="fas fa-history fs-1 text-muted mb-3"></i>
-                        <h5>No history logs found</h5>
-                        <p class="small mb-0">Logs will appear here once the child browses the web or watches videos on monitored devices.</p>
+                        <h5>{{ t('pages.web_video_history.empty_title') }}</h5>
+                        <p class="small mb-0">{{ t('pages.web_video_history.empty_lead') }}</p>
                     </div>
 
                     <!-- List feed -->
@@ -256,11 +256,11 @@
                 <!-- Footer / Pagination -->
                 <div class="card-footer bg-body-secondary p-3 d-flex justify-content-between align-items-center" id="pagination-container" style="display: none;">
                     <button class="btn btn-sm btn-outline-secondary" id="btn-prev-page">
-                        <i class="fas fa-chevron-left me-1"></i> Previous
+                        <i class="fas fa-chevron-left me-1"></i> {{ t('pages.web_video_history.previous') }}
                     </button>
                     <span class="small text-secondary fw-semibold" id="page-indicator">Page 1 of 1</span>
                     <button class="btn btn-sm btn-outline-secondary" id="btn-next-page">
-                        Next <i class="fas fa-chevron-right ms-1"></i>
+                        {{ t('pages.web_video_history.next') }} <i class="fas fa-chevron-right ms-1"></i>
                     </button>
                 </div>
             </div>

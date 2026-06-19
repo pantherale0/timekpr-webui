@@ -1,6 +1,7 @@
 import logging
 from datetime import datetime, timedelta, timezone
 from flask import Blueprint, request, jsonify, session
+from src.i18n.catalog import api_message
 from sqlalchemy import or_, desc, asc
 from src.database import db, AgentAlert, ManagedUser, AgentDevice
 from src.alerts_manager import (
@@ -17,7 +18,7 @@ api_alerts_bp = Blueprint('api_alerts', __name__)
 @api_alerts_bp.route('/api/alerts', methods=['GET'])
 def get_alerts():
     if not session.get('logged_in'):
-        return jsonify({'success': False, 'message': 'Not authenticated'}), 401
+        return jsonify({'success': False, 'message': api_message('not_authenticated')}), 401
 
     system_id = request.args.get('system_id')
     managed_user_id = request.args.get('managed_user_id')
@@ -134,7 +135,7 @@ def get_alerts():
 @api_alerts_bp.route('/api/alerts/prune', methods=['POST'])
 def prune_alerts():
     if not session.get('logged_in'):
-        return jsonify({'success': False, 'message': 'Not authenticated'}), 401
+        return jsonify({'success': False, 'message': api_message('not_authenticated')}), 401
 
     payload = request.get_json() or {}
     older_than_days = int(payload.get('older_than_days', 30))
@@ -167,6 +168,6 @@ def prune_alerts():
     _LOGGER.info("Pruned %d alerts older than %d days.", deleted_count, older_than_days)
     return jsonify({
         'success': True, 
-        'message': f'Successfully pruned {deleted_count} alerts.',
+        'message': api_message('alerts_pruned', count=deleted_count),
         'deleted_count': deleted_count
     })

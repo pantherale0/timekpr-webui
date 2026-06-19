@@ -1,22 +1,21 @@
 {% extends "_spa_fragment.html" %}
 
 {% from '_macros.html' import csrf_field %}
-{% block title %}Devices - Guardian{% endblock %}
+{% block title %}{{ t('pages.admin_devices.title') }}{% endblock %}
 
 {% block content %}
 <div class="guardian-page-header">
     <div class="guardian-page-header__intro">
-        <h1 class="guardian-page-title mb-1">Devices</h1>
-        <p class="guardian-page-lead mb-0">Approve new hardware and keep an eye on the computers, phones, and consoles in your home.</p>
+        <h1 class="guardian-page-title mb-1">{{ t('pages.admin_devices.heading') }}</h1>
+        <p class="guardian-page-lead mb-0">{{ t('pages.admin_devices.lead') }}</p>
     </div>
     <div class="guardian-page-header__actions">
         <button class="btn btn-primary guardian-btn-sage d-inline-flex align-items-center gap-1" onclick="openOnboardingWizard()">
-            <i class="fas fa-plus"></i> Add Device
+            <i class="fas fa-plus"></i> {{ t('pages.admin_devices.add_device') }}
         </button>
     </div>
 </div>
 
-<!-- Visual Quick-Stats Widget Rows -->
 <div class="row g-3 guardian-stat-row">
     <div class="col-sm-6">
         <div class="card border shadow-sm h-100">
@@ -27,8 +26,8 @@
                 </div>
                 <div>
                     <span class="text-secondary small fw-bold text-uppercase d-block mb-1"
-                        style="font-size: 0.7rem; letter-spacing: 0.05em;">Connected &amp; trusted</span>
-                    <h3 class="fw-bold mb-0 lh-1 text-success">{{ approved_devices|length }} Active</h3>
+                        style="font-size: 0.7rem; letter-spacing: 0.05em;">{{ t('pages.admin_devices.connected_trusted') }}</span>
+                    <h3 class="fw-bold mb-0 lh-1 text-success">{{ t('pages.admin_devices.active_count', count=approved_devices|length) }}</h3>
                 </div>
             </div>
         </div>
@@ -43,9 +42,9 @@
                 </div>
                 <div>
                     <span class="text-secondary small fw-bold text-uppercase d-block mb-1"
-                        style="font-size: 0.7rem; letter-spacing: 0.05em;">Waiting for approval</span>
+                        style="font-size: 0.7rem; letter-spacing: 0.05em;">{{ t('pages.admin_devices.waiting_approval') }}</span>
                     <h3 class="fw-bold mb-0 lh-1 {% if pending_devices %}text-warning{% endif %}">{{
-                        pending_devices|length }} Pending</h3>
+                        t('pages.admin_devices.pending_count', count=pending_devices|length) }}</h3>
                 </div>
             </div>
         </div>
@@ -53,12 +52,11 @@
 </div>
 
 <div class="row g-4">
-    <!-- Pending Device Approvals -->
     <div class="col-12">
         <div class="card shadow-sm border">
             <div class="card-header bg-warning-subtle text-warning-emphasis py-3 d-flex align-items-center gap-2">
                 <i class="fas fa-hourglass-half fs-5"></i>
-                <h5 class="mb-0 fw-bold">Devices waiting to connect</h5>
+                <h5 class="mb-0 fw-bold">{{ t('pages.admin_devices.waiting_to_connect') }}</h5>
             </div>
             <div class="card-body p-0">
                 {% if pending_devices %}
@@ -67,13 +65,13 @@
                         <thead>
                             <tr class="table-light">
                                 <th class="ps-3 text-secondary fw-bold"
-                                    style="font-size: 0.75rem; text-transform: uppercase;">Device Label / Hostname</th>
+                                    style="font-size: 0.75rem; text-transform: uppercase;">{{ t('pages.admin_devices.col_device_label') }}</th>
                                 <th class="text-secondary fw-bold"
-                                    style="font-size: 0.75rem; text-transform: uppercase;">Current IP Address</th>
+                                    style="font-size: 0.75rem; text-transform: uppercase;">{{ t('pages.admin_devices.col_ip') }}</th>
                                 <th class="text-secondary fw-bold"
-                                    style="font-size: 0.75rem; text-transform: uppercase;">Platform</th>
+                                    style="font-size: 0.75rem; text-transform: uppercase;">{{ t('pages.admin_devices.col_platform') }}</th>
                                 <th class="pe-3 text-secondary fw-bold text-end"
-                                    style="font-size: 0.75rem; text-transform: uppercase;">Actions</th>
+                                    style="font-size: 0.75rem; text-transform: uppercase;">{{ t('pages.admin_devices.col_actions') }}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -93,11 +91,11 @@
                                         {% if AgentConnectionManager.is_online(device.system_id) %}
                                         <span
                                             class="badge bg-success-subtle text-success border border-success-subtle px-2 py-0.5"
-                                            style="font-size: 0.7rem;">Online</span>
+                                            style="font-size: 0.7rem;">{{ t('pages.admin_devices.online') }}</span>
                                         {% else %}
                                         <span
                                             class="badge bg-secondary-subtle text-secondary border border-secondary-subtle px-2 py-0.5"
-                                            style="font-size: 0.7rem;">Offline</span>
+                                            style="font-size: 0.7rem;">{{ t('pages.admin_devices.offline') }}</span>
                                         {% endif %}
                                     </span>
                                 </td>
@@ -113,12 +111,12 @@
                                     <div class="d-inline-flex gap-2">
                                         <a href="{{ url_for('ui_dashboard.device_detail', system_id=device.system_id) }}"
                                             class="btn btn-sm btn-primary fw-bold">
-                                            <i class="fas fa-search me-1"></i> Details
+                                            <i class="fas fa-search me-1"></i> {{ t('pages.admin_devices.details') }}
                                         </a>
                                         <button onclick="approveDevice('{{ device.system_id }}')"
-                                            class="btn btn-sm btn-success fw-bold px-3">Approve</button>
+                                            class="btn btn-sm btn-success fw-bold px-3">{{ t('pages.admin_devices.approve') }}</button>
                                         <button onclick="rejectDevice('{{ device.system_id }}')"
-                                            class="btn btn-sm btn-danger fw-bold px-3">Reject</button>
+                                            class="btn btn-sm btn-danger fw-bold px-3">{{ t('pages.admin_devices.reject') }}</button>
                                     </div>
                                 </td>
                             </tr>
@@ -129,19 +127,18 @@
                 {% else %}
                 <div class="p-4 text-center text-secondary">
                     <i class="far fa-check-circle fs-3 mb-2 text-success"></i>
-                    <p class="mb-0 fw-semibold">No new connection or registration requests pending.</p>
+                    <p class="mb-0 fw-semibold">{{ t('pages.admin_devices.no_pending') }}</p>
                 </div>
                 {% endif %}
             </div>
         </div>
     </div>
 
-    <!-- Approved Devices -->
     <div class="col-12">
         <div class="card shadow-sm border">
             <div class="card-header guardian-card-header py-3 d-flex align-items-center gap-2">
                 <i class="fas fa-check-double text-success fs-5"></i>
-                <h5 class="mb-0 fw-bold">Connected devices</h5>
+                <h5 class="mb-0 fw-bold">{{ t('pages.admin_devices.connected_devices') }}</h5>
             </div>
             <div class="card-body p-0">
                 {% if approved_devices %}
@@ -150,14 +147,13 @@
                         <thead>
                             <tr class="table-light">
                                 <th class="ps-3 text-secondary fw-bold"
-                                    style="font-size: 0.75rem; text-transform: uppercase;">Device Label / Hostname</th>
+                                    style="font-size: 0.75rem; text-transform: uppercase;">{{ t('pages.admin_devices.col_device_label') }}</th>
                                 <th class="text-secondary fw-bold"
-                                    style="font-size: 0.75rem; text-transform: uppercase;">Current IP Address</th>
+                                    style="font-size: 0.75rem; text-transform: uppercase;">{{ t('pages.admin_devices.col_ip') }}</th>
                                 <th class="text-secondary fw-bold"
-                                    style="font-size: 0.75rem; text-transform: uppercase; text-align: center;">Active
-                                    Mappings</th>
+                                    style="font-size: 0.75rem; text-transform: uppercase; text-align: center;">{{ t('pages.admin_devices.col_active_mappings') }}</th>
                                 <th class="pe-3 text-secondary fw-bold text-end"
-                                    style="font-size: 0.75rem; text-transform: uppercase;">Actions</th>
+                                    style="font-size: 0.75rem; text-transform: uppercase;">{{ t('pages.admin_devices.col_actions') }}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -177,32 +173,31 @@
                                         {% if AgentConnectionManager.is_online(device.system_id) %}
                                         <span
                                             class="badge bg-success-subtle text-success border border-success-subtle px-2 py-0.5"
-                                            style="font-size: 0.7rem;">Online</span>
+                                            style="font-size: 0.7rem;">{{ t('pages.admin_devices.online') }}</span>
                                         {% else %}
                                         <span
                                             class="badge bg-secondary-subtle text-secondary border border-secondary-subtle px-2 py-0.5"
-                                            style="font-size: 0.7rem;">Offline</span>
+                                            style="font-size: 0.7rem;">{{ t('pages.admin_devices.offline') }}</span>
                                         {% endif %}
                                     </span>
                                 </td>
                                 <td>
                                     {% if device.platform == 'nintendo' or device.platform == 'xbox' %}
                                     <code class="bg-body-secondary border px-2 py-1 rounded small"
-                                        style="color: var(--bs-body-color);">Cloud</code>
+                                        style="color: var(--bs-body-color);">{{ t('pages.admin_devices.cloud') }}</code>
                                     {% else %}
                                     <code class="bg-body-secondary border px-2 py-1 rounded small"
                                         style="color: var(--bs-body-color);">{{ device.system_ip }}</code>
                                     {% endif %}
                                 </td>
                                 <td class="text-center">
-                                    <span class="badge bg-secondary p-2">{{ device.user_mappings|length }} linked
-                                        accounts</span>
+                                    <span class="badge bg-secondary p-2">{{ t('pages.admin_devices.linked_accounts', count=device.user_mappings|length) }}</span>
                                 </td>
                                 <td class="pe-3 text-end">
                                     <div class="d-inline-flex gap-2">
                                         <a href="{{ url_for('ui_dashboard.device_detail', system_id=device.system_id) }}"
                                             class="btn btn-sm btn-primary fw-bold">
-                                            <i class="fas fa-search me-1"></i> Details
+                                            <i class="fas fa-search me-1"></i> {{ t('pages.admin_devices.details') }}
                                         </a>
                                         {% if device.user_mappings and
                                         AgentConnectionManager.is_online(device.system_id) %}
@@ -213,16 +208,16 @@
                                             {{ csrf_field() }} <input type="hidden" name="linux_username"
                                                 value="{{ device.user_mappings[0].linux_username }}">
                                             <button type="submit" class="btn btn-sm btn-outline-secondary fw-bold">
-                                                <i class="fas fa-sync-alt me-1"></i> Refresh Inventory
+                                                <i class="fas fa-sync-alt me-1"></i> {{ t('pages.admin_devices.refresh_inventory') }}
                                             </button>
                                         </form>
                                         {% endif %}
                                         <button onclick="unenrollDevice('{{ device.system_id }}')"
-                                            class="btn btn-sm btn-outline-danger fw-bold">Unenroll</button>
+                                            class="btn btn-sm btn-outline-danger fw-bold">{{ t('pages.admin_devices.unenroll') }}</button>
                                         {% if device.platform == 'android' %}
                                         <button
                                             onclick="factoryResetDevice('{{ device.system_id }}', '{{ device_labels.get(device.system_id, device.display_name) }}')"
-                                            class="btn btn-sm btn-danger fw-bold">Factory Reset</button>
+                                            class="btn btn-sm btn-danger fw-bold">{{ t('pages.admin_devices.factory_reset') }}</button>
                                         {% endif %}
                                     </div>
                                 </td>
@@ -234,8 +229,7 @@
                 {% else %}
                 <div class="p-4 text-center text-secondary">
                     <i class="fas fa-laptop-house fs-3 mb-2"></i>
-                    <p class="mb-0 fw-semibold">No approved devices connected yet. Use the Onboarding Wizard to enroll
-                        devices.</p>
+                    <p class="mb-0 fw-semibold">{{ t('pages.admin_devices.no_approved') }}</p>
                 </div>
                 {% endif %}
             </div>

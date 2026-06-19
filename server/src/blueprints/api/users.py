@@ -1,7 +1,8 @@
 import json
 import logging
 from datetime import datetime, timezone, timedelta, time
-from flask import Blueprint, session, request, jsonify, flash, redirect, url_for
+from flask import Blueprint, session, request, jsonify, redirect, url_for
+from src.i18n.catalog import flash_t, api_message, t
 from src.database import db, ManagedUser, AgentDevice, ManagedUserDeviceMap, UserTimeUsage, AppUsageHistory
 from src.helpers import _device_display_label, _get_device_label_map, _mapping_display_label
 from src.users_manager import _refresh_managed_user_summary
@@ -18,7 +19,7 @@ api_users_bp = Blueprint('api_users', __name__)
 @api_users_bp.route('/managed-users/add', methods=['POST'])
 def create_managed_user():
     if not session.get('logged_in'):
-        return jsonify({'success': False, 'message': 'Not authenticated'}), 401
+        return jsonify({'success': False, 'message': api_message('not_authenticated')}), 401
 
     username = (request.form.get('username') or '').strip()
     selected_preset_ids = request.form.getlist('preset_ids')
@@ -26,12 +27,12 @@ def create_managed_user():
     policy_maturity_level = (request.form.get('policy_maturity_level') or '').strip()
 
     if not username:
-        flash('Managed user name is required', 'danger')
+        flash_t('flash.users.name_required', 'danger')
         return redirect(url_for('ui_dashboard.admin'))
 
     existing_user = ManagedUser.query.filter_by(username=username).first()
     if existing_user:
-        flash(f'Managed user {username} already exists', 'warning')
+        flash_t('flash.users.already_exists', 'warning', username=username)
         return redirect(url_for('ui_dashboard.admin'))
 
     managed_user = ManagedUser(
@@ -52,14 +53,14 @@ def create_managed_user():
                 username,
                 exc,
             )
-            flash(f'Profile created but policy preset failed: {exc}', 'warning')
+            flash_t('flash.users.preset_partial', 'warning', error=str(exc))
         except Exception as exc:
             _LOGGER.error(
                 "Failed to apply policy preset for user %s: %s",
                 username,
                 exc,
             )
-            flash('Profile created but policy preset could not be applied', 'warning')
+            flash_t('flash.users.preset_not_applied', 'warning')
     elif selected_preset_ids:
         from src.marketplace_manager import sync_marketplace_subscriptions
         try:
@@ -79,7 +80,7 @@ def create_managed_user():
                 exc,
             )
 
-    flash(f'Managed user {username} created', 'success')
+    flash_t('flash.users.created', 'success', username=username)
     return redirect(url_for('ui_dashboard.admin'))
 
 
@@ -87,23 +88,23 @@ def create_managed_user():
 def apply_policy_preset_route(user_id):
     """Apply or re-apply an age × maturity policy preset to a managed child profile."""
     if not session.get('logged_in'):
-        return jsonify({'success': False, 'message': 'Not authenticated'}), 401
+        return jsonify({'success': False, 'message': api_message('not_authenticated')}), 401
 
     user = ManagedUser.query.get_or_404(user_id)
     policy_age_bracket = (request.form.get('policy_age_bracket') or '').strip()
     policy_maturity_level = (request.form.get('policy_maturity_level') or '').strip()
 
     if not policy_age_bracket or not policy_maturity_level:
-        flash('Age bracket and technical understanding level are required', 'danger')
+        flash_t('flash.users.preset_fields_required', 'danger')
         return redirect(url_for('ui_dashboard.edit_user_profile', user_id=user.id))
 
     from src.policy_preset_manager import apply_policy_preset
 
     try:
         apply_policy_preset(user, policy_age_bracket, policy_maturity_level)
-        flash(f'Policy preset applied for {user.username}', 'success')
+        flash_t('flash.users.preset_applied', 'success', username=user.username)
     except ValueError as exc:
-        flash(f'Failed to apply policy preset: {exc}', 'danger')
+        flash_t('flash.users.preset_failed', 'danger', error=str(exc))
     except Exception as exc:
         _LOGGER.error(
             "Failed to apply policy preset for user %s (id=%d): %s",
@@ -111,7 +112,7 @@ def apply_policy_preset_route(user_id):
             user.id,
             exc,
         )
-        flash('Failed to apply policy preset', 'danger')
+        flash_t('flash.users.preset_apply_failed', 'danger')
 
     return redirect(url_for('ui_dashboard.edit_user_profile', user_id=user.id))
 
@@ -119,7 +120,7 @@ def apply_policy_preset_route(user_id):
 @api_users_bp.route('/managed-users/<int:user_id>/mappings/add', methods=['POST'])
 def add_user_mapping(user_id):
     if not session.get('logged_in'):
-        return jsonify({'success': False, 'message': 'Not authenticated'}), 401
+        return jsonify({'success': False, 'message': api_message('not_authenticated')}), 401
 
     user = ManagedUser.query.get_or_404(user_id)
     system_id = (request.form.get('system_id') or '').strip()
@@ -127,12 +128,16 @@ def add_user_mapping(user_id):
     linux_uid_raw = (request.form.get('linux_uid') or '').strip()
 
     if not system_id or not linux_username:
-        flash('Device and Linux username are required', 'danger')
+        flash_t('flash.users.mapping_fields_required', 'danger')
         return redirect(url_for('ui_dashboard.admin'))
 
     device = AgentDevice.query.get(system_id)
     if not device or device.status != 'approved':
-        flash(f'Device {_device_display_label(system_id)} is not registered or approved', 'danger')
+        flash_t(
+            'flash.users.device_not_registered',
+            'danger',
+            device=_device_display_label(system_id),
+        )
         return redirect(url_for('ui_dashboard.admin'))
 
     device_label = _device_display_label(system_id)
@@ -141,7 +146,12 @@ def add_user_mapping(user_id):
         system_id=system_id,
     ).first()
     if existing_mapping:
-        flash(f'{user.username} is already linked to {device_label}', 'warning')
+        flash_t(
+            'flash.users.already_linked',
+            'warning',
+            username=user.username,
+            device=device_label,
+        )
         return redirect(url_for('ui_dashboard.admin'))
 
     linux_uid = None
@@ -149,7 +159,7 @@ def add_user_mapping(user_id):
         try:
             linux_uid = int(linux_uid_raw)
         except ValueError:
-            flash('Linux UID must be numeric', 'danger')
+            flash_t('flash.users.uid_numeric', 'danger')
             return redirect(url_for('ui_dashboard.admin'))
 
     android_profile_type = request.form.get('android_profile_type')
@@ -170,7 +180,13 @@ def add_user_mapping(user_id):
     from app import task_manager
     task_manager.notify_domain_policy_hint(system_ids={system_id}, reason='mapping_updated')
 
-    flash(f'Mapping added: {user.username} -> {linux_username}@{device_label}', 'success')
+    flash_t(
+        'flash.users.mapping_added',
+        'success',
+        username=user.username,
+        linux_username=linux_username,
+        device=device_label,
+    )
     return redirect(url_for('ui_dashboard.admin'))
 
 
@@ -182,7 +198,7 @@ def add_user():
     if request.method == 'GET':
         return redirect(url_for('ui_dashboard.admin'))
     if not session.get('logged_in'):
-        return jsonify({'success': False, 'message': 'Not authenticated'}), 401
+        return jsonify({'success': False, 'message': api_message('not_authenticated')}), 401
 
     username = (request.form.get('username') or '').strip()
     system_id = (request.form.get('system_id') or '').strip()
@@ -191,12 +207,16 @@ def add_user():
         android_profile_type = None
 
     if not username or not system_id:
-        flash('Both username and device are required', 'danger')
+        flash_t('flash.users.mapping_fields_both', 'danger')
         return redirect(url_for('ui_dashboard.admin'))
 
     device = AgentDevice.query.get(system_id)
     if not device or device.status != 'approved':
-        flash(f'Device {_device_display_label(system_id)} is not registered or approved', 'danger')
+        flash_t(
+            'flash.users.device_not_registered',
+            'danger',
+            device=_device_display_label(system_id),
+        )
         return redirect(url_for('ui_dashboard.admin'))
 
     device_label = _device_display_label(system_id)
@@ -212,7 +232,12 @@ def add_user():
     ).first()
     if existing_mapping:
         db.session.rollback()
-        flash(f'User {username} on {device_label} already exists', 'warning')
+        flash_t(
+            'flash.users.user_device_exists',
+            'warning',
+            username=username,
+            device=device_label,
+        )
         return redirect(url_for('ui_dashboard.admin'))
 
     mapping = ManagedUserDeviceMap(
@@ -234,19 +259,19 @@ def add_user():
 
     from app import task_manager
     task_manager.notify_domain_policy_hint(system_ids={system_id}, reason='mapping_updated')
-    flash(f'Managed user {username} and mapping added', 'success')
+    flash_t('flash.users.created_with_mapping', 'success', username=username)
     return redirect(url_for('ui_dashboard.admin'))
 
 
 @api_users_bp.route('/users/validate/<int:user_id>')
 def validate_user(user_id):
     if not session.get('logged_in'):
-        return jsonify({'success': False, 'message': 'Not authenticated'}), 401
+        return jsonify({'success': False, 'message': api_message('not_authenticated')}), 401
 
     user = ManagedUser.query.get_or_404(user_id)
     mappings = list(user.device_mappings)
     if not mappings:
-        flash('No device mappings configured for this managed user', 'warning')
+        flash_t('flash.users.no_mappings', 'warning')
         return redirect(url_for('ui_dashboard.admin'))
 
     total_valid = 0
@@ -284,16 +309,23 @@ def validate_user(user_id):
             reason='mapping_updated',
         )
     if total_valid:
-        flash(f'Validated {total_valid}/{len(mappings)} mapping(s) for {user.username}', 'success')
+        flash_t(
+            'flash.users.mappings_validated',
+            'success',
+            valid=total_valid,
+            total=len(mappings),
+            username=user.username,
+        )
     else:
-        flash(f'User validation failed: {"; ".join(messages) if messages else "No mappings validated"}', 'danger')
+        details = '; '.join(messages) if messages else t('flash.users.no_mappings_validated')
+        flash_t('flash.users.validation_failed', 'danger', details=details)
     return redirect(url_for('ui_dashboard.admin'))
 
 
 @api_users_bp.route('/managed-users/<int:user_id>/mappings/<int:mapping_id>/validate')
 def validate_mapping(user_id, mapping_id):
     if not session.get('logged_in'):
-        return jsonify({'success': False, 'message': 'Not authenticated'}), 401
+        return jsonify({'success': False, 'message': api_message('not_authenticated')}), 401
 
     user = ManagedUser.query.get_or_404(user_id)
     mapping = ManagedUserDeviceMap.query.filter_by(id=mapping_id, managed_user_id=user.id).first_or_404()
@@ -324,16 +356,20 @@ def validate_mapping(user_id, mapping_id):
     device_labels = _get_device_label_map()
 
     if is_valid:
-        flash(f'Mapping validated: {_mapping_display_label(mapping, device_labels)}', 'success')
+        flash_t(
+            'flash.users.mapping_validated',
+            'success',
+            label=_mapping_display_label(mapping, device_labels),
+        )
     else:
-        flash(f'Mapping validation failed: {message}', 'danger')
+        flash_t('flash.users.mapping_validation_failed', 'danger', message=message)
     return redirect(url_for('ui_dashboard.admin'))
 
 
 @api_users_bp.route('/managed-users/<int:user_id>/mappings/<int:mapping_id>/delete', methods=['POST'])
 def delete_mapping(user_id, mapping_id):
     if not session.get('logged_in'):
-        return jsonify({'success': False, 'message': 'Not authenticated'}), 401
+        return jsonify({'success': False, 'message': api_message('not_authenticated')}), 401
 
     user = ManagedUser.query.get_or_404(user_id)
     mapping = ManagedUserDeviceMap.query.filter_by(id=mapping_id, managed_user_id=user.id).first_or_404()
@@ -348,14 +384,14 @@ def delete_mapping(user_id, mapping_id):
 
     from app import task_manager
     task_manager.notify_domain_policy_hint(system_ids={affected_system_id}, reason='mapping_updated')
-    flash(f'Mapping removed: {mapping_label}', 'success')
+    flash_t('flash.users.mapping_removed', 'success', label=mapping_label)
     return redirect(url_for('ui_dashboard.admin'))
 
 
 @api_users_bp.route('/users/delete/<int:user_id>', methods=['POST'])
 def delete_user(user_id):
     if not session.get('logged_in'):
-        return jsonify({'success': False, 'message': 'Not authenticated'}), 401
+        return jsonify({'success': False, 'message': api_message('not_authenticated')}), 401
     
     user = ManagedUser.query.get_or_404(user_id)
     username = user.username
@@ -367,7 +403,7 @@ def delete_user(user_id):
         from app import task_manager
         task_manager.notify_domain_policy_hint(system_ids=affected_system_ids, reason='mapping_updated')
     
-    flash(f'User {username} removed successfully', 'success')
+    flash_t('flash.users.user_removed', 'success', username=username)
     return redirect(url_for('ui_dashboard.admin'))
 
 
@@ -375,7 +411,7 @@ def delete_user(user_id):
 def get_user_usage(user_id):
     """API endpoint to get user usage data"""
     if not session.get('logged_in'):
-        return jsonify({'success': False, 'message': 'Not authenticated'}), 401
+        return jsonify({'success': False, 'message': api_message('not_authenticated')}), 401
     
     user = ManagedUser.query.get_or_404(user_id)
     days = request.args.get('days', 7, type=int)
@@ -401,7 +437,7 @@ def get_user_usage(user_id):
 def get_all_users():
     """Return all child profiles in JSON format for the onboarding wizard."""
     if not session.get('logged_in'):
-        return jsonify({'success': False, 'message': 'Not authenticated'}), 401
+        return jsonify({'success': False, 'message': api_message('not_authenticated')}), 401
     
     users = ManagedUser.query.order_by(ManagedUser.username.asc()).all()
     return jsonify({
@@ -414,7 +450,7 @@ def get_all_users():
 def api_create_user():
     """Create a new child profile and return its JSON details for the wizard."""
     if not session.get('logged_in'):
-        return jsonify({'success': False, 'message': 'Not authenticated'}), 401
+        return jsonify({'success': False, 'message': api_message('not_authenticated')}), 401
     
     if request.is_json:
         data = request.json or {}
@@ -423,11 +459,14 @@ def api_create_user():
         username = (request.form.get('username') or '').strip()
         
     if not username:
-        return jsonify({'success': False, 'message': 'Profile name is required'}), 400
+        return jsonify({'success': False, 'message': api_message('profile_name_required')}), 400
         
     existing = ManagedUser.query.filter_by(username=username).first()
     if existing:
-        return jsonify({'success': False, 'message': f'Child profile "{username}" already exists'}), 400
+        return jsonify({
+            'success': False,
+            'message': api_message('profile_exists', username=username),
+        }), 400
         
     user = ManagedUser(username=username, is_valid=False, system_ip='Unassigned')
     db.session.add(user)
@@ -442,7 +481,7 @@ def api_create_user():
 def get_user_stats(user_id):
     """API endpoint to get user usage analytics, including daily totals and per-app usage in a date range."""
     if not session.get('logged_in'):
-        return jsonify({'success': False, 'message': 'Not authenticated'}), 401
+        return jsonify({'success': False, 'message': api_message('not_authenticated')}), 401
 
     user = ManagedUser.query.get_or_404(user_id)
     start_date_str = request.args.get('start_date')
@@ -460,7 +499,7 @@ def get_user_stats(user_id):
         else:
             end_date = today
     except ValueError:
-        return jsonify({'success': False, 'message': 'Invalid date format. Use YYYY-MM-DD'}), 400
+        return jsonify({'success': False, 'message': api_message('invalid_date')}), 400
 
     # 1. Query overall system/device usage
     records = UserTimeUsage.query.filter_by(user_id=user.id).filter(
@@ -552,7 +591,7 @@ def update_overlay_settings(user_id):
     Accepts JSON body with optional ``overlay_age_tier`` and ``overlay_parent_note`` fields.
     """
     if not session.get('logged_in'):
-        return jsonify({'success': False, 'message': 'Not authenticated'}), 401
+        return jsonify({'success': False, 'message': api_message('not_authenticated')}), 401
 
     user = ManagedUser.query.get_or_404(user_id)
     data = request.get_json(silent=True) or {}
@@ -562,7 +601,10 @@ def update_overlay_settings(user_id):
         if age_tier is not None and age_tier not in _VALID_AGE_TIERS:
             return jsonify({
                 'success': False,
-                'message': f"overlay_age_tier must be one of: {', '.join(sorted(_VALID_AGE_TIERS))}",
+                'message': api_message(
+                    'overlay_age_tier_invalid',
+                    tiers=', '.join(sorted(_VALID_AGE_TIERS)),
+                ),
             }), 400
         user.overlay_age_tier = age_tier
 

@@ -1,6 +1,7 @@
 import logging
 from datetime import datetime, timezone
 from flask import Blueprint, request, jsonify, session
+from src.i18n.catalog import api_message
 from src.database import db, ManagedUser
 from src.agent_helper import AgentConnectionManager, AgentClient
 from src.helpers import _get_device_label_map, _mapping_display_label
@@ -14,30 +15,30 @@ api_time_bp = Blueprint('api_time', __name__)
 def modify_time():
     """Modify time left for a user"""
     if not session.get('logged_in'):
-        return jsonify({'success': False, 'message': 'Not authenticated'}), 401
+        return jsonify({'success': False, 'message': api_message('not_authenticated')}), 401
     
     user_id = request.form.get('user_id')
     operation = request.form.get('operation')
     seconds = request.form.get('seconds')
     
     if not user_id or not operation or not seconds:
-        return jsonify({'success': False, 'message': 'Missing required parameters'}), 400
+        return jsonify({'success': False, 'message': api_message('missing_params')}), 400
     
     try:
         user_id = int(user_id)
         seconds = int(seconds)
     except ValueError:
-        return jsonify({'success': False, 'message': 'Invalid parameter format'}), 400
+        return jsonify({'success': False, 'message': api_message('invalid_params')}), 400
     
     if operation not in ['+', '-']:
-        return jsonify({'success': False, 'message': "Operation must be '+' or '-'"}), 400
+        return jsonify({'success': False, 'message': api_message('invalid_operation')}), 400
     
     user = ManagedUser.query.get_or_404(user_id)
     today = datetime.now(timezone.utc).date()
 
     mappings = list(user.device_mappings)
     if not mappings:
-        return jsonify({'success': False, 'message': 'No device mappings configured for this user'}), 400
+        return jsonify({'success': False, 'message': api_message('no_mappings')}), 400
 
     user.apply_daily_limit_adjustment(operation, seconds, today)
     user.pending_time_adjustment = None
@@ -52,7 +53,7 @@ def modify_time():
     if not online_mappings:
         return jsonify({
             'success': True,
-            'message': 'All mapped devices are offline. Adjustment saved on the server and will rebalance when a mapped device reconnects.',
+            'message': api_message('devices_offline'),
             'username': user.username,
             'pending': True,
             'refresh': True
@@ -69,12 +70,16 @@ def modify_time():
     if failures or remaining_mappings > 0:
         pending_fragments = []
         if failures:
-            pending_fragments.append(f"{len(failures)} online mapping(s) need retry")
+            pending_fragments.append(api_message('pending_online_retry', count=len(failures)))
         if remaining_mappings > 0:
-            pending_fragments.append(f"{remaining_mappings} offline mapping(s) will rebalance on reconnect")
+            pending_fragments.append(api_message('pending_offline_rebalance', count=remaining_mappings))
         return jsonify({
             'success': True,
-            'message': f"Adjustment stored on the server. Applied immediately to {len(online_mappings) - len(failures)}/{len(online_mappings)} online mapping(s).",
+            'message': api_message(
+                'time_adjustment_partial',
+                applied=len(online_mappings) - len(failures),
+                total=len(online_mappings),
+            ),
             'details': failures,
             'username': user.username,
             'pending': True,
@@ -84,7 +89,7 @@ def modify_time():
 
     return jsonify({
         'success': True,
-        'message': f"Adjustment applied to {len(online_mappings)} mapping(s).",
+        'message': api_message('adjustment_applied', count=len(online_mappings)),
         'username': user.username,
         'pending': False,
         'refresh': True

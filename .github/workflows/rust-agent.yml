@@ -5,6 +5,8 @@ on:
     paths:
       - "agent/**"
       - "android-agent/**"
+      - "i18n/**"
+      - "scripts/i18n/**"
       - ".github/workflows/rust-agent.yml"
   push:
     branches:
@@ -42,6 +44,8 @@ jobs:
             android_agent:
               - "android-agent/**"
               - "agent/**"
+              - "i18n/**"
+              - "scripts/i18n/**"
               - ".github/workflows/rust-agent.yml"
 
   linux-check:
@@ -56,6 +60,12 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libdbus-1-dev pkg-config
+
+      - name: Bundle agent i18n artifacts
+        run: |
+          python -m pip install --disable-pip-version-check PyYAML
+          python scripts/i18n/manage.py validate
+          python scripts/i18n/manage.py bundle --target agent
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -104,6 +114,12 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libdbus-1-dev pkg-config
+
+      - name: Bundle Android strings from i18n
+        run: |
+          python -m pip install --disable-pip-version-check PyYAML
+          python scripts/i18n/manage.py validate
+          python scripts/i18n/manage.py bundle --target agent
 
       - name: Set up JDK
         uses: actions/setup-java@v4
@@ -181,6 +197,12 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
+      - name: Bundle agent i18n artifacts
+        run: |
+          python -m pip install --disable-pip-version-check PyYAML
+          python scripts/i18n/manage.py validate
+          python scripts/i18n/manage.py bundle --target agent
+
       - name: Install Rust toolchain with target
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -237,6 +259,13 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+
+      - name: Bundle agent i18n artifacts
+        shell: bash
+        run: |
+          python -m pip install --disable-pip-version-check PyYAML
+          python scripts/i18n/manage.py validate
+          python scripts/i18n/manage.py bundle --target agent
 
       - name: Install Rust toolchain with target
         uses: dtolnay/rust-toolchain@stable
@@ -357,6 +386,12 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libdbus-1-dev pkg-config
+
+      - name: Bundle Android strings from i18n
+        run: |
+          python -m pip install --disable-pip-version-check PyYAML
+          python scripts/i18n/manage.py validate
+          python scripts/i18n/manage.py bundle --target agent
 
       - name: Set up JDK
         uses: actions/setup-java@v4

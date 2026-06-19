@@ -1,7 +1,7 @@
 {% extends "_spa_fragment.html" %}
 
 {% from '_macros.html' import csrf_field %}
-{% block title %}Profile Settings - {{ user.username }} - Guardian{% endblock %}
+{% block title %}{{ t('pages.admin_user_edit.title', username=user.username) }}{% endblock %}
 
 {% block extra_head %}{% endblock %}
 
@@ -9,24 +9,24 @@
 <span id="blocklist-sync-badge" class="guardian-status-pill" role="status" aria-live="polite">
     <span id="blocklist-sync-dot" class="guardian-status-dot is-unknown"></span>
     <i class="fas fa-sync-alt d-none" id="sync-badge-icon"></i>
-    <span id="blocklist-sync-text">Checking sync</span>
+    <span id="blocklist-sync-text">{{ t('pages.admin_user_edit.checking_sync') }}</span>
 </span>
 {% endblock %}
 
 {% block top_nav_brand_status %}
 <span id="blocklist-sync-dot-mobile" class="guardian-status-dot is-unknown d-lg-none" role="status"
-    aria-label="Checking sync" title="Checking sync"></span>
+    aria-label="{{ t('pages.admin_user_edit.checking_sync') }}" title="{{ t('pages.admin_user_edit.checking_sync') }}"></span>
 {% endblock %}
 
 {% block content %}
 <div class="guardian-page-header">
     <div class="guardian-page-header__intro">
-        <h1 class="guardian-page-title mb-1">{{ user.username }} &mdash; Profile Settings</h1>
-        <p class="guardian-page-lead mb-0">Fine-tune browsing shields, routine locks, and family dialogue for this child.</p>
+        <h1 class="guardian-page-title mb-1">{{ t('pages.admin_user_edit.heading', username=user.username) }}</h1>
+        <p class="guardian-page-lead mb-0">{{ t('pages.admin_user_edit.lead') }}</p>
     </div>
     <div class="guardian-page-header__actions">
         <a href="{{ url_for('ui_dashboard.admin_users') }}" class="btn btn-outline-secondary d-inline-flex align-items-center gap-1">
-            <i class="fas fa-arrow-left"></i> <span>Back to Children</span>
+            <i class="fas fa-arrow-left"></i> <span>{{ t('pages.admin_user_edit.back_to_children') }}</span>
         </a>
     </div>
 </div>
@@ -40,14 +40,14 @@
                     {{ user.username[:2]|upper }}
                 </div>
                 <div class="flex-grow-1">
-                    <h4 class="fw-bold mb-1">Child Profile: {{ user.username }}</h4>
+                    <h4 class="fw-bold mb-1">{{ t('pages.admin_user_edit.child_profile', username=user.username) }}</h4>
                     <span class="text-secondary small fw-bold">
-                        <i class="fas fa-link me-1"></i>Linked account mappings: <strong>{{ user.device_mappings|length }}</strong>
+                        <i class="fas fa-link me-1"></i>{{ t('pages.admin_user_edit.linked_mappings', count=user.device_mappings|length) }}
                     </span>
                 </div>
                 <div>
                     <a href="{{ url_for('ui_schedule.weekly_schedule_user', user_id=user.id) }}" class="btn btn-outline-primary fw-bold">
-                        <i class="fas fa-clock me-1"></i> Adjust Limits &amp; Timeline
+                        <i class="fas fa-clock me-1"></i> {{ t('pages.admin_user_edit.adjust_limits') }}
                     </a>
                 </div>
             </div>
@@ -58,9 +58,9 @@
     <div class="col-12">
         <div class="card border shadow-sm guardian-preset-card">
             <div class="card-header py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
-                <h5 class="mb-0 fw-bold"><i class="fas fa-seedling me-2"></i>Safety Baseline</h5>
+                <h5 class="mb-0 fw-bold"><i class="fas fa-seedling me-2"></i>{{ t('pages.admin_user_edit.safety_baseline') }}</h5>
                 <button type="button" class="btn btn-light btn-sm fw-bold" data-bs-toggle="modal" data-bs-target="#policyPresetModal">
-                    <i class="fas fa-sliders-h me-1"></i> Recalibrate Baseline
+                    <i class="fas fa-sliders-h me-1"></i> {{ t('pages.admin_user_edit.recalibrate_baseline') }}
                 </button>
             </div>
             <div class="card-body p-4">
@@ -70,9 +70,9 @@
                     <p class="mb-1 fw-bold" style="color: #1E293B;">
                         {{ age_meta.profile_title or age_meta.label }} · {{ mat_meta.label }}
                     </p>
-                    <p class="text-secondary small mb-0">A supportive baseline is active. You can still fine-tune any routine lock or browsing shield below.</p>
+                    <p class="text-secondary small mb-0">{{ t('pages.admin_user_edit.baseline_active') }}</p>
                 {% else %}
-                    <p class="mb-0 text-secondary">No baseline applied yet — <span class="fw-semibold" style="color: #1E293B;">Custom configuration</span>. Use <strong>Recalibrate Baseline</strong> to load an age-appropriate starting point.</p>
+                    <p class="mb-0 text-secondary">{{ t('pages.admin_user_edit.no_baseline') }}</p>
                 {% endif %}
             </div>
         </div>
@@ -82,29 +82,29 @@
         <!-- Internet Blocklists Section -->
         <div class="card border shadow-sm mb-4">
             <div class="card-header guardian-card-header py-3">
-                <h5 class="mb-0 fw-bold"><i class="fas fa-globe me-2 guardian-section-icon"></i>Browsing Shields</h5>
+                <h5 class="mb-0 fw-bold"><i class="fas fa-globe me-2 guardian-section-icon"></i>{{ t('pages.admin_user_edit.browsing_shields') }}</h5>
             </div>
             <div class="card-body p-4">
-                <p class="text-secondary small fw-medium mb-4">Curated and custom browsing shields applied across this child's linked accounts.</p>
+                <p class="text-secondary small fw-medium mb-4">{{ t('pages.admin_user_edit.browsing_shields_lead') }}</p>
                 
                 <!-- Quick stats -->
                 <div class="row g-2 mb-4">
                     <div class="col-4">
                         <div class="bg-body-secondary p-3 rounded text-center border">
                             <h3 class="fw-bold mb-0 lh-1">{{ blocklist_sync_status.assigned_source_count }}</h3>
-                            <span class="text-secondary small fw-bold text-uppercase d-block mt-2" style="font-size: 0.65rem; letter-spacing: 0.05em;">Shields assigned</span>
+                            <span class="text-secondary small fw-bold text-uppercase d-block mt-2" style="font-size: 0.65rem; letter-spacing: 0.05em;">{{ t('pages.admin_user_edit.stat_shields_assigned') }}</span>
                         </div>
                     </div>
                     <div class="col-4">
                         <div class="bg-body-secondary p-3 rounded text-center border">
                             <h3 class="fw-bold mb-0 lh-1">{{ blocklist_sync_status.effective_domain_count }}</h3>
-                            <span class="text-secondary small fw-bold text-uppercase d-block mt-2" style="font-size: 0.65rem; letter-spacing: 0.05em;">Sites shielded</span>
+                            <span class="text-secondary small fw-bold text-uppercase d-block mt-2" style="font-size: 0.65rem; letter-spacing: 0.05em;">{{ t('pages.admin_user_edit.stat_sites_shielded') }}</span>
                         </div>
                     </div>
                     <div class="col-4">
                         <div class="bg-body-secondary p-3 rounded text-center border">
                             <h3 class="fw-bold mb-0 lh-1"><span id="blocklist-synced-count">{{ blocklist_sync_status.synced_mapping_count }}</span>/{{ blocklist_sync_status.mapping_count }}</h3>
-                            <span class="text-secondary small fw-bold text-uppercase d-block mt-2" style="font-size: 0.65rem; letter-spacing: 0.05em;">Accounts in sync</span>
+                            <span class="text-secondary small fw-bold text-uppercase d-block mt-2" style="font-size: 0.65rem; letter-spacing: 0.05em;">{{ t('pages.admin_user_edit.stat_accounts_sync') }}</span>
                         </div>
                     </div>
                 </div>
@@ -113,7 +113,7 @@
                 <form action="{{ url_for('subscribe_user_marketplace', user_id=user.id) }}" method="POST" class="mb-4">
                     {{ csrf_field() }}
                     <h6 class="fw-bold mb-3 d-flex align-items-center gap-2 text-dark">
-                        <i class="fas fa-store me-2" style="color: var(--guardian-sage);"></i> Curated Browsing Shields
+                        <i class="fas fa-store me-2" style="color: var(--guardian-sage);"></i> {{ t('pages.admin_user_edit.curated_shields') }}
                     </h6>
                     <div class="row g-3 mb-3">
                         {% for preset in marketplace_presets %}
@@ -127,7 +127,7 @@
                                         </label>
                                     </div>
                                     <div class="d-flex flex-wrap gap-1 mt-1 ms-4">
-                                        <span class="badge bg-primary-subtle text-primary" style="font-size: 0.65rem;">Ages: {{ preset.recommended_ages|join(', ') }}</span>
+                                        <span class="badge bg-primary-subtle text-primary" style="font-size: 0.65rem;">{{ t('pages.admin_user_edit.ages_badge', ages=preset.recommended_ages|join(', ')) }}</span>
                                         <span class="badge bg-secondary-subtle text-secondary-emphasis" style="font-size: 0.65rem;">{{ preset.approx_domain_count }}</span>
                                     </div>
                                 </div>
@@ -136,7 +136,7 @@
                     </div>
                     
                     <button type="submit" class="btn btn-sm btn-success fw-bold px-4">
-                        <i class="fas fa-check-circle me-1"></i> Save Curated Shields
+                        <i class="fas fa-check-circle me-1"></i> {{ t('pages.admin_user_edit.save_curated_shields') }}
                     </button>
                 </form>
 
@@ -144,7 +144,7 @@
                 <form action="{{ url_for('update_user_blocklists', user_id=user.id) }}" method="POST" class="border-top pt-4 border-secondary-subtle">
                     {{ csrf_field() }}
                     <h6 class="fw-bold mb-3 d-flex align-items-center gap-2 text-dark">
-                        <i class="fas fa-sliders-h me-2" style="color: var(--guardian-sage);"></i> Custom Shield Lists
+                        <i class="fas fa-sliders-h me-2" style="color: var(--guardian-sage);"></i> {{ t('pages.admin_user_edit.custom_shield_lists') }}
                     </h6>
                     <div class="row g-3 mb-3">
                         {% for source in blocklist_sources %}
@@ -155,7 +155,7 @@
                                         <label class="form-check-label ms-2 cursor-pointer" for="source-{{ source.id }}">
                                             <strong class="text-body d-block lh-sm mb-1" style="font-size: 0.9rem;">{{ source.name }}</strong>
                                             <span class="text-secondary small fw-bold d-block" style="font-size: 0.72rem;">
-                                                {{ source.domain_count }} domains &bull; {{ source.source_type|replace('_', ' ')|title }}
+                                                {{ t('pages.admin_user_edit.domains_bullet', count=source.domain_count, type=source.source_type|replace('_', ' ')|title) }}
                                             </span>
                                         </label>
                                     </div>
@@ -166,7 +166,7 @@
                     
                     {% if not blocklist_sources %}
                         <div class="alert alert-info py-2 small mb-3">
-                            <i class="fas fa-info-circle me-1"></i> No custom shields yet. Create them under <a href="{{ url_for('ui_dashboard.admin_restrictions') }}" class="alert-link">Browsing Shields</a> before assigning.
+                            <i class="fas fa-info-circle me-1"></i> {{ t('pages.admin_user_edit.no_custom_shields') }}
                         </div>
                     {% endif %}
 
@@ -208,10 +208,10 @@
         <!-- Linux Device Restrictions -->
         <div class="card border shadow-sm mb-4">
             <div class="card-header guardian-card-header py-3">
-                <h5 class="mb-0 fw-bold"><i class="fas fa-desktop me-2 guardian-section-icon"></i>Device Routine Locks</h5>
+                <h5 class="mb-0 fw-bold"><i class="fas fa-desktop me-2 guardian-section-icon"></i>{{ t('pages.admin_user_edit.device_routine_locks') }}</h5>
             </div>
             <div class="card-body p-4">
-                <p class="text-secondary small fw-medium mb-3">System privileges via polkit rules and terminal access control for linked Linux accounts.</p>
+                <p class="text-secondary small fw-medium mb-3">{{ t('pages.admin_user_edit.device_routine_lead') }}</p>
                 {% if linux_device_policy_by_mapping %}
                     <div class="d-flex flex-column gap-3">
                         {% for mapping in user.device_mappings %}
@@ -221,16 +221,16 @@
                                 <div class="d-flex justify-content-between align-items-start gap-2 mb-2 flex-wrap">
                                     <strong class="text-body">{{ mapping.linux_username }}@{{ linux_policy.device_label or mapping.system_id }}</strong>
                                     <span class="badge linux-device-policy-sync-badge {% if linux_policy.is_synced %}bg-success{% else %}bg-warning text-dark{% endif %}" style="font-size: 0.65rem;">
-                                        {% if linux_policy.is_synced %}Synced{% else %}Sync pending{% endif %}
+                                        {% if linux_policy.is_synced %}{{ t('pages.admin_user_edit.synced') }}{% else %}{{ t('pages.admin_user_edit.sync_pending') }}{% endif %}
                                     </span>
                                 </div>
                                 <div class="alert alert-info py-2 small mb-3">
-                                    <i class="fas fa-info-circle me-1"></i>Requires the Guardian agent running as root. Polkit rules apply on common systemd distros; terminal blocking covers common shells and terminal emulators.
+                                    <i class="fas fa-info-circle me-1"></i>{{ t('pages.admin_user_edit.polkit_info') }}
                                 </div>
-                                <h6 class="fw-bold small text-muted text-uppercase mb-2" style="font-size: 0.7rem; letter-spacing: 0.05em;">System privileges (polkit)</h6>
+                                <h6 class="fw-bold small text-muted text-uppercase mb-2" style="font-size: 0.7rem; letter-spacing: 0.05em;">{{ t('pages.admin_user_edit.system_privileges') }}</h6>
                                 <div class="form-check form-switch mb-2">
                                     <input class="form-check-input linux-install-software" type="checkbox" data-mapping-id="{{ mapping.id }}" id="linux-install-software-{{ mapping.id }}" {% if linux_policy.install_software_disabled %}checked{% endif %}>
-                                    <label class="form-check-label small" for="linux-install-software-{{ mapping.id }}">Block software installation</label>
+                                    <label class="form-check-label small" for="linux-install-software-{{ mapping.id }}">{{ t('pages.admin_user_edit.block_install') }}</label>
                                 </div>
                                 <div class="form-check form-switch mb-2">
                                     <input class="form-check-input linux-uninstall-software" type="checkbox" data-mapping-id="{{ mapping.id }}" id="linux-uninstall-software-{{ mapping.id }}" {% if linux_policy.uninstall_software_disabled %}checked{% endif %}>
@@ -279,9 +279,9 @@
                             {% endif %}
                         {% endfor %}
                     </div>
-                    <button type="button" class="btn btn-primary btn-sm fw-bold mt-3" onclick="saveLinuxDevicePolicies()">Save Linux Device Restrictions</button>
+                    <button type="button" class="btn btn-primary btn-sm fw-bold mt-3" onclick="saveLinuxDevicePolicies()">{{ t('pages.admin_user_edit.save_linux_restrictions') }}</button>
                 {% else %}
-                    <p class="text-secondary small mb-0">Link a Linux device mapping to configure device restrictions.</p>
+                    <p class="text-secondary small mb-0">{{ t('pages.admin_user_edit.link_linux_for_restrictions') }}</p>
                 {% endif %}
             </div>
         </div>
@@ -289,10 +289,10 @@
         <!-- Chrome Browser Restrictions -->
         <div class="card border shadow-sm mb-4">
             <div class="card-header guardian-card-header py-3">
-                <h5 class="mb-0 fw-bold"><i class="fab fa-chrome me-2 guardian-section-icon"></i>Browser Boundaries</h5>
+                <h5 class="mb-0 fw-bold"><i class="fab fa-chrome me-2 guardian-section-icon"></i>{{ t('pages.admin_user_edit.browser_boundaries') }}</h5>
             </div>
             <div class="card-body p-4">
-                <p class="text-secondary small fw-medium mb-3">Enforce browser restrictions across Google Chrome, Chromium, and Brave browsers.</p>
+                <p class="text-secondary small fw-medium mb-3">{{ t('pages.admin_user_edit.browser_boundaries_lead') }}</p>
                 {% if linux_device_policy_by_mapping %}
                     <div class="d-flex flex-column gap-3">
                         {% for mapping in user.device_mappings %}
@@ -335,9 +335,9 @@
                             {% endif %}
                         {% endfor %}
                     </div>
-                    <button type="button" class="btn btn-primary btn-sm fw-bold mt-3" onclick="saveLinuxDevicePolicies()">Save Browser Restrictions</button>
+                    <button type="button" class="btn btn-primary btn-sm fw-bold mt-3" onclick="saveLinuxDevicePolicies()">{{ t('pages.admin_user_edit.save_browser_restrictions') }}</button>
                 {% else %}
-                    <p class="text-secondary small mb-0">Link a Linux device mapping to configure browser restrictions.</p>
+                    <p class="text-secondary small mb-0">{{ t('pages.admin_user_edit.link_linux_for_browser') }}</p>
                 {% endif %}
             </div>
         </div>
@@ -349,10 +349,10 @@
         <!-- Access Approval Policies -->
         <div class="card border shadow-sm mb-4">
             <div class="card-header guardian-card-header py-3">
-                <h5 class="mb-0 fw-bold"><i class="fas fa-clipboard-check me-2 guardian-section-icon"></i>Family Dialogue Settings</h5>
+                <h5 class="mb-0 fw-bold"><i class="fas fa-clipboard-check me-2 guardian-section-icon"></i>{{ t('pages.admin_user_edit.family_dialogue') }}</h5>
             </div>
             <div class="card-body p-4">
-                <p class="text-secondary small fw-medium mb-3">Configure per-device approval modes for app launches and blocked websites.</p>
+                <p class="text-secondary small fw-medium mb-3">{{ t('pages.admin_user_edit.family_dialogue_lead') }}</p>
                 {% if user.device_mappings %}
                     <div class="d-flex flex-column gap-3">
                         {% for mapping in user.device_mappings %}
@@ -385,9 +385,9 @@
                             </div>
                         {% endfor %}
                     </div>
-                    <button type="button" class="btn btn-primary btn-sm fw-bold mt-3" onclick="saveApprovalSettings()">Save Approval Settings</button>
+                    <button type="button" class="btn btn-primary btn-sm fw-bold mt-3" onclick="saveApprovalSettings()">{{ t('pages.admin_user_edit.save_approval_settings') }}</button>
                 {% else %}
-                    <p class="text-secondary small mb-0">Link a device mapping before configuring approval policies.</p>
+                    <p class="text-secondary small mb-0">{{ t('pages.admin_user_edit.link_device_for_approval') }}</p>
                 {% endif %}
             </div>
         </div>
@@ -396,10 +396,10 @@
         <!-- Guardian Space Overlay Settings -->
         <div class="card border shadow-sm mb-4" id="guardian-overlay-card">
             <div class="card-header guardian-card-header py-3">
-                <h5 class="mb-0 fw-bold"><i class="fas fa-shield-alt me-2 guardian-section-icon"></i>Guardian Space Overlay</h5>
+                <h5 class="mb-0 fw-bold"><i class="fas fa-shield-alt me-2 guardian-section-icon"></i>{{ t('pages.admin_user_edit.guardian_overlay') }}</h5>
             </div>
             <div class="card-body p-4">
-                <p class="text-secondary small fw-medium mb-3">Customise the full-screen overlay shown to this child when time is up or a site is blocked.</p>
+                <p class="text-secondary small fw-medium mb-3">{{ t('pages.admin_user_edit.overlay_lead') }}</p>
                 <div class="mb-3">
                     <label class="form-label fw-bold small text-muted text-uppercase mb-1" style="font-size: 0.7rem;">Age Tier</label>
                     <select class="form-select form-select-sm" id="overlay-age-tier">
@@ -415,7 +415,7 @@
                     <textarea class="form-control form-control-sm" id="overlay-parent-note" rows="2" maxlength="300" placeholder='e.g. "Hey! Bedtime rules are on. Sleep well — limits refresh in the morning!"'>{{ user.overlay_parent_note or '' }}</textarea>
                     <div class="form-text small text-secondary mt-1">Optional message shown on the overlay card. Leave blank for the built-in default.</div>
                 </div>
-                <button type="button" class="btn btn-success btn-sm fw-bold" onclick="saveOverlaySettings({{ user.id }})">Save Overlay Settings</button>
+                <button type="button" class="btn btn-success btn-sm fw-bold" onclick="saveOverlaySettings({{ user.id }})">{{ t('pages.admin_user_edit.save_overlay') }}</button>
                 <span class="ms-2 small text-secondary" id="overlay-save-status"></span>
             </div>
         </div>
@@ -423,10 +423,10 @@
         <!-- Application Control & Locks -->
         <div class="card border shadow-sm mb-4">
             <div class="card-header guardian-card-header py-3">
-                <h5 class="mb-0 fw-bold"><i class="fas fa-lock me-2 guardian-section-icon"></i>App Routine Locks</h5>
+                <h5 class="mb-0 fw-bold"><i class="fas fa-lock me-2 guardian-section-icon"></i>{{ t('pages.admin_user_edit.app_routine_locks') }}</h5>
             </div>
             <div class="card-body p-4">
-                <p class="text-secondary small fw-medium mb-3">Assign platform-specific application lock policies to this child.</p>
+                <p class="text-secondary small fw-medium mb-3">{{ t('pages.admin_user_edit.app_routine_lead') }}</p>
                 <form action="{{ url_for('ui_apparmor.update_user_app_policies', user_id=user.id) }}" method="POST">
 
                 {{ csrf_field() }}                    {% if linux_app_policies %}
@@ -476,8 +476,8 @@
                     {% endif %}
 
                     <div class="d-flex gap-2">
-                        <button type="submit" class="btn btn-primary btn-sm fw-bold">Save App Policies</button>
-                        <a href="{{ url_for('ui_apparmor.admin_app_policies') }}" class="btn btn-outline-secondary btn-sm fw-bold">Manage Policies</a>
+                        <button type="submit" class="btn btn-primary btn-sm fw-bold">{{ t('pages.admin_user_edit.save_app_policies') }}</button>
+                        <a href="{{ url_for('ui_apparmor.admin_app_policies') }}" class="btn btn-outline-secondary btn-sm fw-bold">{{ t('pages.admin_user_edit.manage_policies') }}</a>
                     </div>
                 </form>
             </div>
@@ -486,7 +486,7 @@
         <!-- Installed Applications Report -->
         <div class="card border shadow-sm">
             <div class="card-header guardian-card-header py-3">
-                <h5 class="mb-0 fw-bold"><i class="fas fa-th me-2 guardian-section-icon"></i>Installed Apps</h5>
+                <h5 class="mb-0 fw-bold"><i class="fas fa-th me-2 guardian-section-icon"></i>{{ t('pages.admin_user_edit.installed_apps') }}</h5>
             </div>
             <div class="card-body p-3" style="max-height: 400px; overflow-y: auto;">
                 {% if installed_apps %}
@@ -538,8 +538,8 @@
                 {{ csrf_field() }}
                 <div class="modal-header">
                     <div>
-                        <h5 class="modal-title fw-bold mb-1" id="policyPresetModalLabel">Recalibrate Safety Baseline</h5>
-                        <p class="mb-0 small opacity-75">Updates browsing shields, Routine Locks, and Family Dialogue Settings for {{ user.username }}.</p>
+                        <h5 class="modal-title fw-bold mb-1" id="policyPresetModalLabel">{{ t('pages.admin_user_edit.modal_recalibrate') }}</h5>
+                        <p class="mb-0 small opacity-75">{{ t('pages.admin_user_edit.modal_recalibrate_lead', username=user.username) }}</p>
                     </div>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
@@ -594,8 +594,8 @@
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn guardian-btn-sage fw-bold">Apply Baseline</button>
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">{{ t('pages.admin_user_edit.cancel') }}</button>
+                    <button type="submit" class="btn guardian-btn-sage fw-bold">{{ t('pages.admin_user_edit.apply_baseline') }}</button>
                 </div>
             </form>
         </div>

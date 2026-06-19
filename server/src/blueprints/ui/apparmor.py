@@ -1,5 +1,6 @@
 import logging
-from flask import Blueprint, session, redirect, url_for, flash, render_template, request
+from flask import Blueprint, session, redirect, url_for, render_template, request
+from src.i18n.catalog import flash_t
 from src.database import (
     db,
     ManagedUserDeviceMap,
@@ -71,38 +72,38 @@ def admin_app_policies():
 @ui_apparmor_bp.route('/admin/app-policies/create', methods=['POST'])
 def create_app_policy():
     if not session.get('logged_in'):
-        flash('Please login first', 'warning')
+        flash_t('flash.auth.login_required', 'warning')
         return redirect(url_for('ui_auth.login'))
 
     name = (request.form.get('name') or '').strip()
     platform_raw = (request.form.get('platform') or AppPolicy.PLATFORM_LINUX).strip()
     if not name:
-        flash('Policy name is required', 'danger')
+        flash_t('flash.apparmor.policy_name_required', 'danger')
         return redirect(url_for('ui_apparmor.admin_app_policies'))
 
     try:
         platform = _normalize_policy_platform(platform_raw)
     except ValueError as exc:
-        flash(str(exc), 'danger')
+        flash_t('flash.common.generic_error', 'danger', error=str(exc))
         return redirect(url_for('ui_apparmor.admin_app_policies'))
 
     existing = AppPolicy.query.filter_by(name=name).first()
     if existing:
-        flash(f'Policy "{name}" already exists', 'warning')
+        flash_t('flash.apparmor.policy_exists', 'warning', name=name)
         return redirect(url_for('ui_apparmor.admin_app_policies'))
 
     policy = AppPolicy(name=name, platform=platform)
     db.session.add(policy)
     db.session.commit()
 
-    flash(f'App Policy "{name}" created successfully', 'success')
+    flash_t('flash.apparmor.policy_created', 'success', name=name)
     return redirect(url_for('ui_apparmor.admin_app_policies'))
 
 
 @ui_apparmor_bp.route('/admin/app-policies/<int:policy_id>/delete', methods=['POST'])
 def delete_app_policy(policy_id):
     if not session.get('logged_in'):
-        flash('Please login first', 'warning')
+        flash_t('flash.auth.login_required', 'warning')
         return redirect(url_for('ui_auth.login'))
 
     policy = AppPolicy.query.get_or_404(policy_id)
@@ -120,14 +121,14 @@ def delete_app_policy(policy_id):
         for mapping in user.device_mappings:
             _sync_mapping_app_policy_to_agent(mapping)
 
-    flash(f'App Policy "{policy_name}" deleted successfully', 'success')
+    flash_t('flash.apparmor.policy_deleted', 'success', policy_name=policy_name)
     return redirect(url_for('ui_apparmor.admin_app_policies'))
 
 
 @ui_apparmor_bp.route('/admin/app-policies/<int:policy_id>/rule/add', methods=['POST'])
 def add_app_policy_rule(policy_id):
     if not session.get('logged_in'):
-        flash('Please login first', 'warning')
+        flash_t('flash.auth.login_required', 'warning')
         return redirect(url_for('ui_auth.login'))
 
     policy = AppPolicy.query.get_or_404(policy_id)
@@ -157,7 +158,7 @@ def add_app_policy_rule(policy_id):
                 break
 
     if not app_name or not path:
-        flash('Application name and target are required', 'danger')
+        flash_t('flash.apparmor.app_name_required', 'danger')
         return redirect(url_for('ui_apparmor.admin_app_policies'))
 
     try:
@@ -168,7 +169,7 @@ def add_app_policy_rule(policy_id):
             path,
         )
     except ValueError as exc:
-        flash(str(exc), 'danger')
+        flash_t('flash.common.generic_error', 'danger', error=str(exc))
         return redirect(url_for('ui_apparmor.admin_app_policies'))
 
     # Duplicate or update rule check
@@ -193,14 +194,19 @@ def add_app_policy_rule(policy_id):
     # Sync changes to all assigned users
     sync_policy_to_all_assigned_users(policy)
 
-    flash(f'Added rule for "{app_name}" to policy "{policy.name}"', 'success')
+    flash_t(
+        'flash.apparmor.rule_added',
+        'success',
+        app_name=app_name,
+        policy_name=policy.name,
+    )
     return redirect(url_for('ui_apparmor.admin_app_policies'))
 
 
 @ui_apparmor_bp.route('/admin/app-policies/rule/<int:rule_id>/delete', methods=['POST'])
 def delete_app_policy_rule(rule_id):
     if not session.get('logged_in'):
-        flash('Please login first', 'warning')
+        flash_t('flash.auth.login_required', 'warning')
         return redirect(url_for('ui_auth.login'))
 
     rule = AppPolicyRule.query.get_or_404(rule_id)
@@ -213,14 +219,19 @@ def delete_app_policy_rule(rule_id):
     # Sync changes to all assigned users
     sync_policy_to_all_assigned_users(policy)
 
-    flash(f'Removed rule for "{app_name}" from policy "{policy.name}"', 'success')
+    flash_t(
+        'flash.apparmor.rule_removed',
+        'success',
+        app_name=app_name,
+        policy_name=policy.name,
+    )
     return redirect(url_for('ui_apparmor.admin_app_policies'))
 
 
 @ui_apparmor_bp.route('/managed-users/<int:user_id>/app-policies/update', methods=['POST'])
 def update_user_app_policies(user_id):
     if not session.get('logged_in'):
-        flash('Please login first', 'warning')
+        flash_t('flash.auth.login_required', 'warning')
         return redirect(url_for('ui_auth.login'))
 
     user = ManagedUser.query.get_or_404(user_id)
@@ -236,7 +247,7 @@ def update_user_app_policies(user_id):
     } if selected_ids else {}
 
     if selected_ids and len(valid_policies) != len(selected_ids):
-        flash('One or more selected app policies no longer exist', 'danger')
+        flash_t('flash.apparmor.policies_missing', 'danger')
         return redirect(url_for('ui_dashboard.edit_user_profile', user_id=user.id))
 
     current_ids = {assignment.policy_id for assignment in user.app_policy_assignments}
@@ -268,10 +279,10 @@ def update_user_app_policies(user_id):
             fail_count += 1
 
     if sync_count > 0 and fail_count == 0:
-        flash(f'Updated app policies for {user.username} and synced to online devices', 'success')
+        flash_t('flash.apparmor.policies_updated_synced', 'success', username=user.username)
     elif fail_count > 0:
-        flash(f'Updated app policies for {user.username}, but sync failed for some devices', 'warning')
+        flash_t('flash.apparmor.policies_updated_sync_partial', 'warning', username=user.username)
     else:
-        flash(f'Updated app policies for {user.username}. Will sync when devices reconnect.', 'success')
+        flash_t('flash.apparmor.policies_updated_offline', 'success', username=user.username)
 
     return redirect(url_for('ui_dashboard.edit_user_profile', user_id=user.id))

@@ -19,3 +19,4 @@ pynintendoparental>=2.4.0
 pyfamilysafety==2.0.0b4
 python-dateutil>=2.9.0
 sentry-sdk[flask]>=2.5.0
+PyYAML>=6.0.1

@@ -1,13 +1,13 @@
 {% extends "_spa_fragment.html" %}
 
 {% from '_macros.html' import csrf_field %}
-{% block title %}Internet Restrictions - Guardian{% endblock %}
+{% block title %}{{ t('pages.restrictions.title') }}{% endblock %}
 
 {% block content %}
 <div class="guardian-page-header">
     <div class="guardian-page-header__intro">
-        <h1 class="guardian-page-title mb-1">Browsing Shields</h1>
-        <p class="guardian-page-lead mb-0">Manage curated and custom shields that keep your family's browsing calm and age-appropriate.</p>
+        <h1 class="guardian-page-title mb-1">{{ t('pages.restrictions.heading') }}</h1>
+        <p class="guardian-page-lead mb-0">{{ t('pages.restrictions.lead') }}</p>
     </div>
 
     <div class="guardian-page-header__actions">
@@ -15,7 +15,7 @@
             <span class="guardian-search-field__icon">
                 <i class="fas fa-search"></i>
             </span>
-            <input type="text" id="restrictions-search" class="form-control rounded-pill py-2" placeholder="Search shields...">
+            <input type="text" id="restrictions-search" class="form-control rounded-pill py-2" placeholder="{{ t('pages.restrictions.search_placeholder') }}">
         </div>
     </div>
 </div>
@@ -23,12 +23,12 @@
 <ul class="nav nav-tabs guardian-tab-nav mb-4" id="restrictionsTab" role="tablist">
     <li class="nav-item" role="presentation">
         <button class="nav-link active fw-bold px-3 py-2" id="custom-tab" data-bs-toggle="tab" data-bs-target="#custom-pane" type="button" role="tab" aria-controls="custom-pane" aria-selected="true" style="font-size: 0.95rem;">
-            <i class="fas fa-sliders-h me-1.5"></i> Custom Shields
+            <i class="fas fa-sliders-h me-1.5"></i> {{ t('pages.restrictions.tab_custom') }}
         </button>
     </li>
     <li class="nav-item" role="presentation">
         <button class="nav-link fw-bold px-3 py-2" id="marketplace-tab" data-bs-toggle="tab" data-bs-target="#marketplace-pane" type="button" role="tab" aria-controls="marketplace-pane" aria-selected="false" style="font-size: 0.95rem;">
-            <i class="fas fa-store me-1.5"></i> Curated Shield Library
+            <i class="fas fa-store me-1.5"></i> {{ t('pages.restrictions.tab_marketplace') }}
         </button>
     </li>
 </ul>
@@ -44,40 +44,40 @@
                         <div class="bg-success-subtle text-success p-2 rounded d-flex align-items-center justify-content-center" style="width: 38px; height: 38px;">
                             <i class="fas fa-folder-plus fs-5"></i>
                         </div>
-                        <h5 class="mb-0 fw-bold">Create a custom shield</h5>
+                        <h5 class="mb-0 fw-bold">{{ t('pages.restrictions.create_custom') }}</h5>
                     </div>
                     <div class="card-body">
                         <form action="{{ url_for('create_blocklist_source') }}" method="POST" class="m-0">
                             {{ csrf_field() }}
                             <div class="row g-3 mb-3">
                                 <div class="col-12 col-md-6">
-                                    <label for="blocklist_name" class="form-label fw-bold small text-muted text-uppercase mb-1" style="font-size: 0.75rem; letter-spacing: 0.05em;">Shield name</label>
-                                    <input type="text" id="blocklist_name" name="name" class="form-control" placeholder="e.g. Evening social pause" required>
+                                    <label for="blocklist_name" class="form-label fw-bold small text-muted text-uppercase mb-1" style="font-size: 0.75rem; letter-spacing: 0.05em;">{{ t('pages.restrictions.shield_name') }}</label>
+                                    <input type="text" id="blocklist_name" name="name" class="form-control" placeholder="{{ t('pages.restrictions.shield_name_placeholder') }}" required>
                                 </div>
                                 <div class="col-12 col-md-6">
-                                    <label for="blocklist_source_type" class="form-label fw-bold small text-muted text-uppercase mb-1" style="font-size: 0.75rem; letter-spacing: 0.05em;">How sites are added</label>
+                                    <label for="blocklist_source_type" class="form-label fw-bold small text-muted text-uppercase mb-1" style="font-size: 0.75rem; letter-spacing: 0.05em;">{{ t('pages.restrictions.how_sites_added') }}</label>
                                     <select id="blocklist_source_type" name="source_type" class="form-select">
-                                        <option value="manual">Manual Curated List</option>
-                                        <option value="external_url">Synchronized URL List</option>
+                                        <option value="manual">{{ t('pages.restrictions.source_manual') }}</option>
+                                        <option value="external_url">{{ t('pages.restrictions.source_external') }}</option>
                                     </select>
                                 </div>
                             </div>
 
                             <!-- Segmented Content Panels -->
                             <div id="panel-external-url" class="mb-3" style="display: none;">
-                                <label for="blocklist_source_url" class="form-label fw-bold small text-muted text-uppercase mb-1" style="font-size: 0.75rem; letter-spacing: 0.05em;">Remote list URL</label>
+                                <label for="blocklist_source_url" class="form-label fw-bold small text-muted text-uppercase mb-1" style="font-size: 0.75rem; letter-spacing: 0.05em;">{{ t('pages.restrictions.remote_list_url') }}</label>
                                 <input type="url" id="blocklist_source_url" name="source_url" class="form-control" placeholder="https://example.com/family-blocklist.txt">
-                                <div class="form-text text-secondary small">Plain-text domain list (Pi-hole or AdGuard format).</div>
+                                <div class="form-text text-secondary small">{{ t('pages.restrictions.remote_list_hint') }}</div>
                             </div>
 
                             <div id="panel-manual-domains" class="mb-3" style="display: block;">
-                                <label for="manual_domains" class="form-label fw-bold small text-muted text-uppercase mb-1" style="font-size: 0.75rem; letter-spacing: 0.05em;">Initial Domain List (One host record per line)</label>
+                                <label for="manual_domains" class="form-label fw-bold small text-muted text-uppercase mb-1" style="font-size: 0.75rem; letter-spacing: 0.05em;">{{ t('pages.restrictions.initial_domains') }}</label>
                                 <textarea id="manual_domains" name="manual_domains" class="form-control text-monospace" rows="3" placeholder="youtube.com&#10;tiktok.com&#10;facebook.com" style="font-family: monospace;"></textarea>
                             </div>
 
                             <div class="text-end">
                                 <button type="submit" class="btn btn-primary btn-cta px-4 fw-bold">
-                                    <i class="fas fa-plus-circle me-1"></i> Create shield
+                                    <i class="fas fa-plus-circle me-1"></i> {{ t('pages.restrictions.create_shield') }}
                                 </button>
                             </div>
                         </form>
@@ -88,8 +88,8 @@
             <!-- Active Blocklist Catalog Loop -->
             <div class="col-12">
                 <h4 class="fw-bold mb-3 d-flex align-items-center gap-2">
-                    <span>Your shields</span>
-                    <span class="badge bg-secondary" id="restrictions-count-badge" style="font-size: 0.8rem; padding: 0.35rem 0.6rem;">{{ blocklist_sources|length }} active</span>
+                    <span>{{ t('pages.restrictions.your_shields') }}</span>
+                    <span class="badge bg-secondary" id="restrictions-count-badge" style="font-size: 0.8rem; padding: 0.35rem 0.6rem;">{{ t('pages.restrictions.active_count', count=blocklist_sources|length) }}</span>
                 </h4>
 
                 <div id="restrictions-cards-container">
@@ -102,18 +102,18 @@
                                         <h5 class="mb-0 fw-bold">{{ source.name }}</h5>
                                         <span class="badge bg-secondary fw-bold text-uppercase" style="font-size: 0.7rem;">{{ source.source_type|replace('_', ' ') }}</span>
                                         {% if source.is_enabled %}
-                                            <span class="badge bg-success" style="font-size: 0.7rem;">Active</span>
+                                            <span class="badge bg-success" style="font-size: 0.7rem;">{{ t('pages.restrictions.active') }}</span>
                                         {% else %}
-                                            <span class="badge bg-secondary" style="font-size: 0.7rem;">Inactive</span>
+                                            <span class="badge bg-secondary" style="font-size: 0.7rem;">{{ t('pages.restrictions.inactive') }}</span>
                                         {% endif %}
                                     </div>
                                     <div class="text-secondary small fw-medium mt-1">
-                                        <span class="text-primary fw-bold">{{ source.domain_count }} blocked domain(s)</span> &bull; Assigned to {{ source.assigned_user_count }} child profile(s)
+                                        <span class="text-primary fw-bold">{{ t('pages.restrictions.blocked_domains', count=source.domain_count) }}</span> &bull; {{ t('pages.restrictions.assigned_profiles', count=source.assigned_user_count) }}
                                         {% if source.source_url %}
-                                            <br><span class="text-muted">Source URL:</span> <code class="small bg-body-secondary px-1 py-0.5 rounded">{{ source.source_url }}</code>
+                                            <br><span class="text-muted">{{ t('pages.restrictions.source_url_label') }}</span> <code class="small bg-body-secondary px-1 py-0.5 rounded">{{ source.source_url }}</code>
                                         {% endif %}
                                         {% if source.last_sync_at %}
-                                            <br><span class="text-muted">Last Sync:</span> <strong>{{ source.last_sync_at }}</strong> (Status: <code>{{ source.last_sync_status }}</code>)
+                                            <br><span class="text-muted">{{ t('pages.restrictions.last_sync_label') }}</span> <strong>{{ source.last_sync_at }}</strong> ({{ t('pages.restrictions.status_label') }} <code>{{ source.last_sync_status }}</code>)
                                         {% endif %}
                                     </div>
                                 </div>
@@ -122,18 +122,18 @@
                                         {{ csrf_field() }}
                                         <div class="form-check form-switch m-0 d-flex align-items-center gap-1">
                                             <input class="form-check-input m-0 cursor-pointer" type="checkbox" role="switch" id="switch-{{ source.id }}" name="is_enabled" onchange="this.form.submit()" {% if source.is_enabled %}checked{% endif %} style="width: 2.2em; height: 1.1em;">
-                                            <label class="form-check-label small fw-bold cursor-pointer" for="switch-{{ source.id }}">Enforce</label>
+                                            <label class="form-check-label small fw-bold cursor-pointer" for="switch-{{ source.id }}">{{ t('pages.restrictions.enforce') }}</label>
                                         </div>
                                     </form>
                                     {% if source.source_type == 'external_url' %}
                                     <form action="{{ url_for('refresh_blocklist_source', source_id=source.id) }}" method="POST" class="m-0">
                                         {{ csrf_field() }}
-                                        <button type="submit" class="btn btn-sm btn-outline-secondary fw-bold"><i class="fas fa-sync-alt me-1"></i> Force sync</button>
+                                        <button type="submit" class="btn btn-sm btn-outline-secondary fw-bold"><i class="fas fa-sync-alt me-1"></i> {{ t('pages.restrictions.force_sync') }}</button>
                                     </form>
                                     {% endif %}
-                                    <form action="{{ url_for('delete_blocklist_source', source_id=source.id) }}" method="POST" onsubmit="return confirm('Remove shield {{ source.name }}?');" class="m-0">
+                                    <form action="{{ url_for('delete_blocklist_source', source_id=source.id) }}" method="POST" onsubmit="return confirm({{ t('pages.restrictions.delete_confirm', name=source.name)|tojson }});" class="m-0">
                                         {{ csrf_field() }}
-                                        <button type="submit" class="btn btn-sm btn-outline-danger fw-bold"><i class="fas fa-trash me-1"></i> Delete</button>
+                                        <button type="submit" class="btn btn-sm btn-outline-danger fw-bold"><i class="fas fa-trash me-1"></i> {{ t('pages.restrictions.delete') }}</button>
                                     </form>
                                 </div>
                             </div>
@@ -144,11 +144,11 @@
                                 <form action="{{ url_for('add_blocklist_domain', source_id=source.id) }}" method="POST" class="row g-2 align-items-end mb-3">
                                     {{ csrf_field() }}
                                     <div class="col-12 col-md-9">
-                                        <label class="form-label fw-bold small text-muted text-uppercase mb-1" style="font-size: 0.7rem; letter-spacing: 0.05em;">Add New Blocked Domain</label>
+                                        <label class="form-label fw-bold small text-muted text-uppercase mb-1" style="font-size: 0.7rem; letter-spacing: 0.05em;">{{ t('pages.restrictions.add_domain') }}</label>
                                         <input type="text" name="domain" class="form-control form-control-sm" placeholder="e.g. reddit.com, instagram.com" required>
                                     </div>
                                     <div class="col-12 col-md-3">
-                                        <button type="submit" class="btn btn-sm btn-secondary fw-bold w-100" style="height: 31px;"><i class="fas fa-plus me-1"></i> Add Domain</button>
+                                        <button type="submit" class="btn btn-sm btn-secondary fw-bold w-100" style="height: 31px;"><i class="fas fa-plus me-1"></i> {{ t('pages.restrictions.add_domain_btn') }}</button>
                                     </div>
                                 </form>
 
@@ -168,11 +168,11 @@
                                 </div>
                                 {% if source.domain_count > 25 %}
                                 <div class="small text-muted fw-bold mt-2 pt-1 fst-italic">
-                                    * Showing first 25 domains. All {{ source.domain_count }} domains are actively restricted.
+                                    * {{ t('pages.restrictions.showing_domains', count=source.domain_count) }}
                                 </div>
                                 {% endif %}
                                 {% else %}
-                                <p class="small text-muted fst-italic mb-0">No blocked domains defined yet. Type a domain above to immediately restrict access.</p>
+                                <p class="small text-muted fst-italic mb-0">{{ t('pages.restrictions.no_domains_yet') }}</p>
                                 {% endif %}
                             </div>
                             {% endif %}
@@ -183,8 +183,8 @@
                             <div class="bg-body-secondary text-secondary rounded-circle d-flex align-items-center justify-content-center mx-auto mb-3" style="width: 64px; height: 64px;">
                                 <i class="fas fa-shield-alt fs-3"></i>
                             </div>
-                            <h5 class="fw-bold mb-2">No shields yet</h5>
-                            <p class="text-secondary mx-auto mb-0" style="max-width: 400px;">Create a hand-picked list or subscribe to a remote shield URL to start guiding browsing.</p>
+                            <h5 class="fw-bold mb-2">{{ t('pages.restrictions.empty_title') }}</h5>
+                            <p class="text-secondary mx-auto mb-0" style="max-width: 400px;">{{ t('pages.restrictions.empty_lead') }}</p>
                         </div>
                     {% endif %}
                 </div>
@@ -247,7 +247,7 @@
                                 {{ csrf_field() }}
                                 <input type="hidden" name="preset_id" value="{{ preset.id }}">
                                 
-                                <h6 class="fw-bold small text-muted text-uppercase mb-2" style="font-size: 0.7rem; letter-spacing: 0.05em;">Apply to Child Profiles</h6>
+                                <h6 class="fw-bold small text-muted text-uppercase mb-2" style="font-size: 0.7rem; letter-spacing: 0.05em;">{{ t('pages.restrictions.apply_to_profiles') }}</h6>
                                 
                                 <div class="d-flex flex-column gap-2 mb-3">
                                     {% if users %}
@@ -257,19 +257,19 @@
                                             <label class="form-check-label ms-2 cursor-pointer fw-semibold text-body small d-flex justify-content-between align-items-center w-100" for="sub-{{ preset.id }}-{{ user.id }}">
                                                 <span>{{ user.username }}</span>
                                                 {% if user.id in subscribed_map[preset.id] %}
-                                                    <span class="badge bg-success-subtle text-success font-monospace" style="font-size: 0.65rem;">Active</span>
+                                                    <span class="badge bg-success-subtle text-success font-monospace" style="font-size: 0.65rem;">{{ t('pages.restrictions.active') }}</span>
                                                 {% endif %}
                                             </label>
                                         </div>
                                         {% endfor %}
                                     {% else %}
-                                        <p class="small text-muted fst-italic mb-0">No child profiles created yet.</p>
+                                        <p class="small text-muted fst-italic mb-0">{{ t('pages.restrictions.no_profiles') }}</p>
                                     {% endif %}
                                 </div>
 
                                 {% if users %}
                                 <button type="submit" class="btn btn-sm btn-outline-success fw-bold w-100">
-                                    <i class="fas fa-check-circle me-1"></i> Update Subscriptions
+                                    <i class="fas fa-check-circle me-1"></i> {{ t('pages.restrictions.update_subscriptions') }}
                                 </button>
                                 {% endif %}
                             </form>
@@ -279,8 +279,8 @@
                 {% endfor %}
             {% else %}
                 <div class="card border shadow-sm p-5 text-center bg-body-tertiary">
-                    <h5 class="fw-bold mb-2">Marketplace catalog is empty</h5>
-                    <p class="text-secondary mx-auto mb-0" style="max-width: 400px;">Static catalog file was not loaded correctly.</p>
+                    <h5 class="fw-bold mb-2">{{ t('pages.restrictions.marketplace_empty_title') }}</h5>
+                    <p class="text-secondary mx-auto mb-0" style="max-width: 400px;">{{ t('pages.restrictions.marketplace_empty_lead') }}</p>
                 </div>
             {% endif %}
         </div>
@@ -342,8 +342,9 @@
                 });
 
                 const countBadge = document.getElementById('restrictions-count-badge');
+                const foundLabel = {{ t('pages.restrictions.found_count', count='__COUNT__')|tojson }};
                 if (countBadge) {
-                    countBadge.textContent = `${visibleCustomCount} found`;
+                    countBadge.textContent = foundLabel.replace('__COUNT__', visibleCustomCount);
                 }
             });
         }

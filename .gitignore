@@ -1,3 +1,9 @@
+# Staged i18n catalogs copied into the server image at build time
+server/i18n/
+
+# Generated Chrome extension locale bundles (scripts/i18n/manage.py bundle --target extension)
+extension/_locales/
+
 # Private keys and certificates - NEVER commit secrets!
 *.pem
 *.key

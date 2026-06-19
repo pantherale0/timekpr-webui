@@ -1,12 +1,12 @@
 {% extends "_spa_fragment.html" %}
 
-{% block title %}Routine Locks &amp; Time - Guardian{% endblock %}
+{% block title %}{{ t('pages.weekly_schedule.title') }}{% endblock %}
 
 {% block content %}
 <div class="guardian-page-header">
     <div class="guardian-page-header__intro">
-        <h1 class="guardian-page-title mb-1">Routine Locks &amp; Time</h1>
-        <p class="guardian-page-lead mb-0">Choose a child profile to open their weekly routine blueprint — screen-time limits and allowed windows in one calm view.</p>
+        <h1 class="guardian-page-title mb-1">{{ t('pages.weekly_schedule.heading') }}</h1>
+        <p class="guardian-page-lead mb-0">{{ t('pages.weekly_schedule.lead') }}</p>
     </div>
 </div>
 
@@ -27,20 +27,20 @@
                         <div class="guardian-page-header__intro">
                             <h2 class="h4 fw-bold mb-1">{{ user.username }}</h2>
                             <p class="guardian-page-lead mb-0 small">
-                                <i class="fas fa-link me-1"></i>{{ user.device_mappings|length }} linked device account{{ 's' if user.device_mappings|length != 1 else '' }}
+                                <i class="fas fa-link me-1"></i>{% if user.device_mappings|length == 1 %}{{ t('pages.weekly_schedule.linked_accounts', count=user.device_mappings|length) }}{% else %}{{ t('pages.weekly_schedule.linked_accounts_plural', count=user.device_mappings|length) }}{% endif %}
                             </p>
                         </div>
                         <div class="guardian-page-header__actions">
                             {% if user.weekly_schedule and not user.weekly_schedule.is_synced %}
-                                <span class="badge bg-warning text-dark">Sync pending</span>
+                                <span class="badge bg-warning text-dark">{{ t('pages.weekly_schedule.sync_pending') }}</span>
                             {% elif user.weekly_schedule %}
-                                <span class="badge bg-success">Synced</span>
+                                <span class="badge bg-success">{{ t('pages.weekly_schedule.synced') }}</span>
                             {% else %}
-                                <span class="badge bg-secondary">Not configured</span>
+                                <span class="badge bg-secondary">{{ t('pages.weekly_schedule.not_configured') }}</span>
                             {% endif %}
                             <a href="{{ url_for('ui_schedule.weekly_schedule_user', user_id=user.id) }}"
                                 class="btn guardian-btn-sage fw-bold">
-                                <i class="fas fa-calendar-week me-1"></i> Open routine blueprint
+                                <i class="fas fa-calendar-week me-1"></i> {{ t('pages.weekly_schedule.open_blueprint') }}
                             </a>
                         </div>
                     </div>
@@ -49,28 +49,28 @@
                     <div class="row g-3 mt-3 pt-3 border-top">
                         <div class="col-12 col-md-4">
                             <div class="guardian-metric-tile text-center h-100">
-                                <span class="guardian-metric-label">Total for week</span>
+                                <span class="guardian-metric-label">{{ t('pages.weekly_schedule.metric_week_total') }}</span>
                                 <strong class="guardian-metric-value text-primary">{{ week_total }}h</strong>
-                                <span class="guardian-metric-sub">allowed screen time</span>
+                                <span class="guardian-metric-sub">{{ t('pages.weekly_schedule.allowed_screen_time') }}</span>
                             </div>
                         </div>
                         <div class="col-12 col-md-4">
                             <div class="guardian-metric-tile text-center h-100">
-                                <span class="guardian-metric-label">Weekdays (Mon–Fri)</span>
+                                <span class="guardian-metric-label">{{ t('pages.weekly_schedule.metric_weekdays') }}</span>
                                 <strong class="guardian-metric-value">{{ weekday_avg }}h</strong>
-                                <span class="guardian-metric-sub">per day average</span>
+                                <span class="guardian-metric-sub">{{ t('pages.weekly_schedule.per_day_average') }}</span>
                             </div>
                         </div>
                         <div class="col-12 col-md-4">
                             <div class="guardian-metric-tile text-center h-100">
-                                <span class="guardian-metric-label">Weekends (Sat–Sun)</span>
+                                <span class="guardian-metric-label">{{ t('pages.weekly_schedule.metric_weekends') }}</span>
                                 <strong class="guardian-metric-value text-warning">{{ weekend_avg }}h</strong>
-                                <span class="guardian-metric-sub">per day average</span>
+                                <span class="guardian-metric-sub">{{ t('pages.weekly_schedule.per_day_average') }}</span>
                             </div>
                         </div>
                     </div>
                     {% else %}
-                    <p class="text-secondary small mb-0 mt-3 pt-3 border-top">No routine limits set yet. Open the blueprint to configure their week.</p>
+                    <p class="text-secondary small mb-0 mt-3 pt-3 border-top">{{ t('pages.weekly_schedule.no_routine') }}</p>
                     {% endif %}
                 </div>
             </article>
@@ -82,9 +82,9 @@
             style="width: 64px; height: 64px;">
             <i class="fas fa-clock fs-3"></i>
         </div>
-        <h5 class="fw-bold mb-2">No child profiles yet</h5>
-        <p class="text-secondary mx-auto mb-3" style="max-width: 400px;">Create child profiles first, then return here to shape each week's routine.</p>
-        <a href="{{ url_for('ui_dashboard.admin_users') }}" class="btn guardian-btn-sage fw-bold">Go to child profiles</a>
+        <h5 class="fw-bold mb-2">{{ t('pages.weekly_schedule.empty_title') }}</h5>
+        <p class="text-secondary mx-auto mb-3" style="max-width: 400px;">{{ t('pages.weekly_schedule.empty_lead') }}</p>
+        <a href="{{ url_for('ui_dashboard.admin_users') }}" class="btn guardian-btn-sage fw-bold">{{ t('pages.weekly_schedule.go_to_profiles') }}</a>
     </div>
 {% endif %}
 {% endblock %}

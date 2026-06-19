@@ -1,13 +1,13 @@
 {% extends "_spa_fragment.html" %}
 
 {% from '_macros.html' import csrf_field %}
-{% block title %}App Routine Locks - Guardian{% endblock %}
+{% block title %}{{ t('pages.restrictions_app.title') }}{% endblock %}
 
 {% block content %}
 <div class="guardian-page-header">
     <div class="guardian-page-header__intro">
-        <h1 class="guardian-page-title mb-1">App Routine Locks</h1>
-        <p class="guardian-page-lead mb-0">Build reusable app-lock profiles and apply them gently across your children's accounts.</p>
+        <h1 class="guardian-page-title mb-1">{{ t('pages.restrictions_app.heading') }}</h1>
+        <p class="guardian-page-lead mb-0">{{ t('pages.restrictions_app.lead') }}</p>
     </div>
 
     <div class="guardian-page-header__actions">
@@ -15,7 +15,7 @@
             <span class="guardian-search-field__icon">
                 <i class="fas fa-search"></i>
             </span>
-            <input type="text" id="policies-search" class="form-control rounded-pill py-2" placeholder="Search app policies...">
+            <input type="text" id="policies-search" class="form-control rounded-pill py-2" placeholder="{{ t('pages.restrictions_app.search_placeholder') }}">
         </div>
     </div>
 </div>
@@ -28,24 +28,24 @@
                 <div class="bg-success-subtle text-success p-2 rounded d-flex align-items-center justify-content-center" style="width: 38px; height: 38px;">
                     <i class="fas fa-folder-plus fs-5"></i>
                 </div>
-                <h5 class="mb-0 fw-bold">Create an app routine profile</h5>
+                <h5 class="mb-0 fw-bold">{{ t('pages.restrictions_app.create_profile') }}</h5>
             </div>
             <div class="card-body">
                 <form action="{{ url_for('ui_apparmor.create_app_policy') }}" method="POST" class="row g-3 align-items-end m-0">
 
                 {{ csrf_field() }}                    <div class="col-12 col-md-5">
-                        <label for="policy_name" class="form-label fw-bold small text-muted text-uppercase mb-1" style="font-size: 0.75rem; letter-spacing: 0.05em;">Policy Name</label>
-                        <input type="text" id="policy_name" name="name" class="form-control" placeholder="e.g. Study Time Locks, Gaming Lockout" required>
+                        <label for="policy_name" class="form-label fw-bold small text-muted text-uppercase mb-1" style="font-size: 0.75rem; letter-spacing: 0.05em;">{{ t('pages.restrictions_app.policy_name') }}</label>
+                        <input type="text" id="policy_name" name="name" class="form-control" placeholder="{{ t('pages.restrictions_app.policy_name_placeholder') }}" required>
                     </div>
                     <div class="col-12 col-md-4">
-                        <label for="policy_platform" class="form-label fw-bold small text-muted text-uppercase mb-1" style="font-size: 0.75rem; letter-spacing: 0.05em;">Platform</label>
+                        <label for="policy_platform" class="form-label fw-bold small text-muted text-uppercase mb-1" style="font-size: 0.75rem; letter-spacing: 0.05em;">{{ t('pages.restrictions_app.platform') }}</label>
                         <select id="policy_platform" name="platform" class="form-select" required>
-                            <option value="linux">Linux / Desktop</option>
-                            <option value="android">Android</option>
+                            <option value="linux">{{ t('pages.restrictions_app.platform_linux') }}</option>
+                            <option value="android">{{ t('pages.restrictions_app.platform_android') }}</option>
                         </select>
                     </div>
                     <div class="col-12 col-md-3">
-                        <button type="submit" class="btn btn-primary btn-cta w-100 fw-bold"><i class="fas fa-plus-circle me-1"></i> Create Policy</button>
+                        <button type="submit" class="btn btn-primary btn-cta w-100 fw-bold"><i class="fas fa-plus-circle me-1"></i> {{ t('pages.restrictions_app.create_policy') }}</button>
                     </div>
                 </form>
             </div>
@@ -55,8 +55,8 @@
     <!-- Policies Loop -->
     <div class="col-12">
         <h4 class="fw-bold mb-3 d-flex align-items-center gap-2">
-            <span>Active Policies</span>
-            <span class="badge bg-secondary" id="policies-count-badge" style="font-size: 0.8rem; padding: 0.35rem 0.6rem;">{{ policies|length }} profiles</span>
+            <span>{{ t('pages.restrictions_app.active_policies') }}</span>
+            <span class="badge bg-secondary" id="policies-count-badge" style="font-size: 0.8rem; padding: 0.35rem 0.6rem;">{{ t('pages.restrictions_app.profiles_count', count=policies|length) }}</span>
         </h4>
 
         <div id="policies-cards-container">
@@ -70,39 +70,39 @@
                                     {% if policy.platform == 'android' %}
                                         <span class="badge bg-info text-dark fw-bold" style="font-size: 0.7rem;">Android</span>
                                     {% else %}
-                                        <span class="badge bg-primary fw-bold" style="font-size: 0.7rem;">Linux / Desktop</span>
+                                        <span class="badge bg-primary fw-bold" style="font-size: 0.7rem;">{{ t('pages.restrictions_app.platform_linux') }}</span>
                                     {% endif %}
-                                    <span class="badge bg-secondary fw-bold" style="font-size: 0.7rem;">{{ policy.rules|length }} rules configured</span>
+                                    <span class="badge bg-secondary fw-bold" style="font-size: 0.7rem;">{{ t('pages.restrictions_app.rules_badge', count=policy.rules|length) }}</span>
                                 </div>
                                 <div class="text-secondary small fw-medium mt-1">
-                                    Assigned to:
+                                    {{ t('pages.restrictions_app.assigned_to') }}
                                     {% if policy.assignments %}
                                         {% for assignment in policy.assignments %}
                                             <strong class="text-primary">{{ assignment.managed_user.username }}</strong>{% if not loop.last %}, {% endif %}
                                         {% endfor %}
                                     {% else %}
-                                        <span class="fst-italic text-muted">No children currently assigned</span>
+                                        <span class="fst-italic text-muted">{{ t('pages.restrictions_app.no_children_assigned') }}</span>
                                     {% endif %}
                                 </div>
                             </div>
                             <div>
-                                <form action="{{ url_for('ui_apparmor.delete_app_policy', policy_id=policy.id) }}" method="POST" onsubmit="return confirm('Delete app policy profile {{ policy.name }}? This will remove all its rules and unassign it from all children.');" class="m-0">
+                                <form action="{{ url_for('ui_apparmor.delete_app_policy', policy_id=policy.id) }}" method="POST" onsubmit="return confirm({{ t('pages.restrictions_app.delete_confirm', name=policy.name)|tojson }});" class="m-0">
 
-                                {{ csrf_field() }}                                    <button type="submit" class="btn btn-sm btn-outline-danger fw-bold"><i class="fas fa-trash me-1"></i> Delete Policy</button>
+                                {{ csrf_field() }}                                    <button type="submit" class="btn btn-sm btn-outline-danger fw-bold"><i class="fas fa-trash me-1"></i> {{ t('pages.restrictions_app.delete_policy') }}</button>
                                 </form>
                             </div>
                         </div>
                         <div class="card-body bg-body-tertiary">
                             <!-- Rule Adder Form inside policy -->
                             <div class="border rounded p-3 bg-body mb-4 shadow-sm">
-                                <h6 class="fw-bold small text-muted text-uppercase mb-3 border-bottom pb-2" style="font-size: 0.7rem; letter-spacing: 0.05em;"><i class="fas fa-plus me-1 text-primary"></i> Add App Lock Rule</h6>
+                                <h6 class="fw-bold small text-muted text-uppercase mb-3 border-bottom pb-2" style="font-size: 0.7rem; letter-spacing: 0.05em;"><i class="fas fa-plus me-1 text-primary"></i> {{ t('pages.restrictions_app.add_lock_rule') }}</h6>
                                 <form action="{{ url_for('ui_apparmor.add_app_policy_rule', policy_id=policy.id) }}" method="POST" class="row g-3 align-items-end m-0" data-policy-platform="{{ policy.platform }}">
 
                                 {{ csrf_field() }}                                    {% if policy.platform == 'linux' %}
                                     <div class="col-12 col-sm-6 col-md-4 col-lg-3">
-                                        <label class="form-label fw-bold small text-muted mb-1" style="font-size: 0.75rem;">Select Curated App</label>
+                                        <label class="form-label fw-bold small text-muted mb-1" style="font-size: 0.75rem;">{{ t('pages.restrictions_app.select_curated') }}</label>
                                         <select name="curated_app_choice" class="form-select form-select-sm app-picker-{{ policy.id }}" onchange="toggleCustomFields(this, '{{ policy.id }}')">
-                                            <option value="">-- Custom executable / path --</option>
+                                            <option value="">{{ t('pages.restrictions_app.custom_executable') }}</option>
                                             {% for option in curated_options %}
                                                 <option value="{{ option.path }}">{{ option.icon }} {{ option.name }}</option>
                                             {% endfor %}
@@ -110,9 +110,9 @@
                                     </div>
                                     {% endif %}
                                     <div class="col-12 col-sm-6 col-md-4 col-lg-3">
-                                        <label class="form-label fw-bold small text-muted mb-1" style="font-size: 0.75rem;">Discovered Apps</label>
+                                        <label class="form-label fw-bold small text-muted mb-1" style="font-size: 0.75rem;">{{ t('pages.restrictions_app.discovered_apps') }}</label>
                                         <select name="discovered_app_choice" class="form-select form-select-sm app-picker-{{ policy.id }}" onchange="applyDiscoveredApp(this, '{{ policy.id }}', '{{ policy.platform }}')">
-                                            <option value="">-- Select discovered app --</option>
+                                            <option value="">{{ t('pages.restrictions_app.select_discovered') }}</option>
                                             {% for app in discovered_apps_by_policy.get(policy.id, []) %}
                                                 <option value="{{ app.match_type }}|{{ app.identifier }}"
                                                     data-name="{{ app.application_name }}"
@@ -126,51 +126,51 @@
                                         {% if not discovered_apps_by_policy.get(policy.id, []) %}
                                         <div class="form-text" style="font-size: 0.7rem;">
                                             {% if policy.platform == 'android' %}
-                                            No Android apps reported yet. Pair an Android device and wait for the agent sync session.
+                                            {{ t('pages.restrictions_app.no_android_apps') }}
                                             {% else %}
-                                            No desktop apps reported yet. Connect a Linux agent and wait for inventory sync.
+                                            {{ t('pages.restrictions_app.no_desktop_apps') }}
                                             {% endif %}
                                         </div>
                                         {% endif %}
                                     </div>
                                     <div class="col-12 col-sm-6 col-md-4 col-lg-3 custom-field-{{ policy.id }}">
-                                        <label class="form-label fw-bold small text-muted mb-1" style="font-size: 0.75rem;">App Label Name</label>
+                                        <label class="form-label fw-bold small text-muted mb-1" style="font-size: 0.75rem;">{{ t('pages.restrictions_app.app_label') }}</label>
                                         <input type="text" name="application_name" class="form-control form-control-sm" placeholder="{% if policy.platform == 'android' %}e.g. TikTok{% else %}e.g. Chrome, Steam{% endif %}">
                                     </div>
                                     {% if policy.platform == 'linux' %}
                                     <div class="col-12 col-sm-6 col-md-4 col-lg-3 custom-field-{{ policy.id }}">
-                                        <label class="form-label fw-bold small text-muted mb-1" style="font-size: 0.75rem;">Match Type</label>
+                                        <label class="form-label fw-bold small text-muted mb-1" style="font-size: 0.75rem;">{{ t('pages.restrictions_app.match_type') }}</label>
                                         <select name="match_type" class="form-select form-select-sm">
-                                            <option value="executable">Single Executable</option>
-                                            <option value="path_pattern">Path Subtree ($HOME/...)</option>
+                                            <option value="executable">{{ t('pages.restrictions_app.match_executable') }}</option>
+                                            <option value="path_pattern">{{ t('pages.restrictions_app.match_path') }}</option>
                                         </select>
                                     </div>
                                     <div class="col-12 col-md-6 custom-field-{{ policy.id }}">
-                                        <label class="form-label fw-bold small text-muted mb-1" style="font-size: 0.75rem;">Executable Path or Pattern</label>
+                                        <label class="form-label fw-bold small text-muted mb-1" style="font-size: 0.75rem;">{{ t('pages.restrictions_app.executable_path') }}</label>
                                         <input type="text" name="executable_path" class="form-control form-control-sm" placeholder="/usr/bin/name or $HOME/Downloads/**">
                                     </div>
                                     {% else %}
                                     <input type="hidden" name="match_type" value="package">
                                     <div class="col-12 col-md-6 custom-field-{{ policy.id }}">
-                                        <label class="form-label fw-bold small text-muted mb-1" style="font-size: 0.75rem;">Package Name</label>
+                                        <label class="form-label fw-bold small text-muted mb-1" style="font-size: 0.75rem;">{{ t('pages.restrictions_app.package_name') }}</label>
                                         <input type="text" name="executable_path" class="form-control form-control-sm" placeholder="com.example.app">
                                     </div>
                                     {% endif %}
                                     <div class="col-12 col-sm-6 col-md-3">
-                                        <label class="form-label fw-bold small text-muted mb-1" style="font-size: 0.75rem;">Preset Action</label>
+                                        <label class="form-label fw-bold small text-muted mb-1" style="font-size: 0.75rem;">{{ t('pages.restrictions_app.preset_action') }}</label>
                                         <select name="preset" class="form-select form-select-sm fw-bold">
                                             <option value="blocked" class="text-danger fw-bold">
-                                                {% if policy.platform == 'android' %}Blocked (suspend app){% else %}Blocked (kill process){% endif %}
+                                                {% if policy.platform == 'android' %}{{ t('pages.restrictions_app.blocked_android') }}{% else %}{{ t('pages.restrictions_app.blocked_linux') }}{% endif %}
                                             </option>
                                             {% if policy.platform == 'linux' %}
-                                            <option value="no_internet" class="text-warning fw-bold">No Internet (block outbound)</option>
+                                            <option value="no_internet" class="text-warning fw-bold">{{ t('pages.restrictions_app.no_internet') }}</option>
                                             {% endif %}
-                                            <option value="complain" class="text-secondary fw-bold">Audited (complain mode)</option>
-                                            <option value="allowed" class="text-success fw-bold">Allowed (run freely)</option>
+                                            <option value="complain" class="text-secondary fw-bold">{{ t('pages.restrictions_app.audited') }}</option>
+                                            <option value="allowed" class="text-success fw-bold">{{ t('pages.restrictions_app.allowed') }}</option>
                                         </select>
                                     </div>
                                     <div class="col-12 col-sm-6 col-md-3">
-                                        <button type="submit" class="btn btn-secondary btn-sm fw-bold w-100" style="height: 31px;"><i class="fas fa-plus me-1"></i> Add Lock Rule</button>
+                                        <button type="submit" class="btn btn-secondary btn-sm fw-bold w-100" style="height: 31px;"><i class="fas fa-plus me-1"></i> {{ t('pages.restrictions_app.add_lock_rule_btn') }}</button>
                                     </div>
                                 </form>
                             </div>
@@ -185,13 +185,13 @@
                                                     <div class="d-flex align-items-center gap-2">
                                                         <strong class="small text-body text-truncate" style="max-width: 60%;">{{ rule.application_name }}</strong>
                                                         {% if rule.preset == 'blocked' %}
-                                                            <span class="badge bg-danger small text-white" style="font-size: 0.65rem;">Blocked</span>
+                                                            <span class="badge bg-danger small text-white" style="font-size: 0.65rem;">{{ t('pages.restrictions_app.badge_blocked') }}</span>
                                                         {% elif rule.preset == 'no_internet' %}
-                                                            <span class="badge bg-warning text-dark small" style="font-size: 0.65rem;">No Net</span>
+                                                            <span class="badge bg-warning text-dark small" style="font-size: 0.65rem;">{{ t('pages.restrictions_app.badge_no_net') }}</span>
                                                         {% elif rule.preset == 'complain' %}
-                                                            <span class="badge bg-secondary small text-white" style="font-size: 0.65rem;">Audited</span>
+                                                            <span class="badge bg-secondary small text-white" style="font-size: 0.65rem;">{{ t('pages.restrictions_app.badge_audited') }}</span>
                                                         {% else %}
-                                                            <span class="badge bg-success small text-white" style="font-size: 0.65rem;">Allowed</span>
+                                                            <span class="badge bg-success small text-white" style="font-size: 0.65rem;">{{ t('pages.restrictions_app.badge_allowed') }}</span>
                                                         {% endif %}
                                                     </div>
                                                     <code class="small text-muted text-truncate mt-1" style="font-size: 0.7rem;" title="{{ rule.executable_path }}">{{ rule.executable_path }}</code>
@@ -205,7 +205,7 @@
                                     {% endfor %}
                                 </div>
                             {% else %}
-                                <p class="small text-muted fst-italic mb-0 text-center py-2">No application locks configured for this policy. Define one above to get started.</p>
+                                <p class="small text-muted fst-italic mb-0 text-center py-2">{{ t('pages.restrictions_app.no_rules') }}</p>
                             {% endif %}
                         </div>
                     </div>
@@ -215,8 +215,8 @@
                     <div class="bg-body-secondary text-secondary rounded-circle d-flex align-items-center justify-content-center mx-auto mb-3" style="width: 64px; height: 64px;">
                         <i class="fas fa-lock fs-3"></i>
                     </div>
-                    <h5 class="fw-bold mb-2">No App Policies Configured</h5>
-                    <p class="text-secondary mx-auto mb-0" style="max-width: 400px;">Create App Lock policies and define block/restrict rules for applications to protect your children.</p>
+                    <h5 class="fw-bold mb-2">{{ t('pages.restrictions_app.empty_title') }}</h5>
+                    <p class="text-secondary mx-auto mb-0" style="max-width: 400px;">{{ t('pages.restrictions_app.empty_lead') }}</p>
                 </div>
             {% endif %}
         </div>
@@ -282,6 +282,7 @@
         const searchInput = document.getElementById('policies-search');
         const policyCards = document.querySelectorAll('.policy-card-item');
         const countBadge = document.getElementById('policies-count-badge');
+        const foundLabel = {{ t('pages.restrictions_app.found_count', count='__COUNT__')|tojson }};
 
         if (searchInput) {
             searchInput.addEventListener('input', (e) => {
@@ -299,7 +300,7 @@
                 });
 
                 if (countBadge) {
-                    countBadge.textContent = `${visibleCount} found`;
+                    countBadge.textContent = foundLabel.replace('__COUNT__', visibleCount);
                 }
             });
         }

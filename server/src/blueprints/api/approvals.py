@@ -19,6 +19,7 @@ from src.approvals_manager import (
     upsert_settings,
 )
 from src.database import db, ApprovalRequest, ManagedUserDeviceMap, PolicyApprovalGrant, AgentDevice, UserOnlineAccount
+from src.i18n.catalog import api_message
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -27,28 +28,28 @@ api_approvals_bp = Blueprint('api_approvals', __name__)
 
 def _require_auth():
     if not session.get('logged_in'):
-        return jsonify({'success': False, 'message': 'Not authenticated'}), 401
+        return jsonify({'success': False, 'message': api_message('not_authenticated')}), 401
     return None
 
 
 def _get_mapping_or_404(mapping_id):
     mapping = ManagedUserDeviceMap.query.get(mapping_id)
     if mapping is None:
-        return None, (jsonify({'success': False, 'message': 'Mapping not found'}), 404)
+        return None, (jsonify({'success': False, 'message': api_message('mapping_not_found')}), 404)
     return mapping, None
 
 
 def _get_request_or_404(request_id):
     request_row = ApprovalRequest.query.get(request_id)
     if request_row is None:
-        return None, (jsonify({'success': False, 'message': 'Approval request not found'}), 404)
+        return None, (jsonify({'success': False, 'message': api_message('approval_request_not_found')}), 404)
     return request_row, None
 
 
 def _get_grant_or_404(grant_id):
     grant = PolicyApprovalGrant.query.get(grant_id)
     if grant is None:
-        return None, (jsonify({'success': False, 'message': 'Approval grant not found'}), 404)
+        return None, (jsonify({'success': False, 'message': api_message('approval_grant_not_found')}), 404)
     return grant, None
 
 
@@ -111,11 +112,11 @@ def approve_approval_request(request_id):
     try:
         request_row = approve_request(request_id, decided_by=actor)
     except ValueError as exc:
-        return jsonify({'success': False, 'message': str(exc)}), 400
+        return jsonify({'success': False, 'message': api_message('validation_error', error=str(exc))}), 400
 
     return jsonify({
         'success': True,
-        'message': 'Request approved',
+        'message': api_message('request_approved'),
         'approval': build_request_summary(request_row),
     })
 
@@ -133,11 +134,11 @@ def deny_approval_request(request_id):
     try:
         request_row = deny_request(request_id, decided_by=actor, reason=reason)
     except ValueError as exc:
-        return jsonify({'success': False, 'message': str(exc)}), 400
+        return jsonify({'success': False, 'message': api_message('validation_error', error=str(exc))}), 400
 
     return jsonify({
         'success': True,
-        'message': 'Request denied',
+        'message': api_message('request_denied'),
         'approval': build_request_summary(request_row),
     })
 
@@ -175,7 +176,7 @@ def update_mapping_approval_settings(mapping_id):
 
     body = request.get_json(silent=True) or {}
     if not isinstance(body, dict):
-        return jsonify({'success': False, 'message': 'Request body must be an object'}), 400
+        return jsonify({'success': False, 'message': api_message('request_body_must_be_object')}), 400
 
     try:
         settings = upsert_settings(
@@ -184,11 +185,11 @@ def update_mapping_approval_settings(mapping_id):
             domain_access_mode=body.get('domain_access_mode'),
         )
     except ValueError as exc:
-        return jsonify({'success': False, 'message': str(exc)}), 400
+        return jsonify({'success': False, 'message': api_message('validation_error', error=str(exc))}), 400
 
     return jsonify({
         'success': True,
-        'message': 'Approval settings updated',
+        'message': api_message('approval_settings_updated'),
         'settings': {
             'device_map_id': mapping.id,
             'app_launch_mode': settings.app_launch_mode,
@@ -226,7 +227,7 @@ def create_mapping_approval_grant(mapping_id):
 
     body = request.get_json(silent=True) or {}
     if not isinstance(body, dict):
-        return jsonify({'success': False, 'message': 'Request body must be an object'}), 400
+        return jsonify({'success': False, 'message': api_message('request_body_must_be_object')}), 400
 
     actor = get_session_actor()
     try:
@@ -239,11 +240,11 @@ def create_mapping_approval_grant(mapping_id):
             created_by=actor,
         )
     except ValueError as exc:
-        return jsonify({'success': False, 'message': str(exc)}), 400
+        return jsonify({'success': False, 'message': api_message('validation_error', error=str(exc))}), 400
 
     return jsonify({
         'success': True,
-        'message': 'Grant created',
+        'message': api_message('grant_created'),
         'grant': build_grant_summary(grant),
     })
 
@@ -262,11 +263,11 @@ def revoke_approval_grant(grant_id):
     try:
         grant = revoke_grant(grant_id, revoked_by=actor)
     except ValueError as exc:
-        return jsonify({'success': False, 'message': str(exc)}), 400
+        return jsonify({'success': False, 'message': api_message('validation_error', error=str(exc))}), 400
 
     return jsonify({
         'success': True,
-        'message': 'Grant revoked',
+        'message': api_message('grant_revoked'),
         'grant': build_grant_summary(grant),
     })
 
@@ -274,22 +275,25 @@ def revoke_approval_grant(grant_id):
 def _require_agent_auth(linux_username):
     auth_header = request.headers.get('Authorization')
     if not auth_header or not auth_header.startswith('Bearer '):
-        return None, None, (jsonify({'success': False, 'message': 'Missing or invalid authorization header'}), 401)
+        return None, None, (jsonify({'success': False, 'message': api_message('missing_auth_header')}), 401)
     
     token = auth_header.split(' ')[1].strip()
     device = AgentDevice.query.filter_by(secure_token=token).first()
     if not device:
-        return None, None, (jsonify({'success': False, 'message': 'Invalid token'}), 401)
+        return None, None, (jsonify({'success': False, 'message': api_message('invalid_token')}), 401)
         
     if not linux_username:
-        return device, None, (jsonify({'success': False, 'message': 'Missing linux_username'}), 400)
+        return device, None, (jsonify({'success': False, 'message': api_message('missing_linux_username')}), 400)
         
     mapping = ManagedUserDeviceMap.query.filter_by(
         system_id=device.system_id,
         linux_username=linux_username
     ).first()
     if not mapping:
-        return device, None, (jsonify({'success': False, 'message': f'No user mapping for user {linux_username} on this device'}), 400)
+        return device, None, (jsonify({
+            'success': False,
+            'message': api_message('no_user_mapping', linux_username=linux_username),
+        }), 400)
         
     return device, mapping, None
 
@@ -301,7 +305,7 @@ def check_registration_status():
     domain = body.get('domain')
     
     if not domain:
-        return jsonify({'success': False, 'message': 'Missing domain'}), 400
+        return jsonify({'success': False, 'message': api_message('missing_domain')}), 400
         
     device, mapping, error_response = _require_agent_auth(linux_username)
     if error_response is not None:
@@ -343,7 +347,7 @@ def request_registration_approval():
     domain = body.get('domain')
     
     if not domain:
-        return jsonify({'success': False, 'message': 'Missing domain'}), 400
+        return jsonify({'success': False, 'message': api_message('missing_domain')}), 400
         
     device, mapping, error_response = _require_agent_auth(linux_username)
     if error_response is not None:
@@ -381,7 +385,7 @@ def request_registration_approval():
     
     return jsonify({
         'success': True,
-        'message': 'Approval request raised successfully',
+        'message': api_message('approval_request_raised'),
         'request': build_request_summary(request_row)
     })
 
@@ -394,7 +398,7 @@ def log_user_login():
     username = body.get('username')
     
     if not domain or not username:
-        return jsonify({'success': False, 'message': 'Missing domain or username'}), 400
+        return jsonify({'success': False, 'message': api_message('missing_domain_or_username')}), 400
         
     device, mapping, error_response = _require_agent_auth(linux_username)
     if error_response is not None:
@@ -426,7 +430,7 @@ def log_user_login():
         
     return jsonify({
         'success': True,
-        'message': 'Login logged successfully',
+        'message': api_message('login_logged'),
         'account': account.to_dict()
     })
 
@@ -434,7 +438,7 @@ def log_user_login():
 @api_approvals_bp.route('/api/user/<int:user_id>/online-accounts', methods=['GET'])
 def get_user_online_accounts(user_id):
     if not session.get('logged_in'):
-        return jsonify({'success': False, 'message': 'Not authenticated'}), 401
+        return jsonify({'success': False, 'message': api_message('not_authenticated')}), 401
         
     from src.database import ManagedUser, UserOnlineAccount
     user = ManagedUser.query.get_or_404(user_id)

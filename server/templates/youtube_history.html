@@ -1,6 +1,6 @@
 {% extends "_spa_fragment.html" %}
 
-{% block title %}YouTube History - {{ user.username }} - Guardian{% endblock %}
+{% block title %}{{ t('pages.youtube_history.title', username=user.username) }}{% endblock %}
 
 {% block extra_head %}
 <!-- Include Chart.js for analytics tab visualization -->
@@ -84,30 +84,30 @@
 <li class="nav-item dropdown guardian-nav-date-filter">
     <button class="btn btn-sm btn-outline-secondary dropdown-toggle guardian-nav-action-btn fw-bold"
         id="dateFilterDropdown" type="button" data-bs-toggle="dropdown" aria-expanded="false"
-        data-bs-auto-close="outside" aria-label="Select date range">
+        data-bs-auto-close="outside" aria-label="{{ t('pages.youtube_history.select_date_range') }}">
         <i class="fas fa-calendar-alt text-primary"></i>
-        <span class="guardian-nav-date-label" id="current-date-range-label">Last 7 Days</span>
+        <span class="guardian-nav-date-label" id="current-date-range-label">{{ t('pages.youtube_history.last_7_days') }}</span>
     </button>
     <div class="dropdown-menu dropdown-menu-end p-3 shadow border" style="width: 280px; font-family: inherit; z-index: 1050;">
-        <h6 class="dropdown-header px-0 mb-2 fw-bold text-uppercase tracking-wider" style="font-size: 0.7rem; color: var(--bs-secondary-color);">Select Period</h6>
+        <h6 class="dropdown-header px-0 mb-2 fw-bold text-uppercase tracking-wider" style="font-size: 0.7rem; color: var(--bs-secondary-color);">{{ t('pages.youtube_history.select_period') }}</h6>
         <div class="d-flex flex-column gap-1 mb-2">
-            <button class="btn btn-sm text-start py-1.5 px-2 fw-semibold date-preset-btn" data-preset="today">Today</button>
-            <button class="btn btn-sm text-start py-1.5 px-2 fw-semibold date-preset-btn" data-preset="yesterday">Yesterday</button>
-            <button class="btn btn-sm text-start py-1.5 px-2 fw-semibold date-preset-btn active" data-preset="7days">Last 7 Days</button>
-            <button class="btn btn-sm text-start py-1.5 px-2 fw-semibold date-preset-btn" data-preset="30days">Last 30 Days</button>
-            <button class="btn btn-sm text-start py-1.5 px-2 fw-semibold date-preset-btn" data-preset="thismonth">This Month</button>
+            <button class="btn btn-sm text-start py-1.5 px-2 fw-semibold date-preset-btn" data-preset="today">{{ t('pages.youtube_history.today') }}</button>
+            <button class="btn btn-sm text-start py-1.5 px-2 fw-semibold date-preset-btn" data-preset="yesterday">{{ t('pages.youtube_history.yesterday') }}</button>
+            <button class="btn btn-sm text-start py-1.5 px-2 fw-semibold date-preset-btn active" data-preset="7days">{{ t('pages.youtube_history.last_7_days') }}</button>
+            <button class="btn btn-sm text-start py-1.5 px-2 fw-semibold date-preset-btn" data-preset="30days">{{ t('pages.youtube_history.last_30_days') }}</button>
+            <button class="btn btn-sm text-start py-1.5 px-2 fw-semibold date-preset-btn" data-preset="thismonth">{{ t('pages.youtube_history.this_month') }}</button>
         </div>
         <div class="dropdown-divider"></div>
-        <h6 class="dropdown-header px-0 my-2 fw-bold text-uppercase tracking-wider" style="font-size: 0.7rem; color: var(--bs-secondary-color);">Custom Range</h6>
+        <h6 class="dropdown-header px-0 my-2 fw-bold text-uppercase tracking-wider" style="font-size: 0.7rem; color: var(--bs-secondary-color);">{{ t('pages.youtube_history.custom_range') }}</h6>
         <div class="mb-2">
-            <label class="form-label small fw-bold text-secondary mb-1">Start Date</label>
+            <label class="form-label small fw-bold text-secondary mb-1">{{ t('pages.youtube_history.start_date') }}</label>
             <input type="date" id="filter-start-date" class="form-control form-control-sm">
         </div>
         <div class="mb-3">
-            <label class="form-label small fw-bold text-secondary mb-1">End Date</label>
+            <label class="form-label small fw-bold text-secondary mb-1">{{ t('pages.youtube_history.end_date') }}</label>
             <input type="date" id="filter-end-date" class="form-control form-control-sm">
         </div>
-        <button id="apply-custom-date" class="btn btn-sm btn-primary w-100 py-1.5 fw-bold">Apply Custom Range</button>
+        <button id="apply-custom-date" class="btn btn-sm btn-primary w-100 py-1.5 fw-bold">{{ t('pages.youtube_history.apply_custom') }}</button>
     </div>
 </li>
 {% endblock %}
@@ -116,15 +116,15 @@
 <div class="guardian-page-header">
     <div class="guardian-page-header__intro">
         <h1 class="guardian-page-title mb-1">
-            <i class="fab fa-youtube text-danger me-1"></i> {{ user.username }} &mdash; YouTube story
+            <i class="fab fa-youtube text-danger me-1"></i> {{ t('pages.youtube_history.heading', username=user.username) }}
         </h1>
         <p class="guardian-page-lead mb-0">
-            See what they've watched and which channels keep drawing them back
+            {{ t('pages.youtube_history.lead') }}
         </p>
     </div>
     <div class="guardian-page-header__actions">
         <a href="{{ url_for('ui_dashboard.user_stats', user_id=user.id) }}" class="btn btn-sm btn-outline-secondary">
-            <i class="fas fa-chevron-left me-1"></i> Back to Stats
+            <i class="fas fa-chevron-left me-1"></i> {{ t('pages.youtube_history.back_to_stats') }}
         </a>
     </div>
 </div>
@@ -134,23 +134,23 @@
     <div class="row g-3 mb-4">
         <div class="col-12 col-md-4">
             <div class="card shadow-sm border text-center p-3 mb-0 h-100 border-youtube">
-                <span class="text-secondary small fw-bold text-uppercase d-block mb-1" style="font-size: 0.7rem; letter-spacing: 0.05em;">Total Watch Time</span>
+                <span class="text-secondary small fw-bold text-uppercase d-block mb-1" style="font-size: 0.7rem; letter-spacing: 0.05em;">{{ t('pages.youtube_history.total_watch_time') }}</span>
                 <strong class="fs-2 text-danger d-block lh-1 fw-bold" id="stat-total-time">—</strong>
-                <span class="small text-muted fw-bold mt-2 d-block" id="stat-total-time-sub">logged duration</span>
+                <span class="small text-muted fw-bold mt-2 d-block" id="stat-total-time-sub">{{ t('pages.youtube_history.logged_duration') }}</span>
             </div>
         </div>
         <div class="col-12 col-md-4">
             <div class="card shadow-sm border text-center p-3 mb-0 h-100">
-                <span class="text-secondary small fw-bold text-uppercase d-block mb-1" style="font-size: 0.7rem; letter-spacing: 0.05em;">Videos Watched</span>
+                <span class="text-secondary small fw-bold text-uppercase d-block mb-1" style="font-size: 0.7rem; letter-spacing: 0.05em;">{{ t('pages.youtube_history.videos_watched') }}</span>
                 <strong class="fs-2 text-body d-block lh-1 fw-bold" id="stat-video-count">—</strong>
-                <span class="small text-muted fw-bold mt-2 d-block">total views</span>
+                <span class="small text-muted fw-bold mt-2 d-block">{{ t('pages.youtube_history.total_views') }}</span>
             </div>
         </div>
         <div class="col-12 col-md-4">
             <div class="card shadow-sm border text-center p-3 mb-0 h-100">
-                <span class="text-secondary small fw-bold text-uppercase d-block mb-1" style="font-size: 0.7rem; letter-spacing: 0.05em;">Unique Channels</span>
+                <span class="text-secondary small fw-bold text-uppercase d-block mb-1" style="font-size: 0.7rem; letter-spacing: 0.05em;">{{ t('pages.youtube_history.unique_channels') }}</span>
                 <strong class="fs-2 text-warning d-block lh-1 fw-bold" id="stat-channel-count">—</strong>
-                <span class="small text-muted fw-bold mt-2 d-block">distinct creators</span>
+                <span class="small text-muted fw-bold mt-2 d-block">{{ t('pages.youtube_history.distinct_creators') }}</span>
             </div>
         </div>
     </div>
@@ -161,18 +161,18 @@
             <!-- Categories Chart Card -->
             <div class="card shadow-sm border mb-4">
                 <div class="card-header py-3 bg-body-secondary">
-                    <h6 class="mb-0 fw-bold text-secondary text-uppercase tracking-wider" style="font-size: 0.75rem; letter-spacing: 0.05em;">Video Categories Breakdown</h6>
+                    <h6 class="mb-0 fw-bold text-secondary text-uppercase tracking-wider" style="font-size: 0.75rem; letter-spacing: 0.05em;">{{ t('pages.youtube_history.categories_breakdown') }}</h6>
                 </div>
                 <div class="card-body">
                     <div id="category-chart-loading" class="text-center py-4">
                         <div class="spinner-border spinner-border-sm text-danger me-2" role="status"></div>
-                        <span class="small text-secondary fw-semibold">Loading chart...</span>
+                        <span class="small text-secondary fw-semibold">{{ t('pages.youtube_history.loading_chart') }}</span>
                     </div>
                     <div id="category-chart-wrapper" style="height: 250px; position: relative; display: none;">
                         <canvas id="chart-youtube-categories"></canvas>
                     </div>
                     <div id="category-chart-empty" class="text-center py-5 text-muted small" style="display: none;">
-                        No category data available for this period.
+                        {{ t('pages.youtube_history.no_category_data') }}
                     </div>
                 </div>
             </div>
@@ -180,18 +180,18 @@
             <!-- Top Channels Chart Card -->
             <div class="card shadow-sm border mb-4">
                 <div class="card-header py-3 bg-body-secondary">
-                    <h6 class="mb-0 fw-bold text-secondary text-uppercase tracking-wider" style="font-size: 0.75rem; letter-spacing: 0.05em;">Top 10 Channels by Watch Time</h6>
+                    <h6 class="mb-0 fw-bold text-secondary text-uppercase tracking-wider" style="font-size: 0.75rem; letter-spacing: 0.05em;">{{ t('pages.youtube_history.top_channels') }}</h6>
                 </div>
                 <div class="card-body">
                     <div id="channels-chart-loading" class="text-center py-4">
                         <div class="spinner-border spinner-border-sm text-danger me-2" role="status"></div>
-                        <span class="small text-secondary fw-semibold">Loading channels...</span>
+                        <span class="small text-secondary fw-semibold">{{ t('pages.youtube_history.loading_channels') }}</span>
                     </div>
                     <div id="channels-chart-wrapper" style="height: 250px; position: relative; display: none;">
                         <canvas id="chart-youtube-channels"></canvas>
                     </div>
                     <div id="channels-chart-empty" class="text-center py-5 text-muted small" style="display: none;">
-                        No channel data available for this period.
+                        {{ t('pages.youtube_history.no_channels') }}
                     </div>
                 </div>
             </div>
@@ -201,8 +201,8 @@
         <div class="col-12 col-lg-7">
             <div class="card shadow-sm border">
                 <div class="card-header py-3 bg-body-secondary d-flex justify-content-between align-items-center flex-wrap gap-2">
-                    <h5 class="mb-0 fw-bold">Watch History Feed</h5>
-                    <span class="text-secondary small fw-medium" id="history-total-label">0 videos found</span>
+                    <h5 class="mb-0 fw-bold">{{ t('pages.youtube_history.watch_history') }}</h5>
+                    <span class="text-secondary small fw-medium" id="history-total-label">{{ t('pages.youtube_history.videos_found', count=0) }}</span>
                 </div>
                 <div class="card-body p-0">
                     <!-- Filters toolbar -->
@@ -210,12 +210,12 @@
                         <div class="flex-grow-1" style="min-width: 200px;">
                             <div class="input-group input-group-sm">
                                 <span class="input-group-text bg-body-secondary border"><i class="fas fa-search"></i></span>
-                                <input type="text" id="youtube-search-input" class="form-control" placeholder="Search titles or channels...">
+                                <input type="text" id="youtube-search-input" class="form-control" placeholder="{{ t('pages.youtube_history.search_placeholder') }}">
                             </div>
                         </div>
                         <div style="min-width: 150px;">
                             <select id="youtube-category-filter" class="form-select form-select-sm">
-                                <option value="all">All Categories</option>
+                                <option value="all">{{ t('pages.youtube_history.all_categories') }}</option>
                             </select>
                         </div>
                     </div>
@@ -223,14 +223,14 @@
                     <!-- Loader -->
                     <div id="history-loading" class="p-5 text-center">
                         <div class="spinner-border text-danger mb-3" role="status"></div>
-                        <p class="text-secondary small mb-0">Loading watch logs...</p>
+                        <p class="text-secondary small mb-0">{{ t('pages.youtube_history.loading_logs') }}</p>
                     </div>
 
                     <!-- Empty state -->
                     <div id="history-empty" class="p-5 text-center text-secondary" style="display: none;">
                         <i class="fab fa-youtube fs-1 text-muted mb-3"></i>
-                        <h5>No watch history logs found</h5>
-                        <p class="small mb-0">Logs will appear here once the child plays YouTube videos on monitored devices.</p>
+                        <h5>{{ t('pages.youtube_history.empty_title') }}</h5>
+                        <p class="small mb-0">{{ t('pages.youtube_history.empty_lead') }}</p>
                     </div>
 
                     <!-- List feed -->
@@ -242,11 +242,11 @@
                 <!-- Footer / Pagination -->
                 <div class="card-footer bg-body-secondary p-3 d-flex justify-content-between align-items-center" id="pagination-container" style="display: none;">
                     <button class="btn btn-sm btn-outline-secondary" id="btn-prev-page">
-                        <i class="fas fa-chevron-left me-1"></i> Previous
+                        <i class="fas fa-chevron-left me-1"></i> {{ t('pages.youtube_history.previous') }}
                     </button>
                     <span class="small text-secondary fw-semibold" id="page-indicator">Page 1 of 1</span>
                     <button class="btn btn-sm btn-outline-secondary" id="btn-next-page">
-                        Next <i class="fas fa-chevron-right ms-1"></i>
+                        {{ t('pages.youtube_history.next') }} <i class="fas fa-chevron-right ms-1"></i>
                     </button>
                 </div>
             </div>

@@ -2,6 +2,7 @@ import json
 import logging
 import secrets
 from flask import Blueprint, request, session, jsonify
+from src.i18n.catalog import api_message
 from src.database import db, AgentDevice
 from src.agent_helper import AgentConnectionManager
 from src.agent_push import notify_pairing_approved
@@ -17,14 +18,17 @@ api_devices_bp = Blueprint('api_devices', __name__)
 def approve_device(system_id):
     """Approve a pending device and send its pairing token if connected."""
     if not session.get('logged_in'):
-        return jsonify({'success': False, 'message': 'Not authenticated'}), 401
+        return jsonify({'success': False, 'message': api_message('not_authenticated')}), 401
     
     device = AgentDevice.query.get(system_id)
     if not device:
-        return jsonify({'success': False, 'message': 'Device not found'}), 404
+        return jsonify({'success': False, 'message': api_message('device_not_found')}), 404
         
     if device.status != 'pending':
-        return jsonify({'success': False, 'message': f'Device is not pending (status: {device.status})'}), 400
+        return jsonify({
+            'success': False,
+            'message': api_message('device_not_pending', status=device.status),
+        }), 400
         
     secure_token = secrets.token_hex(32)
     device.secure_token = secure_token
@@ -41,18 +45,21 @@ def approve_device(system_id):
         )
 
     _LOGGER.info("Approved device %s and generated secure token.", system_id)
-    return jsonify({'success': True, 'message': f'Device {device_label} approved successfully.'})
+    return jsonify({
+        'success': True,
+        'message': api_message('device_approved', device=device_label),
+    })
 
 
 @api_devices_bp.route('/api/device/reject/<system_id>', methods=['POST'])
 def reject_device(system_id):
     """Reject a device and close any pending or active websocket sessions."""
     if not session.get('logged_in'):
-        return jsonify({'success': False, 'message': 'Not authenticated'}), 401
+        return jsonify({'success': False, 'message': api_message('not_authenticated')}), 401
         
     device = AgentDevice.query.get(system_id)
     if not device:
-        return jsonify({'success': False, 'message': 'Device not found'}), 404
+        return jsonify({'success': False, 'message': api_message('device_not_found')}), 404
         
     device.status = 'rejected'
     device.secure_token = None
@@ -76,14 +83,17 @@ def reject_device(system_id):
         AgentConnectionManager.unregister(system_id)
         
     _LOGGER.info("Rejected device %s and closed connections.", system_id)
-    return jsonify({'success': True, 'message': f'Device {device_label} rejected successfully.'})
+    return jsonify({
+        'success': True,
+        'message': api_message('device_rejected', device=device_label),
+    })
 
 
 @api_devices_bp.route('/api/device/<system_id>/unenroll', methods=['POST'])
 def unenroll_device(system_id):
     """Unenroll a device or request an Android factory reset."""
     if not session.get('logged_in'):
-        return jsonify({'success': False, 'message': 'Not authenticated'}), 401
+        return jsonify({'success': False, 'message': api_message('not_authenticated')}), 401
 
     payload = request.get_json(silent=True) or {}
     mode = payload.get('mode', 'unenroll')
@@ -96,7 +106,7 @@ def unenroll_device(system_id):
 def get_pending_devices():
     """Return a JSON list of all pending devices for the onboarding wizard."""
     if not session.get('logged_in'):
-        return jsonify({'success': False, 'message': 'Not authenticated'}), 401
+        return jsonify({'success': False, 'message': api_message('not_authenticated')}), 401
     
     pending = AgentDevice.query.filter_by(status='pending').all()
     results = []

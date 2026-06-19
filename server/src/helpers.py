@@ -74,6 +74,29 @@ def inject_create_profile_wizard():
     }
 
 
+def inject_i18n():
+    """Inject locale and translation helper into templates."""
+    from flask import g
+    from src.i18n.catalog import (
+        DEFAULT_LOCALE,
+        discover_locales,
+        flatten_for_js,
+        load_catalog,
+        locale_label,
+        t as translate,
+    )
+
+    active_locale = getattr(g, 'locale', DEFAULT_LOCALE)
+    catalog = load_catalog(active_locale)
+    return {
+        'locale': active_locale,
+        't': lambda key, **kwargs: translate(key, locale=active_locale, **kwargs),
+        'available_locales': discover_locales(),
+        'locale_labels': {code: locale_label(code) for code in discover_locales()},
+        'js_catalog': flatten_for_js(catalog),
+    }
+
+
 def _format_seconds(seconds):
     if seconds is None:
         return "Unknown"

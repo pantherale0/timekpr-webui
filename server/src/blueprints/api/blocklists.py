@@ -1,6 +1,7 @@
 import logging
 from datetime import datetime, timezone
 from flask import Blueprint, session, request, jsonify, flash, redirect, url_for, abort
+from src.i18n.catalog import flash_t, t
 from src.database import db, BlocklistSource, BlocklistDomain, ManagedUserBlocklistAssignment, ManagedUser
 from src.blocklist_helper import (
     validate_external_source_url,
@@ -26,16 +27,16 @@ def create_blocklist_source():
     manual_domains_raw = request.form.get('manual_domains') or ''
 
     if not name:
-        flash('Blocklist name is required', 'danger')
+        flash_t('flash.blocklists.name_required', 'danger')
         return redirect(url_for('ui_dashboard.settings'))
 
     existing = BlocklistSource.query.filter_by(name=name).first()
     if existing:
-        flash(f'Blocklist "{name}" already exists', 'warning')
+        flash_t('flash.blocklists.already_exists', 'warning', name=name)
         return redirect(url_for('ui_dashboard.settings'))
 
     if source_type not in {BlocklistSource.TYPE_MANUAL, BlocklistSource.TYPE_EXTERNAL_URL}:
-        flash('Unsupported blocklist source type', 'danger')
+        flash_t('flash.blocklists.unsupported_source', 'danger')
         return redirect(url_for('ui_dashboard.settings'))
 
     validated_url = None
@@ -46,7 +47,7 @@ def create_blocklist_source():
         else:
             domains, _ = parse_blocklist_text(manual_domains_raw, strict=True)
     except ValueError as exc:
-        flash(str(exc), 'danger')
+        flash_t('flash.common.generic_error', 'danger', error=str(exc))
         return redirect(url_for('ui_dashboard.settings'))
 
     source = BlocklistSource(
@@ -70,7 +71,12 @@ def create_blocklist_source():
         flash(message, 'success' if success else 'warning')
     else:
         task_manager.notify_domain_policy_hint(reason='blocklist_catalog_updated')
-        flash(f'Blocklist "{source.name}" created with {len(domains)} domain(s)', 'success')
+        flash_t(
+            'flash.blocklists.created',
+            'success',
+            name=source.name,
+            count=len(domains),
+        )
 
     return redirect(url_for('ui_dashboard.settings'))
 
@@ -101,7 +107,7 @@ def delete_blocklist_source(source_id):
     
     from app import task_manager
     task_manager.notify_domain_policy_hint(reason='blocklist_catalog_updated')
-    flash(f'Blocklist "{source_name}" deleted', 'success')
+    flash_t('flash.blocklists.deleted', 'success', name=source_name)
     return redirect(url_for('ui_dashboard.settings'))
 
 
@@ -128,7 +134,12 @@ def toggle_blocklist_source(source_id):
     
     from app import task_manager
     task_manager.notify_domain_policy_hint(reason='blocklist_catalog_updated')
-    flash(f'Blocklist "{source.name}" {"enabled" if source.is_enabled else "disabled"}', 'success')
+    flash_t(
+        'flash.blocklists.toggled',
+        'success',
+        name=source.name,
+        state=t('flash.blocklists.enabled' if source.is_enabled else 'flash.blocklists.disabled'),
+    )
     return redirect(url_for('ui_dashboard.settings'))
 
 
@@ -139,19 +150,19 @@ def add_blocklist_domain(source_id):
 
     source = BlocklistSource.query.get_or_404(source_id)
     if source.source_type != BlocklistSource.TYPE_MANUAL:
-        flash('Only manual blocklists support direct domain editing', 'warning')
+        flash_t('flash.blocklists.manual_only', 'warning')
         return redirect(url_for('ui_dashboard.settings'))
 
     raw_domain = request.form.get('domain')
     try:
         domain = normalize_domain(raw_domain)
     except ValueError as exc:
-        flash(str(exc), 'danger')
+        flash_t('flash.common.generic_error', 'danger', error=str(exc))
         return redirect(url_for('ui_dashboard.settings'))
 
     existing = BlocklistDomain.query.filter_by(source_id=source.id, domain=domain).first()
     if existing:
-        flash(f'{domain} is already present in "{source.name}"', 'warning')
+        flash_t('flash.blocklists.domain_exists', 'warning', domain=domain, name=source.name)
         return redirect(url_for('ui_dashboard.settings'))
 
     db.session.add(BlocklistDomain(source_id=source.id, domain=domain))
@@ -166,7 +177,7 @@ def add_blocklist_domain(source_id):
     
     from app import task_manager
     task_manager.notify_domain_policy_hint(reason='blocklist_catalog_updated')
-    flash(f'Added {domain} to "{source.name}"', 'success')
+    flash_t('flash.blocklists.domain_added', 'success', domain=domain, name=source.name)
     return redirect(url_for('ui_dashboard.settings'))
 
 
@@ -191,7 +202,7 @@ def delete_blocklist_domain(source_id, domain_id):
     
     from app import task_manager
     task_manager.notify_domain_policy_hint(reason='blocklist_catalog_updated')
-    flash(f'Removed {domain_text} from "{source.name}"', 'success')
+    flash_t('flash.blocklists.domain_removed', 'success', domain=domain_text, name=source.name)
     return redirect(url_for('ui_dashboard.settings'))
 
 
@@ -216,7 +227,7 @@ def update_user_blocklists(user_id):
     } if selected_ids else {}
 
     if selected_ids and len(valid_sources) != len(selected_ids):
-        flash('One or more selected blocklists no longer exist', 'danger')
+        flash_t('flash.blocklists.missing', 'danger')
         return redirect(url_for('ui_dashboard.edit_user_profile', user_id=user.id))
 
     current_ids = {assignment.source_id for assignment in user.blocklist_assignments}
@@ -231,7 +242,7 @@ def update_user_blocklists(user_id):
     
     from app import task_manager
     task_manager.notify_domain_policy_hint(reason='blocklist_assignment_updated')
-    flash(f'Updated blocklist assignments for {user.username}', 'success')
+    flash_t('flash.blocklists.assignments_updated', 'success', user=user.username)
     return redirect(url_for('ui_dashboard.edit_user_profile', user_id=user.id))
 
 
@@ -266,10 +277,10 @@ def subscribe_user_marketplace(user_id):
     from src.marketplace_manager import sync_marketplace_subscriptions
     try:
         sync_marketplace_subscriptions(user, selected_preset_ids)
-        flash(f'Curated filter subscriptions updated for {user.username}', 'success')
+        flash_t('flash.blocklists.curated_updated', 'success', user=user.username)
     except Exception as exc:
         _LOGGER.error("Failed to update marketplace subscriptions: %s", exc)
-        flash('Failed to update curated filter subscriptions', 'danger')
+        flash_t('flash.blocklists.curated_failed', 'danger')
 
     if redirect_target == 'restrictions':
         return redirect(url_for('ui_dashboard.admin_restrictions'))
@@ -283,13 +294,13 @@ def subscribe_preset_users():
 
     preset_id = (request.form.get('preset_id') or '').strip()
     if not preset_id:
-        flash('Preset ID is required', 'danger')
+        flash_t('flash.blocklists.preset_required', 'danger')
         return redirect(url_for('ui_dashboard.admin_restrictions'))
 
     from src.marketplace_manager import get_marketplace_presets_dict, sync_marketplace_subscriptions
     presets = get_marketplace_presets_dict()
     if preset_id not in presets:
-        flash(' Curated preset not found', 'danger')
+        flash_t('flash.blocklists.preset_not_found', 'danger')
         return redirect(url_for('ui_dashboard.admin_restrictions'))
 
     # Get user IDs submitted from the checkboxes
@@ -324,9 +335,13 @@ def subscribe_preset_users():
                 
                 sync_marketplace_subscriptions(user, new_preset_ids)
                 
-        flash(f'Curated filter "{presets[preset_id]["name"]}" subscriptions updated successfully', 'success')
+        flash_t(
+            'flash.blocklists.curated_success',
+            'success',
+            name=presets[preset_id]['name'],
+        )
     except Exception as exc:
         _LOGGER.error("Failed to update marketplace subscriptions for preset %s: %s", preset_id, exc)
-        flash('Failed to update curated filter subscriptions', 'danger')
+        flash_t('flash.blocklists.curated_failed', 'danger')
 
     return redirect(url_for('ui_dashboard.admin_restrictions'))

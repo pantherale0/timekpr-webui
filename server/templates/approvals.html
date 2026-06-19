@@ -1,12 +1,12 @@
 {% extends "_spa_fragment.html" %}
 
-{% block title %}Family Dialogue - Guardian{% endblock %}
+{% block title %}{{ t('pages.approvals.title') }}{% endblock %}
 
 {% block content %}
 <div class="guardian-page-header">
     <div class="guardian-page-header__intro">
-        <h1 class="guardian-page-title mb-1">Family Dialogue</h1>
-        <p class="guardian-page-lead mb-0">When your child asks to open an app or visit a site, their request lands here for a calm yes-or-no.</p>
+        <h1 class="guardian-page-title mb-1">{{ t('pages.approvals.heading') }}</h1>
+        <p class="guardian-page-lead mb-0">{{ t('pages.approvals.lead') }}</p>
     </div>
 </div>
 
@@ -18,8 +18,8 @@
                     <i class="fas fa-clipboard-check fs-4"></i>
                 </div>
                 <div>
-                    <span class="text-secondary small fw-bold text-uppercase d-block mb-1" style="font-size: 0.7rem; letter-spacing: 0.05em;">Awaiting Your Reply</span>
-                    <h3 class="fw-bold mb-0 lh-1 {% if pending_count %}text-warning{% endif %}">{{ pending_count }} open</h3>
+                    <span class="text-secondary small fw-bold text-uppercase d-block mb-1" style="font-size: 0.7rem; letter-spacing: 0.05em;">{{ t('pages.approvals.awaiting_reply') }}</span>
+                    <h3 class="fw-bold mb-0 lh-1 {% if pending_count %}text-warning{% endif %}">{{ t('pages.approvals.open_count', count=pending_count) }}</h3>
                 </div>
             </div>
         </div>
@@ -31,7 +31,7 @@
         <div class="card shadow-sm border">
             <div class="card-header bg-warning-subtle text-warning-emphasis py-3 d-flex align-items-center gap-2">
                 <i class="fas fa-hourglass-half fs-5"></i>
-                <h5 class="mb-0 fw-bold">Open requests</h5>
+                <h5 class="mb-0 fw-bold">{{ t('pages.approvals.open_requests') }}</h5>
             </div>
             <div class="card-body p-0">
                 {% if pending_approvals %}
@@ -39,29 +39,29 @@
                         <table class="table table-striped align-middle mb-0" style="font-size: 0.95rem;" id="approvals-table">
                             <thead>
                                 <tr class="table-light">
-                                    <th class="ps-3 text-secondary fw-bold" style="font-size: 0.75rem; text-transform: uppercase;">Child Profile</th>
-                                    <th class="text-secondary fw-bold" style="font-size: 0.75rem; text-transform: uppercase;">Device / Account</th>
-                                    <th class="text-secondary fw-bold" style="font-size: 0.75rem; text-transform: uppercase;">Type</th>
-                                    <th class="text-secondary fw-bold" style="font-size: 0.75rem; text-transform: uppercase;">Target</th>
-                                    <th class="text-secondary fw-bold" style="font-size: 0.75rem; text-transform: uppercase;">Requested</th>
-                                    <th class="pe-3 text-secondary fw-bold text-end" style="font-size: 0.75rem; text-transform: uppercase;">Actions</th>
+                                    <th class="ps-3 text-secondary fw-bold" style="font-size: 0.75rem; text-transform: uppercase;">{{ t('pages.approvals.col_child') }}</th>
+                                    <th class="text-secondary fw-bold" style="font-size: 0.75rem; text-transform: uppercase;">{{ t('pages.approvals.col_device_account') }}</th>
+                                    <th class="text-secondary fw-bold" style="font-size: 0.75rem; text-transform: uppercase;">{{ t('pages.approvals.col_type') }}</th>
+                                    <th class="text-secondary fw-bold" style="font-size: 0.75rem; text-transform: uppercase;">{{ t('pages.approvals.col_target') }}</th>
+                                    <th class="text-secondary fw-bold" style="font-size: 0.75rem; text-transform: uppercase;">{{ t('pages.approvals.col_requested') }}</th>
+                                    <th class="pe-3 text-secondary fw-bold text-end" style="font-size: 0.75rem; text-transform: uppercase;">{{ t('pages.approvals.col_actions') }}</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {% for item in pending_approvals %}
                                     <tr id="approval-row-{{ item.id }}">
-                                        <td class="ps-3 fw-bold">{{ item.managed_username or 'Unknown' }}</td>
+                                        <td class="ps-3 fw-bold">{{ item.managed_username or t('pages.approvals.unknown') }}</td>
                                         <td>
                                             <span class="d-block fw-semibold">{{ item.device_label or item.system_id }}</span>
                                             <span class="text-secondary small">{{ item.linux_username }}</span>
                                         </td>
                                         <td>
                                             {% if item.request_type == 'app_launch' %}
-                                                <span class="badge bg-info text-dark">App Launch</span>
+                                                <span class="badge bg-info text-dark">{{ t('pages.approvals.type_app_launch') }}</span>
                                             {% elif item.request_type == 'registration' %}
-                                                <span class="badge bg-warning text-dark">Site Sign-Up</span>
+                                                <span class="badge bg-warning text-dark">{{ t('pages.approvals.type_signup') }}</span>
                                             {% else %}
-                                                <span class="badge bg-primary">Website</span>
+                                                <span class="badge bg-primary">{{ t('pages.approvals.type_website') }}</span>
                                             {% endif %}
                                         </td>
                                         <td>
@@ -71,8 +71,8 @@
                                         <td class="text-secondary small">{{ item.requested_at|localtime }}</td>
                                         <td class="pe-3 text-end">
                                             <div class="d-inline-flex gap-2">
-                                                <button class="btn btn-sm btn-success fw-bold px-3" style="min-height: 44px;" onclick="approveRequest({{ item.id }})">Approve</button>
-                                                <button class="btn btn-sm btn-outline-danger fw-bold px-3" style="min-height: 44px;" onclick="denyRequest({{ item.id }})">Deny</button>
+                                                <button class="btn btn-sm btn-success fw-bold px-3" style="min-height: 44px;" onclick="approveRequest({{ item.id }})">{{ t('pages.approvals.approve') }}</button>
+                                                <button class="btn btn-sm btn-outline-danger fw-bold px-3" style="min-height: 44px;" onclick="denyRequest({{ item.id }})">{{ t('pages.approvals.deny') }}</button>
                                             </div>
                                         </td>
                                     </tr>
@@ -83,7 +83,7 @@
                 {% else %}
                     <div class="p-4 text-center text-secondary">
                         <i class="far fa-check-circle fs-3 mb-2 text-success"></i>
-                        <p class="mb-0 fw-semibold">No pending access requests.</p>
+                        <p class="mb-0 fw-semibold">{{ t('pages.approvals.no_pending') }}</p>
                     </div>
                 {% endif %}
             </div>
