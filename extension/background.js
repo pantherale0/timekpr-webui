@@ -1,6 +1,8 @@
 // Service worker to handle background YouTube and Web log shipping with local offline buffering,
 // plus registration detection enforcement and login audit forwarding.
 
+importScripts('i18n.js');
+
 // Flush queues on startup
 chrome.runtime.onInstalled.addListener(() => {
     flushBufferQueue();
@@ -79,14 +81,17 @@ function handleCheckRegistration(message, sender, sendResponse) {
 
             // Registration is blocked — redirect tab to the Guardian Space block page
             if (sender && sender.tab && sender.tab.id) {
+                const lang = (navigator.language || "en").split("-")[0];
                 const blockUrl =
                     chrome.runtime.getURL("blockedv2.html") +
                     "?reason=signup" +
                     "&age=eight12" +
+                    "&lang=" +
+                    encodeURIComponent(lang) +
                     "&device=" +
                     encodeURIComponent(message.domain || "") +
                     "&note=" +
-                    encodeURIComponent("Creating accounts online requires a parent check.");
+                    encodeURIComponent(guardianExtI18n('signupBlockNote'));
 
                 chrome.tabs.update(sender.tab.id, { url: blockUrl });
             }

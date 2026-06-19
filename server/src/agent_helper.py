@@ -733,8 +733,12 @@ class AgentClient:
             raise RuntimeError(message or 'Agent rejected capture_screenshot')
         return data or {"queued": True}
 
-    def show_overlay(self, username, reason, age_tier, parent_note, device_name):
+    def show_overlay(self, username, reason, age_tier, parent_note, device_name, locale=None):
         """Ask the agent to show the Guardian Space blocked overlay for a managed user."""
+        from src.database import Settings
+
+        if not locale:
+            locale = Settings.get_value('default_locale', 'en') or 'en'
         success, message, _ = AgentConnectionManager.send_command_sync(
             self.system_id,
             "show_overlay",
@@ -744,6 +748,7 @@ class AgentClient:
                 "age_tier": age_tier or "eight12",
                 "parent_note": parent_note or "",
                 "device_name": device_name or "",
+                "lang": locale,
             },
         )
         return success, message

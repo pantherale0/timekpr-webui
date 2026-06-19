@@ -297,15 +297,15 @@
                 </svg>
             </div>
             <div class="header-text">
-                <h1>Guardian Parental Controls</h1>
-                <span>Managed by your parent or guardian</span>
+                <h1 id="header-title">Guardian Parental Controls</h1>
+                <span id="header-subtitle">Managed by your parent or guardian</span>
             </div>
         </div>
 
         <!-- Body -->
         <div class="card-body">
-            <p class="blocked-heading">Approval required to sign up</p>
-            <p class="blocked-sub">
+            <p class="blocked-heading" id="blocked-heading">Approval required to sign up</p>
+            <p class="blocked-sub" id="blocked-sub">
                 Creating an account on this website requires your parent or guardian's approval.
                 Request approval below and wait for it to be granted before continuing.
             </p>
@@ -340,7 +340,7 @@
                     <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                         <path d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
                     </svg>
-                    Check Approval Status
+                    <span id="btn-check-label">Check Approval Status</span>
                 </button>
             </div>
         </div>
@@ -350,10 +350,11 @@
             <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                 <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
             </svg>
-            Status is automatically checked every 10 seconds. Page will redirect on approval.
+            <span id="footer-auto-check">Status is automatically checked every 10 seconds. Page will redirect on approval.</span>
         </div>
     </div>
 
+    <script src="i18n.js"></script>
     <script src="blocked.js"></script>
 </body>
 </html>

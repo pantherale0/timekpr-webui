@@ -22,7 +22,7 @@ pub async fn run_user_agent() {
                 while let Ok(Some(line)) = lines.next_line().await {
                     if let Ok(payload) = serde_json::from_str::<serde_json::Value>(&line) {
                         if payload["type"] == "toast" {
-                            let title = payload["title"].as_str().unwrap_or("TimeKpr Notification");
+                            let title = payload["title"].as_str().unwrap_or(&crate::i18n::t("notification_fallback_title"));
                             let message = payload["message"].as_str().unwrap_or("");
                             
                             show_toast_notification(title, message);

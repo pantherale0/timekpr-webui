@@ -43,29 +43,19 @@ pub fn on_domain_blocked(linux_username: &str, domain: &str, domain_access_mode:
 }
 
 fn show_domain_blocked_notification(domain: &str) {
-    let body = format!(
-        "{domain} is blocked. A request was sent to your parent. \
-         You can ask them to approve access in TimeKpr."
-    );
+    let body = crate::i18n::t_fmt("domain_blocked_body", &[("domain", domain)]);
+    let title = crate::i18n::t("domain_blocked_title");
+    let product = crate::i18n::t("product_name");
+    let agent_name = crate::i18n::t("agent_name");
     #[cfg(target_os = "linux")]
     {
         let _ = Command::new("notify-send")
-            .args([
-                "TimeKpr",
-                &body,
-                "-u",
-                "normal",
-                "-a",
-                "TimeKpr Agent",
-            ])
+            .args([&title, &body, "-u", "normal", "-a", &agent_name])
             .spawn();
     }
     #[cfg(target_os = "windows")]
     {
-        // Broadcast the notification to the user session helper via our IPC
-        crate::windows_service::ipc::broadcast_toast_notification(
-            "Website Blocked",
-            &body,
-        );
+        crate::windows_service::ipc::broadcast_toast_notification(&title, &body);
     }
+    let _ = product;
 }

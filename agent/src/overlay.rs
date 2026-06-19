@@ -39,24 +39,31 @@ pub fn show(args: &serde_json::Value, username: &str) -> Result<String, String> 
         .unwrap_or("sleep");
     let age_tier = args
         .get("overlay_age_tier")
+        .or_else(|| args.get("age_tier"))
         .and_then(|v| v.as_str())
         .unwrap_or("eight12");
     let parent_note = args
         .get("overlay_parent_note")
+        .or_else(|| args.get("parent_note"))
         .and_then(|v| v.as_str())
         .unwrap_or("");
     let device_name = args
         .get("device_name")
         .and_then(|v| v.as_str())
         .unwrap_or("");
+    let lang = args
+        .get("lang")
+        .or_else(|| args.get("locale"))
+        .and_then(|v| v.as_str())
+        .unwrap_or("en");
 
-    // Build the URL that blockedv2.html reads from query params at startup
     let url = format!(
-        "file:///usr/share/guardian-agent/blockedv2.html?reason={}&age={}&device={}&note={}",
+        "file:///usr/share/guardian-agent/blockedv2.html?reason={}&age={}&device={}&note={}&lang={}",
         url_encode(reason),
         url_encode(age_tier),
         url_encode(device_name),
         url_encode(parent_note),
+        url_encode(lang),
     );
 
     // Kill any existing overlay before launching a new one

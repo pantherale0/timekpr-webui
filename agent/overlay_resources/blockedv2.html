@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" id="html-root">
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -701,7 +701,7 @@
 
                     <div class="status-pill active">
                         <span style="width: 6px; height: 6px; border-radius: 50%; background: var(--accent-sage);"></span>
-                        Shield Active
+                        <span id="shield-active-label">Shield Active</span>
                     </div>
                 </div>
             </div>
@@ -732,7 +732,7 @@
                         <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor">
                             <path d="M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM6 9h12v2H6V9zm8 5H6v-2h8v2zm4-6H6V6h12v2z"/>
                         </svg>
-                        Note from Parent or Carer
+                        <span id="parent-note-header">Note from Parent or Carer</span>
                     </div>
                     <div class="parent-note-text" id="parent-note-content">
                         "Hey! Let's shut off the screens for today. Go ahead and read a book or doodle down below!"
@@ -747,30 +747,30 @@
 
                     <!-- Form template for kids (preset clickables) -->
                     <div class="preset-requests-grid" id="pres-grid">
-                        <button class="btn-preset" onclick="sendQuickRequest('I finished my books!')">📖 I'm done reading!</button>
-                        <button class="btn-preset" onclick="sendQuickRequest('My homework is finished!')">📝 Homework is done</button>
-                        <button class="btn-preset" onclick="sendQuickRequest('I just need 5 more minutes!')">⏰ Ask for 5 more mins</button>
-                        <button class="btn-preset" onclick="sendQuickRequest('My chores are complete!')">🧹 Finished my chores</button>
+                        <button class="btn-preset" id="preset-reading" type="button"></button>
+                        <button class="btn-preset" id="preset-homework" type="button"></button>
+                        <button class="btn-preset" id="preset-five-mins" type="button"></button>
+                        <button class="btn-preset" id="preset-chores" type="button"></button>
                     </div>
 
                     <!-- Custom input template for teenagers -->
                     <div class="custom-request-box" id="teen-grid" style="display: none;">
-                        <textarea class="custom-textarea" id="custom-msg" placeholder="Let your guardians know why you need access (e.g. 'Doing research for my biology project')..."></textarea>
-                        <button class="btn-send" onclick="sendCustomRequest()">
+                        <textarea class="custom-textarea" id="custom-msg" placeholder=""></textarea>
+                        <button class="btn-send" id="btn-request-exception" type="button" onclick="sendCustomRequest()">
                             <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor">
                                 <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
                             </svg>
-                            Request Exception
+                            <span id="btn-request-exception-label">Request Exception</span>
                         </button>
                     </div>
 
                     <!-- Signup verification for registration approvals -->
                     <div class="custom-request-box" id="signup-grid" style="display: none;">
-                        <button class="btn-send" onclick="sendQuickRequest('Site Registration Audit Token Request')">
+                        <button class="btn-send" id="btn-request-signup" type="button">
                             <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor">
                                 <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
                             </svg>
-                            Request Sign-up Approval
+                            <span id="btn-request-signup-label">Request Sign-up Approval</span>
                         </button>
                     </div>
 
@@ -841,7 +841,7 @@
     <!-- ---------------------------------------------------- -->
     <!-- BRAND FOOTER                                         -->
     <!-- ---------------------------------------------------- -->
-    <div class="footer-brand">
+    <div class="footer-brand" id="footer-brand">
         <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
             <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
         </svg>
@@ -855,100 +855,86 @@
         // Live state structures
         let currentAge = 'eight12';
         let currentReason = 'sleep';
+        let currentLocale = 'en';
+        let contentMap = {};
+        let overlayUi = {};
+        let breatheStates = [];
+        let presetMessages = {};
 
-        // Content database mapping Age + Reason into children-appropriate messages
-        const contentMap = {
-            under8: {
-                sleep: {
-                    title: "Time for cozy sleep",
-                    desc: "Your tablet is going to sleep so you can dream of stars and magic! Let's shut our eyes together.",
-                    icon: "sleep",
-                    note: "Hey little explorer! Let's rest our eyes now. Go cuddle up or draw a puppy below!",
-                    target: "Cozy Time"
-                },
-                filtered: {
-                    title: "Let's explore somewhere else",
-                    desc: "We paused this page to keep our digital backyard safe and fun. Want to try a new drawing?",
-                    icon: "filtered",
-                    note: "Your parents chose this to keep your playtime awesome. Draw your favorite animal below!",
-                    target: "Filtered Page"
-                },
-                locked: {
-                    title: "Tablet playtime pause",
-                    desc: "This game is taking a little nap. Let's play with our real toys or try some big breaths!",
-                    icon: "locked",
-                    note: "Playtime is paused for now. Let's do some finger-painting on the screen instead!",
-                    target: "Game Paused"
-                },
-                signup: {
-                    title: "Let's ask your grown-up!",
-                    desc: "Signing up needs a quick approval from your parents or carers. Press the helper button!",
-                    icon: "signup",
-                    note: "To sign up safely, click 'Request Sign-up' and let your guardians know.",
-                    target: "New Account"
+        function formatOverlayText(template, params) {
+            if (!template) return '';
+            return Object.entries(params || {}).reduce(
+                (text, [key, value]) => text.replace(new RegExp(`\\{${key}\\}`, 'g'), String(value)),
+                template
+            );
+        }
+
+        function loadOverlayI18n(locale) {
+            return new Promise((resolve, reject) => {
+                const finish = () => {
+                    const pack = window.guardianOverlayI18n || {};
+                    contentMap = pack.contentMap || {};
+                    overlayUi = pack.ui || {};
+                    breatheStates = pack.breatheStates || [];
+                    presetMessages = pack.presets || {};
+                    currentLocale = pack.locale || locale || 'en';
+                    resolve();
+                };
+                if (window.guardianOverlayI18n) {
+                    finish();
+                    return;
                 }
-            },
-            eight12: {
-                sleep: {
-                    title: "Time to power down & recharge",
-                    desc: "Your device-free bedtime routine is active. Time to let your brain rest and recharge for tomorrow.",
-                    icon: "sleep",
-                    note: "Hey! Bedtime schedule is on. Sleep well, and your limits will refresh first thing in the morning!",
-                    target: "Sleep Routine Active"
-                },
-                filtered: {
-                    title: "This website is paused",
-                    desc: "Under your Guardian rules, access to this site is currently restricted. Let's find something else to explore.",
-                    icon: "filtered",
-                    note: "Hey! We agreed to skip this site to keep our studies and gaming balanced. Homework first!",
-                    target: "website-restricted"
-                },
-                locked: {
-                    title: "Application is taking a break",
-                    desc: "This game or application is currently locked to support real-life screen limits.",
-                    icon: "locked",
-                    note: "Hey! Playtime is up for this game. Let's head downstairs, check in with the family, or try drawing!",
-                    target: "app-locked-profile"
-                },
-                signup: {
-                    title: "Account Sign-Up requires permission",
-                    desc: "Making new profiles on websites is audited to keep your personal data secure. Let's send a request.",
-                    icon: "signup",
-                    note: "Creating accounts online requires an admin check. Send a request to get verified.",
-                    target: "auth-portal-block"
-                }
-            },
-            teen: {
-                sleep: {
-                    title: "Wind-down limits in effect",
-                    desc: "To protect sleep hygiene, this machine has entered offline Wind-Down mode.",
-                    icon: "sleep",
-                    note: "Bedtime rules are active. If you need a temporary extension for a project, submit a quick note.",
-                    target: "System Sleep (22:00 - 07:00)"
-                },
-                filtered: {
-                    title: "Filtered under active policy",
-                    desc: "This domain has been restricted under your Guardian Space safety guidelines.",
-                    icon: "filtered",
-                    note: "Site paused under study-time guidelines. If you believe this is classified incorrectly, let me know.",
-                    target: "URL Intercept Layer"
-                },
-                locked: {
-                    title: "Process terminated by scheduler",
-                    desc: "This application has been suspended in accordance with active session schedule limits.",
-                    icon: "locked",
-                    note: "This application is restricted during study hours. Focus first, play later!",
-                    target: "Process Watchdog Engine"
-                },
-                signup: {
-                    title: "Registration Approval Mandatory",
-                    desc: "Guardian has intercepted a sign-up flow. Creation of external profiles requires active administrative approval.",
-                    icon: "signup",
-                    note: "Signing up? No worries, just submit the approval ticket below so we can keep your details secure.",
-                    target: "Registration Audit Trigger"
-                }
+                const script = document.createElement('script');
+                script.src = `overlay-i18n.${locale}.js`;
+                script.onload = finish;
+                script.onerror = () => {
+                    if (locale !== 'en') {
+                        loadOverlayI18n('en').then(resolve).catch(reject);
+                    } else {
+                        reject(new Error('Failed to load overlay translations'));
+                    }
+                };
+                document.head.appendChild(script);
+            });
+        }
+
+        function applyStaticUi() {
+            const ui = overlayUi;
+            if (ui.page_title) document.title = ui.page_title;
+            const htmlRoot = document.getElementById('html-root');
+            if (htmlRoot) htmlRoot.lang = currentLocale.split('-')[0] || 'en';
+            const shield = document.getElementById('shield-active-label');
+            if (shield && ui.shield_active) shield.textContent = ui.shield_active;
+            const parentHeader = document.getElementById('parent-note-header');
+            if (parentHeader && ui.parent_note_header) parentHeader.textContent = ui.parent_note_header;
+            const customMsg = document.getElementById('custom-msg');
+            if (customMsg && ui.custom_placeholder) customMsg.placeholder = ui.custom_placeholder;
+            const exceptionLabel = document.getElementById('btn-request-exception-label');
+            if (exceptionLabel && ui.request_exception) exceptionLabel.textContent = ui.request_exception;
+            const signupLabel = document.getElementById('btn-request-signup-label');
+            if (signupLabel && ui.request_signup) signupLabel.textContent = ui.request_signup;
+            const footer = document.getElementById('footer-brand');
+            if (footer && ui.footer_html) {
+                footer.innerHTML = `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>${ui.footer_html}`;
             }
-        };
+            const presetBindings = [
+                ['preset-reading', 'reading'],
+                ['preset-homework', 'homework'],
+                ['preset-five-mins', 'five_mins'],
+                ['preset-chores', 'chores'],
+            ];
+            presetBindings.forEach(([elementId, key]) => {
+                const button = document.getElementById(elementId);
+                const message = presetMessages[key];
+                if (!button || !message) return;
+                button.textContent = message;
+                button.onclick = () => sendQuickRequest(message);
+            });
+            const signupBtn = document.getElementById('btn-request-signup');
+            if (signupBtn && ui.signup_audit) {
+                signupBtn.onclick = () => sendQuickRequest(ui.signup_audit);
+            }
+        }
 
         // Render dynamic SVG icon elements
         const iconSVGs = {
@@ -982,7 +968,9 @@
 
         // Core UI layout logic to alter templates based on age and state
         function updateUI() {
-            const data = contentMap[currentAge][currentReason];
+            const raw = contentMap[currentAge] && contentMap[currentAge][currentReason];
+            if (!raw) return;
+            const data = Object.assign({ icon: currentReason }, raw);
 
             // Text values
             document.getElementById('title-text').innerText = data.title;
@@ -992,9 +980,9 @@
 
             // Brand name adjusts to feel less rigid for youngest kids
             if (currentAge === 'under8') {
-                document.getElementById('brand-title').innerText = "Safe Sandbox";
+                document.getElementById('brand-title').innerText = overlayUi.brand_under8 || 'Safe Sandbox';
             } else {
-                document.getElementById('brand-title').innerText = "Guardian Space";
+                document.getElementById('brand-title').innerText = overlayUi.brand_default || 'Guardian Space';
             }
 
             // Graphic Wrapper Switch
@@ -1016,17 +1004,16 @@
             actionWrapper.style.display = 'block';
 
             if (currentReason === 'signup') {
-                actionTitle.innerText = "Request Approval";
+                actionTitle.innerText = overlayUi.action_signup || 'Request Approval';
                 signupGrid.style.display = 'flex';
             } else if (currentReason === 'sleep' && currentAge !== 'teen') {
-                // Younger children can't request sleep bypasses to enforce healthy routines
                 actionWrapper.style.display = 'none';
             } else {
                 if (currentAge === 'under8' || currentAge === 'eight12') {
-                    actionTitle.innerText = "Tap a note to ask your parents:";
+                    actionTitle.innerText = overlayUi.action_preset_title || 'Tap a note to ask your parents:';
                     presGrid.style.display = 'grid';
                 } else {
-                    actionTitle.innerText = "Need an extension? Leave a note for review:";
+                    actionTitle.innerText = overlayUi.action_teen_title || 'Need an extension? Leave a note for review:';
                     teenGrid.style.display = 'flex';
                 }
             }
@@ -1039,7 +1026,10 @@
         function sendQuickRequest(msg) {
             const toast = document.getElementById('toast-banner');
             const text = document.getElementById('toast-text');
-            text.innerText = `"${msg}" sent to parent dashboard. Awaiting response!`;
+            text.innerText = formatOverlayText(
+                overlayUi.toast_sent || '"{message}" sent to parent dashboard. Awaiting response!',
+                { message: msg }
+            );
             toast.style.display = 'flex';
             try {
                 if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
@@ -1061,7 +1051,7 @@
             const textarea = document.getElementById('custom-msg');
             const msg = textarea.value.trim();
             if (msg === "") {
-                sendQuickRequest('Extension requested!');
+                sendQuickRequest(overlayUi.extension_default || 'Extension requested!');
             } else {
                 sendQuickRequest(msg);
                 textarea.value = "";
@@ -1073,12 +1063,6 @@
         // ---------------------------------------------------- */
         const breatheText = document.getElementById('breath-text');
         const breatheSub = document.getElementById('breath-sub');
-        const breatheStates = [
-            { text: "Breathe In", desc: "Let the bubble expand. Feel your shoulders relax." },
-            { text: "Hold", desc: "Keep it steady. Just a brief pause." },
-            { text: "Breathe Out", desc: "Let the air drift away. Feel the calm." },
-            { text: "Hold", desc: "Rest before the next breath." }
-        ];
         let breathCycle = 0;
 
         function runBreathingLoop() {
@@ -1265,6 +1249,7 @@
             const age = params.get('age');
             const device = params.get('device');
             const note = params.get('note');
+            const lang = params.get('lang') || params.get('locale') || 'en';
             if (age && ['under8', 'eight12', 'teen'].includes(age)) {
                 currentAge = age;
             }
@@ -1274,15 +1259,22 @@
             if (device || note) {
                 setDeviceInfo(device ? decodeURIComponent(device) : null, note ? decodeURIComponent(note) : null);
             }
+            return loadOverlayI18n(lang);
         }
 
-        // Initialize state on load
         window.onload = function () {
             initTheme();
-            initFromParams();
-            updateUI();
-            runBreathingLoop();
-        }
+            initFromParams()
+                .then(() => {
+                    applyStaticUi();
+                    updateUI();
+                    runBreathingLoop();
+                })
+                .catch(() => {
+                    updateUI();
+                    runBreathingLoop();
+                });
+        };
     </script>
 </body>
 </html>

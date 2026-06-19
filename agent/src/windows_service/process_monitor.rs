@@ -84,8 +84,8 @@ pub async fn start_process_monitor() {
 
                         // Notify user-agent helper via Named Pipe IPC
                         crate::windows_service::ipc::broadcast_toast_notification(
-                            "App Blocked",
-                            &format!("'{}' has been closed because usage limits are reached.", name),
+                            &crate::i18n::t("app_blocked_title"),
+                            &crate::i18n::t_fmt("app_blocked_body", &[("app", &name)]),
                         );
                     }
 

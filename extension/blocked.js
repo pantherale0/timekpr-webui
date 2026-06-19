@@ -16,6 +16,44 @@ let pollInterval = null;
 let requestSent = false;
 
 // ============================================================
+// i18n
+// ============================================================
+
+function msg(key) {
+    return guardianExtI18n(key);
+}
+
+function applyPageI18n() {
+    document.title = msg('blockedPageTitle');
+
+    const textMap = {
+        'header-title': 'blockedHeaderTitle',
+        'header-subtitle': 'blockedHeaderSubtitle',
+        'blocked-heading': 'blockedHeading',
+        'blocked-sub': 'blockedSub',
+        'btn-check-label': 'btnCheckStatus',
+        'footer-auto-check': 'footerAutoCheck',
+    };
+
+    for (const [elementId, messageKey] of Object.entries(textMap)) {
+        const el = document.getElementById(elementId);
+        if (el) {
+            el.textContent = msg(messageKey);
+        }
+    }
+
+    const requestLabel = document.getElementById('btn-request-label');
+    if (requestLabel) {
+        requestLabel.textContent = msg('btnRequestApproval');
+    }
+
+    const statusText = document.getElementById('status-text');
+    if (statusText && currentStatus === 'idle') {
+        statusText.textContent = msg('statusIdle');
+    }
+}
+
+// ============================================================
 // DOM helpers
 // ============================================================
 
@@ -37,7 +75,7 @@ function setButtonLoading(buttonId, loading, labelId, labelText) {
         const label = document.getElementById(labelId);
         if (label) {
             label.innerHTML = loading
-                ? '<span class="spinner"></span> Sending…'
+                ? `<span class="spinner"></span> ${msg('sending')}`
                 : labelText;
         }
     }
@@ -48,10 +86,12 @@ function setButtonLoading(buttonId, loading, labelId, labelText) {
 // ============================================================
 
 document.addEventListener('DOMContentLoaded', () => {
+    applyPageI18n();
+
     // Display the blocked domain
     const domainText = document.getElementById('domain-text');
     if (domainText) {
-        domainText.textContent = domain || 'Unknown site';
+        domainText.textContent = domain || msg('unknownSite');
     }
 
     // Disable Request Approval if we're already pending or approved
@@ -77,29 +117,27 @@ document.addEventListener('DOMContentLoaded', () => {
 function requestApproval() {
     if (requestSent) return;
 
-    setButtonLoading('btn-request', true, 'btn-request-label', 'Request Approval');
+    const requestLabel = msg('btnRequestApproval');
+    setButtonLoading('btn-request', true, 'btn-request-label', requestLabel);
 
     chrome.runtime.sendMessage(
         { type: 'REQUEST_REGISTRATION', domain: domain },
         (response) => {
             requestSent = true;
-            setButtonLoading('btn-request', false, 'btn-request-label', 'Request Approval');
+            setButtonLoading('btn-request', false, 'btn-request-label', requestLabel);
 
             // Disable button — request has been sent
             const btn = document.getElementById('btn-request');
             if (btn) btn.disabled = true;
 
             if (chrome.runtime.lastError || !response) {
-                setStatusBanner('pending',
-                    'Approval request sent. Waiting for your parent or guardian to respond…');
+                setStatusBanner('pending', msg('statusPendingSent'));
             } else if (response.success === false) {
-                setStatusBanner('idle',
-                    'Could not send request. Please try again.');
+                setStatusBanner('idle', msg('statusSendFailed'));
                 if (btn) btn.disabled = false;
                 requestSent = false;
             } else {
-                setStatusBanner('pending',
-                    'Approval request sent. Waiting for your parent or guardian to respond…');
+                setStatusBanner('pending', msg('statusPendingSent'));
             }
         }
     );
@@ -123,8 +161,7 @@ function checkStatus() {
             if (response.allowed === true) {
                 handleApproved();
             } else if (response.pending === true) {
-                setStatusBanner('pending',
-                    'Approval request is pending. Your parent or guardian has not responded yet.');
+                setStatusBanner('pending', msg('statusPendingWaiting'));
             }
             // If still blocked and not pending, keep current banner
         }
@@ -137,7 +174,7 @@ function checkStatus() {
 
 function handleApproved() {
     stopPolling();
-    setStatusBanner('approved', 'Approved! Redirecting you back to the sign-up page…');
+    setStatusBanner('approved', msg('statusApproved'));
 
     // Brief delay so the user sees the approved banner
     setTimeout(() => {

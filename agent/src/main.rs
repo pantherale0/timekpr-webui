@@ -8,6 +8,7 @@ mod approval_policy;
 mod audit_monitor;
 mod domain_notify;
 mod domain_policy;
+mod i18n;
 #[cfg(target_os = "linux")]
 mod firewall;
 mod installed_apps;

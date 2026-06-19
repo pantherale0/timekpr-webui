@@ -1,6 +1,6 @@
 package com.guardian.agent.ui
 
-import android.annotation.SuppressLint
+import android.net.Uri
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
@@ -78,7 +78,7 @@ class GuardianOverlayActivity : Activity() {
         wv.webChromeClient = WebChromeClient()
         wv.webViewClient = object : WebViewClient() {
             override fun onPageFinished(view: WebView, url: String) {
-                // Inject runtime values after the page initialisation has run
+                // Runtime values are passed via query string; re-apply if the page hot-reloads.
                 val safeReason = reason.replace("'", "\\'")
                 val safeAge = ageTier.replace("'", "\\'")
                 val safeDevice = deviceName.replace("'", "\\'").replace("\"", "\\\"")
@@ -90,8 +90,16 @@ class GuardianOverlayActivity : Activity() {
             }
         }
 
-        // Load the bundled asset — simulator bar is already stripped from this copy
-        wv.loadUrl("file:///android_asset/blockedv2.html")
+        val lang = java.util.Locale.getDefault().language
+        val overlayUrl = buildString {
+            append("file:///android_asset/blockedv2.html")
+            append("?reason=").append(Uri.encode(reason))
+            append("&age=").append(Uri.encode(ageTier))
+            append("&device=").append(Uri.encode(deviceName))
+            append("&note=").append(Uri.encode(parentNote))
+            append("&lang=").append(Uri.encode(lang))
+        }
+        wv.loadUrl(overlayUrl)
     }
 
     override fun onDestroy() {
