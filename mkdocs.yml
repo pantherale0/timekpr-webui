@@ -90,6 +90,7 @@ nav:
       - Child accounts & mappings: web-ui/child-accounts-and-mappings.md
       - Device management: web-ui/device-management.md
       - Settings: web-ui/settings.md
+      - Install PWA: web-ui/install-pwa.md
   - Workflows:
       - Pairing & approval: workflows/pairing-and-approval.md
       - Policy assignment: workflows/policy-assignment.md

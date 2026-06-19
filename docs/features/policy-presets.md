@@ -43,7 +43,7 @@ Re-applying a preset **overwrites** preset-controlled fields (with a confirmatio
 
 ## Relationship to Filter Marketplace
 
-Policy presets reference the same curated blocklist catalog as the [Filter Marketplace](web-filters.md) (`marketplace_presets.json`). The marketplace UI remains available for manual tweaks after a preset is applied.
+Policy presets reference the same curated blocklist catalog as the [Filter Marketplace](../web-ui/web-filters.md) (`marketplace_presets.json`). The marketplace UI remains available for manual tweaks after a preset is applied.
 
 ## Bypass risk escalation
 
