@@ -192,6 +192,7 @@ from src.blueprints import (
     api_xbox_bp,
     api_screenshots_bp,
     api_youtube_bp,
+    api_hardware_baseline_bp,
     api_access_requests_bp,
     websocket_bp,
 )
@@ -218,6 +219,8 @@ app.register_blueprint(api_nintendo_bp)
 app.register_blueprint(api_xbox_bp)
 app.register_blueprint(api_screenshots_bp)
 app.register_blueprint(api_youtube_bp)
+app.register_blueprint(api_hardware_baseline_bp)
+csrf.exempt(api_hardware_baseline_bp)
 csrf.exempt(api_youtube_bp)
 app.register_blueprint(api_access_requests_bp)
 csrf.exempt(api_access_requests_bp)

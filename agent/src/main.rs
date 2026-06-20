@@ -30,6 +30,7 @@ mod ipc;
 mod overlay;
 #[cfg(target_os = "linux")]
 mod clock_integrity_monitor;
+mod bios_management;
 
 #[cfg(target_os = "windows")]
 pub mod windows_service;
@@ -201,6 +202,10 @@ enum ClientMessage {
         #[serde(skip_serializing_if = "Option::is_none")]
         paired: Option<bool>,
         platform: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        hardware_oem: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        hardware_oem_model: Option<String>,
     },
     #[serde(rename = "register")]
     Register {
@@ -927,6 +932,9 @@ async fn handle_command(action: &str, username: &str, args: &serde_json::Value) 
             overlay::dismiss();
             (true, "Guardian Space overlay dismissed".to_string(), serde_json::json!({}))
         }
+        "detect_hardware_oem" | "audit_hardware_baseline" | "apply_hardware_baseline" => {
+            bios_management::handle_command(action, args)
+        }
         _ => (false, format!("Unknown action '{}'", action), serde_json::json!({})),
     }
 }
@@ -956,6 +964,9 @@ async fn handle_command(action: &str, username: &str, args: &serde_json::Value) 
                     .or_else(|| if username.trim().is_empty() { None } else { Some(username) }),
             }),
         ),
+        "detect_hardware_oem" | "audit_hardware_baseline" | "apply_hardware_baseline" => {
+            bios_management::handle_command(action, args)
+        }
         _ => windows_service::policy::handle_windows_command(action, username, args).await,
     }
 }
@@ -1600,6 +1611,8 @@ pub(crate) async fn start_agent_reconnect_loop(
                     .map(|(uid, username)| LinuxUser { username, uid })
                     .collect();
 
+                let hardware_detect = bios_management::detect_hardware_oem();
+
                 let hello_msg = ClientMessage::Hello {
                     system_id: system_id.clone(),
                     system_hostname: system_hostname.clone(),
@@ -1612,6 +1625,8 @@ pub(crate) async fn start_agent_reconnect_loop(
                     linux_users: Some(users_vec),
                     paired: Some(agent_token.is_some()),
                     platform: std::env::consts::OS.to_string(),
+                    hardware_oem: Some(hardware_detect.oem),
+                    hardware_oem_model: hardware_detect.model,
                 };
                 let hello_json = serde_json::to_string(&hello_msg).unwrap();
                 if let Err(e) = ws_stream.send(Message::Text(hello_json.into())).await {

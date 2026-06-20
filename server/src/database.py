@@ -247,6 +247,12 @@ class AgentDevice(db.Model):
     pending_factory_reset = db.Column(db.Boolean, default=False, nullable=False)
     unenrolled_at = db.Column(db.DateTime(timezone=True), nullable=True)
     is_device_owner = db.Column(db.Boolean, default=False, nullable=False)
+    hardware_oem = db.Column(db.String(32), nullable=True)
+    hardware_oem_model = db.Column(db.String(128), nullable=True)
+    hardware_compliance_status = db.Column(db.String(32), nullable=True)
+    hardware_compliance_json = db.Column(db.Text(), nullable=True)
+    hardware_compliance_checked_at = db.Column(db.DateTime(timezone=True), nullable=True)
+    bios_supervisor_password_escrow = db.Column(db.Text(), nullable=True)
 
     # Relationship to per-user Linux account mappings on this device
     user_mappings = db.relationship(

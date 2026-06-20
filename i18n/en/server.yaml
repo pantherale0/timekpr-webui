@@ -913,6 +913,7 @@ pages:
     col_actions: Actions
     online: Online
     offline: Offline
+    hardware_non_compliant: Hardware non-compliant
     details: Details
     approve: Approve
     reject: Reject
@@ -1274,6 +1275,24 @@ pages:
     attention_android_policy: Android routine locks still syncing
     attention_screen_history: Screen history settings still syncing
     attention_no_profiles: No child accounts linked yet
+    attention_hardware_non_compliant: Hardware lockdown settings need attention
+    hardware_lockdown_title: Hardware lockdown
+    hardware_lockdown_heading: BIOS baseline
+    hardware_oem_label: "Detected vendor: {oem}"
+    hardware_oem_unknown: Hardware vendor not detected yet
+    hardware_status_compliant: Compliant
+    hardware_status_non_compliant: Non-compliant
+    hardware_status_unknown: Not checked yet
+    hardware_status_unsupported: Not supported
+    hardware_status_pending: Check in progress
+    hardware_setting_supervisor_password: Supervisor password
+    hardware_setting_usb_boot_disabled: USB boot disabled
+    hardware_setting_secure_boot_enabled: Secure Boot enabled
+    hardware_pending_reboot: A reboot is required to finish applying BIOS changes.
+    hardware_audit_btn: Audit settings
+    hardware_apply_btn: Apply hardware baseline
+    hardware_reveal_password_btn: Reveal supervisor password
+    hardware_apply_warning: Applying a hardware baseline may set a BIOS supervisor password and change boot security settings. Guardian stores the password securely on your server.
     manage_routines: Manage routines
     show_account_details: Account details
     show_app_details: App details

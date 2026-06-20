@@ -111,6 +111,16 @@ def _build_device_protection_summary(
             'severity': 'info',
         })
 
+    if (
+        platform in {'linux', 'windows'}
+        and (device.hardware_compliance_status or '').strip().lower() == 'non_compliant'
+    ):
+        attention_items.append({
+            'message_key': 'pages.device_detail.attention_hardware_non_compliant',
+            'href': '#overview',
+            'severity': 'warning',
+        })
+
     offline_only = (
         len(attention_items) == 1
         and attention_items[0]['message_key'] == 'pages.device_detail.attention_offline'
@@ -479,6 +489,10 @@ def build_device_detail_context(system_id):
         android_device_policy=android_device_policy,
         screenshot_settings=screenshot_settings,
     )
+    hardware_baseline = None
+    if (device.platform or 'linux').strip().lower() in {'linux', 'windows'}:
+        from src.hardware_baseline_manager import get_hardware_baseline_status
+        hardware_baseline = get_hardware_baseline_status(device)
 
     return {
         'template': 'device_detail.html',
@@ -501,6 +515,7 @@ def build_device_detail_context(system_id):
         'nintendo_console': nintendo_console,
         'xbox_console': xbox_console,
         'screenshot_settings': screenshot_settings,
+        'hardware_baseline': hardware_baseline,
     }
 
 

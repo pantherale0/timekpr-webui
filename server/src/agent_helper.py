@@ -44,6 +44,7 @@ ALLOWED_AGENT_ALERT_TYPES = {
     'access_requested',
     'terminal_command',
     'clock_tamper',
+    'hardware_non_compliant',
 }
 
 
@@ -788,6 +789,40 @@ class AgentClient:
             timeout=60,
         )
         return success, message
+
+
+    def apply_hardware_baseline(self, username='', force_reset_password=False):
+        """Apply BIOS hardware baseline settings through the connected agent."""
+        success, message, data = AgentConnectionManager.send_command_sync(
+            self.system_id,
+            'apply_hardware_baseline',
+            username,
+            {'force_reset_password': bool(force_reset_password)},
+            timeout=120,
+        )
+        return success, message, data or {}
+
+    def audit_hardware_baseline(self, username=''):
+        """Audit BIOS hardware baseline settings without applying changes."""
+        success, message, data = AgentConnectionManager.send_command_sync(
+            self.system_id,
+            'audit_hardware_baseline',
+            username,
+            {},
+            timeout=120,
+        )
+        return success, message, data or {}
+
+    def detect_hardware_oem(self, username=''):
+        """Detect hardware OEM and supported BIOS interface."""
+        success, message, data = AgentConnectionManager.send_command_sync(
+            self.system_id,
+            'detect_hardware_oem',
+            username,
+            {},
+            timeout=30,
+        )
+        return success, message, data or {}
 
 
 def refresh_installed_apps(system_id, username):

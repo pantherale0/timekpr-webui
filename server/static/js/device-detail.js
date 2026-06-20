@@ -93,6 +93,83 @@
         }
     }
 
+    function bindHardwareBaseline(signal, systemId) {
+        const card = document.getElementById('hardware-baseline-card');
+        const feedback = document.getElementById('hardware-baseline-feedback');
+        if (!card || !systemId) return;
+
+        function setFeedback(message, isError) {
+            if (!feedback) return;
+            feedback.textContent = message;
+            feedback.className = `small mt-2 ${isError ? 'text-danger' : 'text-success'}`;
+        }
+
+        async function postAction(path, body) {
+            const response = await fetch(path, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': window.csrfToken || '',
+                },
+                body: JSON.stringify(body || {}),
+                signal,
+            });
+            const data = await response.json();
+            if (!response.ok || !data.success) {
+                throw new Error(data.message || 'Request failed');
+            }
+            return data;
+        }
+
+        const auditBtn = document.getElementById('hardware-baseline-audit-btn');
+        if (auditBtn) {
+            auditBtn.addEventListener('click', async () => {
+                auditBtn.disabled = true;
+                setFeedback('Auditing hardware settings…', false);
+                try {
+                    await postAction(`/api/devices/${systemId}/hardware-baseline/audit`, {});
+                    refreshDeviceDetailPreserveTab();
+                } catch (err) {
+                    setFeedback(err.message, true);
+                    auditBtn.disabled = false;
+                }
+            }, { signal });
+        }
+
+        const applyBtn = document.getElementById('hardware-baseline-apply-btn');
+        if (applyBtn) {
+            applyBtn.addEventListener('click', async () => {
+                if (!window.confirm('Apply hardware lockdown settings? This may change BIOS passwords and boot options.')) {
+                    return;
+                }
+                applyBtn.disabled = true;
+                setFeedback('Applying hardware baseline…', false);
+                try {
+                    await postAction(`/api/devices/${systemId}/hardware-baseline/apply`, {});
+                    refreshDeviceDetailPreserveTab();
+                } catch (err) {
+                    setFeedback(err.message, true);
+                    applyBtn.disabled = false;
+                }
+            }, { signal });
+        }
+
+        const revealBtn = document.getElementById('hardware-baseline-reveal-btn');
+        if (revealBtn) {
+            revealBtn.addEventListener('click', async () => {
+                if (!window.confirm('Reveal the escrowed supervisor password? This action is logged.')) {
+                    return;
+                }
+                try {
+                    const data = await postAction(`/api/devices/${systemId}/hardware-baseline/reveal-password`, {});
+                    window.prompt('Escrowed supervisor password (copy now):', data.escrow_password || '');
+                } catch (err) {
+                    setFeedback(err.message, true);
+                }
+            }, { signal });
+        }
+    }
+
     function init() {
         const config = getConfig();
         if (!config) return;
@@ -106,6 +183,7 @@
         const signal = deviceDetailAbort.signal;
 
         bindTabs(signal);
+        bindHardwareBaseline(signal, systemId);
 
 const nintendoSyncBtn = document.getElementById('nintendo-sync-btn');
         const nintendoSyncError = document.getElementById('nintendo-sync-error');

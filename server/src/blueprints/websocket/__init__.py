@@ -152,6 +152,13 @@ def ws_agent_handler(ws):
                     policy_hint_system_ids = sync_mapping_linux_uids_from_device(device)
 
                 update_device_push_metadata(device, hello_msg)
+
+                hardware_oem = hello_msg.get("hardware_oem")
+                if isinstance(hardware_oem, str) and hardware_oem.strip():
+                    device.hardware_oem = hardware_oem.strip().lower()[:32]
+                hardware_oem_model = hello_msg.get("hardware_oem_model")
+                if isinstance(hardware_oem_model, str) and hardware_oem_model.strip():
+                    device.hardware_oem_model = hardware_oem_model.strip()[:128]
                 
                 db.session.commit()
 

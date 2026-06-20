@@ -1,0 +1,22 @@
+{
+  "dell": {
+    "archive": "payload.zip",
+    "version": "0.0.0",
+    "description": "Place Dell CCTK portable binaries in server/static/bios-payloads/dell/payload.zip"
+  },
+  "hp": {
+    "archive": "payload.zip",
+    "version": "0.0.0",
+    "description": "Place HP CMSL module files in server/static/bios-payloads/hp/payload.zip"
+  },
+  "lenovo": {
+    "archive": "payload.zip",
+    "version": "0.0.0",
+    "description": "Place Lenovo WMI helper scripts in server/static/bios-payloads/lenovo/payload.zip"
+  },
+  "surface": {
+    "archive": "payload.zip",
+    "version": "0.0.0",
+    "description": "Place Surface SEMM PowerShell module in server/static/bios-payloads/surface/payload.zip"
+  }
+}

@@ -56,6 +56,7 @@ Uses the same `/ws` handshake as Linux: `hello` → approval → `pairing_approv
 | Device policy | Linux-style mapping restrictions where applicable |
 | Screenshots | Supported on device detail page when enabled |
 | YouTube history | Chrome extension force-installed via HKLM Registry |
+| Hardware baseline | Manual BIOS audit/apply via vendor CLIs (Dell CCTK, HP CMSL, Lenovo WMI, Surface SEMM); payloads downloaded from server |
 
 App policy UI currently emphasizes Linux and Android; Windows uses the same underlying sync commands.
 

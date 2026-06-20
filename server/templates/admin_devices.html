@@ -179,6 +179,11 @@
                                             class="badge bg-secondary-subtle text-secondary border border-secondary-subtle px-2 py-0.5"
                                             style="font-size: 0.7rem;">{{ t('pages.admin_devices.offline') }}</span>
                                         {% endif %}
+                                        {% if device.hardware_compliance_status == 'non_compliant' and device.platform in ['linux', 'windows'] %}
+                                        <span
+                                            class="badge bg-warning-subtle text-warning border border-warning-subtle px-2 py-0.5"
+                                            style="font-size: 0.7rem;">{{ t('pages.admin_devices.hardware_non_compliant') }}</span>
+                                        {% endif %}
                                     </span>
                                 </td>
                                 <td>

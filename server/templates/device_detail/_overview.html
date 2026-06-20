@@ -85,6 +85,63 @@
         </div>
         {% endif %}
 
+    {% if hardware_baseline and hardware_baseline.supported %}
+    <div class="card border shadow-sm mb-4" id="hardware-baseline-card" data-system-id="{{ device.system_id }}">
+        <div class="card-body p-4">
+            <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-3">
+                <div>
+                    <span class="text-secondary small fw-bold text-uppercase d-block mb-1"
+                        style="font-size: 0.7rem; letter-spacing: 0.05em;">{{ t('pages.device_detail.hardware_lockdown_title') }}</span>
+                    <h2 class="h5 fw-bold mb-1">{{ t('pages.device_detail.hardware_lockdown_heading') }}</h2>
+                    <p class="text-secondary small mb-0">
+                        {% if hardware_baseline.hardware_oem %}
+                        {{ t('pages.device_detail.hardware_oem_label', oem=hardware_baseline.hardware_oem|capitalize) }}
+                        {% if hardware_baseline.hardware_oem_model %} · {{ hardware_baseline.hardware_oem_model }}{% endif %}
+                        {% else %}
+                        {{ t('pages.device_detail.hardware_oem_unknown') }}
+                        {% endif %}
+                    </p>
+                </div>
+                <span class="badge {% if hardware_baseline.hardware_compliance_status == 'compliant' %}bg-success-subtle text-success border border-success-subtle{% elif hardware_baseline.hardware_compliance_status == 'non_compliant' %}bg-warning-subtle text-warning border border-warning-subtle{% else %}bg-secondary-subtle text-secondary border border-secondary-subtle{% endif %} px-3 py-2">
+                    {{ t('pages.device_detail.hardware_status_' ~ (hardware_baseline.hardware_compliance_status or 'unknown')) }}
+                </span>
+            </div>
+
+            {% if hardware_baseline.receipt and hardware_baseline.receipt.settings %}
+            <div class="d-flex flex-wrap gap-2 mb-3">
+                {% for key, setting in hardware_baseline.receipt.settings.items() %}
+                <span class="badge {% if setting.applied %}bg-success-subtle text-success{% else %}bg-warning-subtle text-warning{% endif %} border px-2 py-1">
+                    {{ t('pages.device_detail.hardware_setting_' ~ key) }}
+                </span>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            {% if hardware_baseline.receipt and hardware_baseline.receipt.pending_reboot %}
+            <p class="small text-warning-emphasis fw-semibold mb-3">{{ t('pages.device_detail.hardware_pending_reboot') }}</p>
+            {% endif %}
+
+            <div class="d-flex flex-wrap gap-2">
+                <button type="button" class="btn btn-sm btn-primary fw-bold" id="hardware-baseline-audit-btn"
+                    {% if not agent_online %}disabled{% endif %}>
+                    {{ t('pages.device_detail.hardware_audit_btn') }}
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-primary fw-bold" id="hardware-baseline-apply-btn"
+                    {% if not agent_online %}disabled{% endif %}>
+                    {{ t('pages.device_detail.hardware_apply_btn') }}
+                </button>
+                {% if hardware_baseline.has_escrowed_password %}
+                <button type="button" class="btn btn-sm btn-outline-secondary fw-bold" id="hardware-baseline-reveal-btn">
+                    {{ t('pages.device_detail.hardware_reveal_password_btn') }}
+                </button>
+                {% endif %}
+            </div>
+            <p class="small text-secondary mt-3 mb-0">{{ t('pages.device_detail.hardware_apply_warning') }}</p>
+            <div id="hardware-baseline-feedback" class="small mt-2"></div>
+        </div>
+    </div>
+    {% endif %}
+
         <div class="card shadow-sm border">
             <div class="card-header bg-body-secondary py-3 d-flex align-items-center gap-2">
                 <div class="bg-primary-subtle text-primary p-2 rounded d-flex align-items-center justify-content-center"
