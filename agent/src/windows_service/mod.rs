@@ -156,16 +156,18 @@ async fn run_service_tasks(
     power_resume_rx: Option<mpsc::UnboundedReceiver<()>>,
     safe_mode: bool,
 ) {
+    let active_client_tx: Arc<Mutex<Option<mpsc::UnboundedSender<crate::ClientMessage>>>> =
+        Arc::new(Mutex::new(None));
+
     tokio::spawn(ipc::start_ipc_server());
-    tokio::spawn(async {
-        let _ = crate::ipc::run_ipc_server().await;
+    let ipc_client_tx = active_client_tx.clone();
+    tokio::spawn(async move {
+        let _ = crate::ipc::run_ipc_server(ipc_client_tx).await;
     });
 
     let (alert_tx, mut alert_rx) = mpsc::unbounded_channel::<crate::netlink::AppAlert>();
     crate::netlink::register_alert_sender(alert_tx);
 
-    let active_client_tx: Arc<Mutex<Option<mpsc::UnboundedSender<crate::ClientMessage>>>> =
-        Arc::new(Mutex::new(None));
     let active_tx_clone = active_client_tx.clone();
     tokio::spawn(async move {
         while let Some(alert) = alert_rx.recv().await {
