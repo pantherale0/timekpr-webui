@@ -2059,6 +2059,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#offline-pending-commands" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Offline pending commands
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#monitoring" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2408,6 +2419,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#offline-pending-commands" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Offline pending commands
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#monitoring" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2503,6 +2525,14 @@
 <p>Nintendo and Xbox sync inside <code>UPDATE_USER_DATA</code> with ~<strong>5 minute</strong> minimum interval per device unless <strong>Sync Now</strong> forces <code>force=True</code>.</p>
 <h2 id="agent-initiated-sync">Agent-initiated sync<a class="headerlink" href="#agent-initiated-sync" title="Permanent link">&para;</a></h2>
 <p>Domain policies primarily sync when agents send <code>policy_sync_check</code> over WebSocket. Device policy helpers push on mapping save and reconnect.</p>
+<h2 id="offline-pending-commands">Offline pending commands<a class="headerlink" href="#offline-pending-commands" title="Permanent link">&para;</a></h2>
+<p>When an agent is offline, the server enqueues work in the <code>pending_command</code> table (<code>server/src/pending_commands_manager.py</code>):</p>
+<ul>
+<li><strong>Imperative commands</strong> — screenshots, installed-app refresh, unenroll/factory reset; replayed FIFO with stored args.</li>
+<li><strong>Policy snapshots</strong> — Linux/Android device policy, AppArmor policy, screenshot policy, weekly limits, allowed hours; coalesced per device/user and rebuilt from the database at flush time.</li>
+<li><strong>Domain reconcile</strong> — one <code>domain_policy_reconcile</code> marker per device runs the full domain-policy sync pipeline.</li>
+</ul>
+<p>On WebSocket authentication success, a background thread drains the queue for that device. Expired commands are pruned each worker cycle. Android devices may also receive FCM wake hints after enqueue.</p>
 <h2 id="monitoring">Monitoring<a class="headerlink" href="#monitoring" title="Permanent link">&para;</a></h2>
 <ul>
 <li><code>GET /api/task-status</code> — JSON status</li>
