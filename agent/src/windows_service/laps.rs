@@ -187,8 +187,8 @@ fn should_rotate_administrator() -> Result<bool, String> {
 #[cfg(target_os = "windows")]
 fn set_administrator_password(new_password: &str) -> Result<(), String> {
     unsafe {
-        let username = wide_string(ADMIN_USERNAME);
-        let password = wide_string(new_password);
+        let mut username = wide_string(ADMIN_USERNAME);
+        let mut password = wide_string(new_password);
         let mut info = USER_INFO_1003 {
             usri1003_name: username.as_mut_ptr(),
             usri1003_password: password.as_mut_ptr(),

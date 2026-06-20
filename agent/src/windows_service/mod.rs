@@ -201,7 +201,7 @@ async fn run_service_tasks(
         eprintln!("Failed to restore persisted domain policy: {}", message);
     }
 
-    crate::start_agent_reconnect_loop(active_client_tx, safe_mode).await;
+    crate::start_agent_reconnect_loop(active_client_tx, !safe_mode).await;
 }
 
 #[cfg(not(target_os = "windows"))]

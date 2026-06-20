@@ -48,7 +48,8 @@ fn state_handle() -> Arc<Mutex<PersistedSafeModeLockdown>> {
 }
 
 pub fn on_safe_mode_service_start() {
-    let mut state = state_handle().lock().unwrap();
+    let handle = state_handle();
+    let mut state = handle.lock().unwrap();
     if !state.override_applied {
         state.lockdown_active = true;
         let _ = save_state(&state);
@@ -57,7 +58,8 @@ pub fn on_safe_mode_service_start() {
 }
 
 pub fn on_normal_boot_service_start() {
-    let mut state = state_handle().lock().unwrap();
+    let handle = state_handle();
+    let mut state = handle.lock().unwrap();
     state.lockdown_active = false;
     state.override_applied = false;
     let _ = save_state(&state);
@@ -67,14 +69,16 @@ pub fn is_safe_mode_lockdown_active() -> bool {
     if !crate::windows_service::boot_mode::is_safe_mode_boot() {
         return false;
     }
-    state_handle()
+    let handle = state_handle();
+    handle
         .lock()
         .map(|guard| guard.lockdown_active && !guard.override_applied)
         .unwrap_or(false)
 }
 
 pub fn clear_lockdown_override() {
-    let mut state = state_handle().lock().unwrap();
+    let handle = state_handle();
+    let mut state = handle.lock().unwrap();
     state.lockdown_active = false;
     state.override_applied = true;
     let _ = save_state(&state);

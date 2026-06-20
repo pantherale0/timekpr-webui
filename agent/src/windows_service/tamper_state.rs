@@ -40,21 +40,24 @@ pub fn clock_integrity_state_handle() -> Arc<Mutex<ClockIntegrityState>> {
 }
 
 pub fn is_clock_tamper_active() -> bool {
-    clock_integrity_state_handle()
+    let handle = clock_integrity_state_handle();
+    handle
         .lock()
         .map(|guard| guard.tamper_active())
         .unwrap_or(false)
 }
 
 pub fn set_clock_tamper_otp_override(active: bool) {
-    if let Ok(mut guard) = clock_integrity_state_handle().lock() {
+    let handle = clock_integrity_state_handle();
+    if let Ok(mut guard) = handle.lock() {
         guard.set_otp_override(active);
         let _ = save_state(&guard);
     }
 }
 
 pub fn reload_state_from_disk() {
-    if let Ok(mut guard) = clock_integrity_state_handle().lock() {
+    let handle = clock_integrity_state_handle();
+    if let Ok(mut guard) = handle.lock() {
         *guard = load_state();
     }
 }

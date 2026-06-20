@@ -92,7 +92,8 @@ fn normalize_executable_name(value: &str) -> String {
 
 pub fn is_executable_blocked(username: &str, executable_name: &str) -> bool {
     let normalized = normalize_executable_name(executable_name);
-    let cache = app_policy_cache().lock().unwrap();
+    let cache_handle = app_policy_cache();
+    let cache = cache_handle.lock().unwrap();
     let user_policy = cache
         .users
         .get(username)
@@ -107,7 +108,8 @@ pub fn is_executable_blocked(username: &str, executable_name: &str) -> bool {
 }
 
 pub fn blocked_executables_for_user(username: &str) -> HashSet<String> {
-    let cache = app_policy_cache().lock().unwrap();
+    let cache_handle = app_policy_cache();
+    let cache = cache_handle.lock().unwrap();
     let policy = cache.users.get(username);
     policy
         .map(|entry| {
@@ -322,7 +324,7 @@ pub async fn handle_windows_command(
 }
 
 // Discovers classic applications via registry (HKLM/HKCU Uninstall keys) and UWP apps
-pub fn discover_windows_apps(username: &str) -> Vec<DiscoveredApp> {
+pub fn discover_windows_apps(_username: &str) -> Vec<DiscoveredApp> {
     let mut apps = Vec::new();
 
     // 1. Scan registry (HKLM Uninstall key)
@@ -384,7 +386,8 @@ fn scan_registry_uninstall_key(_hkey: isize, _subkey: &str, apps: &mut Vec<Disco
 }
 
 pub fn sync_device_policy(username: &str, policy_json: Option<&serde_json::Value>) -> Result<(), String> {
-    let mut cache = device_policy_cache().lock().unwrap();
+    let cache_handle = device_policy_cache();
+    let mut cache = cache_handle.lock().unwrap();
     let entry = policy_json.cloned().unwrap_or_else(|| json!({}));
     cache.users.insert(username.to_string(), entry);
     persist_device_policy(&cache)
@@ -424,7 +427,8 @@ pub fn sync_app_policy(
     blocked.sort();
     blocked.dedup();
 
-    let mut cache = app_policy_cache().lock().unwrap();
+    let cache_handle = app_policy_cache();
+    let mut cache = cache_handle.lock().unwrap();
     let launch_mode = policy_json
         .and_then(|policy| policy.get("app_launch_mode"))
         .and_then(|value| value.as_str())
