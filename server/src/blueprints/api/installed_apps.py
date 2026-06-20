@@ -106,4 +106,6 @@ def refresh_device_installed_apps(system_id):
     except RuntimeError as exc:
         return jsonify({'success': False, 'message': str(exc)}), 503
 
-    return jsonify({'success': True, 'result': result})
+    queued = bool(isinstance(result, dict) and result.get('queued'))
+    status_code = 202 if queued else 200
+    return jsonify({'success': True, 'result': result, 'queued': queued}), status_code

@@ -138,7 +138,13 @@ def sync_screenshot_policy_for_device(device: AgentDevice) -> tuple[bool, str]:
         return True, 'Screenshot policy not applicable for this platform'
 
     if not AgentConnectionManager.is_online(device.system_id):
-        return False, 'Device is offline'
+        from src.pending_commands_manager import enqueue_policy_snapshot
+
+        try:
+            enqueue_policy_snapshot(device.system_id, 'sync_screenshot_policy', '')
+            return True, 'Queued for reconnect'
+        except ValueError as exc:
+            return False, str(exc)
 
     settings = get_or_create_settings(device)
     payload = build_screenshot_policy_payload(settings)

@@ -1269,6 +1269,7 @@ pages:
     protection_needs_attention: Needs attention
     needs_attention_title: Things to look at
     attention_offline: Device is not connected to Guardian right now
+    attention_pending_commands: "{count} update(s) waiting to apply when this device reconnects"
     attention_unverified_mappings: "{count} account link(s) need a check"
     attention_connection_notes: "{count} connection note(s) in history"
     attention_filter_sync: Website filters still syncing for {count} account(s)

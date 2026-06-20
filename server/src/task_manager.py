@@ -332,6 +332,11 @@ class BackgroundTaskManager:
         if self.deliver_pending_alerts_enabled:
             logger.info("Delivering alert webhooks")
             self._deliver_pending_alerts()
+
+        from src.pending_commands_manager import expire_stale_commands
+        expired_commands = expire_stale_commands()
+        if expired_commands:
+            logger.info("Expired %d stale pending command(s)", expired_commands)
             
         # Automatic alert pruning
         self._prune_old_alerts()
@@ -589,6 +594,41 @@ class BackgroundTaskManager:
                                 mapping.linux_username,
                                 mapping.system_id,
                             )
+                            from src.pending_commands_manager import enqueue_policy_snapshot
+
+                            if (
+                                schedule_dict
+                                and user.weekly_schedule
+                                and not user.weekly_schedule.is_synced
+                                and has_positive_limits
+                            ):
+                                try:
+                                    enqueue_policy_snapshot(
+                                        mapping.system_id,
+                                        'set_weekly_time_limits',
+                                        mapping.linux_username,
+                                    )
+                                except ValueError as exc:
+                                    logger.warning(
+                                        'Failed to queue weekly limits for %s on %s: %s',
+                                        mapping.linux_username,
+                                        mapping.system_id,
+                                        exc,
+                                    )
+                            if unsynced_intervals:
+                                try:
+                                    enqueue_policy_snapshot(
+                                        mapping.system_id,
+                                        'set_allowed_hours',
+                                        mapping.linux_username,
+                                    )
+                                except ValueError as exc:
+                                    logger.warning(
+                                        'Failed to queue allowed hours for %s on %s: %s',
+                                        mapping.linux_username,
+                                        mapping.system_id,
+                                        exc,
+                                    )
                             all_schedule_synced = False
                             all_interval_synced = False
                             continue
@@ -956,6 +996,19 @@ class BackgroundTaskManager:
             success, _message = notify_policy_sync_hint(system_id, reason=reason)
             if success:
                 notified += 1
+                continue
+            if not AgentConnectionManager.is_online(system_id):
+                from src.pending_commands_manager import enqueue_domain_reconcile
+
+                try:
+                    enqueue_domain_reconcile(system_id)
+                    notified += 1
+                except ValueError as exc:
+                    logger.warning(
+                        'Failed to queue domain policy reconcile for %s: %s',
+                        system_id,
+                        exc,
+                    )
         return notified
 
     def request_domain_policy_sync(self, system_id, source_revisions=None, reason='agent_check'):

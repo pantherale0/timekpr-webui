@@ -344,7 +344,7 @@ def upsert_policy(device: AgentDevice, body: dict) -> MappingAndroidDevicePolicy
     db.session.commit()
 
     push_success, push_message = push_device_policy(device)
-    if push_success:
+    if push_success and push_message and 'Queued' not in push_message:
         policy.is_synced = True
         policy.last_synced_at = datetime.now(timezone.utc)
         policy.last_sync_error = None
@@ -368,7 +368,13 @@ def push_device_policy(device: AgentDevice) -> tuple[bool, str]:
         db.session.commit()
 
     if not AgentConnectionManager.is_online(device.system_id):
-        return False, 'Agent offline'
+        from src.pending_commands_manager import enqueue_policy_snapshot
+
+        try:
+            enqueue_policy_snapshot(device.system_id, 'sync_android_device_policy', 'system')
+            return True, 'Queued for reconnect'
+        except ValueError as exc:
+            return False, str(exc)
 
     payload = build_device_policy_payload(policy)
     agent = AgentClient(system_id=device.system_id)

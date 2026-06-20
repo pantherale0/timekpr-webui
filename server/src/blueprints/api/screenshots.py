@@ -85,15 +85,19 @@ def update_device_screenshot_settings(system_id):
 
     sync_success = False
     sync_message = None
-    if AgentConnectionManager.is_online(system_id):
-        sync_success, sync_message = sync_screenshot_policy_for_device(device)
+    queued = False
+    sync_success, sync_message = sync_screenshot_policy_for_device(device)
+    if sync_message and 'Queued' in sync_message:
+        queued = True
 
+    status_code = 202 if queued else 200
     return jsonify({
         'success': True,
         'settings': build_settings_summary(settings, device),
         'sync_success': sync_success,
         'sync_message': sync_message,
-    })
+        'queued': queued,
+    }), status_code
 
 
 @api_screenshots_bp.route('/api/devices/<system_id>/screenshot-settings/sync', methods=['POST'])
@@ -108,11 +112,13 @@ def sync_device_screenshot_settings(system_id):
 
     success, message = sync_screenshot_policy_for_device(device)
     settings = get_or_create_settings(device)
-    status_code = 200 if success else 409
+    queued = bool(message and 'Queued' in message)
+    status_code = 202 if queued else (200 if success else 409)
     return jsonify({
         'success': success,
         'message': message,
         'settings': build_settings_summary(settings, device),
+        'queued': queued,
     }), status_code
 
 
@@ -165,9 +171,6 @@ def capture_device_screenshot(system_id):
     if error_response is not None:
         return error_response
 
-    if not AgentConnectionManager.is_online(system_id):
-        return jsonify({'success': False, 'message': 'Device is offline'}), 409
-
     body = request.get_json(silent=True) or {}
     linux_username = (body.get('linux_username') or '').strip() or None
 
@@ -178,7 +181,9 @@ def capture_device_screenshot(system_id):
     except RuntimeError as exc:
         return jsonify({'success': False, 'message': str(exc)}), 409
 
-    return jsonify({'success': True, 'result': result})
+    queued = bool(isinstance(result, dict) and result.get('queued'))
+    status_code = 202 if queued else 200
+    return jsonify({'success': True, 'result': result, 'queued': queued}), status_code
 
 
 @api_screenshots_bp.route('/api/devices/<system_id>/screenshots', methods=['DELETE'])

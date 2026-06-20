@@ -538,6 +538,11 @@ def initialize_runtime(start_background_tasks=False):
     with _runtime_init_lock:
         with app.app_context():
             _initialize_database()
+            from src.pending_commands_manager import backfill_pending_factory_reset_commands
+
+            backfilled = backfill_pending_factory_reset_commands()
+            if backfilled:
+                _LOGGER.info('Backfilled %d legacy pending factory reset command(s)', backfilled)
         RUNTIME_STATE['initialized'] = True
         _LOGGER.info("Runtime initialization completed")
 

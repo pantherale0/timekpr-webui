@@ -246,7 +246,7 @@ class AgentConnectionManager(metaclass=AgentConnectionManagerMeta):
         return False
 
     @classmethod
-    def send_command_sync(cls, system_id, action, username, args=None, timeout=15):
+    def send_command_sync(cls, system_id, action, username, args=None, timeout=15, queue_if_offline=True):
         """
         Send a command to the client and wait synchronously for the response.
         Thread-safe and block-based.
@@ -269,6 +269,20 @@ class AgentConnectionManager(metaclass=AgentConnectionManagerMeta):
                         break
                     time.sleep(1)
         if not ws:
+            if queue_if_offline:
+                from src.pending_commands_manager import QUEUEABLE_ACTIONS, queue_offline_command
+
+                if action in QUEUEABLE_ACTIONS:
+                    try:
+                        queue_offline_command(system_id, action, username, args)
+                    except ValueError as exc:
+                        return False, str(exc), None
+                    wake_android_for_command(system_id, action)
+                    return (
+                        True,
+                        "Command queued for delivery when device reconnects",
+                        {"queued": True},
+                    )
             return False, f"Agent for system ID '{system_id}' is offline", None
 
         correlation_id = str(uuid.uuid4())

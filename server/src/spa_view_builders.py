@@ -48,6 +48,7 @@ def _build_device_protection_summary(
     agent_online,
     android_device_policy=None,
     screenshot_settings=None,
+    pending_command_count=0,
 ):
     platform = (device.platform or 'linux').strip().lower()
     is_cloud_console = platform in {'nintendo', 'xbox'}
@@ -58,6 +59,14 @@ def _build_device_protection_summary(
             'message_key': 'pages.device_detail.attention_offline',
             'href': '#advanced',
             'severity': 'warning',
+        })
+
+    if pending_command_count > 0:
+        attention_items.append({
+            'message_key': 'pages.device_detail.attention_pending_commands',
+            'message_params': {'count': pending_command_count},
+            'href': '#advanced',
+            'severity': 'info',
         })
 
     unverified_count = sum(1 for mapping in mapped_accounts if not mapping.is_valid)
@@ -113,7 +122,7 @@ def _build_device_protection_summary(
 
     if (
         platform in {'linux', 'windows'}
-        and (device.hardware_compliance_status or '').strip().lower() == 'non_compliant'
+        and (getattr(device, 'hardware_compliance_status', None) or '').strip().lower() == 'non_compliant'
     ):
         attention_items.append({
             'message_key': 'pages.device_detail.attention_hardware_non_compliant',
@@ -480,6 +489,9 @@ def build_device_detail_context(system_id):
             )
 
     agent_online = AgentConnectionManager.is_online(system_id)
+    from src.pending_commands_manager import get_pending_count
+
+    pending_command_count = get_pending_count(system_id)
     protection_summary = _build_device_protection_summary(
         device,
         mapped_accounts,
@@ -488,6 +500,7 @@ def build_device_detail_context(system_id):
         agent_online,
         android_device_policy=android_device_policy,
         screenshot_settings=screenshot_settings,
+        pending_command_count=pending_command_count,
     )
     hardware_baseline = None
     if (device.platform or 'linux').strip().lower() in {'linux', 'windows'}:

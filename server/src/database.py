@@ -386,6 +386,50 @@ class AgentAlert(db.Model):
         self.delivered_at = None
         self.last_delivery_error = None
 
+
+class PendingCommand(db.Model):
+    __tablename__ = 'pending_command'
+
+    KIND_IMPERATIVE = 'imperative'
+    KIND_POLICY_SNAPSHOT = 'policy_snapshot'
+    KIND_DOMAIN_RECONCILE = 'domain_reconcile'
+
+    STATUS_PENDING = 'pending'
+    STATUS_IN_FLIGHT = 'in_flight'
+    STATUS_COMPLETED = 'completed'
+    STATUS_FAILED = 'failed'
+    STATUS_EXPIRED = 'expired'
+    STATUS_SUPERSEDED = 'superseded'
+
+    id = db.Column(db.Integer, primary_key=True)
+    system_id = db.Column(db.String(50), db.ForeignKey('agent_device.system_id'), nullable=False)
+    action = db.Column(db.String(64), nullable=False)
+    username = db.Column(db.String(80), nullable=True)
+    command_kind = db.Column(db.String(32), nullable=False)
+    args_json = db.Column(db.Text, nullable=True)
+    coalesce_key = db.Column(db.String(128), nullable=True)
+    status = db.Column(db.String(20), default=STATUS_PENDING, nullable=False)
+    created_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+    updated_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+    attempt_count = db.Column(db.Integer, default=0, nullable=False)
+    last_error = db.Column(db.Text, nullable=True)
+    expires_at = db.Column(db.DateTime(timezone=True), nullable=True)
+
+    device = db.relationship('AgentDevice', backref=db.backref('pending_commands', lazy=True))
+
+    def __repr__(self):
+        return f'<PendingCommand {self.action} on {self.system_id} [{self.status}]>'
+
+    @property
+    def args(self):
+        if not self.args_json:
+            return {}
+        try:
+            return json.loads(self.args_json)
+        except (TypeError, ValueError, json.JSONDecodeError):
+            return {}
+
+
 class ManagedUser(db.Model):
     __tablename__ = 'managed_user'
     id = db.Column(db.Integer, primary_key=True)

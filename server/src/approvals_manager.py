@@ -664,7 +664,17 @@ def push_mapping_app_policy(mapping):
     from src.agent_helper import AgentClient, AgentConnectionManager
 
     if not AgentConnectionManager.is_online(mapping.system_id):
-        return False, 'Agent offline'
+        from src.pending_commands_manager import enqueue_policy_snapshot
+
+        try:
+            enqueue_policy_snapshot(
+                mapping.system_id,
+                'sync_apparmor_policy',
+                mapping.linux_username,
+            )
+            return True, 'Queued for reconnect'
+        except ValueError as exc:
+            return False, str(exc)
 
     policies_list, _, approval_policy = build_full_app_policy_sync_payload(mapping)
     agent = AgentClient(system_id=mapping.system_id)

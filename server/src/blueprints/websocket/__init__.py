@@ -1,6 +1,7 @@
 import json
 import logging
 import secrets
+import threading
 from datetime import datetime, timezone
 from flask import Blueprint, request
 from sqlalchemy.exc import SQLAlchemyError
@@ -30,6 +31,24 @@ def _agent_server_url_from_request() -> str:
     return f'{ws_scheme}://{host}/ws'
 
 websocket_bp = Blueprint('websocket', __name__)
+
+
+def _flush_pending_commands_on_connect(system_id, flask_app):
+    """Drain persisted pending commands after a device authenticates."""
+    from src.pending_commands_manager import flush_pending_commands
+
+    try:
+        result = flush_pending_commands(system_id, app=flask_app)
+        if result.delivered or result.failed or result.expired:
+            _LOGGER.info(
+                'Pending command flush for %s: delivered=%s failed=%s expired=%s',
+                system_id,
+                result.delivered,
+                result.failed,
+                result.expired,
+            )
+    except Exception:
+        _LOGGER.exception('Pending command flush failed for %s', system_id)
 
 
 def _close_websocket_connection(ws, system_id, connection_label):
@@ -283,6 +302,12 @@ def ws_agent_handler(ws):
 
                         if deliver_pending_factory_reset_on_connect(system_id):
                             return
+
+                    threading.Thread(
+                        target=_flush_pending_commands_on_connect,
+                        args=(system_id, app),
+                        daemon=True,
+                    ).start()
     
         except (
             OSError,

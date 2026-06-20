@@ -17,11 +17,11 @@ Policies attach to **child accounts** and flow to devices through **mappings**.
 | Trigger | Behavior |
 |---------|----------|
 | Agent online (Linux/Windows) | Immediate WebSocket commands |
-| Agent offline | Queued; applied on reconnect |
+| Agent offline | Persisted in `pending_command`; flushed on reconnect (policy snapshots coalesce to latest DB state) |
 | Android idle | FCM `sync_policies` wake or ~4h WorkManager |
 | Nintendo/Xbox | Worker cloud push on schedule change |
 
-Agents may send `policy_sync_check` to pull latest domain manifest hashes.
+Agents may send `policy_sync_check` to pull latest domain manifest hashes (secondary path after reconnect flush).
 
 ## Verify
 

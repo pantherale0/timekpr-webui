@@ -243,7 +243,7 @@ def upsert_policy(mapping: ManagedUserDeviceMap, body: dict) -> MappingLinuxDevi
     db.session.commit()
 
     push_success, push_message = push_mapping_device_policy(mapping)
-    if push_success:
+    if push_success and push_message and 'Queued' not in push_message:
         policy.is_synced = True
         policy.last_synced_at = datetime.now(timezone.utc)
         policy.last_sync_error = None
@@ -267,7 +267,17 @@ def push_mapping_device_policy(mapping: ManagedUserDeviceMap) -> tuple[bool, str
         db.session.commit()
 
     if not AgentConnectionManager.is_online(mapping.system_id):
-        return False, 'Agent offline'
+        from src.pending_commands_manager import enqueue_policy_snapshot
+
+        try:
+            enqueue_policy_snapshot(
+                mapping.system_id,
+                'sync_linux_device_policy',
+                mapping.linux_username,
+            )
+            return True, 'Queued for reconnect'
+        except ValueError as exc:
+            return False, str(exc)
 
     payload = build_device_policy_payload(policy)
     agent = AgentClient(system_id=mapping.system_id)

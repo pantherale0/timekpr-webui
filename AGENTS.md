@@ -59,8 +59,11 @@ Managed Endpoint (Agent) ──(outbound wss://)──► Traefik (TLS terminati
 
 2. **Command & Policy Synchronization**
    - Persistent WebSocket for real-time commands and heartbeats.
-   - **Disconnected operation**: Server queues policy changes in `pending_commands` table.
-   - On reconnect → queue is replayed in order → agent reaches consistent state.
+   - **Disconnected operation**: Server persists work in the `pending_command` table (`server/src/pending_commands_manager.py`).
+   - Imperative RPCs (screenshots, app refresh, unenroll/factory reset) are stored with args and replayed FIFO on reconnect.
+   - Policy snapshot commands coalesce to the latest desired state per device/user and rebuild payloads from the database at flush time.
+   - Domain policy uses a `domain_policy_reconcile` marker that runs the full incremental sync orchestration when the agent reconnects.
+   - Android may also be woken via FCM; agents still send periodic `policy_sync_check` as a secondary pull path.
    - Use exponential backoff + jitter for reconnection.
 
 **Security Boundaries (Strict)**

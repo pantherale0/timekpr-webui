@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 import pytest
 
-from src.database import AgentDevice, ManagedUser, ManagedUserDeviceMap
+from src.database import AgentDevice, ManagedUser, ManagedUserDeviceMap, PendingCommand
 from src.device_lifecycle_manager import (
     MODE_FACTORY_RESET,
     MODE_UNENROLL,
@@ -73,7 +73,7 @@ def test_factory_reset_blocked_on_linux(approved_linux_device):
 @patch('src.device_lifecycle_manager.AgentConnectionManager.is_online', return_value=False)
 @patch('src.device_lifecycle_manager.device_prefers_push', return_value=True)
 @patch('src.device_lifecycle_manager.AgentClient.factory_reset_device', return_value=(False, 'offline'))
-def test_factory_reset_sets_pending_when_offline(
+def test_factory_reset_queues_command_when_push_delivery_fails(
     mock_factory_reset,
     mock_push,
     mock_online,
@@ -83,15 +83,44 @@ def test_factory_reset_sets_pending_when_offline(
     result = unenroll_device('sys-android-life', MODE_FACTORY_RESET)
 
     assert result['success'] is True
+    assert result['queued'] is True
     assert result['pending_factory_reset'] is True
-    assert result['server_revoked'] is True
+    assert result['status_code'] == 202
     mock_factory_reset.assert_called_once()
 
     refreshed = AgentDevice.query.get('sys-android-life')
     assert refreshed.status == 'rejected'
-    assert refreshed.pending_factory_reset is True
+    assert refreshed.pending_factory_reset is False
     assert refreshed.secure_token == 'secure-token'
-    assert refreshed.unenrolled_at is not None
+
+    pending = PendingCommand.query.filter_by(
+        system_id='sys-android-life',
+        action='factory_reset',
+        status=PendingCommand.STATUS_PENDING,
+    ).count()
+    assert pending == 1
+
+
+@patch('src.device_lifecycle_manager.AgentConnectionManager.is_online', return_value=False)
+@patch('src.device_lifecycle_manager.device_prefers_push', return_value=False)
+def test_offline_unenroll_queues_agent_cleanup(
+    mock_push,
+    mock_online,
+    approved_linux_device,
+    db_session,
+):
+    result = unenroll_device('sys-linux-life', MODE_UNENROLL)
+
+    assert result['success'] is True
+    assert result['queued'] is True
+    assert result['status_code'] == 202
+
+    pending = PendingCommand.query.filter_by(
+        system_id='sys-linux-life',
+        action='unenroll',
+        status=PendingCommand.STATUS_PENDING,
+    ).count()
+    assert pending == 1
 
 
 @patch('src.device_lifecycle_manager.AgentConnectionManager.is_online', return_value=True)
@@ -115,16 +144,29 @@ def test_unenroll_revokes_and_records_timestamp(
     assert refreshed.unenrolled_at is not None
 
 
-@patch('src.device_lifecycle_manager.AgentClient.factory_reset_device', return_value=(True, 'wiping'))
-def test_deliver_pending_factory_reset_clears_flag(mock_factory_reset, approved_android_device, db_session):
+@patch('src.pending_commands_manager.flush_pending_commands')
+def test_deliver_pending_factory_reset_uses_queue(
+    mock_flush,
+    approved_android_device,
+    db_session,
+):
+    from src.pending_commands_manager import FlushResult
+
     approved_android_device.pending_factory_reset = True
     approved_android_device.status = 'rejected'
     db_session.commit()
+    mock_flush.return_value = FlushResult(delivered=1)
 
     delivered = deliver_pending_factory_reset_on_connect('sys-android-life')
 
     assert delivered is True
-    mock_factory_reset.assert_called_once_with('child')
+    mock_flush.assert_called_once_with('sys-android-life')
     refreshed = AgentDevice.query.get('sys-android-life')
     assert refreshed.pending_factory_reset is False
     assert refreshed.secure_token is None
+
+    pending = PendingCommand.query.filter_by(
+        system_id='sys-android-life',
+        action='factory_reset',
+    ).count()
+    assert pending == 1

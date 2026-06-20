@@ -59,6 +59,16 @@ def _revoke_server_trust(device: AgentDevice, *, keep_token_for_pending_reset: b
     _close_device_connections(device.system_id)
 
 
+def _queue_lifecycle_command(system_id: str, action: str, username: str) -> tuple[bool, str]:
+    from src.pending_commands_manager import enqueue_command
+
+    try:
+        enqueue_command(system_id, action, username=username or None, args={})
+        return True, f'Device offline; {action} queued for next connection'
+    except ValueError as exc:
+        return False, str(exc)
+
+
 def unenroll_device(system_id: str, mode: str) -> dict:
     """
     Unenroll or factory-reset a device.
@@ -99,77 +109,133 @@ def unenroll_device(system_id: str, mode: str) -> dict:
     client = AgentClient(system_id)
     delivered_to_agent = False
     factory_reset_requested = normalized_mode == MODE_FACTORY_RESET
-    pending_factory_reset = False
+    queued_for_reconnect = False
     delivery_message = ''
+    keep_token_for_queue = False
 
     if normalized_mode == MODE_FACTORY_RESET:
         if AgentConnectionManager.is_online(system_id) or device_prefers_push(device):
             success, message = client.factory_reset_device(username)
             delivery_message = message or ''
             delivered_to_agent = success
-            if not success and device_prefers_push(device):
-                pending_factory_reset = True
+            if not success:
+                queued, queue_message = _queue_lifecycle_command(
+                    system_id,
+                    MODE_FACTORY_RESET,
+                    username,
+                )
+                if queued:
+                    queued_for_reconnect = True
+                    keep_token_for_queue = True
+                    delivery_message = queue_message
         else:
-            pending_factory_reset = True
-            delivery_message = 'Device offline; factory reset queued for next connection'
+            queued, delivery_message = _queue_lifecycle_command(
+                system_id,
+                MODE_FACTORY_RESET,
+                username,
+            )
+            queued_for_reconnect = queued
+            keep_token_for_queue = queued
     else:
         if AgentConnectionManager.is_online(system_id) or device_prefers_push(device):
             success, message = client.unenroll_device(username)
             delivery_message = message or ''
             delivered_to_agent = success
+            if not success and not AgentConnectionManager.is_online(system_id):
+                queued, queue_message = _queue_lifecycle_command(
+                    system_id,
+                    MODE_UNENROLL,
+                    username,
+                )
+                if queued:
+                    queued_for_reconnect = True
+                    delivery_message = queue_message
         else:
-            delivery_message = 'Device offline; server trust revoked without agent cleanup'
+            queued, delivery_message = _queue_lifecycle_command(
+                system_id,
+                MODE_UNENROLL,
+                username,
+            )
+            queued_for_reconnect = queued
 
-    device.pending_factory_reset = pending_factory_reset
+    device.pending_factory_reset = False
     _revoke_server_trust(
         device,
-        keep_token_for_pending_reset=pending_factory_reset and bool(device.secure_token),
+        keep_token_for_pending_reset=keep_token_for_queue and bool(device.secure_token),
     )
     db.session.commit()
 
     _LOGGER.info(
-        "Unenrolled device %s (mode=%s, delivered=%s, pending_reset=%s)",
+        "Unenrolled device %s (mode=%s, delivered=%s, queued=%s)",
         system_id,
         normalized_mode,
         delivered_to_agent,
-        pending_factory_reset,
+        queued_for_reconnect,
     )
 
+    status_code = 202 if queued_for_reconnect else 200
     return {
         'success': True,
         'message': delivery_message or 'Device unenrolled successfully',
         'delivered_to_agent': delivered_to_agent,
         'factory_reset_requested': factory_reset_requested,
-        'pending_factory_reset': pending_factory_reset,
+        'pending_factory_reset': queued_for_reconnect and factory_reset_requested,
+        'queued': queued_for_reconnect,
         'server_revoked': True,
-        'status_code': 200,
+        'status_code': status_code,
     }
 
 
 def deliver_pending_factory_reset_on_connect(system_id: str) -> bool:
     """
-    Send a queued factory reset immediately after WebSocket authentication.
+    Deliver a legacy pending_factory_reset flag or queued factory reset on connect.
 
-    Returns True when a pending reset was dispatched.
+    Returns True when a factory reset was dispatched.
     """
+    from src.pending_commands_manager import (
+        PendingCommand,
+        enqueue_command,
+        flush_pending_commands,
+    )
+
     device = AgentDevice.query.get(system_id)
-    if not device or not device.pending_factory_reset or not _is_android_device(device):
+    if not device or not _is_android_device(device):
         return False
 
     username = _resolve_command_username(device)
-    client = AgentClient(system_id)
-    success, message = client.factory_reset_device(username)
-    device.pending_factory_reset = False
-    if success:
+    if device.pending_factory_reset:
+        try:
+            enqueue_command(system_id, 'factory_reset', username=username or None, args={})
+        except ValueError as exc:
+            _LOGGER.warning(
+                'Failed to queue legacy factory reset for %s: %s',
+                system_id,
+                exc,
+            )
+        device.pending_factory_reset = False
+        db.session.commit()
+
+    pending_row = PendingCommand.query.filter_by(
+        system_id=system_id,
+        action=MODE_FACTORY_RESET,
+        status=PendingCommand.STATUS_PENDING,
+    ).first()
+    if pending_row is None:
+        return False
+
+    result = flush_pending_commands(system_id)
+    if result.delivered == 0:
+        return False
+
+    device = AgentDevice.query.get(system_id)
+    if device is not None:
         device.secure_token = None
-    db.session.commit()
+        db.session.commit()
 
     _LOGGER.info(
-        "Delivered pending factory reset to %s (success=%s, message=%s)",
+        "Delivered queued factory reset to %s (failed=%s)",
         system_id,
-        success,
-        message,
+        result.failed,
     )
-
     _close_device_connections(system_id)
     return True
