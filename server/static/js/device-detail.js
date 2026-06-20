@@ -170,6 +170,69 @@
         }
     }
 
+    function bindWindowsLaps(signal, systemId) {
+        const card = document.getElementById('windows-laps-card');
+        const feedback = document.getElementById('windows-laps-feedback');
+        if (!card || !systemId) return;
+
+        function setFeedback(message, isError) {
+            if (!feedback) return;
+            feedback.textContent = message;
+            feedback.className = `small mt-2 ${isError ? 'text-danger' : 'text-success'}`;
+        }
+
+        async function postAction(path, body) {
+            const response = await fetch(path, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': window.csrfToken || '',
+                },
+                body: JSON.stringify(body || {}),
+                signal,
+            });
+            const data = await response.json();
+            if (!response.ok || !data.success) {
+                throw new Error(data.message || 'Request failed');
+            }
+            return data;
+        }
+
+        const revealBtn = document.getElementById('windows-laps-reveal-btn');
+        if (revealBtn) {
+            revealBtn.addEventListener('click', async () => {
+                if (!window.confirm('Reveal the escrowed local Administrator password? This action is logged.')) {
+                    return;
+                }
+                try {
+                    const data = await postAction(`/api/devices/${systemId}/windows-laps/reveal-password`, {});
+                    window.prompt('Escrowed local Administrator password (copy now):', data.password || '');
+                } catch (err) {
+                    setFeedback(err.message, true);
+                }
+            }, { signal });
+        }
+
+        const clearBtn = document.getElementById('windows-laps-clear-lockdown-btn');
+        if (clearBtn) {
+            clearBtn.addEventListener('click', async () => {
+                if (!window.confirm('Release Safe Mode lockdown on this device?')) {
+                    return;
+                }
+                clearBtn.disabled = true;
+                setFeedback('Sending Safe Mode lockdown override…', false);
+                try {
+                    await postAction(`/api/devices/${systemId}/windows-laps/clear-safe-mode-lockdown`, {});
+                    setFeedback('Safe Mode lockdown override sent to the agent.', false);
+                } catch (err) {
+                    setFeedback(err.message, true);
+                } finally {
+                    clearBtn.disabled = false;
+                }
+            }, { signal });
+        }
+    }
+
     function init() {
         const config = getConfig();
         if (!config) return;
@@ -184,6 +247,7 @@
 
         bindTabs(signal);
         bindHardwareBaseline(signal, systemId);
+        bindWindowsLaps(signal, systemId);
 
 const nintendoSyncBtn = document.getElementById('nintendo-sync-btn');
         const nintendoSyncError = document.getElementById('nintendo-sync-error');

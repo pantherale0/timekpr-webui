@@ -44,6 +44,7 @@ ALLOWED_AGENT_ALERT_TYPES = {
     'access_requested',
     'terminal_command',
     'clock_tamper',
+    'boot_config_tamper',
     'hardware_non_compliant',
     'dialogue_flag',
     'sentiment_breach',
@@ -834,6 +835,17 @@ class AgentClient:
         success, message, data = AgentConnectionManager.send_command_sync(
             self.system_id,
             'detect_hardware_oem',
+            username,
+            {},
+            timeout=30,
+        )
+        return success, message, data or {}
+
+    def clear_safe_mode_lockdown(self, username=''):
+        """Clear Safe Mode lockdown override on a Windows agent."""
+        success, message, data = AgentConnectionManager.send_command_sync(
+            self.system_id,
+            'clear_safe_mode_lockdown',
             username,
             {},
             timeout=30,

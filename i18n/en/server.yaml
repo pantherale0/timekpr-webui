@@ -1191,6 +1191,8 @@ pages:
     filter_commands: Terminal Commands Only
     clock_tamper_event: Device clock may have been changed
     clock_tamper_feed: Clock tamper detected on a managed device
+    boot_config_tamper_event: Boot configuration tamper detected
+    boot_config_tamper_feed: Someone tried to change how this PC boots
     prune_activities: Prune Old Activities
     loading_feed: Loading activity feed...
     loading_older: Loading older activities...
@@ -1322,6 +1324,12 @@ pages:
     hardware_apply_btn: Apply hardware baseline
     hardware_reveal_password_btn: Reveal supervisor password
     hardware_apply_warning: Applying a hardware baseline may set a BIOS supervisor password and change boot security settings. Guardian stores the password securely on your server.
+    windows_laps_title: Local administrator
+    windows_laps_heading: Windows administrator password
+    windows_laps_description: Guardian rotates the built-in local Administrator account when it is enabled with a weak password, and stores the new password securely on your server.
+    windows_laps_rotated_label: "Last rotated: {rotated_at}"
+    windows_laps_reveal_password_btn: Reveal local Administrator password
+    windows_laps_clear_lockdown_btn: Release Safe Mode lockdown
     manage_routines: Manage routines
     show_account_details: Account details
     show_app_details: App details

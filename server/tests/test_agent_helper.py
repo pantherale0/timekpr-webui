@@ -455,6 +455,22 @@ def test_clock_tamper_alert_type():
     assert payload["details"]["skew_seconds"] == 420
 
 
+def test_boot_config_tamper_alert_type():
+    payload = normalize_agent_alert_payload("sys-1", {
+        "type": "alert_event",
+        "event_type": "boot_config_tamper",
+        "occurred_at": "2026-06-06T21:00:00Z",
+        "linux_username": "system",
+        "details": {
+            "source": "bcdedit_enum",
+            "entry_id": "{default}",
+            "detected_flags": ["safeboot:minimal"],
+        },
+    })
+    assert payload["event_type"] == "boot_config_tamper"
+    assert payload["details"]["source"] == "bcdedit_enum"
+
+
 def test_terminal_command_alert_type():
     payload = normalize_agent_alert_payload("sys-1", {
         "type": "alert_event",

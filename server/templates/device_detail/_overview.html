@@ -142,6 +142,38 @@
     </div>
     {% endif %}
 
+    {% if windows_laps and windows_laps.supported %}
+    <div class="card border shadow-sm mb-4" id="windows-laps-card" data-system-id="{{ device.system_id }}">
+        <div class="card-body p-4">
+            <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-3">
+                <div>
+                    <span class="text-secondary small fw-bold text-uppercase d-block mb-1"
+                        style="font-size: 0.7rem; letter-spacing: 0.05em;">{{ t('pages.device_detail.windows_laps_title') }}</span>
+                    <h2 class="h5 fw-bold mb-1">{{ t('pages.device_detail.windows_laps_heading') }}</h2>
+                    <p class="text-secondary small mb-0">{{ t('pages.device_detail.windows_laps_description') }}</p>
+                </div>
+                {% if windows_laps.rotated_at %}
+                <span class="badge bg-success-subtle text-success border border-success-subtle px-3 py-2">
+                    {{ t('pages.device_detail.windows_laps_rotated_label', rotated_at=windows_laps.rotated_at) }}
+                </span>
+                {% endif %}
+            </div>
+            <div class="d-flex flex-wrap gap-2">
+                {% if windows_laps.has_escrowed_password %}
+                <button type="button" class="btn btn-sm btn-outline-secondary fw-bold" id="windows-laps-reveal-btn">
+                    {{ t('pages.device_detail.windows_laps_reveal_password_btn') }}
+                </button>
+                {% endif %}
+                <button type="button" class="btn btn-sm btn-outline-warning fw-bold" id="windows-laps-clear-lockdown-btn"
+                    {% if not agent_online %}disabled{% endif %}>
+                    {{ t('pages.device_detail.windows_laps_clear_lockdown_btn') }}
+                </button>
+            </div>
+            <div id="windows-laps-feedback" class="small mt-2"></div>
+        </div>
+    </div>
+    {% endif %}
+
         <div class="card shadow-sm border">
             <div class="card-header bg-body-secondary py-3 d-flex align-items-center gap-2">
                 <div class="bg-primary-subtle text-primary p-2 rounded d-flex align-items-center justify-content-center"

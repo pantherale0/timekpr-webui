@@ -253,6 +253,9 @@ class AgentDevice(db.Model):
     hardware_compliance_json = db.Column(db.Text(), nullable=True)
     hardware_compliance_checked_at = db.Column(db.DateTime(timezone=True), nullable=True)
     bios_supervisor_password_escrow = db.Column(db.Text(), nullable=True)
+    windows_local_admin_password_escrow = db.Column(db.Text(), nullable=True)
+    windows_local_admin_rotated_at = db.Column(db.DateTime(timezone=True), nullable=True)
+    windows_local_admin_rotation_id = db.Column(db.String(64), nullable=True)
 
     # Relationship to per-user Linux account mappings on this device
     user_mappings = db.relationship(

@@ -1,10 +1,18 @@
+pub mod bcd_integrity;
+pub mod boot_mode;
 pub mod clock_integrity_monitor;
 pub mod dns_proxy;
 pub mod ipc;
+pub mod laps;
 pub mod overlay;
 pub mod policy;
 pub mod process_monitor;
+pub mod safe_mode_lockdown;
+pub mod safeboot_registry;
 pub mod tamper_state;
+
+#[cfg(target_os = "windows")]
+pub const SERVICE_NAME: &str = "GuardianAgent";
 
 #[cfg(target_os = "windows")]
 use std::sync::{Arc, Mutex};
@@ -27,10 +35,10 @@ define_windows_service!(ffi_service_main, timekpr_service_main);
 #[cfg(target_os = "windows")]
 pub async fn run_service() {
     println!("Starting Windows Service Dispatcher...");
-    if let Err(e) = service_dispatcher::start("TimeKprAgent", ffi_service_main) {
+    if let Err(e) = service_dispatcher::start(SERVICE_NAME, ffi_service_main) {
         eprintln!("Failed to start service dispatcher: {}", e);
         println!("Running in standalone/console mode...");
-        run_service_tasks(None).await;
+        run_service_tasks(None, boot_mode::is_safe_mode_boot()).await;
     }
 }
 
@@ -46,7 +54,7 @@ fn timekpr_service_main(_args: Vec<std::ffi::OsString>) {
         let (power_resume_tx, power_resume_rx) = mpsc::unbounded_channel::<()>();
 
         let status_handle = service_control_handler::register(
-            "TimeKprAgent",
+            SERVICE_NAME,
             move |control_event| {
                 match control_event {
                     ServiceControl::Stop | ServiceControl::Shutdown => {
@@ -93,9 +101,22 @@ fn timekpr_service_main(_args: Vec<std::ffi::OsString>) {
             process_id: None,
         });
 
-        let _ = dns_proxy::configure_system_dns().await;
+        safeboot_registry::ensure_registered();
 
-        let service_task = tokio::spawn(run_service_tasks(Some(power_resume_rx)));
+        let safe_mode = boot_mode::is_safe_mode_boot();
+        if safe_mode {
+            safe_mode_lockdown::on_safe_mode_service_start();
+        } else {
+            safe_mode_lockdown::on_normal_boot_service_start();
+        }
+
+        if !safe_mode {
+            let _ = dns_proxy::configure_system_dns().await;
+        } else {
+            println!("Safe Mode boot detected; skipping DNS reconfiguration.");
+        }
+
+        let service_task = tokio::spawn(run_service_tasks(Some(power_resume_rx), safe_mode));
 
         let _ = status_handle.set_service_status(ServiceStatus {
             service_type: ServiceType::OWN_PROCESS,
@@ -131,7 +152,10 @@ fn timekpr_service_main(_args: Vec<std::ffi::OsString>) {
 }
 
 #[cfg(target_os = "windows")]
-async fn run_service_tasks(power_resume_rx: Option<mpsc::UnboundedReceiver<()>>) {
+async fn run_service_tasks(
+    power_resume_rx: Option<mpsc::UnboundedReceiver<()>>,
+    safe_mode: bool,
+) {
     tokio::spawn(ipc::start_ipc_server());
     tokio::spawn(async {
         let _ = crate::ipc::run_ipc_server().await;
@@ -162,6 +186,10 @@ async fn run_service_tasks(power_resume_rx: Option<mpsc::UnboundedReceiver<()>>)
 
     tokio::spawn(process_monitor::start_process_monitor());
 
+    if !safe_mode {
+        tokio::spawn(bcd_integrity::start_bcd_monitor());
+    }
+
     let users_map = policy::get_windows_users_map();
     let clock_monitor = clock_integrity_monitor::start(users_map);
     clock_integrity_monitor::spawn_periodic_monitor(clock_monitor.clone());
@@ -173,7 +201,7 @@ async fn run_service_tasks(power_resume_rx: Option<mpsc::UnboundedReceiver<()>>)
         eprintln!("Failed to restore persisted domain policy: {}", message);
     }
 
-    crate::start_agent_reconnect_loop(active_client_tx).await;
+    crate::start_agent_reconnect_loop(active_client_tx, safe_mode).await;
 }
 
 #[cfg(not(target_os = "windows"))]

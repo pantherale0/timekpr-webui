@@ -448,6 +448,14 @@ impl PendingDomainPolicySync {
 }
 
 fn policy_state_path() -> PathBuf {
+    #[cfg(target_os = "windows")]
+    {
+        let primary_dir = PathBuf::from(r"C:\ProgramData\Guardian");
+        if fs::create_dir_all(&primary_dir).is_ok() {
+            return primary_dir.join("domain-policy.json");
+        }
+    }
+
     let primary_dir = PathBuf::from("/var/lib/guardian-agent");
     if fs::create_dir_all(&primary_dir).is_ok() {
         return primary_dir.join("domain-policy.json");

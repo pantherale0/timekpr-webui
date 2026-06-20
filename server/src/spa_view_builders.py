@@ -536,6 +536,11 @@ def build_device_detail_context(system_id):
         from src.hardware_baseline_manager import get_hardware_baseline_status
         hardware_baseline = get_hardware_baseline_status(device)
 
+    windows_laps = None
+    if (device.platform or '').strip().lower() == 'windows':
+        from src.windows_laps_manager import get_windows_laps_status
+        windows_laps = get_windows_laps_status(device)
+
     return {
         'template': 'device_detail.html',
         'device': device,
@@ -558,6 +563,7 @@ def build_device_detail_context(system_id):
         'xbox_console': xbox_console,
         'screenshot_settings': screenshot_settings,
         'hardware_baseline': hardware_baseline,
+        'windows_laps': windows_laps,
     }
 
 

@@ -402,6 +402,16 @@ def ws_agent_handler(ws):
                                     system_id,
                                     exc,
                                 )
+                        elif alert.event_type == 'boot_config_tamper':
+                            try:
+                                from src.dashboard_events import notify_dashboard_changed
+                                notify_dashboard_changed('boot_config_tamper')
+                            except Exception as exc:
+                                _LOGGER.error(
+                                    "Failed to notify dashboard of boot config tamper from %s: %s",
+                                    system_id,
+                                    exc,
+                                )
                     except ValueError as exc:
                         _LOGGER.warning(
                             "Rejected invalid alert payload from %s: %s",
@@ -412,6 +422,37 @@ def ws_agent_handler(ws):
                         db.session.rollback()
                         _LOGGER.error(
                             "Failed to store alert payload from %s: %s",
+                            system_id,
+                            exc,
+                        )
+                elif msg_type == "credential_escrow":
+                    try:
+                        from src.windows_laps_manager import persist_credential_escrow
+                        from src.agent_helper import parse_agent_alert_timestamp
+
+                        credential_type = (msg.get("credential_type") or "").strip()
+                        rotation_id = (msg.get("rotation_id") or "").strip()
+                        password = msg.get("password")
+                        if not isinstance(password, str) or not password.strip():
+                            raise ValueError("password must be a non-empty string")
+                        occurred_at = parse_agent_alert_timestamp(msg.get("occurred_at"))
+                        persist_credential_escrow(
+                            system_id,
+                            credential_type,
+                            rotation_id,
+                            password.strip(),
+                            occurred_at=occurred_at,
+                        )
+                    except ValueError as exc:
+                        _LOGGER.warning(
+                            "Rejected invalid credential escrow payload from %s: %s",
+                            system_id,
+                            exc,
+                        )
+                    except Exception as exc:
+                        db.session.rollback()
+                        _LOGGER.error(
+                            "Failed to store credential escrow from %s: %s",
                             system_id,
                             exc,
                         )

@@ -230,6 +230,13 @@ pub(crate) enum ClientMessage {
     PolicySyncCheck {
         source_revisions: HashMap<String, String>,
     },
+    #[serde(rename = "credential_escrow")]
+    CredentialEscrow {
+        credential_type: String,
+        rotation_id: String,
+        occurred_at: String,
+        password: String,
+    },
 }
 
 #[derive(Clone, Debug, Default)]
@@ -1589,8 +1596,24 @@ async fn run_linux_main() {
     start_agent_reconnect_loop(active_client_tx).await;
 }
 
+#[cfg(target_os = "linux")]
 pub(crate) async fn start_agent_reconnect_loop(
     active_client_tx: Arc<Mutex<Option<mpsc::UnboundedSender<ClientMessage>>>>,
+) {
+    start_agent_reconnect_loop_impl(active_client_tx).await;
+}
+
+#[cfg(target_os = "windows")]
+pub(crate) async fn start_agent_reconnect_loop(
+    active_client_tx: Arc<Mutex<Option<mpsc::UnboundedSender<ClientMessage>>>>,
+    run_laps_on_connect: bool,
+) {
+    start_agent_reconnect_loop_impl(active_client_tx, run_laps_on_connect).await;
+}
+
+async fn start_agent_reconnect_loop_impl(
+    active_client_tx: Arc<Mutex<Option<mpsc::UnboundedSender<ClientMessage>>>>,
+    #[cfg(target_os = "windows")] run_laps_on_connect: bool,
 ) {
     loop {
         let mut device_unenrolled = false;
@@ -1830,11 +1853,34 @@ pub(crate) async fn start_agent_reconnect_loop(
                     shutdown_tx.subscribe(),
                 );
 
-                let startup_details = serde_json::json!({
+                let mut startup_details = serde_json::json!({
                     "source": "agent_service",
                     "hostname": system_hostname.clone(),
                 });
+                #[cfg(target_os = "windows")]
+                if windows_service::boot_mode::is_safe_mode_boot() {
+                    startup_details["safe_mode"] = serde_json::json!(true);
+                    if let Some(variant) = windows_service::boot_mode::safe_mode_variant() {
+                        startup_details["safe_mode_variant"] = serde_json::json!(format!("{variant:?}"));
+                    }
+                }
                 let _ = client_tx.send(build_alert_message("system_startup", None, startup_details));
+
+                #[cfg(target_os = "windows")]
+                if run_laps_on_connect {
+                    match windows_service::laps::audit_and_rotate() {
+                        Ok(Some(payload)) => {
+                            let _ = client_tx.send(ClientMessage::CredentialEscrow {
+                                credential_type: "windows_local_admin".to_string(),
+                                rotation_id: payload.rotation_id,
+                                occurred_at: payload.occurred_at,
+                                password: payload.password,
+                            });
+                        }
+                        Ok(None) => {}
+                        Err(err) => eprintln!("Windows LAPS audit failed: {}", err),
+                    }
+                }
 
                 while let Some(msg_result) = ws_read.next().await {
                     match msg_result {

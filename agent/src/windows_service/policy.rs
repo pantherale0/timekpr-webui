@@ -1,6 +1,124 @@
-use std::collections::HashMap;
+use std::sync::{Arc, Mutex, OnceLock};
+use std::collections::{HashMap, HashSet};
+use serde::{Deserialize, Serialize};
 use serde_json::json;
+use std::fs;
+use std::path::PathBuf;
 use crate::installed_apps::DiscoveredApp;
+
+const APP_POLICY_PATH: &str = r"C:\ProgramData\Guardian\app-policy.json";
+const DEVICE_POLICY_PATH: &str = r"C:\ProgramData\Guardian\device-policy.json";
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+struct UserAppPolicy {
+    #[serde(default)]
+    blocked_executables: Vec<String>,
+    #[serde(default)]
+    app_launch_mode: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+struct CachedAppPolicy {
+    #[serde(default)]
+    users: HashMap<String, UserAppPolicy>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+struct CachedDevicePolicy {
+    #[serde(default)]
+    users: HashMap<String, serde_json::Value>,
+}
+
+static APP_POLICY_CACHE: OnceLock<Arc<Mutex<CachedAppPolicy>>> = OnceLock::new();
+static DEVICE_POLICY_CACHE: OnceLock<Arc<Mutex<CachedDevicePolicy>>> = OnceLock::new();
+
+fn app_policy_cache() -> Arc<Mutex<CachedAppPolicy>> {
+    APP_POLICY_CACHE
+        .get_or_init(|| Arc::new(Mutex::new(load_app_policy_from_disk())))
+        .clone()
+}
+
+fn device_policy_cache() -> Arc<Mutex<CachedDevicePolicy>> {
+    DEVICE_POLICY_CACHE
+        .get_or_init(|| Arc::new(Mutex::new(load_device_policy_from_disk())))
+        .clone()
+}
+
+fn load_app_policy_from_disk() -> CachedAppPolicy {
+    if let Ok(raw) = fs::read_to_string(APP_POLICY_PATH) {
+        serde_json::from_str(&raw).unwrap_or_default()
+    } else {
+        CachedAppPolicy::default()
+    }
+}
+
+fn load_device_policy_from_disk() -> CachedDevicePolicy {
+    if let Ok(raw) = fs::read_to_string(DEVICE_POLICY_PATH) {
+        serde_json::from_str(&raw).unwrap_or_default()
+    } else {
+        CachedDevicePolicy::default()
+    }
+}
+
+fn persist_app_policy(state: &CachedAppPolicy) -> Result<(), String> {
+    let parent = PathBuf::from(APP_POLICY_PATH).parent().map(|p| p.to_path_buf());
+    if let Some(dir) = parent {
+        fs::create_dir_all(&dir).map_err(|e| format!("failed to create policy dir: {}", e))?;
+    }
+    let json = serde_json::to_string_pretty(state)
+        .map_err(|e| format!("failed to serialize app policy: {}", e))?;
+    fs::write(APP_POLICY_PATH, json).map_err(|e| format!("failed to write app policy: {}", e))
+}
+
+fn persist_device_policy(state: &CachedDevicePolicy) -> Result<(), String> {
+    let parent = PathBuf::from(DEVICE_POLICY_PATH).parent().map(|p| p.to_path_buf());
+    if let Some(dir) = parent {
+        fs::create_dir_all(&dir).map_err(|e| format!("failed to create policy dir: {}", e))?;
+    }
+    let json = serde_json::to_string_pretty(state)
+        .map_err(|e| format!("failed to serialize device policy: {}", e))?;
+    fs::write(DEVICE_POLICY_PATH, json)
+        .map_err(|e| format!("failed to write device policy: {}", e))
+}
+
+fn normalize_executable_name(value: &str) -> String {
+    let trimmed = value.trim();
+    let file_name = std::path::Path::new(trimmed)
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or(trimmed);
+    file_name.to_ascii_lowercase()
+}
+
+pub fn is_executable_blocked(username: &str, executable_name: &str) -> bool {
+    let normalized = normalize_executable_name(executable_name);
+    let cache = app_policy_cache().lock().unwrap();
+    let user_policy = cache
+        .users
+        .get(username)
+        .or_else(|| cache.users.values().next());
+    let Some(policy) = user_policy else {
+        return normalized == "steam.exe";
+    };
+    policy
+        .blocked_executables
+        .iter()
+        .any(|blocked| normalize_executable_name(blocked) == normalized)
+}
+
+pub fn blocked_executables_for_user(username: &str) -> HashSet<String> {
+    let cache = app_policy_cache().lock().unwrap();
+    let policy = cache.users.get(username);
+    policy
+        .map(|entry| {
+            entry
+                .blocked_executables
+                .iter()
+                .map(|value| normalize_executable_name(value))
+                .collect()
+        })
+        .unwrap_or_default()
+}
 
 // Standard user info level 3 structure for NetUserEnum
 #[repr(C)]
@@ -121,9 +239,9 @@ pub async fn handle_windows_command(
             }
         }
         "sync_apparmor_policy" | "sync_windows_app_policy" => {
-            // On Windows, the AppArmor policy translates to process rules (allowlist/blocklist)
             let approval_policy = args.get("approval_policy");
-            match sync_app_policy(username, approval_policy) {
+            let policies = args.get("policies");
+            match sync_app_policy(username, approval_policy, policies) {
                 Ok(()) => (true, "Windows application policy synchronized".to_string(), json!({})),
                 Err(err) => (false, err, json!({})),
             }
@@ -172,6 +290,14 @@ pub async fn handle_windows_command(
             (
                 true,
                 "Clock tamper override applied".to_string(),
+                json!({}),
+            )
+        }
+        "clear_safe_mode_lockdown" => {
+            crate::windows_service::safe_mode_lockdown::clear_lockdown_override();
+            (
+                true,
+                "Safe Mode lockdown override applied".to_string(),
                 json!({}),
             )
         }
@@ -257,19 +383,61 @@ fn scan_registry_uninstall_key(_hkey: isize, _subkey: &str, apps: &mut Vec<Disco
     });
 }
 
-pub fn sync_device_policy(_username: &str, policy_json: Option<&serde_json::Value>) -> Result<(), String> {
-    println!("Syncing Windows device policies: {:?}", policy_json);
-    // Writes GPO policies in Registry:
-    // terminalAccessDisabled -> Software\Policies\Microsoft\Windows\System\DisableCMD = 2
-    // bluetoothDisabled -> stopping bthserv service
-    // mountRemovableMediaDisabled -> USBSTOR registry / GPO registry policies
-    Ok(())
+pub fn sync_device_policy(username: &str, policy_json: Option<&serde_json::Value>) -> Result<(), String> {
+    let mut cache = device_policy_cache().lock().unwrap();
+    let entry = policy_json.cloned().unwrap_or_else(|| json!({}));
+    cache.users.insert(username.to_string(), entry);
+    persist_device_policy(&cache)
 }
 
-pub fn sync_app_policy(_username: &str, _policy_json: Option<&serde_json::Value>) -> Result<(), String> {
-    // Keep in-memory structures or write to local policy file (C:\ProgramData\TimeKpr\app-policy.json)
-    // for process_monitor.rs to enforce allowlists and blocklists
-    Ok(())
+pub fn sync_app_policy(
+    username: &str,
+    policy_json: Option<&serde_json::Value>,
+    policies_json: Option<&serde_json::Value>,
+) -> Result<(), String> {
+    let mut blocked = Vec::new();
+    if let Some(policy) = policy_json {
+        if let Some(blocked_packages) = policy
+            .get("blocked_packages")
+            .and_then(|value| value.as_array())
+        {
+            for package in blocked_packages {
+                if let Some(raw) = package.as_str() {
+                    blocked.push(normalize_executable_name(raw));
+                }
+            }
+        }
+    }
+    if let Some(policies) = policies_json.and_then(|value| value.as_array()) {
+        for rule in policies {
+            if rule.get("preset").and_then(|value| value.as_str()) == Some("blocked") {
+                if let Some(path) = rule.get("executable_path").and_then(|value| value.as_str()) {
+                    blocked.push(normalize_executable_name(path));
+                }
+                if let Some(path) = rule.get("identifier").and_then(|value| value.as_str()) {
+                    blocked.push(normalize_executable_name(path));
+                }
+            }
+        }
+    }
+
+    blocked.sort();
+    blocked.dedup();
+
+    let mut cache = app_policy_cache().lock().unwrap();
+    let launch_mode = policy_json
+        .and_then(|policy| policy.get("app_launch_mode"))
+        .and_then(|value| value.as_str())
+        .unwrap_or("blocklist")
+        .to_string();
+    cache.users.insert(
+        username.to_string(),
+        UserAppPolicy {
+            blocked_executables: blocked,
+            app_launch_mode: launch_mode,
+        },
+    );
+    persist_app_policy(&cache)
 }
 
 pub fn modify_time_left(_username: &str, _op: &str, _secs: i64) -> Result<(), String> {

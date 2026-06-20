@@ -511,6 +511,18 @@
             `;
         }
 
+        // 4c. Boot configuration tamper
+        if (type === 'boot_config_tamper') {
+            const source = details.source || 'unknown';
+            const flags = Array.isArray(details.detected_flags) ? details.detected_flags.join(', ') : '';
+            const processName = details.process_name || '';
+            return `
+                <div style="font-size: 0.85rem;" class="text-danger">
+                    <i class="fas fa-shield-alt me-1.5"></i>Boot configuration tamper detected (${escapeHtml(String(source))}${processName ? ` · ${escapeHtml(String(processName))}` : ''}${flags ? ` · ${escapeHtml(flags)}` : ''}).
+                </div>
+            `;
+        }
+
         // 5. System startups/shutdowns/resume etc
         if (type.startsWith('system_')) {
             const systemActions = {

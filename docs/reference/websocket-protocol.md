@@ -59,9 +59,33 @@ Rejected/banned devices receive `success: false` (except Android pending factory
 | `command_response` | Reply to server RPC |
 | `policy_sync_check` | Request domain policy refresh |
 | `alert_event` | Usage/security alerts |
+| `credential_escrow` | Agent-initiated secret escrow (Windows local Administrator password) |
 | `installed_apps_report` | App inventory chunks |
 | `app_icon_report` | PNG icon upload |
 | `screenshot_report` | Desktop screenshot upload |
+
+### `credential_escrow` (Windows)
+
+Sent after the agent rotates the built-in local Administrator password:
+
+```json
+{
+  "type": "credential_escrow",
+  "credential_type": "windows_local_admin",
+  "rotation_id": "uuid",
+  "occurred_at": "2026-06-20T12:00:00Z",
+  "password": "plaintext-over-wss"
+}
+```
+
+The server encrypts the password at rest; it is never written to the device filesystem.
+
+### `alert_event` integrity types
+
+| `event_type` | Meaning |
+|--------------|---------|
+| `clock_tamper` | Wall-clock skew detected |
+| `boot_config_tamper` | Unauthorized Safe Mode / BCD change detected or intercepted |
 
 ## Server → agent commands
 
@@ -71,6 +95,7 @@ Delivered as JSON with `action` field (via `AgentClient`), including:
 - Domain policy sync sequence (`begin_domain_policy_sync`, chunks, manifest, finalize)
 - `sync_apparmor_policy`, `sync_linux_device_policy`, `sync_android_device_policy`
 - `refresh_installed_apps`, `unenroll`, `factory_reset`
+- `clear_safe_mode_lockdown` (Windows Safe Mode lockdown override)
 
 See platform docs and [App discovery](../features/app-discovery.md).
 

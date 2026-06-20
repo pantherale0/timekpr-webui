@@ -12,7 +12,7 @@ Enforced in `ALLOWED_AGENT_ALERT_TYPES`:
 | Session | `user_signed_in`, `user_signed_out` |
 | Apps | `app_launched`, `app_blocked`, `app_usage` |
 | Approvals | `access_requested`, `terminal_command` |
-| Integrity | `clock_tamper` (Linux, Android, and Windows agents) |
+| Integrity | `clock_tamper` (Linux, Android, and Windows agents), `boot_config_tamper` (Windows BCD / boot-tool tampering) |
 
 Unknown types are rejected at ingest.
 
