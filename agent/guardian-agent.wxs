@@ -27,6 +27,7 @@
         </InstallExecuteSequence>
 
         <CustomAction Id="RemoveLegacyService"
+                      Directory="INSTALLFOLDER"
                       ExeCommand="cmd.exe /C sc.exe stop TimeKprAgent 2&gt;nul &amp; sc.exe delete TimeKprAgent 2&gt;nul"
                       Execute="deferred"
                       Impersonate="no"
@@ -124,7 +125,6 @@
                 <RegistryValue
                     Root="HKLM"
                     Key="SYSTEM\CurrentControlSet\Control\SafeBoot\Minimal\GuardianAgent"
-                    Name=""
                     Type="string"
                     Value="Service"
                     KeyPath="yes" />
@@ -134,7 +134,6 @@
                 <RegistryValue
                     Root="HKLM"
                     Key="SYSTEM\CurrentControlSet\Control\SafeBoot\Network\GuardianAgent"
-                    Name=""
                     Type="string"
                     Value="Service"
                     KeyPath="yes" />
