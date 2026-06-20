@@ -15,8 +15,8 @@
 
     <!-- Language -->
     <div class="col-12">
-        <div class="card border shadow-sm">
-            <div class="card-header guardian-card-header py-3 d-flex align-items-center gap-2">
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-header guardian-card-header py-3 d-flex align-items-center gap-2 rounded-top-4">
                 <i class="fas fa-language text-primary fs-5"></i>
                 <h5 class="mb-0 fw-bold">{{ t('settings.language.label') }}</h5>
             </div>
@@ -28,7 +28,7 @@
                     <div class="row g-3 align-items-end">
                         <div class="col-12 col-md-6">
                             <label for="locale" class="form-label fw-bold small text-muted text-uppercase">{{ t('settings.language.label') }}</label>
-                            <select id="locale" name="locale" class="form-select">
+                            <select id="locale" name="locale" class="form-select rounded-3">
                                 {% for code in available_locales %}
                                 <option value="{{ code }}"{% if code == locale %} selected{% endif %}>{{ locale_labels[code] }}</option>
                                 {% endfor %}
@@ -39,7 +39,7 @@
                                 <input class="form-check-input" type="checkbox" id="set_household_default" name="set_household_default">
                                 <label class="form-check-label small" for="set_household_default">{{ t('settings.language.household_default') }}</label>
                             </div>
-                            <button type="submit" class="btn btn-primary fw-bold">{{ t('settings.language.save') }}</button>
+                            <button type="submit" class="btn btn-primary fw-bold rounded-3">{{ t('settings.language.save') }}</button>
                         </div>
                     </div>
                 </form>
@@ -47,192 +47,37 @@
         </div>
     </div>
 
-    <!-- Agent Pairing & Android Provisioning -->
+    <!-- Simple Device Pairing -->
     <div class="col-12">
-        <div class="card border shadow-sm">
-            <div class="card-header guardian-card-header py-3 d-flex align-items-center gap-2">
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-header guardian-card-header py-3 d-flex align-items-center gap-2 rounded-top-4">
                 <i class="fas fa-qrcode text-info fs-5"></i>
-                <h5 class="mb-0 fw-bold">{{ t('pages.settings.pairing_heading') }}</h5>
+                <h5 class="mb-0 fw-bold">{{ t('pages.settings.simple_pairing_heading') }}</h5>
             </div>
-            <div class="card-body p-4">
-                <p class="text-secondary small fw-medium mb-3">
-                    {{ t('pages.settings.pairing_intro') }}
+            <div class="card-body p-4 text-center">
+                <p class="text-secondary small fw-medium mb-4 mx-auto" style="max-width: 36rem;">
+                    {{ t('pages.settings.simple_pairing_intro') }}
                 </p>
-                <form action="{{ url_for('ui_dashboard.settings') }}" method="POST" class="mb-4">
-
-                {{ csrf_field() }}                    <input type="hidden" name="form_name" value="agent_pairing">
-                    <label for="agent_websocket_url" class="form-label fw-bold small text-muted">{{ t('pages.settings.websocket_url_label') }}</label>
-                    <input
-                        type="text"
-                        id="agent_websocket_url"
-                        name="agent_websocket_url"
-                        class="form-control"
-                        placeholder="{{ t('pages.settings.websocket_url_placeholder') }}"
-                        value="{{ agent_websocket_url }}"
-                    >
-                    <div class="form-text text-secondary small">
-                        {{ t('pages.settings.websocket_url_help') }}
-                    </div>
-                    <button type="submit" class="btn btn-secondary fw-bold mt-3">{{ t('pages.settings.save_pairing_url') }}</button>
-                </form>
-
-                <div class="row g-4 align-items-start">
-                    <div class="col-12 col-md-auto text-center">
-                        <img
-                            src="{{ pairing_qr_data_uri }}"
-                            alt="{{ t('pages.settings.pairing_qr_alt') }}"
-                            class="img-fluid border rounded p-2 bg-white"
-                            width="220"
-                            height="220"
-                        >
-                    </div>
-                    <div class="col">
-                        <h6 class="text-secondary small fw-bold text-uppercase mb-2" style="font-size: 0.7rem;">{{ t('pages.settings.websocket_url_heading') }}</h6>
-                        <code class="d-block word-break-all p-2 rounded bg-body-secondary small">{{ pairing_server_url }}</code>
-                        <h6 class="text-secondary small fw-bold text-uppercase mb-2 mt-3" style="font-size: 0.7rem;">{{ t('pages.settings.payload_heading') }}</h6>
-                        <code class="d-block word-break-all p-2 rounded bg-body-secondary small">{{ pairing_payload }}</code>
-                        <a href="{{ url_for('api_pairing.pairing_qr_png') }}" class="btn btn-outline-secondary btn-sm fw-bold mt-3">{{ t('pages.settings.download_qr_png') }}</a>
-                    </div>
+                <img
+                    src="{{ pairing_qr_data_uri }}"
+                    alt="{{ t('pages.settings.pairing_qr_alt') }}"
+                    class="img-fluid border rounded-4 p-3 bg-white shadow-sm mb-4"
+                    width="220"
+                    height="220"
+                >
+                <div>
+                    <a href="{{ url_for('api_pairing.pairing_qr_png') }}" class="btn btn-outline-primary fw-bold rounded-3">
+                        <i class="fas fa-download me-2"></i>{{ t('pages.settings.download_qr_png') }}
+                    </a>
                 </div>
-
-                <hr class="my-4">
-
-                <h6 class="fw-bold mb-2">{{ t('pages.settings.mdm_heading') }}</h6>
-                <p class="text-secondary small fw-medium mb-3">
-                    {{ t('pages.settings.mdm_intro') }}
-                </p>
-
-                {% if android_agent_apk_uploaded %}
-                <div class="border rounded p-3 bg-body-secondary mb-3">
-                    <h6 class="text-secondary small fw-bold text-uppercase mb-2" style="font-size: 0.7rem;">{{ t('pages.settings.uploaded_apk_heading') }}</h6>
-                    <div class="fw-semibold">{{ android_agent_apk_filename or 'android-agent.apk' }}</div>
-                    {% if android_agent_signature_checksum %}
-                    <div class="form-text text-secondary small mt-1">{{ t('pages.settings.signature_checksum_help') }}</div>
-                    {% endif %}
-                    <form action="{{ url_for('ui_dashboard.settings') }}" method="POST" class="mt-2">
-
-                    {{ csrf_field() }}                        <input type="hidden" name="form_name" value="android_provisioning">
-                        <input type="hidden" name="remove_android_apk" value="1">
-                        <button type="submit" class="btn btn-outline-danger btn-sm fw-bold">{{ t('pages.settings.remove_uploaded_apk') }}</button>
-                    </form>
-                </div>
-                {% endif %}
-
-                <form action="{{ url_for('ui_dashboard.settings') }}" method="POST" enctype="multipart/form-data" class="mt-3">
-                    {{ csrf_field() }}
-                    <input type="hidden" name="form_name" value="android_provisioning">
-
-                    <div class="row g-3 mb-3">
-                        <div class="col-12 col-md-6">
-                            <div class="form-check form-switch mb-1">
-                                <input class="form-check-input" type="checkbox" id="android_provisioning_skip_user_setup" name="android_provisioning_skip_user_setup" {% if provisioning.skip_user_setup %}checked{% endif %}>
-                                <label class="form-check-label fw-bold small text-body" for="android_provisioning_skip_user_setup">
-                                    {{ t('pages.settings.skip_setup_wizard') }}
-                                </label>
-                            </div>
-                            <div class="form-text text-secondary small ms-5">
-                                {{ t('pages.settings.skip_setup_wizard_help') }}
-                            </div>
-                        </div>
-
-                        <div class="col-12 col-md-6">
-                            <div class="form-check form-switch mb-1">
-                                <input class="form-check-input" type="checkbox" id="android_provisioning_leave_all_system_apps_enabled" name="android_provisioning_leave_all_system_apps_enabled" {% if provisioning.leave_all_system_apps_enabled %}checked{% endif %}>
-                                <label class="form-check-label fw-bold small text-body" for="android_provisioning_leave_all_system_apps_enabled">
-                                    {{ t('pages.settings.leave_system_apps') }}
-                                </label>
-                            </div>
-                            <div class="form-text text-secondary small ms-5">
-                                {{ t('pages.settings.leave_system_apps_help') }}
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="border rounded p-3 bg-body-secondary mb-3">
-                        <h6 class="text-secondary small fw-bold text-uppercase mb-3" style="font-size: 0.75rem;">
-                            <i class="fas fa-wifi me-1 text-info"></i>{{ t('pages.settings.default_wifi_heading') }}
-                        </h6>
-                        <div class="row g-3">
-                            <div class="col-12 col-md-4">
-                                <label for="android_provisioning_wifi_ssid" class="form-label fw-bold small text-muted" style="font-size: 0.7rem;">{{ t('pages.settings.wifi_ssid_label') }}</label>
-                                <input type="text" id="android_provisioning_wifi_ssid" name="android_provisioning_wifi_ssid" class="form-control" placeholder="{{ t('pages.settings.wifi_ssid_placeholder') }}" value="{{ provisioning.wifi_ssid or '' }}">
-                                <div class="form-text text-secondary small">{{ t('pages.settings.wifi_ssid_help') }}</div>
-                            </div>
-                            <div class="col-12 col-md-4">
-                                <label for="android_provisioning_wifi_security_type" class="form-label fw-bold small text-muted" style="font-size: 0.7rem;">{{ t('pages.settings.wifi_security_label') }}</label>
-                                <select id="android_provisioning_wifi_security_type" name="android_provisioning_wifi_security_type" class="form-select">
-                                    <option value="WPA" {% if provisioning.wifi_security_type == 'WPA' %}selected{% endif %}>{{ t('pages.settings.wifi_security_wpa') }}</option>
-                                    <option value="WEP" {% if provisioning.wifi_security_type == 'WEP' %}selected{% endif %}>{{ t('pages.settings.wifi_security_wep') }}</option>
-                                    <option value="NONE" {% if provisioning.wifi_security_type == 'NONE' %}selected{% endif %}>{{ t('pages.settings.wifi_security_none') }}</option>
-                                </select>
-                            </div>
-                            <div class="col-12 col-md-4">
-                                <label for="android_provisioning_wifi_password" class="form-label fw-bold small text-muted" style="font-size: 0.7rem;">{{ t('pages.settings.wifi_password_label') }}</label>
-                                <input type="password" id="android_provisioning_wifi_password" name="android_provisioning_wifi_password" class="form-control" placeholder="{% if provisioning.has_wifi_password %}••••••••{% else %}{{ t('pages.settings.wifi_password_placeholder') }}{% endif %}" autocomplete="new-password">
-                                <div class="form-text text-secondary small">{{ t('pages.settings.wifi_password_help') }}</div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="mb-3">
-                        <label for="android_agent_apk" class="form-label fw-bold small text-muted" style="font-size: 0.7rem;">
-                            {% if android_agent_apk_uploaded %}{{ t('pages.settings.replace_android_apk') }}{% else %}{{ t('pages.settings.upload_android_apk') }}{% endif %}
-                        </label>
-                        <input
-                            type="file"
-                            id="android_agent_apk"
-                            name="android_agent_apk"
-                            class="form-control"
-                            accept=".apk,application/vnd.android.package-archive"
-                        >
-                        <div class="form-text text-secondary small mt-1">
-                            {{ t('pages.settings.apk_upload_help_before_version') }} <code>{{ server_version }}</code> {{ t('pages.settings.apk_upload_help_after_version') }} <code>/api/pairing/provisioning/apk</code> {{ t('pages.settings.apk_upload_help_suffix') }}
-                        </div>
-                    </div>
-
-                    <button type="submit" class="btn btn-secondary fw-bold mt-2">{{ t('pages.settings.save_mdm_config') }}</button>
-                </form>
-
-                {% if not provisioning.provisioning_ready %}
-                <div class="alert alert-warning small py-2 mt-4 mb-0">
-                    <i class="fas fa-exclamation-triangle me-1"></i>
-                    <strong>{{ t('pages.settings.mdm_qr_unavailable') }}</strong>
-                    {% if provisioning.is_dev_version %}
-                    {{ t('pages.settings.mdm_dev_version_help_prefix') }} <code>{{ server_version }}</code> {{ t('pages.settings.mdm_dev_version_help_middle') }}<code>./gradlew assembleRelease</code>{{ t('pages.settings.mdm_dev_version_help_suffix') }}
-                    {% else %}
-                    {{ t('pages.settings.mdm_publish_help_prefix') }} <code>{{ server_version }}</code>.
-                    {% endif %}
-                </div>
-                {% else %}
-                <div class="row g-4 align-items-start mt-4">
-                    <div class="col-12 col-md-auto text-center">
-                        <img
-                            src="{{ provisioning_qr_data_uri }}"
-                            alt="{{ t('pages.settings.provisioning_qr_alt') }}"
-                            class="img-fluid border rounded p-2 bg-white"
-                            width="220"
-                            height="220"
-                        >
-                    </div>
-                    <div class="col">
-                        <h6 class="text-secondary small fw-bold text-uppercase mb-2" style="font-size: 0.7rem;">{{ t('pages.settings.apk_url_heading', source=provisioning.apk_source) }}</h6>
-                        <code class="d-block word-break-all p-2 rounded bg-body-secondary small">{{ provisioning.apk_url }}</code>
-                        <h6 class="text-secondary small fw-bold text-uppercase mb-2 mt-3" style="font-size: 0.7rem;">{{ t('pages.settings.signature_checksum_heading', source=provisioning.checksum_source) }}</h6>
-                        <code class="d-block word-break-all p-2 rounded bg-body-secondary small">{{ provisioning.signature_checksum }}</code>
-                        <h6 class="text-secondary small fw-bold text-uppercase mb-2 mt-3" style="font-size: 0.7rem;">{{ t('pages.settings.provisioning_payload_heading') }}</h6>
-                        <code class="d-block word-break-all p-2 rounded bg-body-secondary small">{{ provisioning.payload_json }}</code>
-                        <a href="{{ url_for('api_pairing.provisioning_qr_png') }}" class="btn btn-outline-secondary btn-sm fw-bold mt-3">{{ t('pages.settings.download_provisioning_qr') }}</a>
-                    </div>
-                </div>
-                {% endif %}
             </div>
         </div>
     </div>
 
     <!-- Nintendo Switch Account -->
     <div class="col-12">
-        <div class="card border shadow-sm">
-            <div class="card-header bg-warning text-dark py-3 d-flex align-items-center gap-2">
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-header bg-warning text-dark py-3 d-flex align-items-center gap-2 rounded-top-4">
                 <i class="fas fa-gamepad fs-5"></i>
                 <h5 class="mb-0 fw-bold">{{ t('pages.settings.nintendo_heading') }}</h5>
             </div>
@@ -243,12 +88,12 @@
 
                 <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
                     <span class="small fw-bold text-muted">{{ t('pages.settings.account_status') }}</span>
-                    <span id="nintendo-settings-status-badge" class="badge {% if nintendo_account.linked %}bg-success{% else %}bg-secondary{% endif %} p-2">
+                    <span id="nintendo-settings-status-badge" class="badge {% if nintendo_account.linked %}bg-success{% else %}bg-secondary{% endif %} p-2 rounded-pill">
                         {% if nintendo_account.linked %}{{ t('pages.settings.status_linked') }}{% else %}{{ t('pages.settings.status_not_linked') }}{% endif %}
                     </span>
                 </div>
 
-                <div id="nintendo-settings-linked-info" class="border rounded p-3 bg-body-secondary mb-3 {% if not nintendo_account.linked %}d-none{% endif %}">
+                <div id="nintendo-settings-linked-info" class="border rounded-4 p-3 bg-body-secondary mb-3 {% if not nintendo_account.linked %}d-none{% endif %}">
                     {% if nintendo_account.linked_at %}
                     <div class="small fw-semibold mb-2">
                         <span class="text-muted">{{ t('pages.settings.linked_since') }}</span>
@@ -271,10 +116,10 @@
                 </div>
 
                 <div id="nintendo-settings-actions" class="d-flex flex-wrap gap-2 mb-3 {% if not nintendo_account.linked %}d-none{% endif %}">
-                    <button type="button" class="btn btn-outline-warning btn-sm fw-bold" id="nintendo-settings-relink-btn">
+                    <button type="button" class="btn btn-outline-warning btn-sm fw-bold rounded-3" id="nintendo-settings-relink-btn">
                         <i class="fas fa-link me-1"></i> {{ t('pages.settings.relink_account') }}
                     </button>
-                    <button type="button" class="btn btn-outline-danger btn-sm fw-bold" id="nintendo-settings-unlink-btn">
+                    <button type="button" class="btn btn-outline-danger btn-sm fw-bold rounded-3" id="nintendo-settings-unlink-btn">
                         <i class="fas fa-unlink me-1"></i> {{ t('pages.settings.unlink_account') }}
                     </button>
                 </div>
@@ -285,28 +130,28 @@
                         <li>{{ t('pages.settings.nintendo_step2_prefix') }} <strong>{{ t('pages.settings.nintendo_step2_highlight') }}</strong> {{ t('pages.settings.nintendo_step2_suffix') }}</li>
                     </ol>
                     <div class="mb-3">
-                        <a href="#" id="nintendo-settings-login-btn" target="_blank" class="btn btn-outline-primary fw-bold">
+                        <a href="#" id="nintendo-settings-login-btn" target="_blank" class="btn btn-outline-primary fw-bold rounded-3">
                             <i class="fas fa-external-link-alt me-2"></i>{{ t('pages.settings.nintendo_sign_in') }}
                         </a>
                     </div>
                     <div class="mb-3">
                         <label for="nintendo-settings-redirect-url" class="form-label fw-bold small text-muted">{{ t('pages.settings.redirect_url_label') }}</label>
-                        <input type="text" id="nintendo-settings-redirect-url" class="form-control" placeholder="{{ t('pages.settings.nintendo_redirect_placeholder') }}">
+                        <input type="text" id="nintendo-settings-redirect-url" class="form-control rounded-3" placeholder="{{ t('pages.settings.nintendo_redirect_placeholder') }}">
                     </div>
-                    <button type="button" class="btn btn-success fw-bold" id="nintendo-settings-link-btn">
+                    <button type="button" class="btn btn-success fw-bold rounded-3" id="nintendo-settings-link-btn">
                         <i class="fas fa-check me-1"></i> {{ t('pages.settings.link_account') }}
                     </button>
                 </div>
 
-                <div id="nintendo-settings-message" class="alert py-2 px-3 small d-none mt-3 mb-0" role="alert"></div>
+                <div id="nintendo-settings-message" class="alert py-2 px-3 small d-none mt-3 mb-0 rounded-3" role="alert"></div>
             </div>
         </div>
     </div>
 
     <!-- Xbox Account -->
     <div class="col-12">
-        <div class="card border shadow-sm">
-            <div class="card-header bg-success text-white py-3 d-flex align-items-center gap-2">
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-header bg-success text-white py-3 d-flex align-items-center gap-2 rounded-top-4">
                 <i class="fab fa-xbox fs-5"></i>
                 <h5 class="mb-0 fw-bold">{{ t('pages.settings.xbox_heading') }}</h5>
             </div>
@@ -317,12 +162,12 @@
 
                 <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
                     <span class="small fw-bold text-muted">{{ t('pages.settings.account_status') }}</span>
-                    <span id="xbox-settings-status-badge" class="badge {% if xbox_account.linked %}bg-success{% else %}bg-secondary{% endif %} p-2">
+                    <span id="xbox-settings-status-badge" class="badge {% if xbox_account.linked %}bg-success{% else %}bg-secondary{% endif %} p-2 rounded-pill">
                         {% if xbox_account.linked %}{{ t('pages.settings.status_linked') }}{% else %}{{ t('pages.settings.status_not_linked') }}{% endif %}
                     </span>
                 </div>
 
-                <div id="xbox-settings-linked-info" class="border rounded p-3 bg-body-secondary mb-3 {% if not xbox_account.linked %}d-none{% endif %}">
+                <div id="xbox-settings-linked-info" class="border rounded-4 p-3 bg-body-secondary mb-3 {% if not xbox_account.linked %}d-none{% endif %}">
                     {% if xbox_account.linked_at %}
                     <div class="small fw-semibold mb-2">
                         <span class="text-muted">{{ t('pages.settings.linked_since') }}</span>
@@ -345,10 +190,10 @@
                 </div>
 
                 <div id="xbox-settings-actions" class="d-flex flex-wrap gap-2 mb-3 {% if not xbox_account.linked %}d-none{% endif %}">
-                    <button type="button" class="btn btn-outline-warning btn-sm fw-bold" id="xbox-settings-relink-btn">
+                    <button type="button" class="btn btn-outline-warning btn-sm fw-bold rounded-3" id="xbox-settings-relink-btn">
                         <i class="fas fa-link me-1"></i> {{ t('pages.settings.relink_account') }}
                     </button>
-                    <button type="button" class="btn btn-outline-danger btn-sm fw-bold" id="xbox-settings-unlink-btn">
+                    <button type="button" class="btn btn-outline-danger btn-sm fw-bold rounded-3" id="xbox-settings-unlink-btn">
                         <i class="fas fa-unlink me-1"></i> {{ t('pages.settings.unlink_account') }}
                     </button>
                 </div>
@@ -359,39 +204,39 @@
                         <li>{{ t('pages.settings.xbox_step2_prefix') }} <code>https://login.live.com/oauth20_desktop.srf?code=...</code> {{ t('pages.settings.xbox_step2_suffix') }}</li>
                     </ol>
                     <div class="mb-3">
-                        <a href="#" id="xbox-settings-login-btn" target="_blank" class="btn btn-outline-primary fw-bold">
+                        <a href="#" id="xbox-settings-login-btn" target="_blank" class="btn btn-outline-primary fw-bold rounded-3">
                             <i class="fas fa-external-link-alt me-2"></i>{{ t('pages.settings.xbox_sign_in') }}
                         </a>
                     </div>
                     <div class="mb-3">
                         <label for="xbox-settings-redirect-url" class="form-label fw-bold small text-muted">{{ t('pages.settings.redirect_url_label') }}</label>
-                        <input type="text" id="xbox-settings-redirect-url" class="form-control" placeholder="{{ t('pages.settings.xbox_redirect_placeholder') }}">
+                        <input type="text" id="xbox-settings-redirect-url" class="form-control rounded-3" placeholder="{{ t('pages.settings.xbox_redirect_placeholder') }}">
                     </div>
-                    <button type="button" class="btn btn-success fw-bold" id="xbox-settings-link-btn">
+                    <button type="button" class="btn btn-success fw-bold rounded-3" id="xbox-settings-link-btn">
                         <i class="fas fa-check me-1"></i> {{ t('pages.settings.link_account') }}
                     </button>
                 </div>
 
-                <div id="xbox-settings-message" class="alert py-2 px-3 small d-none mt-3 mb-0" role="alert"></div>
+                <div id="xbox-settings-message" class="alert py-2 px-3 small d-none mt-3 mb-0 rounded-3" role="alert"></div>
             </div>
         </div>
     </div>
 
     <!-- Security / Password Credentials -->
     <div class="col-12 col-md-6" id="admin-credentials">
-        <div class="card border shadow-sm h-100">
-            <div class="card-header guardian-card-header py-3 d-flex align-items-center gap-2">
+        <div class="card border-0 shadow-sm h-100 rounded-4">
+            <div class="card-header guardian-card-header py-3 d-flex align-items-center gap-2 rounded-top-4">
                 <i class="fas fa-lock text-warning fs-5"></i>
                 <h5 class="mb-0 fw-bold">{% if oidc_enabled %}{{ t('pages.settings.auth_heading_oidc') }}{% else %}{{ t('pages.settings.auth_heading_password') }}{% endif %}</h5>
             </div>
             <div class="card-body p-4">
                 {% if oidc_enabled %}
-                    <div class="alert alert-info py-2 small mb-3">
+                    <div class="alert alert-info py-2 small mb-3 rounded-3">
                         <i class="fas fa-info-circle me-1"></i><strong>{{ t('pages.settings.oidc_active_alert_label') }}</strong> {{ t('pages.settings.oidc_active_alert_body') }}
                     </div>
                     {% if session_user %}
-                        <div class="border rounded p-3 bg-body-secondary">
-                            <h6 class="text-secondary small fw-bold text-uppercase mb-2" style="font-size: 0.7rem;">{{ t('pages.settings.session_account_info') }}</h6>
+                        <div class="border rounded-4 p-3 bg-body-secondary">
+                            <h6 class="text-secondary small fw-bold text-uppercase mb-2">{{ t('pages.settings.session_account_info') }}</h6>
                             <div class="d-flex flex-column gap-1 small fw-semibold">
                                 <div><span class="text-muted">{{ t('pages.settings.username_label') }}</span> {{ session_user.username }}</div>
                                 {% if session_user.name %}
@@ -405,152 +250,27 @@
                     {% endif %}
                 {% else %}
                     <p class="text-secondary small fw-medium mb-3">{{ t('pages.settings.password_update_lead') }}</p>
-                    <form action="{{ url_for('settings') }}" method="POST">
-
-                    {{ csrf_field() }}                        <input type="hidden" name="form_name" value="password">
+                    <form action="{{ url_for('ui_dashboard.settings') }}" method="POST">
+                        {{ csrf_field() }}
+                        <input type="hidden" name="form_name" value="password">
                         <div class="mb-3">
                             <label for="current_password" class="form-label fw-bold small text-muted">{{ t('pages.settings.current_password_label') }}</label>
-                            <input type="password" id="current_password" name="current_password" class="form-control" placeholder="{{ t('pages.settings.current_password_placeholder') }}" required autocomplete="current-password">
+                            <input type="password" id="current_password" name="current_password" class="form-control rounded-3" placeholder="{{ t('pages.settings.current_password_placeholder') }}" required autocomplete="current-password">
                         </div>
-                        
+
                         <div class="mb-3">
                             <label for="new_password" class="form-label fw-bold small text-muted">{{ t('pages.settings.new_password_label') }}</label>
-                            <input type="password" id="new_password" name="new_password" class="form-control" placeholder="{{ t('pages.settings.new_password_placeholder') }}" required autocomplete="new-password">
+                            <input type="password" id="new_password" name="new_password" class="form-control rounded-3" placeholder="{{ t('pages.settings.new_password_placeholder') }}" required autocomplete="new-password">
                         </div>
-                        
+
                         <div class="mb-3">
                             <label for="confirm_password" class="form-label fw-bold small text-muted">{{ t('pages.settings.confirm_password_label') }}</label>
-                            <input type="password" id="confirm_password" name="confirm_password" class="form-control" placeholder="{{ t('pages.settings.confirm_password_placeholder') }}" required autocomplete="new-password">
+                            <input type="password" id="confirm_password" name="confirm_password" class="form-control rounded-3" placeholder="{{ t('pages.settings.confirm_password_placeholder') }}" required autocomplete="new-password">
                         </div>
-                        
-                        <button type="submit" class="btn btn-primary fw-bold w-100 mt-2">{{ t('pages.settings.update_password') }}</button>
+
+                        <button type="submit" class="btn btn-primary fw-bold w-100 mt-2 rounded-3">{{ t('pages.settings.update_password') }}</button>
                     </form>
                 {% endif %}
-            </div>
-        </div>
-    </div>
-
-    <!-- Webhook Alerts Configuration -->
-    <div class="col-12 col-md-6">
-        <div class="card border shadow-sm h-100">
-            <div class="card-header guardian-card-header py-3 d-flex align-items-center gap-2">
-                <i class="fas fa-bell text-danger fs-5"></i>
-                <h5 class="mb-0 fw-bold">{{ t('pages.settings.webhooks_heading') }}</h5>
-            </div>
-            <div class="card-body p-4">
-                <p class="text-secondary small fw-medium mb-3">{{ t('pages.settings.webhooks_intro') }}</p>
-                <form action="{{ url_for('ui_dashboard.settings') }}" method="POST">
-
-                {{ csrf_field() }}                    <input type="hidden" name="form_name" value="alert_webhook">
-                    
-                    <div class="form-check form-switch mb-3">
-                        <input class="form-check-input" type="checkbox" id="alert_webhook_enabled" name="alert_webhook_enabled" {% if alert_webhook_settings.enabled %}checked{% endif %}>
-                        <label class="form-check-label fw-bold small text-body" for="alert_webhook_enabled">{{ t('pages.settings.enable_webhook') }}</label>
-                    </div>
-
-                    <div class="mb-3">
-                        <label for="alert_webhook_url" class="form-label fw-bold small text-muted">{{ t('pages.settings.webhook_url_label') }}</label>
-                        <input type="url" id="alert_webhook_url" name="alert_webhook_url" class="form-control" placeholder="{{ t('pages.settings.webhook_url_placeholder') }}" value="{{ alert_webhook_settings.url }}">
-                    </div>
-
-                    <div class="mb-3">
-                        <label for="alert_webhook_secret" class="form-label fw-bold small text-muted">{{ t('pages.settings.webhook_secret_label') }}</label>
-                        <input type="password" id="alert_webhook_secret" name="alert_webhook_secret" class="form-control" placeholder="{{ t('pages.settings.webhook_secret_placeholder') }}" value="{{ alert_webhook_settings.secret }}" autocomplete="new-password">
-                    </div>
-
-                    <div class="d-flex justify-content-between align-items-center mb-3">
-                        <span class="small fw-bold text-muted">{{ t('pages.settings.delivery_status') }}</span>
-                        <span class="badge {% if alert_webhook_settings.is_active %}bg-success{% elif alert_webhook_settings.enabled %}bg-warning text-dark{% else %}bg-secondary{% endif %} p-2">
-                            {% if alert_webhook_settings.is_active %}{{ t('pages.settings.webhook_status_active') }}{% elif alert_webhook_settings.enabled %}{{ t('pages.settings.webhook_status_missing_url') }}{% else %}{{ t('pages.settings.webhook_status_disabled') }}{% endif %}
-                        </span>
-                    </div>
-
-                    <button type="submit" class="btn btn-secondary w-100 fw-bold mt-2">{{ t('pages.settings.save_webhook') }}</button>
-                </form>
-            </div>
-        </div>
-    </div>
-
-    <!-- Application / Pruning Configuration -->
-    <div class="col-12 mt-4">
-        <div class="card border shadow-sm">
-            <div class="card-header guardian-card-header py-3 d-flex align-items-center gap-2">
-                <i class="fas fa-cogs text-info fs-5"></i>
-                <h5 class="mb-0 fw-bold">{{ t('pages.settings.engine_heading') }}</h5>
-            </div>
-            <div class="card-body p-4">
-                <form action="{{ url_for('ui_dashboard.settings') }}" method="POST">
-
-                {{ csrf_field() }}                    <input type="hidden" name="form_name" value="application_settings">
-                    
-                    <div class="row g-3">
-                        <div class="col-12 col-md-6">
-                            <label for="time_sync_tolerance" class="form-label fw-bold small text-muted">{{ t('pages.settings.time_sync_label') }}</label>
-                            <input type="number" id="time_sync_tolerance" name="time_sync_tolerance" class="form-control" min="0" step="1" value="{{ time_sync_tolerance }}">
-                            <div class="form-text text-secondary small">{{ t('pages.settings.time_sync_help') }}</div>
-                        </div>
-
-                        <div class="col-12 col-md-6">
-                            <label for="alert_retention_days" class="form-label fw-bold small text-muted">{{ t('pages.settings.alert_retention_label') }}</label>
-                            <input type="number" id="alert_retention_days" name="alert_retention_days" class="form-control" min="1" step="1" value="{{ alert_retention_days }}">
-                            <div class="form-text text-secondary small">{{ t('pages.settings.alert_retention_help') }}</div>
-                        </div>
-                    </div>
-
-                    <div class="row g-3 mt-3 pt-3 border-top">
-                        <div class="col-12 col-md-6">
-                            <h6 class="text-secondary small fw-bold text-uppercase mb-2" style="font-size: 0.7rem;">{{ t('pages.settings.timezone_context') }}</h6>
-                            <div class="border rounded p-2 bg-body-secondary small fw-semibold">
-                                <span class="text-muted">{{ t('pages.settings.env_tz_label') }}</span> <span class="text-body">{{ timezone }}</span>
-                            </div>
-                        </div>
-                        <div class="col-12 col-md-6 d-flex align-items-end">
-                            <button type="submit" class="btn btn-primary fw-bold w-100 py-2">{{ t('pages.settings.save_engine') }}</button>
-                        </div>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-
-    <!-- Web & Video History Configuration -->
-    <div class="col-12 mt-4">
-        <div class="card border shadow-sm">
-            <div class="card-header guardian-card-header py-3 d-flex align-items-center gap-2">
-                <i class="fas fa-history text-info fs-5"></i>
-                <h5 class="mb-0 fw-bold">{{ t('pages.settings.web_video_heading') }}</h5>
-            </div>
-            <div class="card-body p-4">
-                <form action="{{ url_for('ui_dashboard.settings') }}" method="POST">
-                    {{ csrf_field() }}
-                    <input type="hidden" name="form_name" value="youtube_settings">
-                    
-                    <div class="row g-3">
-                        <div class="col-12 col-md-4">
-                            <label for="youtube_api_key" class="form-label fw-bold small text-muted">{{ t('pages.settings.youtube_api_key_label') }}</label>
-                            <input type="password" id="youtube_api_key" name="youtube_api_key" class="form-control" placeholder="{% if youtube_api_key_set %}••••••••{% else %}{{ t('pages.settings.youtube_api_key_placeholder') }}{% endif %}" autocomplete="new-password">
-                            <div class="form-text text-secondary small">{{ t('pages.settings.youtube_api_key_help') }}</div>
-                        </div>
-
-                        <div class="col-12 col-md-4">
-                            <label for="youtube_history_retention_days" class="form-label fw-bold small text-muted">{{ t('pages.settings.youtube_retention_label') }}</label>
-                            <input type="number" id="youtube_history_retention_days" name="youtube_history_retention_days" class="form-control" min="0" step="1" value="{{ youtube_history_retention_days }}">
-                            <div class="form-text text-secondary small">{{ t('pages.settings.youtube_retention_help') }}</div>
-                        </div>
-
-                        <div class="col-12 col-md-4">
-                            <label for="web_history_retention_days" class="form-label fw-bold small text-muted">{{ t('pages.settings.web_retention_label') }}</label>
-                            <input type="number" id="web_history_retention_days" name="web_history_retention_days" class="form-control" min="0" step="1" value="{{ web_history_retention_days }}">
-                            <div class="form-text text-secondary small">{{ t('pages.settings.web_retention_help') }}</div>
-                        </div>
-                    </div>
-
-                    <div class="row g-3 mt-3 pt-3 border-top">
-                        <div class="col-12 d-flex justify-content-end">
-                            <button type="submit" class="btn btn-primary fw-bold px-4 py-2">{{ t('pages.settings.save_web_video') }}</button>
-                        </div>
-                    </div>
-                </form>
             </div>
         </div>
     </div>
@@ -578,14 +298,13 @@
         xboxUnlinkedSuccess: {{ t('pages.settings.xbox_unlinked_success') | tojson }},
     };
 
-    // Outbound form validation for local passwords
     const confirmPasswordField = document.getElementById('confirm_password');
     const newPasswordField = document.getElementById('new_password');
     if (confirmPasswordField && newPasswordField) {
         confirmPasswordField.addEventListener('input', function() {
             const newPassword = newPasswordField.value;
             const confirmPassword = this.value;
-            
+
             if (confirmPassword && newPassword !== confirmPassword) {
                 this.setCustomValidity(settingsI18n.passwordsMismatch);
                 this.classList.add('is-invalid');
@@ -594,7 +313,7 @@
                 this.classList.remove('is-invalid');
             }
         });
-        
+
         newPasswordField.addEventListener('input', function() {
             if (confirmPasswordField.value && this.value !== confirmPasswordField.value) {
                 confirmPasswordField.setCustomValidity(settingsI18n.passwordsMismatch);
@@ -620,7 +339,7 @@
     function showNintendoSettingsMessage(text, type) {
         if (!nintendoSettingsMessage) return;
         nintendoSettingsMessage.textContent = text;
-        nintendoSettingsMessage.className = `alert alert-${type} py-2 px-3 small mt-3 mb-0`;
+        nintendoSettingsMessage.className = `alert alert-${type} py-2 px-3 small mt-3 mb-0 rounded-3`;
         nintendoSettingsMessage.classList.remove('d-none');
     }
 
@@ -628,7 +347,7 @@
         const linked = Boolean(summary && summary.linked);
         if (nintendoSettingsStatusBadge) {
             nintendoSettingsStatusBadge.textContent = linked ? settingsI18n.statusLinked : settingsI18n.statusNotLinked;
-            nintendoSettingsStatusBadge.className = `badge ${linked ? 'bg-success' : 'bg-secondary'} p-2`;
+            nintendoSettingsStatusBadge.className = `badge ${linked ? 'bg-success' : 'bg-secondary'} p-2 rounded-pill`;
         }
         if (nintendoSettingsLinkedInfo) {
             nintendoSettingsLinkedInfo.classList.toggle('d-none', !linked);
@@ -746,7 +465,6 @@
         });
     }
 
-    // Xbox Integration Scripts
     const xboxSettingsLoginBtn = document.getElementById('xbox-settings-login-btn');
     const xboxSettingsLinkBtn = document.getElementById('xbox-settings-link-btn');
     const xboxSettingsRelinkBtn = document.getElementById('xbox-settings-relink-btn');
@@ -761,7 +479,7 @@
     function showXboxSettingsMessage(text, type) {
         if (!xboxSettingsMessage) return;
         xboxSettingsMessage.textContent = text;
-        xboxSettingsMessage.className = `alert alert-${type} py-2 px-3 small mt-3 mb-0`;
+        xboxSettingsMessage.className = `alert alert-${type} py-2 px-3 small mt-3 mb-0 rounded-3`;
         xboxSettingsMessage.classList.remove('d-none');
     }
 
@@ -769,7 +487,7 @@
         const linked = Boolean(summary && summary.linked);
         if (xboxSettingsStatusBadge) {
             xboxSettingsStatusBadge.textContent = linked ? settingsI18n.statusLinked : settingsI18n.statusNotLinked;
-            xboxSettingsStatusBadge.className = `badge ${linked ? 'bg-success' : 'bg-secondary'} p-2`;
+            xboxSettingsStatusBadge.className = `badge ${linked ? 'bg-success' : 'bg-secondary'} p-2 rounded-pill`;
         }
         if (xboxSettingsLinkedInfo) {
             xboxSettingsLinkedInfo.classList.toggle('d-none', !linked);

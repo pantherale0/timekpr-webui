@@ -335,9 +335,16 @@
                         <li class="nav-header guardian-nav-section-header mt-2">{{ t('nav.system') }}</li>
                         <li class="nav-item">
                             <a href="/settings" data-spa-nav="/settings"
-                                class="nav-link{% if initial_path and initial_path.startswith('/settings') %} active{% endif %}">
+                                class="nav-link{% if initial_path and initial_path == '/settings' %} active{% endif %}">
                                 <i class="nav-icon fas fa-cog"></i>
                                 <p>{{ t('nav.settings') }}</p>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="/admin/settings" data-spa-nav="/admin/settings"
+                                class="nav-link{% if initial_path and initial_path.startswith('/admin/settings') %} active{% endif %}">
+                                <i class="nav-icon fas fa-server"></i>
+                                <p>{{ t('nav.admin_settings') }}</p>
                             </a>
                         </li>
                     </ul>

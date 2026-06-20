@@ -48,6 +48,7 @@ nav:
   child_profiles: Child Profiles
   system: SYSTEM
   settings: Settings
+  admin_settings: System Settings
   brand_guardian: Guardian
   brand_subtitle: Family Safety
   main_navigation: Main navigation
@@ -521,7 +522,9 @@ pages:
   settings:
     title: Household Settings - Guardian
     heading: Household Settings
-    lead: Pairing codes, alerts, and the quiet defaults that keep Guardian running smoothly.
+    lead: Language, device pairing, cloud accounts, and your sign-in preferences for the family console.
+    simple_pairing_heading: Connect a device
+    simple_pairing_intro: Scan this code from the Guardian app when adding a new phone, tablet, or computer to your household.
     pairing_heading: Device pairing
     pairing_intro: Scan the pairing QR from the Guardian Android app during setup, or use the WebSocket URL when installing Linux agents.
     websocket_url_label: AGENT WEBSOCKET URL
@@ -651,6 +654,11 @@ pages:
     xbox_linked_success: Xbox Account linked successfully.
     xbox_unlink_confirm: Unlink the Xbox Account? Enrolled consoles will remain, but cloud sync will stop until you link again.
     xbox_unlinked_success: Xbox Account unlinked.
+
+  admin_settings:
+    title: System Settings - Guardian
+    heading: System Settings
+    lead: Technical configuration for agents, Android provisioning, webhooks, API keys, and data retention.
 
   dashboard:
     title: Family Home - Guardian

@@ -1,0 +1,304 @@
+{% extends "_spa_fragment.html" %}
+
+{% from '_macros.html' import csrf_field %}
+{% block title %}{{ t('pages.admin_settings.title') }}{% endblock %}
+
+{% block content %}
+<div class="guardian-page-header">
+    <div class="guardian-page-header__intro">
+        <h1 class="guardian-page-title mb-1">{{ t('pages.admin_settings.heading') }}</h1>
+        <p class="guardian-page-lead mb-0">{{ t('pages.admin_settings.lead') }}</p>
+    </div>
+</div>
+
+<div class="row g-4 guardian-admin-settings-stack">
+
+    <!-- Agent WebSocket URL override -->
+    <div class="col-12">
+        <div class="card border-dark shadow-sm rounded-0">
+            <div class="card-header bg-dark text-white py-3 d-flex align-items-center gap-2">
+                <i class="fas fa-plug fs-5"></i>
+                <h5 class="mb-0 fw-bold">{{ t('pages.settings.pairing_heading') }}</h5>
+            </div>
+            <div class="card-body p-4 bg-light">
+                <p class="text-secondary small fw-medium mb-3">{{ t('pages.settings.pairing_intro') }}</p>
+                <form action="{{ url_for('ui_dashboard.admin_settings') }}" method="POST" class="mb-4">
+                    {{ csrf_field() }}
+                    <input type="hidden" name="form_name" value="agent_pairing">
+                    <label for="agent_websocket_url" class="form-label fw-bold small text-muted">{{ t('pages.settings.websocket_url_label') }}</label>
+                    <input
+                        type="text"
+                        id="agent_websocket_url"
+                        name="agent_websocket_url"
+                        class="form-control font-monospace"
+                        placeholder="{{ t('pages.settings.websocket_url_placeholder') }}"
+                        value="{{ agent_websocket_url }}"
+                    >
+                    <div class="form-text text-secondary small">{{ t('pages.settings.websocket_url_help') }}</div>
+                    <button type="submit" class="btn btn-dark fw-bold mt-3">{{ t('pages.settings.save_pairing_url') }}</button>
+                </form>
+
+                <div class="row g-4 align-items-start">
+                    <div class="col-12 col-md-auto text-center">
+                        <img
+                            src="{{ pairing_qr_data_uri }}"
+                            alt="{{ t('pages.settings.pairing_qr_alt') }}"
+                            class="img-fluid border border-dark rounded-0 p-2 bg-white"
+                            width="220"
+                            height="220"
+                        >
+                    </div>
+                    <div class="col">
+                        <h6 class="text-secondary small fw-bold text-uppercase mb-2">{{ t('pages.settings.websocket_url_heading') }}</h6>
+                        <code class="d-block word-break-all p-2 rounded-0 bg-white border border-secondary-subtle small font-monospace">{{ pairing_server_url }}</code>
+                        <h6 class="text-secondary small fw-bold text-uppercase mb-2 mt-3">{{ t('pages.settings.payload_heading') }}</h6>
+                        <code class="d-block word-break-all p-2 rounded-0 bg-white border border-secondary-subtle small font-monospace">{{ pairing_payload }}</code>
+                        <a href="{{ url_for('api_pairing.pairing_qr_png') }}" class="btn btn-outline-dark btn-sm fw-bold mt-3">{{ t('pages.settings.download_qr_png') }}</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Android MDM Provisioning -->
+    <div class="col-12">
+        <div class="card border-dark shadow-sm rounded-0">
+            <div class="card-header bg-dark text-white py-3 d-flex align-items-center gap-2">
+                <i class="fab fa-android fs-5"></i>
+                <h5 class="mb-0 fw-bold">{{ t('pages.settings.mdm_heading') }}</h5>
+            </div>
+            <div class="card-body p-4 bg-light">
+                <p class="text-secondary small fw-medium mb-3">{{ t('pages.settings.mdm_intro') }}</p>
+
+                {% if android_agent_apk_uploaded %}
+                <div class="border border-secondary rounded-0 p-3 bg-white mb-3">
+                    <h6 class="text-secondary small fw-bold text-uppercase mb-2">{{ t('pages.settings.uploaded_apk_heading') }}</h6>
+                    <div class="fw-semibold font-monospace">{{ android_agent_apk_filename or 'android-agent.apk' }}</div>
+                    {% if android_agent_signature_checksum %}
+                    <div class="form-text text-secondary small mt-1">{{ t('pages.settings.signature_checksum_help') }}</div>
+                    {% endif %}
+                    <form action="{{ url_for('ui_dashboard.admin_settings') }}" method="POST" class="mt-2">
+                        {{ csrf_field() }}
+                        <input type="hidden" name="form_name" value="android_provisioning">
+                        <input type="hidden" name="remove_android_apk" value="1">
+                        <button type="submit" class="btn btn-outline-danger btn-sm fw-bold">{{ t('pages.settings.remove_uploaded_apk') }}</button>
+                    </form>
+                </div>
+                {% endif %}
+
+                <form action="{{ url_for('ui_dashboard.admin_settings') }}" method="POST" enctype="multipart/form-data">
+                    {{ csrf_field() }}
+                    <input type="hidden" name="form_name" value="android_provisioning">
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-12 col-md-6">
+                            <div class="form-check form-switch mb-1">
+                                <input class="form-check-input" type="checkbox" id="android_provisioning_skip_user_setup" name="android_provisioning_skip_user_setup" {% if provisioning.skip_user_setup %}checked{% endif %}>
+                                <label class="form-check-label fw-bold small text-body" for="android_provisioning_skip_user_setup">
+                                    {{ t('pages.settings.skip_setup_wizard') }}
+                                </label>
+                            </div>
+                            <div class="form-text text-secondary small ms-5">{{ t('pages.settings.skip_setup_wizard_help') }}</div>
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <div class="form-check form-switch mb-1">
+                                <input class="form-check-input" type="checkbox" id="android_provisioning_leave_all_system_apps_enabled" name="android_provisioning_leave_all_system_apps_enabled" {% if provisioning.leave_all_system_apps_enabled %}checked{% endif %}>
+                                <label class="form-check-label fw-bold small text-body" for="android_provisioning_leave_all_system_apps_enabled">
+                                    {{ t('pages.settings.leave_system_apps') }}
+                                </label>
+                            </div>
+                            <div class="form-text text-secondary small ms-5">{{ t('pages.settings.leave_system_apps_help') }}</div>
+                        </div>
+                    </div>
+
+                    <div class="border border-secondary rounded-0 p-3 bg-white mb-3">
+                        <h6 class="text-secondary small fw-bold text-uppercase mb-3">
+                            <i class="fas fa-wifi me-1"></i>{{ t('pages.settings.default_wifi_heading') }}
+                        </h6>
+                        <div class="row g-3">
+                            <div class="col-12 col-md-4">
+                                <label for="android_provisioning_wifi_ssid" class="form-label fw-bold small text-muted">{{ t('pages.settings.wifi_ssid_label') }}</label>
+                                <input type="text" id="android_provisioning_wifi_ssid" name="android_provisioning_wifi_ssid" class="form-control font-monospace" placeholder="{{ t('pages.settings.wifi_ssid_placeholder') }}" value="{{ provisioning.wifi_ssid or '' }}">
+                                <div class="form-text text-secondary small">{{ t('pages.settings.wifi_ssid_help') }}</div>
+                            </div>
+                            <div class="col-12 col-md-4">
+                                <label for="android_provisioning_wifi_security_type" class="form-label fw-bold small text-muted">{{ t('pages.settings.wifi_security_label') }}</label>
+                                <select id="android_provisioning_wifi_security_type" name="android_provisioning_wifi_security_type" class="form-select">
+                                    <option value="WPA" {% if provisioning.wifi_security_type == 'WPA' %}selected{% endif %}>{{ t('pages.settings.wifi_security_wpa') }}</option>
+                                    <option value="WEP" {% if provisioning.wifi_security_type == 'WEP' %}selected{% endif %}>{{ t('pages.settings.wifi_security_wep') }}</option>
+                                    <option value="NONE" {% if provisioning.wifi_security_type == 'NONE' %}selected{% endif %}>{{ t('pages.settings.wifi_security_none') }}</option>
+                                </select>
+                            </div>
+                            <div class="col-12 col-md-4">
+                                <label for="android_provisioning_wifi_password" class="form-label fw-bold small text-muted">{{ t('pages.settings.wifi_password_label') }}</label>
+                                <input type="password" id="android_provisioning_wifi_password" name="android_provisioning_wifi_password" class="form-control" placeholder="{% if provisioning.has_wifi_password %}••••••••{% else %}{{ t('pages.settings.wifi_password_placeholder') }}{% endif %}" autocomplete="new-password">
+                                <div class="form-text text-secondary small">{{ t('pages.settings.wifi_password_help') }}</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="android_agent_apk" class="form-label fw-bold small text-muted">
+                            {% if android_agent_apk_uploaded %}{{ t('pages.settings.replace_android_apk') }}{% else %}{{ t('pages.settings.upload_android_apk') }}{% endif %}
+                        </label>
+                        <input type="file" id="android_agent_apk" name="android_agent_apk" class="form-control" accept=".apk,application/vnd.android.package-archive">
+                        <div class="form-text text-secondary small mt-1">
+                            {{ t('pages.settings.apk_upload_help_before_version') }} <code>{{ server_version }}</code> {{ t('pages.settings.apk_upload_help_after_version') }} <code>/api/pairing/provisioning/apk</code> {{ t('pages.settings.apk_upload_help_suffix') }}
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-dark fw-bold">{{ t('pages.settings.save_mdm_config') }}</button>
+                </form>
+
+                {% if not provisioning.provisioning_ready %}
+                <div class="alert alert-warning small py-2 mt-4 mb-0 rounded-0">
+                    <i class="fas fa-exclamation-triangle me-1"></i>
+                    <strong>{{ t('pages.settings.mdm_qr_unavailable') }}</strong>
+                    {% if provisioning.is_dev_version %}
+                    {{ t('pages.settings.mdm_dev_version_help_prefix') }} <code>{{ server_version }}</code> {{ t('pages.settings.mdm_dev_version_help_middle') }}<code>./gradlew assembleRelease</code>{{ t('pages.settings.mdm_dev_version_help_suffix') }}
+                    {% else %}
+                    {{ t('pages.settings.mdm_publish_help_prefix') }} <code>{{ server_version }}</code>.
+                    {% endif %}
+                </div>
+                {% else %}
+                <div class="row g-4 align-items-start mt-4">
+                    <div class="col-12 col-md-auto text-center">
+                        <img
+                            src="{{ provisioning_qr_data_uri }}"
+                            alt="{{ t('pages.settings.provisioning_qr_alt') }}"
+                            class="img-fluid border border-dark rounded-0 p-2 bg-white"
+                            width="220"
+                            height="220"
+                        >
+                    </div>
+                    <div class="col">
+                        <h6 class="text-secondary small fw-bold text-uppercase mb-2">{{ t('pages.settings.apk_url_heading', source=provisioning.apk_source) }}</h6>
+                        <code class="d-block word-break-all p-2 rounded-0 bg-white border border-secondary-subtle small font-monospace">{{ provisioning.apk_url }}</code>
+                        <h6 class="text-secondary small fw-bold text-uppercase mb-2 mt-3">{{ t('pages.settings.signature_checksum_heading', source=provisioning.checksum_source) }}</h6>
+                        <code class="d-block word-break-all p-2 rounded-0 bg-white border border-secondary-subtle small font-monospace">{{ provisioning.signature_checksum }}</code>
+                        <h6 class="text-secondary small fw-bold text-uppercase mb-2 mt-3">{{ t('pages.settings.provisioning_payload_heading') }}</h6>
+                        <code class="d-block word-break-all p-2 rounded-0 bg-white border border-secondary-subtle small font-monospace">{{ provisioning.payload_json }}</code>
+                        <a href="{{ url_for('api_pairing.provisioning_qr_png') }}" class="btn btn-outline-dark btn-sm fw-bold mt-3">{{ t('pages.settings.download_provisioning_qr') }}</a>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Outbound Webhooks -->
+    <div class="col-12 col-lg-6">
+        <div class="card border-dark shadow-sm h-100 rounded-0">
+            <div class="card-header bg-dark text-white py-3 d-flex align-items-center gap-2">
+                <i class="fas fa-bell fs-5"></i>
+                <h5 class="mb-0 fw-bold">{{ t('pages.settings.webhooks_heading') }}</h5>
+            </div>
+            <div class="card-body p-4 bg-light">
+                <p class="text-secondary small fw-medium mb-3">{{ t('pages.settings.webhooks_intro') }}</p>
+                <form action="{{ url_for('ui_dashboard.admin_settings') }}" method="POST">
+                    {{ csrf_field() }}
+                    <input type="hidden" name="form_name" value="alert_webhook">
+
+                    <div class="form-check form-switch mb-3">
+                        <input class="form-check-input" type="checkbox" id="alert_webhook_enabled" name="alert_webhook_enabled" {% if alert_webhook_settings.enabled %}checked{% endif %}>
+                        <label class="form-check-label fw-bold small text-body" for="alert_webhook_enabled">{{ t('pages.settings.enable_webhook') }}</label>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="alert_webhook_url" class="form-label fw-bold small text-muted">{{ t('pages.settings.webhook_url_label') }}</label>
+                        <input type="url" id="alert_webhook_url" name="alert_webhook_url" class="form-control font-monospace" placeholder="{{ t('pages.settings.webhook_url_placeholder') }}" value="{{ alert_webhook_settings.url }}">
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="alert_webhook_secret" class="form-label fw-bold small text-muted">{{ t('pages.settings.webhook_secret_label') }}</label>
+                        <input type="password" id="alert_webhook_secret" name="alert_webhook_secret" class="form-control font-monospace" placeholder="{{ t('pages.settings.webhook_secret_placeholder') }}" value="{{ alert_webhook_settings.secret }}" autocomplete="new-password">
+                    </div>
+
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <span class="small fw-bold text-muted">{{ t('pages.settings.delivery_status') }}</span>
+                        <span class="badge {% if alert_webhook_settings.is_active %}bg-success{% elif alert_webhook_settings.enabled %}bg-warning text-dark{% else %}bg-secondary{% endif %} p-2">
+                            {% if alert_webhook_settings.is_active %}{{ t('pages.settings.webhook_status_active') }}{% elif alert_webhook_settings.enabled %}{{ t('pages.settings.webhook_status_missing_url') }}{% else %}{{ t('pages.settings.webhook_status_disabled') }}{% endif %}
+                        </span>
+                    </div>
+
+                    <button type="submit" class="btn btn-dark w-100 fw-bold">{{ t('pages.settings.save_webhook') }}</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- General Engine Configuration -->
+    <div class="col-12 col-lg-6">
+        <div class="card border-dark shadow-sm h-100 rounded-0">
+            <div class="card-header bg-dark text-white py-3 d-flex align-items-center gap-2">
+                <i class="fas fa-cogs fs-5"></i>
+                <h5 class="mb-0 fw-bold">{{ t('pages.settings.engine_heading') }}</h5>
+            </div>
+            <div class="card-body p-4 bg-light">
+                <form action="{{ url_for('ui_dashboard.admin_settings') }}" method="POST">
+                    {{ csrf_field() }}
+                    <input type="hidden" name="form_name" value="application_settings">
+
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label for="time_sync_tolerance" class="form-label fw-bold small text-muted">{{ t('pages.settings.time_sync_label') }}</label>
+                            <input type="number" id="time_sync_tolerance" name="time_sync_tolerance" class="form-control font-monospace" min="0" step="1" value="{{ time_sync_tolerance }}">
+                            <div class="form-text text-secondary small">{{ t('pages.settings.time_sync_help') }}</div>
+                        </div>
+                        <div class="col-12">
+                            <label for="alert_retention_days" class="form-label fw-bold small text-muted">{{ t('pages.settings.alert_retention_label') }}</label>
+                            <input type="number" id="alert_retention_days" name="alert_retention_days" class="form-control font-monospace" min="1" step="1" value="{{ alert_retention_days }}">
+                            <div class="form-text text-secondary small">{{ t('pages.settings.alert_retention_help') }}</div>
+                        </div>
+                    </div>
+
+                    <div class="border border-secondary rounded-0 p-2 bg-white small fw-semibold mt-3">
+                        <span class="text-muted">{{ t('pages.settings.env_tz_label') }}</span>
+                        <span class="text-body font-monospace">{{ timezone }}</span>
+                    </div>
+
+                    <button type="submit" class="btn btn-dark w-100 fw-bold mt-3">{{ t('pages.settings.save_engine') }}</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Web & Video History Monitoring -->
+    <div class="col-12">
+        <div class="card border-dark shadow-sm rounded-0">
+            <div class="card-header bg-dark text-white py-3 d-flex align-items-center gap-2">
+                <i class="fas fa-history fs-5"></i>
+                <h5 class="mb-0 fw-bold">{{ t('pages.settings.web_video_heading') }}</h5>
+            </div>
+            <div class="card-body p-4 bg-light">
+                <form action="{{ url_for('ui_dashboard.admin_settings') }}" method="POST">
+                    {{ csrf_field() }}
+                    <input type="hidden" name="form_name" value="youtube_settings">
+
+                    <div class="row g-3">
+                        <div class="col-12 col-md-4">
+                            <label for="youtube_api_key" class="form-label fw-bold small text-muted">{{ t('pages.settings.youtube_api_key_label') }}</label>
+                            <input type="password" id="youtube_api_key" name="youtube_api_key" class="form-control font-monospace" placeholder="{% if youtube_api_key_set %}••••••••{% else %}{{ t('pages.settings.youtube_api_key_placeholder') }}{% endif %}" autocomplete="new-password">
+                            <div class="form-text text-secondary small">{{ t('pages.settings.youtube_api_key_help') }}</div>
+                        </div>
+                        <div class="col-12 col-md-4">
+                            <label for="youtube_history_retention_days" class="form-label fw-bold small text-muted">{{ t('pages.settings.youtube_retention_label') }}</label>
+                            <input type="number" id="youtube_history_retention_days" name="youtube_history_retention_days" class="form-control font-monospace" min="0" step="1" value="{{ youtube_history_retention_days }}">
+                            <div class="form-text text-secondary small">{{ t('pages.settings.youtube_retention_help') }}</div>
+                        </div>
+                        <div class="col-12 col-md-4">
+                            <label for="web_history_retention_days" class="form-label fw-bold small text-muted">{{ t('pages.settings.web_retention_label') }}</label>
+                            <input type="number" id="web_history_retention_days" name="web_history_retention_days" class="form-control font-monospace" min="0" step="1" value="{{ web_history_retention_days }}">
+                            <div class="form-text text-secondary small">{{ t('pages.settings.web_retention_help') }}</div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-end mt-4 pt-3 border-top border-secondary-subtle">
+                        <button type="submit" class="btn btn-dark fw-bold px-4">{{ t('pages.settings.save_web_video') }}</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

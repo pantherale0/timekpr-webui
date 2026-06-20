@@ -3,18 +3,7 @@ from flask import Blueprint, request, redirect, url_for, session
 from src.i18n.catalog import flash_t
 from src.database import AgentDevice, Settings
 from src.agent_helper import AgentConnectionManager, refresh_installed_apps
-from src.settings_manager import (
-    _get_agent_websocket_url,
-    _get_alert_webhook_settings,
-    _get_time_sync_tolerance,
-    _get_alert_retention_days,
-    _get_android_agent_apk_filename,
-    _get_android_agent_signature_checksum,
-    encrypt_setting,
-    _get_youtube_api_key_encrypted,
-    _get_youtube_history_retention_days,
-    _get_web_history_retention_days,
-)
+from src.settings_manager import encrypt_setting
 from src.blueprints.ui.spa import render_spa_shell
 from src.pairing_helper import (
     has_uploaded_android_apk,
@@ -79,16 +68,50 @@ def settings():
         flash_t('flash.auth.login_required', 'warning')
         return redirect(url_for('ui_auth.login'))
 
-    alert_webhook_settings = _get_alert_webhook_settings()
-    time_sync_tolerance = _get_time_sync_tolerance()
-    alert_retention_days = _get_alert_retention_days()
-    agent_websocket_url = _get_agent_websocket_url()
-    android_agent_apk_filename = _get_android_agent_apk_filename()
-    android_agent_signature_checksum = _get_android_agent_signature_checksum()
-    android_agent_apk_uploaded = has_uploaded_android_apk()
-
     if request.method == 'POST':
         form_name = (request.form.get('form_name') or 'password').strip()
+
+        if form_name == 'language':
+            from src.i18n.catalog import SUPPORTED_LOCALES
+
+            chosen = (request.form.get('locale') or '').strip()
+            if chosen not in SUPPORTED_LOCALES:
+                flash_t('flash.common.invalid_values', 'danger')
+            else:
+                session['locale'] = chosen
+                if request.form.get('set_household_default') == 'on':
+                    Settings.set_value('default_locale', chosen)
+                flash_t('flash.settings.language_saved', 'success')
+            return redirect(url_for('ui_dashboard.settings'))
+        else:
+            current_password = request.form.get('current_password')
+            new_password = request.form.get('new_password')
+            confirm_password = request.form.get('confirm_password')
+
+            if not current_password or not new_password or not confirm_password:
+                flash_t('flash.common.fields_required', 'danger')
+            elif not Settings.check_admin_password(current_password):
+                flash_t('flash.settings.password_wrong', 'danger')
+            elif new_password != confirm_password:
+                flash_t('flash.settings.password_mismatch', 'danger')
+            elif len(new_password) < 4:
+                flash_t('flash.settings.password_short', 'danger')
+            else:
+                Settings.set_admin_password(new_password)
+                flash_t('flash.settings.password_updated', 'success')
+                return redirect(url_for('ui_dashboard.settings'))
+
+    return render_spa_shell('settings')
+
+
+@ui_dashboard_bp.route('/admin/settings', methods=['GET', 'POST'])
+def admin_settings():
+    if not session.get('logged_in'):
+        flash_t('flash.auth.login_required', 'warning')
+        return redirect(url_for('ui_auth.login'))
+
+    if request.method == 'POST':
+        form_name = (request.form.get('form_name') or '').strip()
 
         if form_name == 'agent_pairing':
             submitted_url = (request.form.get('agent_websocket_url') or '').strip()
@@ -102,18 +125,15 @@ def settings():
                     flash_t('flash.settings.pairing_url_updated', 'success')
                 else:
                     flash_t('flash.settings.pairing_url_reset', 'success')
-                return redirect(url_for('ui_dashboard.settings'))
-
-            agent_websocket_url = submitted_url
+                return redirect(url_for('ui_dashboard.admin_settings'))
         elif form_name == 'android_provisioning':
             if request.form.get('remove_android_apk') == '1':
                 remove_uploaded_android_apk()
                 Settings.set_value('android_agent_apk_filename', '')
                 Settings.set_value('android_agent_signature_checksum', '')
                 flash_t('flash.settings.apk_removed', 'success')
-                return redirect(url_for('ui_dashboard.settings'))
+                return redirect(url_for('ui_dashboard.admin_settings'))
 
-            # 1. Save settings toggles
             skip_user_setup = '1' if request.form.get('android_provisioning_skip_user_setup') == 'on' else '0'
             leave_all_system_apps_enabled = '1' if request.form.get('android_provisioning_leave_all_system_apps_enabled') == 'on' else '0'
             wifi_ssid = (request.form.get('android_provisioning_wifi_ssid') or '').strip()
@@ -124,7 +144,6 @@ def settings():
             Settings.set_value('android_provisioning_wifi_ssid', wifi_ssid)
             Settings.set_value('android_provisioning_wifi_security_type', wifi_security_type)
 
-            # 2. Handle Wi-Fi password encryption
             if not wifi_ssid:
                 Settings.set_value('android_provisioning_wifi_password', '')
             else:
@@ -133,7 +152,6 @@ def settings():
                     encrypted_password = encrypt_setting(wifi_password)
                     Settings.set_value('android_provisioning_wifi_password', encrypted_password)
 
-            # 3. Handle APK Upload
             uploaded_apk = request.files.get('android_agent_apk')
             apk_updated = False
             if uploaded_apk and (uploaded_apk.filename or '').strip():
@@ -144,16 +162,16 @@ def settings():
                     apk_updated = True
                 except ValueError as exc:
                     flash_t('flash.common.generic_error', 'danger', error=str(exc))
-                    return redirect(url_for('ui_dashboard.settings'))
+                    return redirect(url_for('ui_dashboard.admin_settings'))
                 except RuntimeError as exc:
                     flash_t('flash.settings.apk_process_failed', 'danger', error=str(exc))
-                    return redirect(url_for('ui_dashboard.settings'))
+                    return redirect(url_for('ui_dashboard.admin_settings'))
 
             if apk_updated:
                 flash_t('flash.settings.apk_uploaded', 'success')
             else:
                 flash_t('flash.settings.mdm_updated', 'success')
-            return redirect(url_for('ui_dashboard.settings'))
+            return redirect(url_for('ui_dashboard.admin_settings'))
         elif form_name == 'alert_webhook':
             webhook_enabled = request.form.get('alert_webhook_enabled') == 'on'
             webhook_url = (request.form.get('alert_webhook_url') or '').strip()
@@ -173,21 +191,14 @@ def settings():
                     Settings.set_value('alert_webhook_url', webhook_url)
                     Settings.set_value('alert_webhook_secret', webhook_secret)
                     flash_t('flash.settings.webhook_updated', 'success')
-                    return redirect(url_for('ui_dashboard.settings'))
-
-            alert_webhook_settings = {
-                'enabled': webhook_enabled,
-                'url': webhook_url,
-                'secret': webhook_secret,
-                'is_active': webhook_enabled and bool(webhook_url),
-            }
+                    return redirect(url_for('ui_dashboard.admin_settings'))
         elif form_name == 'application_settings':
             tolerance = request.form.get('time_sync_tolerance')
             retention = request.form.get('alert_retention_days')
             try:
                 tolerance_val = int(tolerance)
                 retention_val = int(retention)
-                
+
                 if tolerance_val < 0:
                     flash_t('flash.settings.tolerance_invalid', 'danger')
                 elif retention_val < 1:
@@ -196,21 +207,9 @@ def settings():
                     Settings.set_value('time_sync_tolerance', str(tolerance_val))
                     Settings.set_value('alert_retention_days', str(retention_val))
                     flash_t('flash.settings.app_settings_updated', 'success')
-                    return redirect(url_for('ui_dashboard.settings'))
+                    return redirect(url_for('ui_dashboard.admin_settings'))
             except (TypeError, ValueError):
                 flash_t('flash.common.invalid_values', 'danger')
-        elif form_name == 'language':
-            from src.i18n.catalog import SUPPORTED_LOCALES
-
-            chosen = (request.form.get('locale') or '').strip()
-            if chosen not in SUPPORTED_LOCALES:
-                flash_t('flash.common.invalid_values', 'danger')
-            else:
-                session['locale'] = chosen
-                if request.form.get('set_household_default') == 'on':
-                    Settings.set_value('default_locale', chosen)
-                flash_t('flash.settings.language_saved', 'success')
-            return redirect(url_for('ui_dashboard.settings'))
         elif form_name == 'youtube_settings':
             youtube_api_key = request.form.get('youtube_api_key') or ''
             retention = request.form.get('youtube_history_retention_days')
@@ -228,30 +227,11 @@ def settings():
                         encrypted_key = encrypt_setting(youtube_api_key)
                         Settings.set_value('youtube_api_key', encrypted_key)
                     flash_t('flash.settings.web_video_updated', 'success')
-                    return redirect(url_for('ui_dashboard.settings'))
+                    return redirect(url_for('ui_dashboard.admin_settings'))
             except (TypeError, ValueError):
                 flash_t('flash.common.invalid_values', 'danger')
-        else:
-            current_password = request.form.get('current_password')
-            new_password = request.form.get('new_password')
-            confirm_password = request.form.get('confirm_password')
 
-            if not current_password or not new_password or not confirm_password:
-                flash_t('flash.common.fields_required', 'danger')
-            elif not Settings.check_admin_password(current_password):
-                flash_t('flash.settings.password_wrong', 'danger')
-            elif new_password != confirm_password:
-                flash_t('flash.settings.password_mismatch', 'danger')
-            elif len(new_password) < 4:
-                flash_t('flash.settings.password_short', 'danger')
-            else:
-                Settings.set_admin_password(new_password)
-                flash_t('flash.settings.password_updated', 'success')
-                return redirect(url_for('ui_dashboard.settings'))
-
-                return redirect(url_for('ui_dashboard.settings'))
-
-    return render_spa_shell('settings')
+    return render_spa_shell('admin/settings')
 
 
 @ui_dashboard_bp.route('/stats/<int:user_id>')

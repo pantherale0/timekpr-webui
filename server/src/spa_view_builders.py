@@ -341,7 +341,33 @@ def build_admin_restrictions_context():
     }
 
 
+def _build_pairing_qr_context():
+    server_url = build_agent_websocket_url(
+        request,
+        configured_url=_get_agent_websocket_url(),
+    )
+    registration_token = AgentConnectionManager.registration_token
+    pairing_payload = pairing_payload_json(server_url, registration_token)
+    pairing_qr_data_uri = render_pairing_qr_data_uri(pairing_payload)
+    return {
+        'pairing_server_url': server_url,
+        'pairing_qr_data_uri': pairing_qr_data_uri,
+        'pairing_payload': pairing_payload,
+        'registration_token': registration_token,
+    }
+
+
 def build_settings_context():
+    pairing = _build_pairing_qr_context()
+    return {
+        'template': 'settings.html',
+        'pairing_qr_data_uri': pairing['pairing_qr_data_uri'],
+        'nintendo_account': get_nintendo_account_summary(),
+        'xbox_account': get_xbox_account_summary(),
+    }
+
+
+def build_admin_settings_context():
     alert_webhook_settings = _get_alert_webhook_settings()
     time_sync_tolerance = _get_time_sync_tolerance()
     alert_retention_days = _get_alert_retention_days()
@@ -350,41 +376,32 @@ def build_settings_context():
     android_agent_signature_checksum = _get_android_agent_signature_checksum()
     android_agent_apk_uploaded = has_uploaded_android_apk()
 
-    server_url = build_agent_websocket_url(
-        request,
-        configured_url=_get_agent_websocket_url(),
-    )
-    registration_token = AgentConnectionManager.registration_token
-    pairing_payload = pairing_payload_json(server_url, registration_token)
-    pairing_qr_data_uri = render_pairing_qr_data_uri(pairing_payload)
-
+    pairing = _build_pairing_qr_context()
     provisioning = resolve_android_provisioning(
-        server_url,
+        pairing['pairing_server_url'],
         get_server_version(),
         checksum_override=android_agent_signature_checksum,
-        registration_token=registration_token,
+        registration_token=pairing['registration_token'],
     )
     provisioning_qr_data_uri = None
     if provisioning['provisioning_ready'] and provisioning['payload_json']:
         provisioning_qr_data_uri = render_pairing_qr_data_uri(provisioning['payload_json'])
 
     return {
-        'template': 'settings.html',
+        'template': 'admin_settings.html',
         'alert_webhook_settings': alert_webhook_settings,
         'time_sync_tolerance': time_sync_tolerance,
         'alert_retention_days': alert_retention_days,
         'agent_websocket_url': agent_websocket_url,
-        'pairing_server_url': server_url,
-        'pairing_qr_data_uri': pairing_qr_data_uri,
-        'pairing_payload': pairing_payload,
+        'pairing_server_url': pairing['pairing_server_url'],
+        'pairing_qr_data_uri': pairing['pairing_qr_data_uri'],
+        'pairing_payload': pairing['pairing_payload'],
         'android_agent_apk_filename': android_agent_apk_filename,
         'android_agent_apk_uploaded': android_agent_apk_uploaded,
         'android_agent_signature_checksum': android_agent_signature_checksum,
         'provisioning': provisioning,
         'provisioning_qr_data_uri': provisioning_qr_data_uri,
         'server_version': get_server_version(),
-        'nintendo_account': get_nintendo_account_summary(),
-        'xbox_account': get_xbox_account_summary(),
         'youtube_api_key_set': bool(_get_youtube_api_key_encrypted()),
         'youtube_history_retention_days': _get_youtube_history_retention_days(),
         'web_history_retention_days': _get_web_history_retention_days(),

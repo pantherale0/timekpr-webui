@@ -72,6 +72,15 @@ def test_spa_fragment_settings(auth_client):
     assert b'Household Settings' in response.data
 
 
+def test_spa_fragment_admin_settings(auth_client):
+    response = auth_client.get(
+        '/ui/fragment/admin/settings',
+        headers={'X-Guardian-SPA': 'fragment'},
+    )
+    assert response.status_code == 200
+    assert b'System Settings' in response.data
+
+
 def test_spa_fragment_user_profile(auth_client, db_session):
     from src.database import ManagedUser
 

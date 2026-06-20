@@ -140,7 +140,7 @@ def test_resolve_android_provisioning_includes_new_options(mock_uploaded, db_ses
 def test_post_android_provisioning_settings(auth_client, db_session, app):
     with app.app_context():
         response = auth_client.post(
-            '/settings',
+            '/admin/settings',
             data={
                 'form_name': 'android_provisioning',
                 'android_provisioning_skip_user_setup': 'on',
@@ -166,7 +166,7 @@ def test_post_android_provisioning_settings_preserves_password(auth_client, db_s
         Settings.set_value('android_provisioning_wifi_password', encrypt_setting('original-pass'))
         
         response = auth_client.post(
-            '/settings',
+            '/admin/settings',
             data={
                 'form_name': 'android_provisioning',
                 'android_provisioning_wifi_ssid': 'SSID',
@@ -185,7 +185,7 @@ def test_post_android_provisioning_settings_clears_wifi(auth_client, db_session,
         Settings.set_value('android_provisioning_wifi_password', encrypt_setting('original-pass'))
         
         response = auth_client.post(
-            '/settings',
+            '/admin/settings',
             data={
                 'form_name': 'android_provisioning',
                 'android_provisioning_wifi_ssid': '',  # Empty SSID clears Wi-Fi settings

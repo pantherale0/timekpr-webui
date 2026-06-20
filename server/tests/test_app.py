@@ -222,7 +222,7 @@ def test_settings_page(client, db_session):
 
     # POST alert webhook settings
     with patch('src.url_safety.is_safe_outbound_url', return_value=True):
-        res = client.post('/settings', data={
+        res = client.post('/admin/settings', data={
             'form_name': 'alert_webhook',
             'alert_webhook_enabled': 'on',
             'alert_webhook_url': 'https://hooks.example.test/timekpr',
@@ -234,7 +234,7 @@ def test_settings_page(client, db_session):
     assert Settings.get_value('alert_webhook_secret') == 'secret-value'
 
     # Enabled without URL should fail validation
-    res = client.post('/settings', data={
+    res = client.post('/admin/settings', data={
         'form_name': 'alert_webhook',
         'alert_webhook_enabled': 'on',
         'alert_webhook_url': '',
@@ -243,20 +243,20 @@ def test_settings_page(client, db_session):
     assert b'Webhook URL is required when alert delivery is enabled' in res.data
 
     # POST agent pairing URL settings
-    res = client.post('/settings', data={
+    res = client.post('/admin/settings', data={
         'form_name': 'agent_pairing',
         'agent_websocket_url': 'wss://agents.example.test/ws',
     }, follow_redirects=True)
     assert b'Agent pairing URL updated successfully' in res.data
     assert Settings.get_value('agent_websocket_url') == 'wss://agents.example.test/ws'
 
-    res = client.post('/settings', data={
+    res = client.post('/admin/settings', data={
         'form_name': 'agent_pairing',
         'agent_websocket_url': 'https://agents.example.test/ws',
     }, follow_redirects=True)
     assert b'Agent WebSocket URL must use ws:// or wss://' in res.data
 
-    res = client.post('/settings', data={
+    res = client.post('/admin/settings', data={
         'form_name': 'agent_pairing',
         'agent_websocket_url': '',
     }, follow_redirects=True)
@@ -273,7 +273,7 @@ def test_settings_page(client, db_session):
 
     with patch('src.blueprints.ui.dashboard.save_uploaded_android_apk', return_value=('app-release.apk', 'checksum-abc')):
         res = client.post(
-            '/settings',
+            '/admin/settings',
             data={
                 'form_name': 'android_provisioning',
                 'android_agent_apk': (apk_buffer, 'app-release.apk'),
