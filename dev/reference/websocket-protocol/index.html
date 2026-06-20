@@ -2011,6 +2011,34 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Post-auth agent messages">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#credential_escrow-windows" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        credential_escrow (Windows)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#alert_event-integrity-types" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        alert_event integrity types
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -2427,6 +2455,34 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Post-auth agent messages">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#credential_escrow-windows" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        credential_escrow (Windows)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#alert_event-integrity-types" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        alert_event integrity types
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -2546,6 +2602,10 @@
 <td>Usage/security alerts</td>
 </tr>
 <tr>
+<td><code>credential_escrow</code></td>
+<td>Agent-initiated secret escrow (Windows local Administrator password)</td>
+</tr>
+<tr>
 <td><code>installed_apps_report</code></td>
 <td>App inventory chunks</td>
 </tr>
@@ -2559,6 +2619,36 @@
 </tr>
 </tbody>
 </table>
+<h3 id="credential_escrow-windows"><code>credential_escrow</code> (Windows)<a class="headerlink" href="#credential_escrow-windows" title="Permanent link">&para;</a></h3>
+<p>Sent after the agent rotates the built-in local Administrator password:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="p">{</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">  </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;credential_escrow&quot;</span><span class="p">,</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">  </span><span class="nt">&quot;credential_type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;windows_local_admin&quot;</span><span class="p">,</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">  </span><span class="nt">&quot;rotation_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;uuid&quot;</span><span class="p">,</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">  </span><span class="nt">&quot;occurred_at&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2026-06-20T12:00:00Z&quot;</span><span class="p">,</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">  </span><span class="nt">&quot;password&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;plaintext-over-wss&quot;</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="p">}</span>
+</code></pre></div>
+<p>The server encrypts the password at rest; it is never written to the device filesystem.</p>
+<h3 id="alert_event-integrity-types"><code>alert_event</code> integrity types<a class="headerlink" href="#alert_event-integrity-types" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th><code>event_type</code></th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>clock_tamper</code></td>
+<td>Wall-clock skew detected</td>
+</tr>
+<tr>
+<td><code>boot_config_tamper</code></td>
+<td>Unauthorized Safe Mode / BCD change detected or intercepted</td>
+</tr>
+</tbody>
+</table>
 <h2 id="server-agent-commands">Server → agent commands<a class="headerlink" href="#server-agent-commands" title="Permanent link">&para;</a></h2>
 <p>Delivered as JSON with <code>action</code> field (via <code>AgentClient</code>), including:</p>
 <ul>
@@ -2566,6 +2656,7 @@
 <li>Domain policy sync sequence (<code>begin_domain_policy_sync</code>, chunks, manifest, finalize)</li>
 <li><code>sync_apparmor_policy</code>, <code>sync_linux_device_policy</code>, <code>sync_android_device_policy</code></li>
 <li><code>refresh_installed_apps</code>, <code>unenroll</code>, <code>factory_reset</code></li>
+<li><code>clear_safe_mode_lockdown</code> (Windows Safe Mode lockdown override)</li>
 </ul>
 <p>See platform docs and <a href="../../features/app-discovery/">App discovery</a>.</p>
 <h2 id="android-notes">Android notes<a class="headerlink" href="#android-notes" title="Permanent link">&para;</a></h2>

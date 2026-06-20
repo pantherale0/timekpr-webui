@@ -983,6 +983,28 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#safe-mode-and-boot-hardening" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Safe Mode and boot hardening
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#local-administrator-password-escrow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Local Administrator password escrow
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#limitations" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2465,6 +2487,28 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#safe-mode-and-boot-hardening" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Safe Mode and boot hardening
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#local-administrator-password-escrow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Local Administrator password escrow
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#limitations" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2524,7 +2568,7 @@
 </thead>
 <tbody>
 <tr>
-<td><strong>Windows service</strong> (<code>TimeKprAgent</code>)</td>
+<td><strong>Windows service</strong> (<code>GuardianAgent</code>)</td>
 <td>Runs as SYSTEM; WebSocket loop, DNS proxy, process monitor, policy catalog</td>
 </tr>
 <tr>
@@ -2539,7 +2583,10 @@
 <li><strong>DNS proxy</strong> — redirects adapters to <code>127.0.0.1</code> for domain blocklists; outbound UDP/53 firewall rule reduces bypass</li>
 <li><strong>Process monitor</strong> — ToolHelp snapshot loop; terminates blocked executables and enforces time lockouts</li>
 <li><strong>Clock integrity</strong> — periodic wall-clock tamper detection via <code>QueryInterruptTime</code> cross-check and SNTP; triggers process lockout, parent alerts, and a full-screen Edge overlay on tamper</li>
-<li><strong>Policy store</strong> — Windows user enumeration (RID ≥ 1000); AppArmor-like app rules per mapped username</li>
+<li><strong>Policy store</strong> — Windows user enumeration (RID ≥ 1000); AppArmor-like app rules per mapped username, persisted under <code>C:\ProgramData\Guardian\</code> for offline enforcement</li>
+<li><strong>Safe Mode defense</strong> — <code>GuardianAgent</code> is registered under SafeBoot Minimal and Network hives; on Safe Mode boot the service enters lockdown using cached local policy and blocks diagnostic shells</li>
+<li><strong>Local Administrator LAPS</strong> — rotates the enabled built-in Administrator account when it uses a weak or unmanaged password; escrow travels to the server over WSS (never stored locally in plain text)</li>
+<li><strong>BCD integrity</strong> — monitors boot configuration for unauthorized Safe Mode loops and intercepts <code>bcdedit</code> / <code>msconfig</code> tamper attempts</li>
 </ul>
 <p>On service stop, DNS settings and policies are restored.</p>
 <h2 id="installation">Installation<a class="headerlink" href="#installation" title="Permanent link">&para;</a></h2>
@@ -2595,9 +2642,40 @@
 <td>Hardware baseline</td>
 <td>Manual BIOS audit/apply via vendor CLIs (Dell CCTK, HP CMSL, Lenovo WMI, Surface SEMM); payloads downloaded from server</td>
 </tr>
+<tr>
+<td>Safe Mode lockdown</td>
+<td>Automatic strict process lockdown in Safe Mode; parents can release via device detail</td>
+</tr>
+<tr>
+<td>Local Administrator LAPS</td>
+<td>Automatic rotation + server escrow for the built-in Administrator account</td>
+</tr>
+<tr>
+<td>Boot configuration</td>
+<td>Continuous BCD audit and interception of boot-tool tampering</td>
+</tr>
 </tbody>
 </table>
 <p>App policy UI currently emphasizes Linux and Android; Windows uses the same underlying sync commands.</p>
+<h2 id="safe-mode-and-boot-hardening">Safe Mode and boot hardening<a class="headerlink" href="#safe-mode-and-boot-hardening" title="Permanent link">&para;</a></h2>
+<p>The MSI registers <code>GuardianAgent</code> under:</p>
+<ul>
+<li><code>HKLM\SYSTEM\CurrentControlSet\Control\SafeBoot\Minimal\GuardianAgent</code></li>
+<li><code>HKLM\SYSTEM\CurrentControlSet\Control\SafeBoot\Network\GuardianAgent</code></li>
+</ul>
+<p>The service self-heals these keys at startup if they are missing. During Safe Mode the agent skips DNS changes (Minimal mode may have no network stack) and relies on cached app/device policy files under <code>C:\ProgramData\Guardian\</code>.</p>
+<p>Parents can release an active Safe Mode lockdown from the device detail page (<code>POST /api/devices/&lt;system_id&gt;/windows-laps/clear-safe-mode-lockdown</code>), which sends the <code>clear_safe_mode_lockdown</code> command to the agent.</p>
+<h2 id="local-administrator-password-escrow">Local Administrator password escrow<a class="headerlink" href="#local-administrator-password-escrow" title="Permanent link">&para;</a></h2>
+<p>After a successful WebSocket authentication on normal boot, the agent audits the built-in Administrator account (RID 500). If the account is enabled and unmanaged or weakly protected, the agent sets a random password and sends:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="p">{</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;credential_escrow&quot;</span><span class="p">,</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">  </span><span class="nt">&quot;credential_type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;windows_local_admin&quot;</span><span class="p">,</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">  </span><span class="nt">&quot;rotation_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;&lt;uuid&gt;&quot;</span><span class="p">,</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">  </span><span class="nt">&quot;occurred_at&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2026-06-20T12:00:00Z&quot;</span><span class="p">,</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">  </span><span class="nt">&quot;password&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;&lt;plaintext over WSS/TLS&gt;&quot;</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="p">}</span>
+</code></pre></div>
+<p>The server encrypts this value with Fernet and exposes it through <code>GET /api/devices/&lt;system_id&gt;/windows-laps</code> and <code>POST .../windows-laps/reveal-password</code>.</p>
 <h2 id="limitations">Limitations<a class="headerlink" href="#limitations" title="Permanent link">&para;</a></h2>
 <ul>
 <li>No AppArmor or polkit — enforcement is process/DNS based</li>
