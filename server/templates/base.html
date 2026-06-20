@@ -23,11 +23,11 @@
         rel="stylesheet">
 
     <!-- Custom Stylesheet -->
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/guardian-wizard.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v=server_version) }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/guardian-wizard.css', v=server_version) }}">
 
     <!-- Theme Manager -->
-    <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/theme.js', v=server_version) }}"></script>
     <script>
         (function () {
             const originalFetch = window.fetch;
@@ -1718,7 +1718,7 @@
     {% include '_create_profile_wizard.html' %}
     <script type="application/json" id="policy-preset-matrix-data">{{ policy_preset_matrix | tojson }}</script>
     <script type="application/json" id="marketplace-presets-data">{{ marketplace_presets | tojson }}</script>
-    <script src="{{ url_for('static', filename='js/guardian-wizard.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/guardian-wizard.js', v=server_version) }}"></script>
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             if (!window.GuardianWizard) return;

@@ -43,7 +43,20 @@
                                 {{ user.username[:2]|upper }}
                             </div>
                             <div>
-                                <h5 class="mb-0 fw-bold">{{ user.username }}</h5>
+                                <div class="d-flex align-items-center gap-2 flex-wrap">
+                                    <h5 class="mb-0 fw-bold">{{ user.username }}</h5>
+                                    {% if user.policy_age_bracket and user.policy_maturity_level %}
+                                        {% set age_meta = policy_preset_matrix.age_brackets.get(user.policy_age_bracket, {}) %}
+                                        {% set mat_meta = policy_preset_matrix.maturity_levels.get(user.policy_maturity_level, {}) %}
+                                        <span class="badge bg-light text-slate border" style="font-size: 0.75rem; border-color: #4A6B5D !important; color: #1E293B;">
+                                            <i class="fas fa-shield-alt me-1" style="color: #4A6B5D;"></i>{{ age_meta.profile_title or age_meta.label }} · {{ mat_meta.label }}
+                                        </span>
+                                    {% else %}
+                                        <span class="badge bg-warning-subtle text-warning-emphasis border border-warning" style="font-size: 0.75rem; background-color: #feefc3; color: #b06000;">
+                                            <i class="fas fa-exclamation-triangle me-1"></i>No Safety Baseline
+                                        </span>
+                                    {% endif %}
+                                </div>
                                 <span class="text-secondary small fw-semibold">
                                     <i class="fas fa-link me-1"></i>
                                     {{ t('pages.admin_users.linked_device_accounts', count=user.device_mappings|length, verified=user.device_mappings|selectattr('is_valid')|list|length) }}

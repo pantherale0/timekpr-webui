@@ -39,6 +39,8 @@ _LOGGER = logging.getLogger(__name__)
 
 # Version metadata
 __version__ = os.environ.get("TIMEKPR_SERVER_VERSION", "v0.0.0-dev")
+import time
+_startup_version = __version__ if __version__ != "v0.0.0-dev" else f"v0.0.0-dev-{int(time.time())}"
 
 def _load_secret_key(flask_app):
     """Load a stable Flask secret key for signed sessions across restarts/workers."""
@@ -151,6 +153,10 @@ app.template_filter('localtime')(localtime_filter)
 app.context_processor(inject_timezone)
 app.context_processor(inject_create_profile_wizard)
 app.context_processor(inject_i18n)
+
+@app.context_processor
+def inject_server_version():
+    return {'server_version': _startup_version}
 
 
 @app.before_request

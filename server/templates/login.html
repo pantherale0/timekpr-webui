@@ -16,9 +16,9 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap" rel="stylesheet">
     
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/guardian-wizard.css') }}">
-    <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v=server_version) }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/guardian-wizard.css', v=server_version) }}">
+    <script src="{{ url_for('static', filename='js/theme.js', v=server_version) }}"></script>
     <style>
         body {
             font-family: 'Atkinson Hyperlegible', sans-serif;

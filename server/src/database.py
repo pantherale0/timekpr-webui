@@ -2083,3 +2083,32 @@ class UserOnlineAccount(db.Model):
             'first_seen_at': self.first_seen_at.isoformat() if self.first_seen_at else None,
             'last_seen_at': self.last_seen_at.isoformat() if self.last_seen_at else None,
         }
+
+
+class ChannelBlockRule(db.Model):
+    __tablename__ = 'channel_block_rule'
+
+    id = db.Column(db.Integer, primary_key=True)
+    managed_user_id = db.Column(db.Integer, db.ForeignKey('managed_user.id'), nullable=False)
+    platform = db.Column(db.String(32), nullable=False)  # 'youtube' | 'tiktok'
+    channel_id = db.Column(db.String(100), nullable=True)
+    channel_name = db.Column(db.String(255), nullable=False)
+    is_blocked = db.Column(db.Boolean, default=True, nullable=False)
+    created_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+
+    managed_user = db.relationship('ManagedUser', backref=db.backref('channel_block_rules', cascade='all, delete-orphan'))
+
+    __table_args__ = (
+        db.UniqueConstraint('managed_user_id', 'platform', 'channel_name', name='user_channel_block_uc'),
+    )
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'managed_user_id': self.managed_user_id,
+            'platform': self.platform,
+            'channel_id': self.channel_id,
+            'channel_name': self.channel_name,
+            'is_blocked': self.is_blocked,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+        }

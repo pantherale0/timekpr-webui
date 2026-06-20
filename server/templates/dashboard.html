@@ -21,6 +21,46 @@
     </div>
 </div>
 
+{% set missing_baseline_users = [] %}
+{% for u in users %}
+    {% if not u.policy_age_bracket or not u.policy_maturity_level %}
+        {% set _ = missing_baseline_users.append(u) %}
+    {% endif %}
+{% endfor %}
+
+{% if missing_baseline_users %}
+<div class="alert alert-warning border shadow-sm p-3 mb-4 d-flex justify-content-between align-items-center flex-wrap gap-3" style="background-color: #FFFbeb; border-left: 4px solid #F59e0b !important;">
+    <div class="d-flex align-items-center gap-3">
+        <div class="bg-warning-subtle text-warning rounded-circle d-flex align-items-center justify-content-center" style="width: 40px; height: 40px; background-color: #FEf3c7; color: #D97706;">
+            <i class="fas fa-shield-alt fs-5"></i>
+        </div>
+        <div>
+            <h6 class="fw-bold mb-1 text-dark" style="color: #1E293B; font-size: 0.95rem;">Set a Safety Baseline Preset</h6>
+            <p class="mb-0 text-secondary small">
+                The following child profiles do not have an active safety baseline preset:
+                <strong>
+                    {% for m_user in missing_baseline_users %}
+                        {{ m_user.username }}{% if not loop.last %}, {% endif %}
+                    {% endfor %}
+                </strong>.
+                Apply a safety preset to protect them with age-appropriate filters.
+            </p>
+        </div>
+    </div>
+    <div>
+        {% if missing_baseline_users|length == 1 %}
+            <a href="{{ url_for('ui_dashboard.edit_user_profile', user_id=missing_baseline_users[0].id) }}" class="btn btn-sm btn-warning text-dark fw-bold shadow-sm">
+                <i class="fas fa-shield-alt me-1"></i> Protect Now
+            </a>
+        {% else %}
+            <a href="{{ url_for('ui_dashboard.admin_users') }}" class="btn btn-sm btn-warning text-dark fw-bold shadow-sm">
+                <i class="fas fa-shield-alt me-1"></i> Configure Profiles
+            </a>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+
 <div class="row g-4">
     {% if users %}
         {% for user in users %}
@@ -54,9 +94,30 @@
                     <div class="card-body p-3 d-flex flex-column justify-content-between">
                         <div>
                             <!-- Mappings Info -->
-                            <p id="mapping-summary-{{ user.id }}" class="text-secondary small fw-semibold mb-3">
+                            <p id="mapping-summary-{{ user.id }}" class="text-secondary small fw-semibold mb-2">
                                 {{ t('pages.dashboard.mapping_summary', count=user.mapping_count, online=user.online_mapping_count) }}
                             </p>
+
+                            <!-- Safety Preset Status / Warning -->
+                            {% if user.policy_age_bracket and user.policy_maturity_level %}
+                                {% set age_meta = policy_preset_matrix.age_brackets.get(user.policy_age_bracket, {}) %}
+                                {% set mat_meta = policy_preset_matrix.maturity_levels.get(user.policy_maturity_level, {}) %}
+                                <div class="badge bg-light text-slate border p-2 mb-3 w-100 text-start d-flex align-items-center justify-content-between" style="font-weight: normal; color: #1E293B; white-space: normal;">
+                                    <span>
+                                        <i class="fas fa-shield-alt me-1" style="color: #4A6B5D;"></i>
+                                        <strong>{{ age_meta.profile_title or age_meta.label }}</strong> · {{ mat_meta.label }}
+                                    </span>
+                                    <span class="small text-muted" style="font-size: 0.65rem;">Active Preset</span>
+                                </div>
+                            {% else %}
+                                <div class="alert alert-warning p-2 mb-3 small d-flex align-items-center justify-content-between" style="border-left: 3px solid #ffc107; background-color: #fffaf0;">
+                                    <span>
+                                        <i class="fas fa-exclamation-triangle me-1 text-warning"></i>
+                                        No safety baseline active.
+                                    </span>
+                                    <a href="{{ url_for('ui_dashboard.edit_user_profile', user_id=user.id) }}" class="btn btn-xs btn-warning text-dark fw-bold px-2 py-0" style="font-size: 0.7rem;">Protect</a>
+                                </div>
+                            {% endif %}
                             
                             <!-- Quick Stats Row -->
                             <div class="row g-2 mb-3">

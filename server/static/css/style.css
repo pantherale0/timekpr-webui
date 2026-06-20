@@ -2019,3 +2019,100 @@ body {
     font-size: 0.65rem;
   }
 }
+
+/* ==========================================================================
+   GUARDIAN INSPECTOR SIDEBAR & OVERLAY STYLING
+   ========================================================================== */
+
+.guardian-inspector-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(30, 41, 59, 0.4);
+  backdrop-filter: blur(4px);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.25s ease, visibility 0.25s ease;
+  z-index: 1040;
+}
+
+.guardian-inspector-overlay.open {
+  opacity: 1;
+  visibility: visible;
+}
+
+.guardian-inspector-sidebar {
+  position: fixed;
+  right: -420px;
+  top: 0;
+  width: 100%;
+  max-width: 420px;
+  height: 100vh;
+  background-color: rgba(251, 251, 249, 0.98);
+  backdrop-filter: blur(12px);
+  border-left: 1px solid #e8dcc8;
+  box-shadow: -5px 0 25px rgba(30, 41, 59, 0.15);
+  transition: right 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  z-index: 1050;
+  display: flex;
+  flex-direction: column;
+}
+
+.guardian-inspector-sidebar.open {
+  right: 0;
+}
+
+.guardian-inspector-sidebar .sidebar-header {
+  border-bottom: 1px solid var(--bs-border-color, #dee2e6);
+  background-color: rgba(74, 107, 93, 0.03);
+}
+
+.guardian-inspector-sidebar .sidebar-body {
+  overflow-y: auto;
+  flex-grow: 1;
+}
+
+.guardian-inspector-sidebar .inspect-card {
+  background: #ffffff;
+  border: 1px solid var(--bs-border-color, #dee2e6);
+}
+
+.guardian-inspector-sidebar .inspect-section h6 {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #64748b;
+}
+
+.guardian-inspector-sidebar .btn-sage {
+  background-color: #4A6B5D;
+  border-color: #4A6B5D;
+}
+
+.guardian-inspector-sidebar .btn-sage:hover {
+  background-color: #3b5449;
+  border-color: #3b5449;
+}
+
+.interactive-inspect-row {
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.interactive-inspect-row:hover {
+  background-color: rgba(74, 107, 93, 0.05) !important;
+}
+
+.text-slate {
+  color: #1E293B !important;
+}
+
+.text-sage {
+  color: #4A6B5D !important;
+}
+
+.word-break-all {
+  word-break: break-all;
+}

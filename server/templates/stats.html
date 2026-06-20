@@ -749,7 +749,7 @@
             const platformLabel = app.platform === 'android' ? 'Android' : 'Linux';
 
             return `
-                <tr>
+                <tr class="interactive-inspect-row cursor-pointer" data-inspect-type="app" data-inspect-value="${escapeHtml(app.executable_path)}">
                     <td>${iconHtml}</td>
                     <td>
                         <div class="fw-bold text-body" style="font-size: 0.9rem;">${escapeHtml(app.application_name)}</div>
@@ -968,9 +968,33 @@
                     iconClass = 'fas fa-exclamation-triangle bg-warning text-dark';
                 }
 
+                let inspectAttrs = '';
+                const details = event.details || {};
+                if (event.event_type === 'app_usage' || event.event_type === 'app_blocked') {
+                    const val = details.executable_path || details.application_name;
+                    if (val) {
+                        inspectAttrs = `data-inspect-type="app" data-inspect-value="${escapeHtml(val)}" class="timeline-item shadow-sm border interactive-inspect-row cursor-pointer"`;
+                    }
+                } else if (event.event_type === 'access_requested') {
+                    const val = details.target_value;
+                    const kind = details.target_kind === 'app' ? 'app' : 'domain';
+                    if (val) {
+                        inspectAttrs = `data-inspect-type="${kind}" data-inspect-value="${escapeHtml(val)}" class="timeline-item shadow-sm border interactive-inspect-row cursor-pointer"`;
+                    }
+                } else if (event.event_type === 'dns_block' || event.event_type === 'domain_blocked') {
+                    const val = details.domain;
+                    if (val) {
+                        inspectAttrs = `data-inspect-type="domain" data-inspect-value="${escapeHtml(val)}" class="timeline-item shadow-sm border interactive-inspect-row cursor-pointer"`;
+                    }
+                }
+                
+                if (!inspectAttrs) {
+                    inspectAttrs = 'class="timeline-item shadow-sm border"';
+                }
+
                 itemDiv.innerHTML = `
                     <i class="${iconClass}"></i>
-                    <div class="timeline-item shadow-sm border">
+                    <div ${inspectAttrs}>
                         <span class="time text-secondary small"><i class="fas fa-clock me-1"></i>${eventTime}</span>
                         <h3 class="timeline-header fw-bold" style="font-size: 0.9rem;">
                             <span class="badge bg-secondary me-2">${escapeHtml(event.scope_label)}</span>

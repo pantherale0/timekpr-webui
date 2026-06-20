@@ -159,21 +159,27 @@ def _build_device_protection_summary(
 
 
 def build_dashboard_context():
+    from src.policy_preset_manager import get_matrix_metadata_for_ui
+
     db.session.expire_all()
     snapshot = build_dashboard_snapshot()
     return {
         'template': 'dashboard.html',
         'users': snapshot['users'],
         'pending_adjustments': snapshot['pending_adjustments'],
+        'policy_preset_matrix': get_matrix_metadata_for_ui(),
     }
 
 
 def build_admin_users_context():
+    from src.policy_preset_manager import get_matrix_metadata_for_ui
+
     return {
         'template': 'admin_users.html',
         'users': ManagedUser.query.order_by(ManagedUser.username.asc()).all(),
         'approved_devices': AgentDevice.query.filter_by(status='approved').all(),
         'device_labels': _get_device_label_map(),
+        'policy_preset_matrix': get_matrix_metadata_for_ui(),
     }
 
 

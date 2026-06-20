@@ -439,7 +439,11 @@
                     ? '/static/img/video_placeholder.png'
                     : `https://img.youtube.com/vi/${item.video_id}/mqdefault.jpg`;
 
-                card.className = `history-feed-item p-3 border-bottom d-flex gap-3 align-items-start ${isTiktok ? 'border-tiktok' : 'border-youtube'}`;
+                card.className = `history-feed-item p-3 border-bottom d-flex gap-3 align-items-start interactive-inspect-row cursor-pointer ${isTiktok ? 'border-tiktok' : 'border-youtube'}`;
+                card.setAttribute('data-inspect-type', 'channel');
+                card.setAttribute('data-inspect-value', item.channel_name);
+                card.setAttribute('data-inspect-platform', item.type);
+                
                 card.innerHTML = `
                     <div class="video-thumbnail-container">
                         <img class="video-thumbnail" src="${thumbnailUrl}" alt="Thumbnail" onerror="this.src='/static/img/video_placeholder.png'; this.onerror=null;">
@@ -464,7 +468,10 @@
                 `;
             } else {
                 const visitedAtFormatted = formatDateTime(item.timestamp);
-                card.className = 'history-feed-item p-3 border-bottom d-flex gap-3 align-items-start border-web';
+                card.className = 'history-feed-item p-3 border-bottom d-flex gap-3 align-items-start interactive-inspect-row cursor-pointer border-web';
+                card.setAttribute('data-inspect-type', 'domain');
+                card.setAttribute('data-inspect-value', item.domain);
+                
                 card.innerHTML = `
                     <div class="d-flex align-items-center justify-content-center bg-body-secondary border rounded" style="width: 48px; height: 48px; flex-shrink: 0;">
                         <i class="fas fa-globe text-primary fs-4"></i>

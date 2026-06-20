@@ -737,3 +737,302 @@ def update_overlay_settings(user_id):
         'overlay_age_tier': user.overlay_age_tier,
         'overlay_parent_note': user.overlay_parent_note,
     })
+
+
+@api_users_bp.route('/api/user/<int:user_id>/inspect', methods=['GET'])
+def inspect_item(user_id):
+    if not session.get('logged_in'):
+        return jsonify({'success': False, 'message': 'Not authenticated'}), 401
+
+    user = ManagedUser.query.get_or_404(user_id)
+    inspect_type = request.args.get('type', '').strip().lower()
+    value = request.args.get('value', '').strip()
+
+    if not inspect_type or not value:
+        return jsonify({'success': False, 'message': 'Type and value are required'}), 400
+
+    from src.database import WebHistory, AppUsageHistory, BlocklistSource, PolicyApprovalGrant, BlocklistDomain, AppArmorRule
+    from sqlalchemy import func
+
+    devices_distribution = {}
+    total_visits = 0
+    first_seen = None
+    last_seen = None
+    whitelisted = False
+
+    device_map_ids = [m.id for m in user.device_mappings]
+
+    if inspect_type == 'domain':
+        records = WebHistory.query.filter_by(managed_user_id=user.id, domain=value).all()
+        total_visits = len(records)
+        if records:
+            sorted_records = sorted(records, key=lambda r: r.visited_at)
+            first_seen = sorted_records[0].visited_at.isoformat()
+            last_seen = sorted_records[-1].visited_at.isoformat()
+            for r in records:
+                dev_label = r.device.system_hostname if r.device else r.device_id
+                devices_distribution[dev_label] = devices_distribution.get(dev_label, 0) + 1
+
+        if device_map_ids:
+            grant = PolicyApprovalGrant.query.filter(
+                PolicyApprovalGrant.device_map_id.in_(device_map_ids),
+                PolicyApprovalGrant.grant_type == PolicyApprovalGrant.GRANT_DOMAIN_ACCESS,
+                PolicyApprovalGrant.target_value == value,
+                PolicyApprovalGrant.status == PolicyApprovalGrant.STATUS_ACTIVE
+            ).first()
+            if grant:
+                whitelisted = True
+
+        assigned_sources = [a.source for a in user.blocklist_assignments if a.source]
+        active_shields = []
+        for src in assigned_sources:
+            in_src = BlocklistDomain.query.filter_by(source_id=src.id, domain=value).first()
+            if in_src:
+                active_shields.append({
+                    'id': src.id,
+                    'name': src.name,
+                    'is_marketplace': src.is_marketplace
+                })
+
+        return jsonify({
+            'success': True,
+            'type': 'domain',
+            'value': value,
+            'total_visits': total_visits,
+            'first_seen': first_seen,
+            'last_seen': last_seen,
+            'device_distribution': devices_distribution,
+            'whitelisted': whitelisted,
+            'active_shields': active_shields
+        })
+
+    elif inspect_type == 'app':
+        records = AppUsageHistory.query.join(ManagedUserDeviceMap).filter(
+            ManagedUserDeviceMap.managed_user_id == user.id,
+            (AppUsageHistory.application_name == value) | (AppUsageHistory.executable_path == value)
+        ).all()
+        
+        total_visits = len(records)
+        total_duration = sum(r.duration_seconds for r in records)
+        if records:
+            sorted_records = sorted(records, key=lambda r: r.start_time)
+            first_seen = sorted_records[0].start_time.isoformat()
+            last_seen = sorted_records[-1].end_time.isoformat()
+            for r in records:
+                dev_label = r.device_map.device.system_hostname if (r.device_map and r.device_map.device) else r.device_map.system_id
+                devices_distribution[dev_label] = devices_distribution.get(dev_label, 0) + 1
+
+        if device_map_ids:
+            grant = PolicyApprovalGrant.query.filter(
+                PolicyApprovalGrant.device_map_id.in_(device_map_ids),
+                PolicyApprovalGrant.grant_type == PolicyApprovalGrant.GRANT_APP_LAUNCH,
+                PolicyApprovalGrant.target_value == value,
+                PolicyApprovalGrant.status == PolicyApprovalGrant.STATUS_ACTIVE
+            ).first()
+            if grant:
+                whitelisted = True
+
+        active_rules = []
+        if device_map_ids:
+            rules = AppArmorRule.query.filter(
+                AppArmorRule.device_map_id.in_(device_map_ids),
+                AppArmorRule.executable_path == value
+            ).all()
+            for rule in rules:
+                active_rules.append({
+                    'device': rule.device_map.device.system_hostname if rule.device_map.device else rule.device_map.system_id,
+                    'preset': rule.preset
+                })
+
+        return jsonify({
+            'success': True,
+            'type': 'app',
+            'value': value,
+            'total_launches': total_visits,
+            'total_duration': total_duration,
+            'first_seen': first_seen,
+            'last_seen': last_seen,
+            'device_distribution': devices_distribution,
+            'whitelisted': whitelisted,
+            'active_rules': active_rules
+        })
+
+    return jsonify({'success': False, 'message': 'Unsupported inspect type'}), 400
+
+
+@api_users_bp.route('/api/user/<int:user_id>/whitelist', methods=['POST'])
+def whitelist_item(user_id):
+    if not session.get('logged_in'):
+        return jsonify({'success': False, 'message': 'Not authenticated'}), 401
+
+    user = ManagedUser.query.get_or_404(user_id)
+    inspect_type = request.form.get('type', '').strip().lower()
+    value = request.form.get('value', '').strip()
+
+    if not inspect_type or not value:
+        return jsonify({'success': False, 'message': 'Type and value are required'}), 400
+
+    from src.approvals_manager import create_grant, get_session_actor
+    from src.database import PolicyApprovalGrant, ApprovalRequest
+
+    actor = get_session_actor() or 'admin'
+    
+    if not user.device_mappings:
+        return jsonify({'success': False, 'message': 'No devices mapped to this child profile.'}), 400
+
+    success_count = 0
+    for mapping in user.device_mappings:
+        if inspect_type == 'domain':
+            create_grant(
+                mapping=mapping,
+                grant_type=PolicyApprovalGrant.GRANT_DOMAIN_ACCESS,
+                target_kind=ApprovalRequest.TARGET_DOMAIN,
+                target_value=value,
+                display_label=value,
+                created_by=actor
+            )
+            success_count += 1
+        elif inspect_type == 'app':
+            create_grant(
+                mapping=mapping,
+                grant_type=PolicyApprovalGrant.GRANT_APP_LAUNCH,
+                target_kind=None,
+                target_value=value,
+                display_label=value,
+                created_by=actor
+            )
+            success_count += 1
+
+    return jsonify({
+        'success': True,
+        'message': f'Successfully whitelisted {value} across {success_count} device accounts.'
+    })
+
+
+@api_users_bp.route('/api/user/<int:user_id>/block', methods=['POST'])
+def block_item(user_id):
+    if not session.get('logged_in'):
+        return jsonify({'success': False, 'message': 'Not authenticated'}), 401
+
+    user = ManagedUser.query.get_or_404(user_id)
+    inspect_type = request.form.get('type', '').strip().lower()
+    value = request.form.get('value', '').strip()
+    source_id_raw = request.form.get('source_id', '').strip()
+    new_source_name = request.form.get('new_source_name', '').strip()
+
+    if not inspect_type or not value:
+        return jsonify({'success': False, 'message': 'Type and value are required'}), 400
+
+    if inspect_type == 'domain':
+        from src.database import BlocklistSource, BlocklistDomain, ManagedUserBlocklistAssignment
+        from src.blocklist_helper import normalize_domain, compute_source_revision
+
+        try:
+            domain = normalize_domain(value)
+        except ValueError as exc:
+            return jsonify({'success': False, 'message': str(exc)}), 400
+
+        source = None
+        if source_id_raw.isdigit():
+            source = BlocklistSource.query.get(int(source_id_raw))
+        elif new_source_name:
+            source = BlocklistSource.query.filter_by(name=new_source_name).first()
+            if not source:
+                source = BlocklistSource(
+                    name=new_source_name,
+                    source_type=BlocklistSource.TYPE_MANUAL,
+                    is_enabled=True,
+                    content_revision=compute_source_revision([])
+                )
+                db.session.add(source)
+                db.session.flush()
+
+        if not source:
+            return jsonify({'success': False, 'message': 'Invalid blocklist selection'}), 400
+
+        if source.source_type != BlocklistSource.TYPE_MANUAL:
+            return jsonify({'success': False, 'message': 'Can only add domains to manual shield lists.'}), 400
+
+        existing_domain = BlocklistDomain.query.filter_by(source_id=source.id, domain=domain).first()
+        if not existing_domain:
+            db.session.add(BlocklistDomain(source_id=source.id, domain=domain))
+            db.session.commit()
+            
+            domains_list = [row.domain for row in BlocklistDomain.query.with_entities(BlocklistDomain.domain).filter_by(source_id=source.id).all()]
+            source.content_revision = compute_source_revision(domains_list)
+            source.updated_at = datetime.now(timezone.utc)
+
+        assignment = ManagedUserBlocklistAssignment.query.filter_by(managed_user_id=user.id, source_id=source.id).first()
+        if not assignment:
+            db.session.add(ManagedUserBlocklistAssignment(managed_user_id=user.id, source_id=source.id))
+
+        db.session.commit()
+
+        from app import task_manager
+        task_manager.notify_domain_policy_hint(reason='blocklist_assignment_updated')
+
+        return jsonify({
+            'success': True,
+            'message': f'Successfully blocked {domain} and assigned/updated shield list "{source.name}".'
+        })
+
+    elif inspect_type == 'app':
+        from src.database import AppPolicy, AppPolicyRule, ManagedUserAppPolicyAssignment
+        from src.apparmor_manager import compile_user_apparmor_rules
+        from src.blueprints.ui.apparmor import _sync_mapping_app_policy_to_agent
+
+        policy_name = f"Custom App Rules for {user.username}"
+        policy = AppPolicy.query.filter_by(name=policy_name).first()
+        if not policy:
+            policy = AppPolicy(name=policy_name, platform=AppPolicy.PLATFORM_LINUX)
+            db.session.add(policy)
+            db.session.flush()
+
+        assignment = ManagedUserAppPolicyAssignment.query.filter_by(managed_user_id=user.id, policy_id=policy.id).first()
+        if not assignment:
+            db.session.add(ManagedUserAppPolicyAssignment(managed_user_id=user.id, policy_id=policy.id))
+
+        rule = AppPolicyRule.query.filter_by(policy_id=policy.id, executable_path=value).first()
+        if rule:
+            rule.preset = AppPolicyRule.PRESET_BLOCKED
+        else:
+            rule = AppPolicyRule(
+                policy_id=policy.id,
+                application_name=value.split('/')[-1] or value,
+                executable_path=value,
+                match_type=AppPolicyRule.MATCH_TYPE_EXECUTABLE,
+                preset=AppPolicyRule.PRESET_BLOCKED,
+                is_custom=True
+            )
+            db.session.add(rule)
+
+        db.session.commit()
+
+        compile_user_apparmor_rules(user)
+        for mapping in user.device_mappings:
+            _sync_mapping_app_policy_to_agent(mapping)
+
+        return jsonify({
+            'success': True,
+            'message': f'Successfully blocked application {value} and updated custom rules.'
+        })
+
+    return jsonify({'success': False, 'message': 'Unsupported inspect type'}), 400
+
+
+@api_users_bp.route('/api/blocklists/sources/manual', methods=['GET'])
+def get_manual_blocklists():
+    if not session.get('logged_in'):
+        return jsonify({'success': False, 'message': 'Not authenticated'}), 401
+
+    from src.database import BlocklistSource
+    sources = BlocklistSource.query.filter_by(source_type=BlocklistSource.TYPE_MANUAL).all()
+    return jsonify({
+        'success': True,
+        'sources': [{
+            'id': src.id,
+            'name': src.name,
+            'is_marketplace': src.is_marketplace
+        } for src in sources]
+    })
+

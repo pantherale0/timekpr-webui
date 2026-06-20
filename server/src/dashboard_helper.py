@@ -45,6 +45,8 @@ def _build_user_entry(user):
         'time_left': time_left_formatted,
         'pending_adjustment': _pending_adjustment_label(user),
         'schedule_is_synced': _schedule_is_synced(user),
+        'policy_age_bracket': user.policy_age_bracket,
+        'policy_maturity_level': user.policy_maturity_level,
     }
 
 
@@ -94,6 +96,8 @@ def build_dashboard_json_snapshot():
             'time_left': user['time_left'],
             'pending_adjustment': user['pending_adjustment'],
             'schedule_is_synced': user['schedule_is_synced'],
+            'policy_age_bracket': user['policy_age_bracket'],
+            'policy_maturity_level': user['policy_maturity_level'],
         })
     return {
         'users': users,
