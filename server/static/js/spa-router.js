@@ -282,6 +282,11 @@
         currentPath = path;
         updateSidebarActive(path);
 
+        // Collapse mobile sidebar overlay if open after navigation
+        if (document.body.classList.contains('sidebar-open')) {
+            document.body.classList.remove('sidebar-open');
+        }
+
         if (options.pushState !== false) {
             const hash = options.preserveHash === false ? '' : (window.location.hash || '');
             history.pushState({ spaPath: path }, parsed.title || document.title, path + (options.search || window.location.search) + hash);
@@ -351,7 +356,7 @@
         const path = normalizePath(
             (event.state && event.state.spaPath) || window.location.pathname,
         );
-        navigateTo(path, { pushState: false, force: true });
+        navigateTo(path, { pushState: false, force: false });
     });
 
     document.addEventListener('submit', (event) => {
