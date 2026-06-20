@@ -63,6 +63,22 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         );
         return false;
     }
+
+    if (message.type === "DIALOGUE_FLAG" || message.type === "SENTIMENT_BREACH") {
+        sendNativeRequest(
+            {
+                type: message.type,
+                platform: message.platform || "unknown",
+                details: message.details || {}
+            },
+            (response) => {
+                if (sendResponse) {
+                    sendResponse(response || { success: false, message: "No response from agent" });
+                }
+            }
+        );
+        return true;
+    }
 });
 
 

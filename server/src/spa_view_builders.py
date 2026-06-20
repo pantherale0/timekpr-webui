@@ -13,7 +13,7 @@ from src.blocklists_manager import (
 from src.blueprints.api.nintendo import get_nintendo_account_summary
 from src.blueprints.api.xbox import get_xbox_account_summary
 from src.dashboard_helper import build_dashboard_snapshot
-from src.database import AgentDevice, AppPolicy, ManagedUser, UserWeeklySchedule, db
+from src.database import AgentDevice, AppPolicy, ManagedUser, UserWeeklySchedule, Settings, db
 from src.helpers import _get_device_label_map, generate_parental_access_code
 from src.installed_apps_manager import list_installed_apps_for_device, list_installed_apps_for_managed_user
 from src.nintendo_sync import build_nintendo_console_view_context
@@ -296,6 +296,7 @@ def build_edit_user_profile_context(user_id):
 
 
 def build_admin_approvals_context():
+    import json
     from src.approvals_manager import build_request_summary, list_pending_requests
 
     pending_rows = list_pending_requests(limit=100)
@@ -304,6 +305,10 @@ def build_admin_approvals_context():
     for row in pending_rows:
         summary = build_request_summary(row)
         summary['requested_at'] = row.requested_at
+        try:
+            summary['details'] = json.loads(row.details_json) if row.details_json else {}
+        except Exception:
+            summary['details'] = {}
         pending_approvals.append(summary)
     return {
         'template': 'approvals.html',
@@ -411,6 +416,7 @@ def build_admin_settings_context():
         'youtube_api_key_set': bool(_get_youtube_api_key_encrypted()),
         'youtube_history_retention_days': _get_youtube_history_retention_days(),
         'web_history_retention_days': _get_web_history_retention_days(),
+        'bad_words_list': Settings.get_value('bad_words_list', ''),
     }
 
 

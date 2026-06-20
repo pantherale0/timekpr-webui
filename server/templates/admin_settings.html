@@ -293,6 +293,14 @@
                         </div>
                     </div>
 
+                    <div class="row g-3 mt-3">
+                        <div class="col-12">
+                            <label for="bad_words_list" class="form-label fw-bold small text-muted">Slang & Bad Word Lexicon</label>
+                            <textarea id="bad_words_list" name="bad_words_list" class="form-control font-monospace" rows="3" placeholder="e.g. slang1, slang2, slang3">{{ bad_words_list }}</textarea>
+                            <div class="form-text text-secondary small">Add custom bad words or slang modifiers, separated by commas. These will be synchronized to the browser extension to watch for targeted cyberbullying or toxicity.</div>
+                        </div>
+                    </div>
+
                     <div class="d-flex justify-content-end mt-4 pt-3 border-top border-secondary-subtle">
                         <button type="submit" class="btn btn-dark fw-bold px-4">{{ t('pages.settings.save_web_video') }}</button>
                     </div>

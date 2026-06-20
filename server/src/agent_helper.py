@@ -45,6 +45,8 @@ ALLOWED_AGENT_ALERT_TYPES = {
     'terminal_command',
     'clock_tamper',
     'hardware_non_compliant',
+    'dialogue_flag',
+    'sentiment_breach',
 }
 
 

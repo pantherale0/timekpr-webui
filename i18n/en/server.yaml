@@ -969,6 +969,12 @@ pages:
     approve: Approve
     deny: Deny
     no_pending: No pending access requests.
+    family_dialogue:
+      flag_title: "Conversation Alert"
+      flag_lead: "Guardian noticed some highly negative interactions on {platform}."
+      flag_prompt: "This might be a good moment for a supportive, face-to-face family check-in."
+      flag_slang: "Matched intent / words"
+      acknowledge: "Acknowledge"
 
   restrictions:
     title: Internet Restrictions - Guardian

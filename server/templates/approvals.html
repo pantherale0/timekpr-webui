@@ -26,6 +26,72 @@
     </div>
 </div>
 
+{% set dialogue_alerts = pending_approvals | selectattr('request_type', 'in', ['dialogue_flag', 'sentiment_breach']) | list %}
+{% set standard_requests = pending_approvals | rejectattr('request_type', 'in', ['dialogue_flag', 'sentiment_breach']) | list %}
+
+{% if dialogue_alerts %}
+<div class="row g-4 mb-4" id="dialogue-alerts-section">
+    <div class="col-12">
+        <h4 class="fw-bold mb-3 text-secondary d-flex align-items-center gap-2">
+            <i class="fas fa-comments text-muted"></i>
+            {{ t('pages.family_dialogue') }}
+        </h4>
+        <div class="row g-3">
+            {% for item in dialogue_alerts %}
+                <div class="col-12 col-md-6" id="approval-row-{{ item.id }}">
+                    <div class="card border shadow-sm rounded-0" style="background-color: #FBFBF9; border-color: #E2E8F0 !important; color: #1E293B;">
+                        <div class="card-header border-bottom py-3 d-flex justify-content-between align-items-center bg-white" style="border-color: #E2E8F0 !important;">
+                            <div class="d-flex align-items-center gap-2">
+                                <i class="fas fa-heartbeat text-secondary" style="color: #4A6B5D !important;"></i>
+                                <span class="fw-bold text-uppercase small text-muted" style="letter-spacing: 0.05em;">
+                                    {{ t('pages.approvals.family_dialogue.flag_title') }}
+                                </span>
+                            </div>
+                            <span class="badge bg-secondary-subtle text-secondary small">{{ item.requested_at|localtime }}</span>
+                        </div>
+                        <div class="card-body p-4">
+                            <h6 class="fw-bold mb-2">
+                                {{ item.managed_username or t('pages.approvals.unknown') }} on {{ item.device_label or item.system_id }}
+                            </h6>
+                            <p class="mb-3 text-secondary" style="font-size: 0.95rem;">
+                                {{ t('pages.approvals.family_dialogue.flag_lead', platform=item.details.platform|capitalize if (item.details and item.details.platform) else 'Unknown') }}
+                                <br>
+                                <span class="fw-medium text-secondary-emphasis">{{ t('pages.approvals.family_dialogue.flag_prompt') }}</span>
+                            </p>
+                            
+                            {% if item.details and (item.details.text_snippet or item.details.context_before or item.details.context_after) %}
+                                <blockquote class="blockquote font-monospace p-3 bg-white border-start border-3 border-secondary mb-3 rounded-0" style="font-size: 0.85rem; background-color: #F8FAFC !important; border-color: #4A6B5D !important;">
+                                    {% if item.details.context_before %}
+                                        <div class="text-muted mb-1">{{ item.details.context_before }}</div>
+                                    {% endif %}
+                                    <div class="fw-bold text-dark mb-1">{{ item.details.text_snippet }}</div>
+                                    {% if item.details.context_after %}
+                                        <div class="text-muted">{{ item.details.context_after }}</div>
+                                    {% endif %}
+                                </blockquote>
+                            {% endif %}
+                            
+                            {% if item.details and item.details.matched_words %}
+                                <div class="mb-3">
+                                    <span class="small text-muted fw-semibold">{{ t('pages.approvals.family_dialogue.flag_slang') }}:</span>
+                                    <span class="ms-1 font-monospace small px-2 py-1 bg-white border rounded text-secondary">{{ item.details.matched_words | join(', ') }}</span>
+                                </div>
+                            {% endif %}
+                            
+                            <div class="d-flex justify-content-end">
+                                <button class="btn btn-outline-dark fw-bold px-4 rounded-0" style="min-height: 44px;" onclick="acknowledgeDialogueAlert({{ item.id }})">
+                                    {{ t('pages.approvals.family_dialogue.acknowledge') }}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endif %}
+
 <div class="row g-4">
     <div class="col-12">
         <div class="card shadow-sm border">
@@ -34,7 +100,7 @@
                 <h5 class="mb-0 fw-bold">{{ t('pages.approvals.open_requests') }}</h5>
             </div>
             <div class="card-body p-0">
-                {% if pending_approvals %}
+                {% if standard_requests %}
                     <div class="table-responsive">
                         <table class="table table-striped align-middle mb-0" style="font-size: 0.95rem;" id="approvals-table">
                             <thead>
@@ -48,7 +114,7 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                {% for item in pending_approvals %}
+                                {% for item in standard_requests %}
                                     <tr id="approval-row-{{ item.id }}">
                                         <td class="ps-3 fw-bold">{{ item.managed_username or t('pages.approvals.unknown') }}</td>
                                         <td>
@@ -131,6 +197,34 @@
                 updateApprovalsBadgesFromApi();
             })
             .catch(() => showNotification('Failed to deny request', 'error'));
+    }
+
+    function acknowledgeDialogueAlert(requestId) {
+        fetch(`/api/approvals/${requestId}/deny`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ reason: 'Acknowledged dialogue alert' }),
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (!data.success) {
+                    showNotification(data.message || 'Failed to acknowledge alert', 'error');
+                    return;
+                }
+                showNotification('Alert acknowledged');
+                const row = document.getElementById(`approval-row-${requestId}`);
+                if (row) row.remove();
+                
+                const dialogueSection = document.getElementById('dialogue-alerts-section');
+                if (dialogueSection) {
+                    const cards = dialogueSection.querySelectorAll('.card');
+                    if (cards.length <= 1) {
+                        dialogueSection.remove();
+                    }
+                }
+                updateApprovalsBadgesFromApi();
+            })
+            .catch(() => showNotification('Failed to acknowledge alert', 'error'));
     }
 </script>
 {% endblock %}

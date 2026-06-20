@@ -372,6 +372,26 @@ def ws_agent_handler(ws):
                                     system_id,
                                     exc,
                                 )
+                        elif alert.event_type in {'dialogue_flag', 'sentiment_breach'}:
+                            try:
+                                from src.approvals_manager import ingest_dialogue_flag_alert
+                                ingest_dialogue_flag_alert(
+                                    system_id,
+                                    normalized_alert,
+                                    source_alert_id=alert.id,
+                                )
+                            except ValueError as exc:
+                                _LOGGER.warning(
+                                    "Rejected dialogue flag ingest from %s: %s",
+                                    system_id,
+                                    exc,
+                                )
+                            except Exception as exc:
+                                _LOGGER.error(
+                                    "Failed to ingest dialogue flag alert from %s: %s",
+                                    system_id,
+                                    exc,
+                                )
                         elif alert.event_type == 'clock_tamper':
                             try:
                                 from src.dashboard_events import notify_dashboard_changed

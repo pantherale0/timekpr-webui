@@ -262,6 +262,43 @@ def ingest_access_request(system_id, normalized_alert, source_alert_id=None):
     return request_row
 
 
+def ingest_dialogue_flag_alert(system_id, normalized_alert, source_alert_id=None):
+    """Create a pending dialogue flag request from a websocket agent alert."""
+    event_type = normalized_alert.get('event_type')
+    if event_type not in ('dialogue_flag', 'sentiment_breach'):
+        raise ValueError(f"Invalid event type: {event_type}")
+
+    linux_username = (normalized_alert.get('linux_username') or '').strip() or 'user'
+    mapping = _resolve_mapping(system_id, linux_username)
+    now = datetime.now(timezone.utc)
+
+    details = normalized_alert.get('details') or {}
+    if not isinstance(details, dict):
+        details = {}
+
+    platform = (details.get('platform') or 'unknown').strip()
+    target_value = platform
+    display_label = f"Conversation Alert on {platform.capitalize()}"
+
+    request_row = ApprovalRequest(
+        device_map_id=mapping.id,
+        request_type=event_type,
+        target_kind=ApprovalRequest.TARGET_DIALOGUE,
+        target_value=target_value,
+        display_label=display_label,
+        status=ApprovalRequest.STATUS_PENDING,
+        requested_at=now,
+        source_alert_id=source_alert_id,
+        details_json=json.dumps(details, sort_keys=True),
+    )
+    db.session.add(request_row)
+    db.session.commit()
+
+    from src.dashboard_events import notify_dashboard_changed
+    notify_dashboard_changed('approval_requested')
+    return request_row
+
+
 def list_pending_requests(
     status=None,
     request_type=None,

@@ -1730,17 +1730,27 @@ class ApprovalRequest(db.Model):
     REQUEST_APP_LAUNCH = 'app_launch'
     REQUEST_DOMAIN_ACCESS = 'domain_access'
     REQUEST_REGISTRATION = 'registration'
-    VALID_REQUEST_TYPES = {REQUEST_APP_LAUNCH, REQUEST_DOMAIN_ACCESS, REQUEST_REGISTRATION}
+    REQUEST_DIALOGUE_FLAG = 'dialogue_flag'
+    REQUEST_SENTIMENT_BREACH = 'sentiment_breach'
+    VALID_REQUEST_TYPES = {
+        REQUEST_APP_LAUNCH,
+        REQUEST_DOMAIN_ACCESS,
+        REQUEST_REGISTRATION,
+        REQUEST_DIALOGUE_FLAG,
+        REQUEST_SENTIMENT_BREACH,
+    }
 
     TARGET_PACKAGE = 'package'
     TARGET_EXECUTABLE = 'executable'
     TARGET_PATH_PATTERN = 'path_pattern'
     TARGET_DOMAIN = 'domain'
+    TARGET_DIALOGUE = 'dialogue'
     VALID_TARGET_KINDS = {
         TARGET_PACKAGE,
         TARGET_EXECUTABLE,
         TARGET_PATH_PATTERN,
         TARGET_DOMAIN,
+        TARGET_DIALOGUE,
     }
 
     STATUS_PENDING = 'pending'

@@ -1,6 +1,8 @@
 use std::fs;
 use std::path::Path;
 use serde::{Deserialize, Serialize};
+use std::sync::{Arc, Mutex};
+use tokio::sync::mpsc;
 
 #[derive(Deserialize, Debug, Clone)]
 struct AgentConfig {
@@ -117,10 +119,23 @@ enum IpcRequest {
         reason: String,
         message: String,
     },
+    #[serde(rename = "DIALOGUE_FLAG")]
+    DialogueFlag {
+        platform: String,
+        details: serde_json::Value,
+    },
+    #[serde(rename = "SENTIMENT_BREACH")]
+    SentimentBreach {
+        platform: String,
+        details: serde_json::Value,
+    },
 }
 
 #[cfg(target_os = "linux")]
-async fn handle_ipc_connection(mut stream: tokio::net::UnixStream) {
+async fn handle_ipc_connection(
+    mut stream: tokio::net::UnixStream,
+    active_client_tx: Arc<Mutex<Option<mpsc::UnboundedSender<crate::ClientMessage>>>>,
+) {
     let username = match stream.peer_cred() {
         Ok(cred) => {
             if let Some(user) = users::get_user_by_uid(cred.uid()) {
@@ -137,22 +152,26 @@ async fn handle_ipc_connection(mut stream: tokio::net::UnixStream) {
     };
 
     let (mut reader, mut writer) = stream.split();
-    process_ipc_messages(&mut reader, &mut writer, &username).await;
+    process_ipc_messages(&mut reader, &mut writer, &username, active_client_tx).await;
 }
 
 #[cfg(target_os = "windows")]
-async fn handle_ipc_connection(mut server: tokio::net::windows::named_pipe::NamedPipeServer) {
+async fn handle_ipc_connection(
+    mut server: tokio::net::windows::named_pipe::NamedPipeServer,
+    active_client_tx: Arc<Mutex<Option<mpsc::UnboundedSender<crate::ClientMessage>>>>,
+) {
     let username = crate::windows_service::dns_proxy::get_active_session_username()
         .unwrap_or_else(|| "windows_user".to_string());
 
     let (mut reader, mut writer) = tokio::io::split(server);
-    process_ipc_messages(&mut reader, &mut writer, &username).await;
+    process_ipc_messages(&mut reader, &mut writer, &username, active_client_tx).await;
 }
 
 async fn process_ipc_messages<R: tokio::io::AsyncReadExt + Unpin, W: tokio::io::AsyncWriteExt + Unpin>(
     reader: &mut R,
     writer: &mut W,
     username: &str,
+    active_client_tx: Arc<Mutex<Option<mpsc::UnboundedSender<crate::ClientMessage>>>>,
 ) {
     loop {
         let payload = match read_framed_message(reader).await {
@@ -243,6 +262,24 @@ async fn process_ipc_messages<R: tokio::io::AsyncReadExt + Unpin, W: tokio::io::
             }
             IpcRequest::AccessRequest { reason, message } => {
                 let response = handle_access_request(username, reason, message).await;
+                if let Ok(res_bytes) = serde_json::to_vec(&response) {
+                    if let Err(e) = write_framed_message(writer, &res_bytes).await {
+                        eprintln!("IPC error writing response: {}", e);
+                        break;
+                    }
+                }
+            }
+            IpcRequest::DialogueFlag { platform, details } => {
+                let response = handle_dialogue_alert(username, "dialogue_flag", platform, details, active_client_tx.clone()).await;
+                if let Ok(res_bytes) = serde_json::to_vec(&response) {
+                    if let Err(e) = write_framed_message(writer, &res_bytes).await {
+                        eprintln!("IPC error writing response: {}", e);
+                        break;
+                    }
+                }
+            }
+            IpcRequest::SentimentBreach { platform, details } => {
+                let response = handle_dialogue_alert(username, "sentiment_breach", platform, details, active_client_tx.clone()).await;
                 if let Ok(res_bytes) = serde_json::to_vec(&response) {
                     if let Err(e) = write_framed_message(writer, &res_bytes).await {
                         eprintln!("IPC error writing response: {}", e);
@@ -523,6 +560,42 @@ async fn handle_access_request(username: &str, reason: String, message: String) 
     }
 }
 
+async fn handle_dialogue_alert(
+    username: &str,
+    event_type: &str,
+    platform: String,
+    mut details: serde_json::Value,
+    active_client_tx: Arc<Mutex<Option<mpsc::UnboundedSender<crate::ClientMessage>>>>,
+) -> serde_json::Value {
+    if let Some(obj) = details.as_object_mut() {
+        if !obj.contains_key("platform") {
+            obj.insert("platform".to_string(), serde_json::Value::String(platform));
+        }
+    }
+
+    let occurred_at = chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
+    let msg = crate::ClientMessage::AlertEvent {
+        event_type: event_type.to_string(),
+        occurred_at,
+        linux_username: Some(username.to_string()),
+        details,
+    };
+
+    let opt_tx = {
+        let guard = active_client_tx.lock().unwrap();
+        guard.clone()
+    };
+
+    if let Some(tx) = opt_tx {
+        match tx.send(msg) {
+            Ok(_) => serde_json::json!({ "success": true, "message": "Alert queued" }),
+            Err(e) => serde_json::json!({ "success": false, "message": format!("WebSocket send error: {}", e) }),
+        }
+    } else {
+        serde_json::json!({ "success": false, "message": "WebSocket disconnected" })
+    }
+}
+
 async fn handle_login_detected(username: &str, domain: String, login_username: String) -> serde_json::Value {
     let Some(config) = load_agent_config() else {
         return serde_json::json!({
@@ -576,7 +649,9 @@ async fn handle_login_detected(username: &str, domain: String, login_username: S
 }
 
 #[cfg(target_os = "linux")]
-pub async fn run_ipc_server() -> Result<(), String> {
+pub async fn run_ipc_server(
+    active_client_tx: Arc<Mutex<Option<mpsc::UnboundedSender<crate::ClientMessage>>>>,
+) -> Result<(), String> {
     let socket_dir = "/run/guardian-agent";
     let socket_path = "/run/guardian-agent/ipc.sock";
 
@@ -614,7 +689,8 @@ pub async fn run_ipc_server() -> Result<(), String> {
     loop {
         match listener.accept().await {
             Ok((stream, _)) => {
-                tokio::spawn(handle_ipc_connection(stream));
+                let active_tx = active_client_tx.clone();
+                tokio::spawn(handle_ipc_connection(stream, active_tx));
             }
             Err(e) => {
                 eprintln!("IPC Socket accept error: {}", e);
@@ -624,7 +700,9 @@ pub async fn run_ipc_server() -> Result<(), String> {
 }
 
 #[cfg(target_os = "windows")]
-pub async fn run_ipc_server() -> Result<(), String> {
+pub async fn run_ipc_server(
+    active_client_tx: Arc<Mutex<Option<mpsc::UnboundedSender<crate::ClientMessage>>>>,
+) -> Result<(), String> {
     use tokio::net::windows::named_pipe::ServerOptions;
 
     let pipe_name = r"\\.\pipe\guardian-agent-ipc";
@@ -651,7 +729,8 @@ pub async fn run_ipc_server() -> Result<(), String> {
 
         match server.connect().await {
             Ok(_) => {
-                tokio::spawn(handle_ipc_connection(server));
+                let active_tx = active_client_tx.clone();
+                tokio::spawn(handle_ipc_connection(server, active_tx));
             }
             Err(e) => {
                 eprintln!("IPC Named Pipe client connection error: {}", e);

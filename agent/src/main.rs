@@ -191,7 +191,7 @@ pub struct LinuxUser {
 
 #[derive(Serialize, Debug, Clone)]
 #[serde(tag = "type")]
-enum ClientMessage {
+pub(crate) enum ClientMessage {
     #[serde(rename = "hello")]
     Hello {
         system_id: String,
@@ -1579,8 +1579,9 @@ async fn run_linux_main() {
     });
 
     // Spawn local Unix Socket IPC Server for Chrome Extension communications
-    tokio::spawn(async {
-        if let Err(e) = ipc::run_ipc_server().await {
+    let ipc_tx = active_client_tx.clone();
+    tokio::spawn(async move {
+        if let Err(e) = ipc::run_ipc_server(ipc_tx).await {
             eprintln!("Fatal error running local IPC server: {}", e);
         }
     });

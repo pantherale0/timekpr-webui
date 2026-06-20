@@ -333,3 +333,32 @@ def test_policy_hash_includes_approval_revision(approval_mapping, db_session):
     revision = compute_approval_revision_hash(approval_mapping)
     after = compute_mapping_policy_hash(1000, source_state, [1], approval_revision=revision)
     assert before != after
+
+
+def test_ingest_dialogue_flag_alert(approval_mapping, db_session):
+    from src.approvals_manager import ingest_dialogue_flag_alert
+    alert = {
+        'event_type': 'dialogue_flag',
+        'linux_username': 'child',
+        'details': {
+            'platform': 'discord',
+            'text_snippet': 'you are a loser',
+            'context_before': 'hello',
+            'context_after': 'bye',
+            'matched_words': ['loser'],
+            'score': -0.8,
+        },
+    }
+    row = ingest_dialogue_flag_alert('sys-approval', alert, source_alert_id=None)
+    assert row is not None
+    assert row.request_type == 'dialogue_flag'
+    assert row.target_kind == 'dialogue'
+    assert row.target_value == 'discord'
+    assert row.display_label == 'Conversation Alert on Discord'
+    
+    import json
+    details = json.loads(row.details_json)
+    assert details['text_snippet'] == 'you are a loser'
+    assert details['score'] == -0.8
+    assert details['matched_words'] == ['loser']
+

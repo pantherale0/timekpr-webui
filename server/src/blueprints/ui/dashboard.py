@@ -223,6 +223,10 @@ def admin_settings():
                     Settings.set_value('video_history_retention_days', str(retention_val))
                     Settings.set_value('youtube_history_retention_days', str(retention_val))
                     Settings.set_value('web_history_retention_days', str(web_retention_val))
+                    
+                    bad_words = request.form.get('bad_words_list') or ''
+                    Settings.set_value('bad_words_list', bad_words.strip())
+
                     if youtube_api_key:
                         encrypted_key = encrypt_setting(youtube_api_key)
                         Settings.set_value('youtube_api_key', encrypted_key)

@@ -448,4 +448,175 @@ if (isLoginPage()) {
     attachLoginListeners();
 }
 
+// ============================================================
+// Local Sentiment & Slang Analysis Monitor
+// ============================================================
 
+const DEFAULT_BAD_WORDS = {
+    self_harm: [
+        "kys", "kms", "suicide", "kill myself", "kill yourself", "end my life", 
+        "cut myself", "want to die", "hanging myself", "overdose"
+    ],
+    modifiers: [
+        "loser", "retard", "trash", "fat", "ugly", "worthless", "die", "kill you",
+        "kill u", "hate you", "stupid", "idiot", "garbage", "pathetic"
+    ]
+};
+
+const TARGET_PRONOUNS = ["you", "your", "u", "ur", "yours", "yourself", "u're", "you're"];
+
+function decodeLeetspeak(text) {
+    const leetMap = {
+        '1': 'l', '3': 'e', '4': 'a', '@': 'a', '5': 's', 
+        '$': 's', '0': 'o', '7': 't', '!': 'i', '8': 'b'
+    };
+    return text.toLowerCase().split('').map(char => leetMap[char] || char).join('');
+}
+
+function normalizeSentence(sentence) {
+    let text = decodeLeetspeak(sentence);
+    // Strip common spacing punctuation
+    text = text.replace(/[-_.,*?#!$@()\[\]{}]/g, '');
+    
+    // Collapse single-letter spaced chains (e.g. "l o s e r" -> "loser")
+    text = text.replace(/\b([a-z])(?:\s+([a-z]))+\b/gi, (match) => {
+        return match.replace(/\s+/g, '');
+    });
+    
+    return text.trim();
+}
+
+function evaluateTextContent(text, platform) {
+    const sentences = text.split(/(?<=[.!?])\s+|\n+/);
+    
+    chrome.storage.local.get({ custom_bad_words: [] }, (storage) => {
+        const customWords = storage.custom_bad_words || [];
+        const modifiers = [...DEFAULT_BAD_WORDS.modifiers, ...customWords];
+        const selfHarm = DEFAULT_BAD_WORDS.self_harm;
+        
+        for (let i = 0; i < sentences.length; i++) {
+            const rawSentence = sentences[i].trim();
+            if (!rawSentence) continue;
+            
+            const normalized = normalizeSentence(rawSentence);
+            const tokens = normalized.split(/\s+/);
+            
+            let matchedWords = [];
+            let score = 0.0;
+            let isBreach = false;
+            
+            // Stage 2: Check self-harm (immediate trigger)
+            for (const word of selfHarm) {
+                if (normalized.includes(word)) {
+                    matchedWords.push(word);
+                    score = -1.0;
+                    isBreach = true;
+                    break;
+                }
+            }
+            
+            if (!isBreach) {
+                // Stage 3: Check slang modifiers + pronoun proximity
+                for (const word of modifiers) {
+                    const idx = normalized.indexOf(word);
+                    if (idx !== -1) {
+                        let isTargeted = false;
+                        const wordTokens = word.split(/\s+/);
+                        const mainWordToken = wordTokens[0];
+                        const wordTokenIdx = tokens.indexOf(mainWordToken);
+                        
+                        if (wordTokenIdx !== -1) {
+                            const startSearch = Math.max(0, wordTokenIdx - 3);
+                            const endSearch = Math.min(tokens.length - 1, wordTokenIdx + wordTokens.length + 2);
+                            
+                            for (let j = startSearch; j <= endSearch; j++) {
+                                if (j >= wordTokenIdx && j < wordTokenIdx + wordTokens.length) {
+                                    continue;
+                                }
+                                if (TARGET_PRONOUNS.includes(tokens[j])) {
+                                    isTargeted = true;
+                                    break;
+                                }
+                            }
+                        } else {
+                            const proximityRegex = new RegExp(`(?:\\b(?:you|your|u|ur|yours|yourself|you're)\\b\\s+(?:\\w+\\s+){0,2}\\b${word}\\b)|(?:\\b${word}\\b\\s+(?:\\w+\\s+){0,2}\\b(?:you|your|u|ur|yours|yourself|you're)\\b)`, 'i');
+                            if (proximityRegex.test(normalized)) {
+                                isTargeted = true;
+                            }
+                        }
+                        
+                        if (isTargeted) {
+                            matchedWords.push(word);
+                            score = -0.8;
+                            isBreach = true;
+                            break;
+                        } else {
+                            score = -0.3; // Gaming noise
+                        }
+                    }
+                }
+            }
+            
+            if (isBreach) {
+                const contextBefore = i > 0 ? sentences[i - 1].trim() : "";
+                const contextAfter = i < sentences.length - 1 ? sentences[i + 1].trim() : "";
+                
+                const payload = {
+                    type: score <= -0.9 ? "SENTIMENT_BREACH" : "DIALOGUE_FLAG",
+                    platform: platform,
+                    details: {
+                        text_snippet: rawSentence,
+                        context_before: contextBefore,
+                        context_after: contextAfter,
+                        platform: platform,
+                        matched_words: matchedWords,
+                        score: score,
+                        timestamp: new Date().toISOString()
+                    }
+                };
+                
+                try {
+                    chrome.runtime.sendMessage(payload);
+                } catch (e) {
+                    // Context invalidated
+                }
+                break;
+            }
+        }
+    });
+}
+
+let dialogueDebounceTimer = null;
+document.addEventListener('input', (event) => {
+    const target = event.target;
+    if (!target) return;
+    
+    const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.getAttribute('contenteditable') === 'true';
+    if (!isInput) return;
+    
+    const hostname = window.location.hostname;
+    let platform = null;
+    if (hostname.includes('discord.com')) {
+        platform = 'discord';
+    } else if (hostname.includes('reddit.com')) {
+        platform = 'reddit';
+    } else if (hostname.includes('instagram.com')) {
+        platform = 'instagram';
+    }
+    
+    if (!platform) return;
+    
+    let text = '';
+    if (target.getAttribute('contenteditable') === 'true') {
+        text = target.innerText || target.textContent || '';
+    } else {
+        text = target.value || '';
+    }
+    
+    if (!text.trim()) return;
+    
+    clearTimeout(dialogueDebounceTimer);
+    dialogueDebounceTimer = setTimeout(() => {
+        evaluateTextContent(text, platform);
+    }, 1500);
+});
