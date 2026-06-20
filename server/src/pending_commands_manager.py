@@ -278,18 +278,20 @@ def rebuild_command_args(row: PendingCommand) -> dict | None:
 
     if action == 'set_weekly_time_limits':
         mapping = _mapping_for_command(row.system_id, username)
-        if mapping is None or mapping.user is None or mapping.user.weekly_schedule is None:
+        managed_user = mapping.managed_user if mapping is not None else None
+        if managed_user is None or managed_user.weekly_schedule is None:
             return None
-        return {'schedule': mapping.user.weekly_schedule.get_schedule_dict()}
+        return {'schedule': managed_user.weekly_schedule.get_schedule_dict()}
 
     if action == 'set_allowed_hours':
         mapping = _mapping_for_command(row.system_id, username)
-        if mapping is None or mapping.user is None:
+        managed_user = mapping.managed_user if mapping is not None else None
+        if managed_user is None:
             return None
         client = AgentClient(row.system_id)
         intervals_dict = {day: [] for day in range(1, 8)}
         for interval in sorted(
-            mapping.user.time_intervals,
+            managed_user.time_intervals,
             key=lambda item: (
                 item.day_of_week,
                 item.sort_order,
@@ -365,18 +367,20 @@ def _mark_policy_synced(row: PendingCommand, success: bool, message: str | None 
 
     elif action == 'set_weekly_time_limits':
         mapping = _mapping_for_command(row.system_id, username)
-        if mapping is None or mapping.user is None or mapping.user.weekly_schedule is None:
+        managed_user = mapping.managed_user if mapping is not None else None
+        if managed_user is None or managed_user.weekly_schedule is None:
             return
         if success:
-            mapping.user.weekly_schedule.mark_synced()
+            managed_user.weekly_schedule.mark_synced()
 
     elif action == 'set_allowed_hours':
         mapping = _mapping_for_command(row.system_id, username)
-        if mapping is None or mapping.user is None:
+        managed_user = mapping.managed_user if mapping is not None else None
+        if managed_user is None:
             return
         if success:
             for interval in UserDailyTimeInterval.query.filter_by(
-                user_id=mapping.user.id,
+                user_id=managed_user.id,
                 is_synced=False,
             ).all():
                 interval.mark_synced()
