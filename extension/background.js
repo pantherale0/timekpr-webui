@@ -121,7 +121,7 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 
         try {
             const parsedUrl = new URL(urlString);
-            if (parsedUrl.hostname.includes('youtube.com') && parseYoutubeVideoId(urlString)) {
+            if (parsedUrl.hostname.includes('youtube.com') && (parseYoutubeVideoId(urlString) || parsedUrl.pathname.startsWith('/shorts'))) {
                 return;
             }
             if (parsedUrl.hostname.includes('tiktok.com') && parseTiktokVideoId(urlString)) {

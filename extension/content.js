@@ -19,19 +19,48 @@ function isShortsPage() {
         document.querySelector('ytd-shorts, ytd-reel-player-overlay-renderer') !== null;
 }
 
+function getActiveVideoElement() {
+    if (isShortsPage()) {
+        const activeRenderer = document.querySelector('ytd-reel-video-renderer[is-active]');
+        if (activeRenderer) {
+            const video = activeRenderer.querySelector('video');
+            if (video) return video;
+        }
+        // Fallback to finding any playing video on Shorts page
+        const playing = Array.from(document.querySelectorAll('video')).find(v => !v.paused);
+        if (playing) return playing;
+    }
+    return document.querySelector('video');
+}
+
 function parseVideoDetails() {
     const onShorts = isShortsPage();
 
     // Title
     let title = "";
-    const titleEl = onShorts
-        ? (document.querySelector('ytd-reel-player-header-renderer h2') ||
-           document.querySelector('h2.ytd-reel-player-header-renderer') ||
-           document.querySelector('ytd-reel-player-overlay-renderer #title') ||
-           document.querySelector('#title'))
-        : (document.querySelector('ytd-watch-metadata h1') ||
-           document.querySelector('h1.ytd-watch-metadata') ||
-           document.querySelector('#container > h1 > yt-formatted-string'));
+    let titleEl = null;
+
+    if (onShorts) {
+        const activeRenderer = document.querySelector('ytd-reel-video-renderer[is-active]');
+        if (activeRenderer) {
+            titleEl = activeRenderer.querySelector('ytd-reel-player-header-renderer h2') ||
+                      activeRenderer.querySelector('h2.ytd-reel-player-header-renderer') ||
+                      activeRenderer.querySelector('ytd-reel-player-overlay-renderer #title') ||
+                      activeRenderer.querySelector('.title') ||
+                      activeRenderer.querySelector('#title');
+        }
+        if (!titleEl) {
+            titleEl = document.querySelector('ytd-reel-player-header-renderer h2') ||
+                      document.querySelector('h2.ytd-reel-player-header-renderer') ||
+                      document.querySelector('ytd-reel-player-overlay-renderer #title') ||
+                      document.querySelector('#title');
+        }
+    } else {
+        titleEl = document.querySelector('ytd-watch-metadata h1') ||
+                  document.querySelector('h1.ytd-watch-metadata') ||
+                  document.querySelector('#container > h1 > yt-formatted-string');
+    }
+
     if (titleEl) {
         title = titleEl.textContent.trim();
     } else {
@@ -41,12 +70,27 @@ function parseVideoDetails() {
     // Channel Name and Channel ID
     let channelName = "";
     let channelId = "";
-    const channelEl = onShorts
-        ? (document.querySelector('ytd-reel-player-overlay-renderer ytd-channel-name a') ||
-           document.querySelector('.ytd-reel-player-overlay-renderer #channel-name a'))
-        : (document.querySelector('ytd-video-owner-renderer #channel-name a') ||
-           document.querySelector('#upload-info #channel-name a') ||
-           document.querySelector('#owner-text a'));
+    let channelEl = null;
+
+    if (onShorts) {
+        const activeRenderer = document.querySelector('ytd-reel-video-renderer[is-active]');
+        if (activeRenderer) {
+            channelEl = activeRenderer.querySelector('ytd-reel-player-overlay-renderer ytd-channel-name a') ||
+                        activeRenderer.querySelector('.ytd-reel-player-overlay-renderer #channel-name a') ||
+                        activeRenderer.querySelector('ytd-channel-name a') ||
+                        activeRenderer.querySelector('#channel-name a') ||
+                        activeRenderer.querySelector('a[href^="/@"]');
+        }
+        if (!channelEl) {
+            channelEl = document.querySelector('ytd-reel-player-overlay-renderer ytd-channel-name a') ||
+                        document.querySelector('.ytd-reel-player-overlay-renderer #channel-name a');
+        }
+    } else {
+        channelEl = document.querySelector('ytd-video-owner-renderer #channel-name a') ||
+                    document.querySelector('#upload-info #channel-name a') ||
+                    document.querySelector('#owner-text a');
+    }
+
     if (channelEl) {
         channelName = channelEl.textContent.trim();
         const href = channelEl.getAttribute('href') || "";
@@ -58,12 +102,24 @@ function parseVideoDetails() {
 
 function flush() {
     if (accumulatedTime > 0 && currentVideoId) {
-        const details = parseVideoDetails();
+        // Only parse from DOM if we are still on the same video page.
+        // If the URL has already changed, querying the DOM will yield the next video's details.
+        let title = currentTitle;
+        let channelName = currentChannelName;
+        let channelId = currentChannelId;
+        
+        if (getVideoId() === currentVideoId) {
+            const details = parseVideoDetails();
+            title = details.title || title;
+            channelName = details.channelName || channelName;
+            channelId = details.channelId || channelId;
+        }
+
         const payload = {
             video_id: currentVideoId,
-            title: details.title || currentTitle || "Unknown Video",
-            channel_name: details.channelName || currentChannelName || "Unknown Channel",
-            channel_id: details.channelId || currentChannelId || "",
+            title: title || "Unknown Video",
+            channel_name: channelName || "Unknown Channel",
+            channel_id: channelId || "",
             duration_seconds: Math.round(accumulatedTime),
             watched_at: new Date().toISOString()
         };
@@ -85,7 +141,7 @@ function checkState() {
         return;
     }
 
-    const video = document.querySelector('video');
+    const video = getActiveVideoElement();
     const isPlaying = video && !video.paused && !video.ended && video.readyState >= 3;
     const isVisible = document.visibilityState === 'visible';
 
@@ -105,6 +161,13 @@ function checkState() {
 
     if (isPlaying && isVisible) {
         accumulatedTime += delta;
+        // If we don't have details yet, try to fetch them again
+        if (!currentTitle || currentTitle === "Unknown Video" || !currentChannelName) {
+            const details = parseVideoDetails();
+            if (details.title) currentTitle = details.title;
+            if (details.channelName) currentChannelName = details.channelName;
+            if (details.channelId) currentChannelId = details.channelId;
+        }
         // Periodic flush every 60 seconds to prevent losing data and excessive session spikes
         if (accumulatedTime >= 60) {
             flush();
