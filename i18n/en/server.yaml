@@ -443,9 +443,9 @@ js:
   dashboard_weekday_friday: Friday
   dashboard_weekday_saturday: Saturday
   dashboard_chart_hours: Hours Used
-  dashboard_agent_online: Agent Online
-  dashboard_agent_offline: Agent Offline
-  dashboard_unsynced: Unsynced
+  dashboard_agent_online: Online
+  dashboard_agent_offline: Offline
+  dashboard_unsynced: Protected · Sync pending
   dashboard_mapping_summary: "{count} device mapping(s) ({online} online)"
   dashboard_requests: request(s)
   dashboard_connecting: Connecting
@@ -474,8 +474,8 @@ js:
   routine_save_success: Routine adjustments saved successfully!
   routine_reset_confirm: Reset to the last saved baseline?
   routine_sync_not_configured: Not configured
-  routine_sync_pending: Sync pending
-  routine_sync_online: Online
+  routine_sync_pending: Protected · Sync pending
+  routine_sync_online: Protected · Up to date
   routine_sync_unknown: Status unknown
   routine_day_monday: Monday
   routine_day_tuesday: Tuesday
@@ -491,16 +491,22 @@ js:
   wizard_baseline_preview: Choose a growth milestone and responsibility level to preview your family baseline.
   wizard_baseline_profile: "Baseline Summary: {profile} Profile (Age {age})"
   profile_sync_none: No browsing shields assigned
-  profile_sync_awaiting_uid: Finishing account setup
-  profile_sync_pending: Sync pending
-  profile_sync_live: Up to date
+  profile_sync_awaiting_uid: Protected · Finishing setup
+  profile_sync_pending: Protected · Sync pending
+  profile_sync_live: Protected · Up to date
   profile_sync_unknown: Unable to check status
   profile_app_approved: App approved
   profile_app_revoked: Approval revoked
   profile_revoke_failed: Failed to revoke approval
   profile_revoke_confirm: Revoke approval for this app?
-  profile_device_synced: Synced
-  profile_device_sync_pending: Sync pending
+  profile_device_synced: Protected
+  profile_device_sync_pending: Protected · Sync pending
+  profile_sync_status_synced: Up to date
+  profile_sync_status_awaiting_uid: Finishing setup
+  profile_sync_status_not_configured: Shields not applied yet
+  profile_sync_status_pending: Updating...
+  dashboard_sync_updating: Protected · Updating...
+  dashboard_sync_offline: Protected · Offline
   never: Never
 
 settings:
@@ -655,7 +661,9 @@ pages:
     agent_offline: Agent Offline
     pending: "Pending:"
     requests: request(s)
-    unsynced: Unsynced
+    unsynced: Protected · Sync pending
+    sync_updating: Protected · Updating...
+    sync_offline: Protected · Offline
     mapping_summary: "{count} device mapping(s) ({online} online)"
     routine_left: Routine Left Today
     last_checked: Last Checked
@@ -785,6 +793,12 @@ pages:
     sync_hide_details: Hide details
     uid_label: "UID: {uid}"
     last_sync: "Last Sync: {time}"
+    remediation_title: "Fix: open laptop, ensure Guardian is running, click Verify."
+    remediation_lead: "Remediation Guide:"
+    remediation_step1: "1. Turn on the device and connect to the internet."
+    remediation_step2: "2. Ensure the Guardian agent service is running."
+    remediation_step3: "3. If setup is finishing, make sure you log in to the child's OS account."
+    technical_details_label: "Technical Error Details (for troubleshooting):"
     computer_browser: Computer & browser boundaries
     computer_browser_lead: Limits what your child can change on linked computers and how their browser behaves. Changes save automatically.
     computer_changes: Computer changes
@@ -1046,8 +1060,8 @@ pages:
     lead: Choose a child profile to open their weekly routine blueprint — screen-time limits and allowed windows in one calm view.
     linked_accounts: "{count} linked device account"
     linked_accounts_plural: "{count} linked device accounts"
-    sync_pending: Sync pending
-    synced: Synced
+    sync_pending: Protected · Sync pending
+    synced: Protected
     not_configured: Not configured
     open_blueprint: Open routine blueprint
     metric_week_total: Total for week

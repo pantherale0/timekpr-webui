@@ -89,6 +89,19 @@ def _get_user_assigned_blocklist_source_ids(user):
     }
 
 
+def _clean_sync_error(raw_error):
+    if not raw_error:
+        return None
+    err = str(raw_error).lower()
+    if 'hash mismatch' in err or 'revision mismatch' in err:
+        return 'The policy version on this device does not match the server. Ensure the device is online to update.'
+    if 'sqlite' in err or 'database' in err or 'db error' in err:
+        return 'A local database error occurred on the device. Restarting the Guardian service usually resolves this.'
+    if 'websocket' in err or 'connection closed' in err or 'timeout' in err:
+        return 'Unable to connect to the device. Please make sure it is powered on and connected to the internet.'
+    return raw_error
+
+
 def _build_user_blocklist_sync_status(user):
     assigned_source_ids = _get_user_assigned_blocklist_source_ids(user)
     active_sources = []
@@ -118,7 +131,7 @@ def _build_user_blocklist_sync_status(user):
             'needs_sync': summary['needs_sync'],
             'effective_domain_count': summary['effective_domain_count'],
             'last_synced': mapping.blocklist_last_synced.strftime('%Y-%m-%d %H:%M') if mapping.blocklist_last_synced else None,
-            'last_error': mapping.blocklist_last_error,
+            'last_error': _clean_sync_error(mapping.blocklist_last_error),
         })
 
     needs_sync = any(mapping['needs_sync'] for mapping in mappings)

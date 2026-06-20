@@ -211,34 +211,64 @@
                         </button>
                         <div class="collapse" id="account-sync-technical">
                             <h6 class="text-secondary small fw-bold text-uppercase mb-3" style="font-size: 0.75rem; letter-spacing: 0.05em;">{{ t('pages.admin_user_edit.account_sync_log') }}</h6>
-                            <div class="d-flex flex-column gap-2">
-                                {% for mapping in blocklist_sync_status.mappings %}
-                                    <div class="border rounded p-3 bg-body-secondary d-flex justify-content-between align-items-center flex-wrap gap-2">
-                                        <div>
-                                            <strong class="text-body">{{ mapping.linux_username }} on {{ mapping.device_label }}</strong>
-                                            <div class="text-secondary small fw-semibold mt-1">
-                                                {% if mapping.last_synced %}
-                                                    {{ t('pages.admin_user_edit.last_sync', time=mapping.last_synced) }}
-                                                {% endif %}
-                                                {% if mapping.linux_uid is not none %}
-                                                    · {{ t('pages.admin_user_edit.uid_label', uid=mapping.linux_uid) }}
-                                                {% endif %}
-                                            </div>
-                                        </div>
-                                        <span class="badge {% if mapping.status == 'synced' %}bg-success{% elif mapping.status == 'awaiting_uid' %}bg-warning text-dark{% elif mapping.status == 'not_configured' %}bg-secondary{% else %}bg-warning text-dark{% endif %} p-2">
-                                            {% if mapping.status == 'synced' %}
-                                                {{ t('pages.admin_user_edit.sync_status_synced') }}
-                                            {% elif mapping.status == 'awaiting_uid' %}
-                                                {{ t('pages.admin_user_edit.sync_status_awaiting_uid') }}
-                                            {% elif mapping.status == 'not_configured' %}
-                                                {{ t('pages.admin_user_edit.sync_status_not_configured') }}
-                                            {% else %}
-                                                {{ t('pages.admin_user_edit.sync_status_pending') }}
-                                            {% endif %}
-                                        </span>
-                                    </div>
-                                {% endfor %}
-                            </div>
+                             <div class="d-flex flex-column gap-3">
+                                 {% for mapping in blocklist_sync_status.mappings %}
+                                     <div class="border rounded p-3 bg-body-secondary d-flex flex-column gap-2 mb-2 w-100" id="mapping-card-{{ mapping.mapping_id }}">
+                                         <div class="d-flex justify-content-between align-items-center flex-wrap w-100">
+                                             <div>
+                                                 <strong class="text-body">{{ mapping.linux_username }} on {{ mapping.device_label }}</strong>
+                                                 <div class="text-secondary small fw-semibold mt-1">
+                                                     {% if mapping.last_synced %}
+                                                         {{ t('pages.admin_user_edit.last_sync', time=mapping.last_synced) }}
+                                                     {% endif %}
+                                                     {% if mapping.linux_uid is not none %}
+                                                         · {{ t('pages.admin_user_edit.uid_label', uid=mapping.linux_uid) }}
+                                                     {% endif %}
+                                                 </div>
+                                             </div>
+                                             <span class="badge {% if mapping.status == 'synced' %}bg-success{% elif mapping.status == 'awaiting_uid' %}bg-warning text-dark{% elif mapping.status == 'not_configured' %}bg-secondary{% else %}bg-warning text-dark{% endif %} p-2 mapping-status-badge">
+                                                 {% if mapping.status == 'synced' %}
+                                                     {{ t('pages.admin_user_edit.sync_status_synced') }}
+                                                 {% elif mapping.status == 'awaiting_uid' %}
+                                                     {{ t('pages.admin_user_edit.sync_status_awaiting_uid') }}
+                                                 {% elif mapping.status == 'not_configured' %}
+                                                     {{ t('pages.admin_user_edit.sync_status_not_configured') }}
+                                                 {% else %}
+                                                     {{ t('pages.admin_user_edit.sync_status_pending') }}
+                                                 {% endif %}
+                                             </span>
+                                         </div>
+
+                                         <div class="w-100 border-top pt-2 mt-1 mapping-remediation-box {% if mapping.status == 'synced' or mapping.status == 'not_configured' %}d-none{% endif %}">
+                                             <div class="p-3 bg-light-subtle rounded border border-warning-subtle small">
+                                                 <div class="d-flex align-items-center gap-2 mb-2">
+                                                     <i class="fas fa-shield-alt text-success"></i>
+                                                     <span class="fw-bold text-success-emphasis">Active Protection Guarded</span>
+                                                 </div>
+                                                 <p class="text-secondary mb-2" style="font-size: 0.8rem;">
+                                                     Your child is still fully protected on this device. The existing browsing shields and limits remain active in the background.
+                                                 </p>
+                                                 <div class="fw-bold mb-1 text-dark">{{ t('pages.admin_user_edit.remediation_lead') }}</div>
+                                                 <ul class="list-unstyled mb-0 d-flex flex-column gap-1 text-secondary" style="font-size: 0.78rem;">
+                                                     <li>{{ t('pages.admin_user_edit.remediation_step1') }}</li>
+                                                     <li>{{ t('pages.admin_user_edit.remediation_step2') }}</li>
+                                                     <li>{{ t('pages.admin_user_edit.remediation_step3') }}</li>
+                                                 </ul>
+                                             </div>
+                                         </div>
+
+                                         <div class="w-100 mt-1 mapping-error-details {% if not mapping.last_error %}d-none{% endif %}">
+                                             <button class="btn btn-link btn-xs p-0 text-decoration-none text-muted" type="button" 
+                                                     data-bs-toggle="collapse" data-bs-target="#error-details-{{ mapping.mapping_id }}" style="font-size: 0.72rem;">
+                                                 <i class="fas fa-bug me-1"></i>{{ t('pages.admin_user_edit.sync_show_details') }}
+                                             </button>
+                                             <div class="collapse mt-2" id="error-details-{{ mapping.mapping_id }}">
+                                                 <div class="p-2 rounded bg-dark-subtle border text-dark font-monospace" style="font-size: 0.75rem; white-space: pre-wrap;"><pre class="mb-0 text-wrap font-monospace" style="font-size: 0.75rem;">{{ mapping.last_error }}</pre></div>
+                                             </div>
+                                         </div>
+                                     </div>
+                                 {% endfor %}
+                             </div>
                         </div>
                     </div>
                 {% endif %}

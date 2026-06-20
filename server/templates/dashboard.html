@@ -38,9 +38,15 @@
                             <span id="approval-badge-{{ user.id }}" class="badge bg-info text-dark" style="font-size: 0.7rem; display: none;">
                                 <span id="approval-badge-text-{{ user.id }}">0</span> {{ t('pages.dashboard.requests') }}
                             </span>
-                            <span id="sync-status-{{ user.id }}" class="badge bg-warning text-dark align-items-center gap-1" style="{% if user.schedule_is_synced %}display: none;{% else %}display: inline-flex;{% endif %}">
-                                <i class="fas fa-exclamation-triangle" style="font-size: 0.75rem;"></i>
-                                <span id="sync-text-{{ user.id }}">{{ t('pages.dashboard.unsynced') }}</span>
+                            <span id="sync-status-{{ user.id }}" class="badge {% if user.is_online %}bg-success{% else %}bg-secondary{% endif %} text-white align-items-center gap-1" style="{% if user.schedule_is_synced %}display: none;{% else %}display: inline-flex;{% endif %}">
+                                <i class="{% if user.is_online %}fas fa-sync fa-spin{% else %}fas fa-shield-alt{% endif %}" style="font-size: 0.75rem;"></i>
+                                <span id="sync-text-{{ user.id }}">
+                                    {% if user.is_online %}
+                                        {{ t('pages.dashboard.sync_updating') }}
+                                    {% else %}
+                                        {{ t('pages.dashboard.sync_offline') }}
+                                    {% endif %}
+                                </span>
                             </span>
                         </div>
                     </div>
@@ -353,12 +359,24 @@
     function updateSyncStatusBadge(user) {
         const statusBadge = document.getElementById('sync-status-' + user.id);
         const syncText = document.getElementById('sync-text-' + user.id);
+        const syncIcon = statusBadge ? statusBadge.querySelector('i') : null;
         if (!statusBadge || !syncText) return;
 
         if (!user.schedule_is_synced) {
-            statusBadge.className = 'badge bg-warning text-dark align-items-center gap-1';
             statusBadge.style.display = 'inline-flex';
-            syncText.textContent = i18n.dashboard_unsynced || 'Unsynced';
+            if (user.is_online) {
+                statusBadge.className = 'badge bg-success text-white align-items-center gap-1';
+                syncText.textContent = i18n.dashboard_sync_updating || 'Protected · Updating...';
+                if (syncIcon) {
+                    syncIcon.className = 'fas fa-sync fa-spin';
+                }
+            } else {
+                statusBadge.className = 'badge bg-secondary text-white align-items-center gap-1';
+                syncText.textContent = i18n.dashboard_sync_offline || 'Protected · Offline';
+                if (syncIcon) {
+                    syncIcon.className = 'fas fa-shield-alt';
+                }
+            }
         } else {
             statusBadge.style.display = 'none';
         }

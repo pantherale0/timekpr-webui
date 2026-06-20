@@ -179,6 +179,56 @@
                 } else {
                     setBlocklistSyncStatus('is-live', i18n('profile_sync_live'));
                 }
+
+                if (blocklistData.mappings && Array.isArray(blocklistData.mappings)) {
+                    blocklistData.mappings.forEach((mapping) => {
+                        const card = document.getElementById(`mapping-card-${mapping.mapping_id}`);
+                        if (!card) return;
+
+                        const statusBadge = card.querySelector('.mapping-status-badge');
+                        if (statusBadge) {
+                            let badgeClass = 'badge p-2 mapping-status-badge ';
+                            let badgeText = '';
+                            if (mapping.status === 'synced') {
+                                badgeClass += 'bg-success';
+                                badgeText = i18n('profile_sync_status_synced') || 'Up to date';
+                            } else if (mapping.status === 'awaiting_uid') {
+                                badgeClass += 'bg-warning text-dark';
+                                badgeText = i18n('profile_sync_status_awaiting_uid') || 'Finishing setup';
+                            } else if (mapping.status === 'not_configured') {
+                                badgeClass += 'bg-secondary';
+                                badgeText = i18n('profile_sync_status_not_configured') || 'Shields not applied yet';
+                            } else {
+                                badgeClass += 'bg-warning text-dark';
+                                badgeText = i18n('profile_sync_status_pending') || 'Updating...';
+                            }
+                            statusBadge.className = badgeClass;
+                            statusBadge.textContent = badgeText;
+                        }
+
+                        const remediationBox = card.querySelector('.mapping-remediation-box');
+                        if (remediationBox) {
+                            if (mapping.status === 'synced' || mapping.status === 'not_configured') {
+                                remediationBox.classList.add('d-none');
+                            } else {
+                                remediationBox.classList.remove('d-none');
+                            }
+                        }
+
+                        const errorDetails = card.querySelector('.mapping-error-details');
+                        if (errorDetails) {
+                            if (mapping.last_error) {
+                                errorDetails.classList.remove('d-none');
+                                const preEl = errorDetails.querySelector('pre');
+                                if (preEl) {
+                                    preEl.textContent = mapping.last_error;
+                                }
+                            } else {
+                                errorDetails.classList.add('d-none');
+                            }
+                        }
+                    });
+                }
             })
             .catch((error) => {
                 console.error('Error fetching sync status:', error);
