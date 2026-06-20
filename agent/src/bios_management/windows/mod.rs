@@ -4,7 +4,8 @@ use std::process::Command;
 
 use serde_json::json;
 
-use super::super::compliance::HardwareReceipt;
+use super::compliance::HardwareReceipt;
+use super::password;
 
 mod oem_detect;
 
@@ -62,7 +63,7 @@ pub fn run_vendor_apply(
         ));
     }
 
-    let password = super::super::password::generate_supervisor_password(16);
+    let password = password::generate_supervisor_password(16);
     let mut receipt = HardwareReceipt::new("windows", oem, model, interface);
     receipt.vendor_tool = json!({
         "name": receipt.interface.clone().unwrap_or_else(|| "vendor-cli".to_string()),
@@ -254,7 +255,11 @@ $archive = Join-Path $target 'payload.zip'
 Invoke-WebRequest -Uri '{url}' -Headers $headers -OutFile $archive
 Expand-Archive -Path $archive -DestinationPath $target -Force
 Remove-Item $archive
-"#
+"#,
+                agent_token = agent_token,
+                payload_root = PAYLOAD_ROOT,
+                vendor = vendor,
+                url = url,
             ),
         ])
         .status()
@@ -296,7 +301,7 @@ pub fn read_agent_config() -> (Option<String>, Option<String>) {
     (server_url, agent_token)
 }
 
-pub fn run_detect() -> super::super::compliance::OemDetectResult {
+pub fn run_detect() -> super::compliance::OemDetectResult {
     detect()
 }
 

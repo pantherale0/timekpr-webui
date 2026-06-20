@@ -30,7 +30,7 @@ pub fn detect_hardware_oem() -> OemDetectResult {
     }
     #[cfg(target_os = "windows")]
     {
-        return windows::oem_detect::detect();
+        return windows::run_detect();
     }
     #[cfg(not(any(target_os = "linux", target_os = "windows")))]
     {

@@ -42,12 +42,13 @@ pub fn detect() -> OemDetectResult {
         _ => None,
     };
 
+    let supported = interface.is_some();
     OemDetectResult {
         oem,
         model: Some(model),
         platform: "windows".to_string(),
         interface,
-        supported: interface.is_some(),
+        supported,
         message: None,
     }
 }
