@@ -11,6 +11,8 @@ from src.database import (
     ManagedUser,
     ManagedUserDeviceMap,
     PendingCommand,
+    UserDailyTimeInterval,
+    UserWeeklySchedule,
 )
 from src.pending_commands_manager import (
     DOMAIN_RECONCILE_ACTION,
@@ -21,6 +23,7 @@ from src.pending_commands_manager import (
     flush_pending_commands,
     get_pending_count,
     queue_offline_command,
+    rebuild_command_args,
 )
 
 
@@ -199,3 +202,108 @@ def test_queue_offline_command_routes_policy_snapshot(approved_device, db_sessio
 
     assert row.command_kind == PendingCommand.KIND_POLICY_SNAPSHOT
     assert row.args_json is None
+
+
+def test_rebuild_command_args_set_weekly_time_limits(approved_device, db_session):
+    user = ManagedUser(username='caiden', system_ip='Unassigned', is_valid=True)
+    db_session.add(user)
+    db_session.flush()
+    db_session.add(UserWeeklySchedule(user_id=user.id, monday_hours=2.0, tuesday_hours=1.5))
+    db_session.add(ManagedUserDeviceMap(
+        managed_user_id=user.id,
+        system_id=approved_device.system_id,
+        linux_username='caiden',
+        is_valid=True,
+    ))
+    db_session.commit()
+
+    row = enqueue_policy_snapshot(
+        approved_device.system_id,
+        'set_weekly_time_limits',
+        'caiden',
+    )
+
+    args = rebuild_command_args(row)
+
+    assert args is not None
+    assert args['schedule']['monday'] == 2.0
+    assert args['schedule']['tuesday'] == 1.5
+
+
+def test_rebuild_command_args_set_allowed_hours(approved_device, db_session):
+    user = ManagedUser(username='caiden', system_ip='Unassigned', is_valid=True)
+    db_session.add(user)
+    db_session.flush()
+    db_session.add(UserDailyTimeInterval(
+        user_id=user.id,
+        day_of_week=1,
+        start_hour=9,
+        start_minute=0,
+        end_hour=17,
+        end_minute=0,
+    ))
+    db_session.add(ManagedUserDeviceMap(
+        managed_user_id=user.id,
+        system_id=approved_device.system_id,
+        linux_username='caiden',
+        is_valid=True,
+    ))
+    db_session.commit()
+
+    row = enqueue_policy_snapshot(
+        approved_device.system_id,
+        'set_allowed_hours',
+        'caiden',
+    )
+
+    args = rebuild_command_args(row)
+
+    assert args is not None
+    assert 'intervals' in args
+    monday = args['intervals']['1']
+    for hour in ('9', '10', '11', '12', '13', '14', '15', '16'):
+        assert monday[hour] == {'STARTMIN': 0, 'ENDMIN': 60, 'UACC': 0}
+
+
+def test_flush_set_weekly_time_limits_rebuilds_from_managed_user(approved_device, db_session):
+    user = ManagedUser(username='caiden', system_ip='Unassigned', is_valid=True)
+    db_session.add(user)
+    db_session.flush()
+    schedule = UserWeeklySchedule(user_id=user.id, monday_hours=3.0, is_synced=False)
+    db_session.add(schedule)
+    db_session.add(ManagedUserDeviceMap(
+        managed_user_id=user.id,
+        system_id=approved_device.system_id,
+        linux_username='caiden',
+        is_valid=True,
+    ))
+    db_session.commit()
+
+    enqueue_policy_snapshot(
+        approved_device.system_id,
+        'set_weekly_time_limits',
+        'caiden',
+    )
+
+    ws = DummyWS()
+    AgentConnectionManager.register(approved_device.system_id, ws, '127.0.0.1')
+
+    with patch.object(
+        AgentConnectionManager,
+        'send_command_sync',
+        return_value=(True, 'ok', None),
+    ) as mock_send:
+        try:
+            result = flush_pending_commands(approved_device.system_id)
+        finally:
+            AgentConnectionManager.unregister(approved_device.system_id)
+
+    assert result.delivered == 1
+    mock_send.assert_called_once()
+    call_args = mock_send.call_args[0]
+    assert call_args[0] == approved_device.system_id
+    assert call_args[1] == 'set_weekly_time_limits'
+    assert call_args[2] == 'caiden'
+    assert call_args[3]['schedule']['monday'] == 3.0
+    db_session.refresh(schedule)
+    assert schedule.is_synced is True
