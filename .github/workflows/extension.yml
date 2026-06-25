@@ -56,7 +56,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "24"
 
       - name: Run YouTube utils unit tests
         run: node scripts/test-youtube-utils.js
@@ -69,10 +69,11 @@ jobs:
   # Verifies that the extension correctly hides Google AI Mode elements and
   # SGE containers while leaving regular search results visible.
   #
-  # Chrome extensions cannot run in --headless mode (a Chrome limitation), so
-  # we use Xvfb (virtual framebuffer) to provide a virtual X11 display for a
-  # headed Chromium instance.  The test communicates with Chromium via the
-  # Chrome DevTools Protocol (CDP) WebSocket.
+  # KEY: Chrome extensions cannot run in --headless mode (a hard Chrome
+  # limitation). We install Google Chrome Stable (the Debian .deb package)
+  # rather than chromium-browser which on Ubuntu 22.04+ is a Snap stub that
+  # silently drops --load-extension and --remote-debugging-port.
+  # Xvfb provides a virtual X11 display for the headed browser process.
   # ─────────────────────────────────────────────────────────────────────────
   browser-integration-test:
     needs: changes
@@ -85,45 +86,53 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "24"
 
-      - name: Install Chromium and Xvfb
+      - name: Install Google Chrome Stable (Debian package)
+        # We explicitly use the Google Chrome apt repository to get a real Debian
+        # package. This is the only way to reliably support --load-extension in CI.
+        # Ubuntu's chromium-browser package redirects to a Snap that blocks extensions.
         run: |
+          set -euo pipefail
+          curl -fsSL https://dl.google.com/linux/linux_signing_key.pub \
+            | sudo gpg --dearmor -o /usr/share/keyrings/google-chrome.gpg
+          echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google-chrome.gpg] \
+            https://dl.google.com/linux/chrome/deb/ stable main" \
+            | sudo tee /etc/apt/sources.list.d/google-chrome.list
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends \
-            chromium-browser \
+            google-chrome-stable \
             xvfb \
-            x11-utils \
-            dbus-x11
-
-      - name: Locate Chromium binary
-        id: chromium
-        run: |
-          path="$(which chromium-browser 2>/dev/null || which chromium 2>/dev/null || echo '')"
-          if [[ -z "$path" ]]; then
-            echo "Could not find Chromium binary" >&2
-            exit 1
-          fi
-          echo "path=$path" >> "$GITHUB_OUTPUT"
-          echo "Chromium found at: $path"
-          "$path" --version
+            x11-utils
+          google-chrome-stable --version
 
       - name: Start Xvfb virtual display
         run: |
-          # Start virtual framebuffer on display :99
-          Xvfb :99 -screen 0 1920x1080x24 -ac &
+          Xvfb :99 -screen 0 1920x1080x24 -ac +extension RANDR &
           echo "XVFB_PID=$!" >> "$GITHUB_ENV"
           sleep 1
-          # Verify the display is up
-          DISPLAY=:99 xdpyinfo >/dev/null 2>&1 && echo "Xvfb is running" || { echo "Xvfb failed to start" >&2; exit 1; }
+          DISPLAY=:99 xdpyinfo >/dev/null 2>&1 \
+            && echo "Xvfb is running on :99" \
+            || { echo "Xvfb failed to start" >&2; exit 1; }
 
       - name: Run extension browser integration tests
         env:
           DISPLAY: ":99"
-          CHROMIUM_PATH: ${{ steps.chromium.outputs.path }}
+          CHROMIUM_PATH: /usr/bin/google-chrome-stable
           DEBUG_PORT: "9223"
           HTTP_PORT: "8085"
+          SCREENSHOTS_DIR: "/tmp/ext-test-screenshots"
         run: node scripts/test-sge-hiding.js
+
+      - name: Upload screenshots
+        # Always upload so we get visual evidence on both pass and fail
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: extension-test-screenshots
+          path: /tmp/ext-test-screenshots/
+          if-no-files-found: warn
+          retention-days: 14
 
       - name: Stop Xvfb
         if: always()
