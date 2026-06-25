@@ -192,18 +192,70 @@ async function main() {
         const targets = await waitForChromiumReady(30_000);
         console.log('DevTools targets:', targets.map(t => t.url));
 
+        // ── Step 3a: Warm the MV3 service worker ─────────────────────────────
+        // In MV3, the background service worker can be killed between events.
+        // If it is not alive when content.js sends CHECK_AI_POLICY, the message
+        // is silently dropped and the callback receives undefined → no CSS injection.
+        // We connect to the background target via CDP and evaluate a no-op to ensure
+        // the worker is active before the page content script fires.
+        const bgTarget = targets.find(t =>
+            t.url.includes('background.js') ||
+            t.url.includes('background.html') ||
+            t.type === 'service_worker'
+        );
+        if (bgTarget) {
+            console.log('Step 3a: Pre-warming service worker via CDP...');
+            const bgWs = await connectWs(bgTarget.webSocketDebuggerUrl);
+            const bgRpc = makeRpc(bgWs);
+            await bgRpc('Runtime.evaluate', { expression: '1+1', returnByValue: true });
+            bgWs.close();
+            console.log('Service worker warmed.');
+        } else {
+            console.log('Step 3a: No background target found — skipping service worker warmup.');
+        }
+
+        // ── Step 3b: Connect to the test page and reload it ───────────────────
+        // The page was already loaded before we warmed the worker. Reload it now
+        // so the content script fires against the (now-live) service worker.
         const target = targets.find(t => t.url.includes('search.html'));
         if (!target) throw new Error('Could not find the search.html tab — available: ' + targets.map(t => t.url).join(', '));
 
         ws = await connectWs(target.webSocketDebuggerUrl);
-        console.log('WebSocket connected.');
+        console.log('WebSocket connected to test page.');
 
         const sendCmd = makeRpc(ws);
 
-        // Enable Page domain so we can take screenshots
+        // Enable domains
         await sendCmd('Page.enable');
+        await sendCmd('Runtime.enable');
 
-        // Wait for the extension content script to run (message passing + MutationObserver)
+        // Forward page console messages to the test output (useful for debugging)
+        ws.addEventListener('message', (event) => {
+            const msg = JSON.parse(event.data);
+            if (msg.method === 'Runtime.consoleAPICalled') {
+                const args = (msg.params.args || []).map(a => a.value ?? a.description ?? '').join(' ');
+                console.log(`  [page:${msg.params.type}] ${args}`);
+            }
+        });
+
+        console.log('Reloading test page so content script fires against live service worker...');
+        await Promise.all([
+            sendCmd('Page.reload', {}),
+            new Promise((resolve) => {
+                const handler = (event) => {
+                    const msg = JSON.parse(event.data);
+                    if (msg.method === 'Page.loadEventFired') {
+                        ws.removeEventListener('message', handler);
+                        resolve();
+                    }
+                };
+                ws.addEventListener('message', handler);
+                setTimeout(resolve, 5000); // bail-out after 5 s if event never fires
+            })
+        ]);
+        console.log('Page reloaded.');
+
+        // Give the content script time to run and receive the policy response
         console.log('Waiting 3 s for extension content script to initialise...');
         await sleep(3000);
 
