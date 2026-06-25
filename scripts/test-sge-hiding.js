@@ -47,12 +47,21 @@ const USER_DATA_DIR   = path.join(os.tmpdir(), `guardian-ext-test-${process.pid}
 const SCREENSHOTS_DIR = process.env.SCREENSHOTS_DIR || path.join(os.tmpdir(), 'ext-test-screenshots');
 const MOCK_URL        = `http://google.127.0.0.1.nip.io:${PORT}/search.html`;
 
+// Branded Google Chrome (126+) treats --load-extension as ephemeral: the service
+// worker never registers and content scripts are not injected. Use CDP instead.
+function isGoogleChromeBranded() {
+    const base = path.basename(CHROMIUM_PATH);
+    return base === 'google-chrome' || base === 'google-chrome-stable';
+}
+const USE_CDP_EXTENSION_LOAD = isGoogleChromeBranded();
+
 fs.mkdirSync(SCREENSHOTS_DIR, { recursive: true });
 
 console.log(`Chrome binary : ${CHROMIUM_PATH}`);
 console.log(`Extension     : ${EXTENSION_PATH}`);
 console.log(`User data dir : ${USER_DATA_DIR}`);
 console.log(`Screenshots   : ${SCREENSHOTS_DIR}`);
+console.log(`Extension load: ${USE_CDP_EXTENSION_LOAD ? 'CDP Extensions.loadUnpacked (Google Chrome)' : '--load-extension (Chromium)'}`);
 
 async function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
 
@@ -76,8 +85,6 @@ function launchChromium() {
     // --no-sandbox is required in CI (unprivileged namespaces are disabled).
     // Extensions require a headed display — use Xvfb in CI (set DISPLAY=:99).
     const args = [
-        `--load-extension=${EXTENSION_PATH}`,
-        `--disable-extensions-except=${EXTENSION_PATH}`,
         `--remote-debugging-port=${DEBUG_PORT}`,
         '--remote-debugging-address=127.0.0.1',
         '--no-first-run',
@@ -87,8 +94,19 @@ function launchChromium() {
         '--no-sandbox',           // required for CI
         '--disable-setuid-sandbox',
         `--user-data-dir=${USER_DATA_DIR}`,
-        MOCK_URL
     ];
+
+    if (USE_CDP_EXTENSION_LOAD) {
+        // Required for Extensions.loadUnpacked over CDP on branded Chrome builds.
+        args.push('--enable-unsafe-extension-debugging');
+        args.push('about:blank');
+    } else {
+        args.push(
+            `--load-extension=${EXTENSION_PATH}`,
+            `--disable-extensions-except=${EXTENSION_PATH}`,
+            MOCK_URL,
+        );
+    }
     const proc = spawn(CHROMIUM_PATH, args, {
         env: { ...process.env },  // inherit DISPLAY so Xvfb is used
     });
@@ -164,8 +182,49 @@ function findGuardianServiceWorker(targets) {
     });
 }
 
-async function warmGuardianServiceWorker(label = 'service worker') {
-    const deadline = Date.now() + 10_000;
+async function connectBrowserCdp() {
+    const version = await fetchJson(`http://127.0.0.1:${DEBUG_PORT}/json/version`);
+    const ws = await connectWs(version.webSocketDebuggerUrl);
+    return { ws, rpc: makeRpc(ws) };
+}
+
+async function loadExtensionViaCdp() {
+    const { ws, rpc } = await connectBrowserCdp();
+    try {
+        const result = await rpc('Extensions.loadUnpacked', { path: EXTENSION_PATH });
+        console.log(`Extension installed via CDP (id: ${result.id})`);
+        return result.id;
+    } finally {
+        ws.close();
+    }
+}
+
+async function openTestPageTab() {
+    const { ws, rpc } = await connectBrowserCdp();
+    try {
+        const { targetId } = await rpc('Target.createTarget', { url: MOCK_URL });
+        console.log(`Opened test page tab (targetId: ${targetId})`);
+        return targetId;
+    } finally {
+        ws.close();
+    }
+}
+
+async function waitForSearchPageTarget(maxMs = 15_000) {
+    const deadline = Date.now() + maxMs;
+    while (Date.now() < deadline) {
+        const targets = await fetchJson(`http://127.0.0.1:${DEBUG_PORT}/json`);
+        const target = targets.find((t) => t.type === 'page' && t.url.includes('search.html'));
+        if (target) {
+            return target;
+        }
+        await sleep(300);
+    }
+    throw new Error(`Test page tab not found after ${maxMs}ms`);
+}
+
+async function warmGuardianServiceWorker(label = 'service worker', maxMs = 10_000) {
+    const deadline = Date.now() + maxMs;
     while (Date.now() < deadline) {
         const targets = await fetchJson(`http://127.0.0.1:${DEBUG_PORT}/json`);
         const bgTarget = findGuardianServiceWorker(targets);
@@ -222,27 +281,40 @@ async function main() {
         httpServer = await startHttpServer();
         console.log(`HTTP server on port ${PORT}`);
 
-        console.log('Step 2: Launching Chrome with extension...');
+        console.log('Step 2: Launching Chrome...');
+        if (USE_CDP_EXTENSION_LOAD) {
+            console.log('  (Google Chrome Stable — extension will be loaded via CDP)');
+        } else {
+            console.log('  (extension loaded via --load-extension)');
+        }
         chromiumProc = launchChromium();
 
         console.log('Step 3: Waiting for Chrome DevTools to become ready...');
-        const targets = await waitForChromiumReady(30_000);
-        console.log('DevTools targets:', targets.map(t => t.url));
+        await waitForChromiumReady(30_000);
 
-        // ── Step 3a: Warm the MV3 service worker ─────────────────────────────
-        // In MV3, the background service worker can be killed between events.
-        // If it is not alive when content.js sends CHECK_AI_POLICY, the message
-        // is silently dropped and the callback receives undefined → no CSS injection.
-        // On google.* pages Chrome also exposes its built-in Hangouts extension
-        // (background.html) in DevTools — never warm that by mistake.
-        console.log('Step 3a: Pre-warming Guardian service worker via CDP...');
-        await warmGuardianServiceWorker('initial load');
+        if (USE_CDP_EXTENSION_LOAD) {
+            console.log('Step 3a: Installing extension via CDP Extensions.loadUnpacked...');
+            await loadExtensionViaCdp();
+            console.log('Step 3b: Pre-warming Guardian service worker...');
+            const warmed = await warmGuardianServiceWorker('post-install', 15_000);
+            if (!warmed) {
+                throw new Error(
+                    'Guardian extension failed to activate after CDP install — '
+                    + 'service worker never appeared. Ensure --enable-unsafe-extension-debugging is set.'
+                );
+            }
+            console.log('Step 3c: Opening mock Google Search page...');
+            await openTestPageTab();
+        } else {
+            const targets = await fetchJson(`http://127.0.0.1:${DEBUG_PORT}/json`);
+            console.log('DevTools targets:', targets.map(t => t.url));
+            console.log('Step 3a: Pre-warming Guardian service worker via CDP...');
+            await warmGuardianServiceWorker('initial load');
+        }
 
-        // ── Step 3b: Connect to the test page and reload it ───────────────────
-        // The page was already loaded before we warmed the worker. Reload it now
-        // so the content script fires against the (now-live) service worker.
-        const target = targets.find(t => t.url.includes('search.html'));
-        if (!target) throw new Error('Could not find the search.html tab — available: ' + targets.map(t => t.url).join(', '));
+        // ── Connect to the test page (reload on Chromium path only) ───────────
+        const target = await waitForSearchPageTarget();
+        console.log('DevTools targets include test page:', target.url);
 
         ws = await connectWs(target.webSocketDebuggerUrl);
         console.log('WebSocket connected to test page.');
@@ -262,22 +334,28 @@ async function main() {
             }
         });
 
-        console.log('Reloading test page so content script fires against live service worker...');
-        await Promise.all([
-            sendCmd('Page.reload', {}),
-            new Promise((resolve) => {
-                const handler = (event) => {
-                    const msg = JSON.parse(event.data);
-                    if (msg.method === 'Page.loadEventFired') {
-                        ws.removeEventListener('message', handler);
-                        resolve();
-                    }
-                };
-                ws.addEventListener('message', handler);
-                setTimeout(resolve, 5000); // bail-out after 5 s if event never fires
-            })
-        ]);
-        console.log('Page reloaded.');
+        if (!USE_CDP_EXTENSION_LOAD) {
+            // Chromium: page loaded before the worker was warmed — reload so the
+            // content script fires against the now-live service worker.
+            console.log('Reloading test page so content script fires against live service worker...');
+            await Promise.all([
+                sendCmd('Page.reload', {}),
+                new Promise((resolve) => {
+                    const handler = (event) => {
+                        const msg = JSON.parse(event.data);
+                        if (msg.method === 'Page.loadEventFired') {
+                            ws.removeEventListener('message', handler);
+                            resolve();
+                        }
+                    };
+                    ws.addEventListener('message', handler);
+                    setTimeout(resolve, 5000); // bail-out after 5 s if event never fires
+                })
+            ]);
+            console.log('Page reloaded.');
+        } else {
+            console.log('Test page opened fresh after extension install — no reload needed.');
+        }
 
         // Give the content script time to run and receive the policy response
         console.log('Waiting 3 s for extension content script to initialise...');

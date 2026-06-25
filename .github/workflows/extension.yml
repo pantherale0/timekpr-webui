@@ -73,6 +73,9 @@ jobs:
   # limitation). We install Google Chrome Stable (the Debian .deb package)
   # rather than chromium-browser which on Ubuntu 22.04+ is a Snap stub that
   # silently drops --load-extension and --remote-debugging-port.
+  # Branded Chrome 126+ no longer fully installs extensions via --load-extension
+  # (no service worker, no content scripts). The test script loads the extension
+  # via CDP Extensions.loadUnpacked with --enable-unsafe-extension-debugging.
   # Xvfb provides a virtual X11 display for the headed browser process.
   # ─────────────────────────────────────────────────────────────────────────
   browser-integration-test:
