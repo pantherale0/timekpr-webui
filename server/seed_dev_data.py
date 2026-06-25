@@ -26,7 +26,9 @@ from src.database import (
     BlocklistSource,
     BlocklistDomain,
     ManagedUserBlocklistAssignment,
-    PendingCommand
+    PendingCommand,
+    AiPromptLog,
+    AiSessionLog
 )
 from src.policy_preset_manager import apply_policy_preset
 
@@ -43,6 +45,8 @@ def seed_data():
         print("Purging existing mock data...")
         WebHistory.query.delete()
         VideoHistory.query.delete()
+        AiPromptLog.query.delete()
+        AiSessionLog.query.delete()
         AppUsageHistory.query.delete()
         AgentAlert.query.delete()
         UserTimeUsage.query.delete()
@@ -199,10 +203,10 @@ def seed_data():
             db.session.add(sam_assignment)
             db.session.commit()
 
-        # 7. Generate 14 days of history and usage data
-        print("Generating 14 days of history and usage data...")
+        # 7. Generate 45 days of history and usage data
+        print("Generating 45 days of history and usage data...")
         today = datetime.now(timezone.utc).date()
-        start_date = today - timedelta(days=13)
+        start_date = today - timedelta(days=44)
 
         # Sample web history sites
         allowed_sites = [
@@ -246,7 +250,24 @@ def seed_data():
             ("tiktok_vid_4", "How to solve equations in seconds", "@math_genius", "Education", 45)
         ]
 
-        for offset in range(14):
+        ai_services = [
+            ("ChatGPT", "chatgpt.com", "https://chatgpt.com/c/chat-id", "ChatGPT Chat"),
+            ("Claude", "claude.ai", "https://claude.ai/chat/chat-id", "Claude Conversation"),
+            ("Gemini", "gemini.google.com", "https://gemini.google.com/app", "Gemini - Google AI")
+        ]
+        ai_prompts = [
+            "how do I build a dynamic web app with vanilla js?",
+            "write an essay about the solar system in 300 words",
+            "can you solve this math problem: 3x + 5 = 20?",
+            "what is the difference between a list and a tuple in python?",
+            "explain how photosynthesis works",
+            "give me ideas for a science fair project about renewable energy",
+            "write a short mystery story",
+            "how to build a treehouse step-by-step",
+            "what is quantum entanglement?"
+        ]
+
+        for offset in range(45):
             curr_date = start_date + timedelta(days=offset)
             is_weekend = curr_date.weekday() >= 5
 
@@ -557,6 +578,70 @@ def seed_data():
                         duration_seconds=duration
                     ))
 
+            # SAM AI Prompt Logs
+            if random.random() < 0.4:
+                num_sam_prompts = random.randint(1, 3)
+                for _ in range(num_sam_prompts):
+                    p_hour = random.randint(9, 21)
+                    p_min = random.randint(0, 59)
+                    p_sec = random.randint(0, 59)
+                    p_time = datetime(curr_date.year, curr_date.month, curr_date.day, p_hour, p_min, p_sec, tzinfo=timezone.utc)
+                    
+                    service_name, s_domain, s_url, s_title = random.choice(ai_services)
+                    prompt_text = random.choice(ai_prompts)
+                    status = random.choice(["Allowed", "Allowed", "Flagged"])
+                    
+                    db.session.add(AiPromptLog(
+                        device_map_id=sam_mapping.id,
+                        service=service_name,
+                        domain=s_domain,
+                        prompt_text=prompt_text,
+                        prompt_length=len(prompt_text),
+                        url=s_url,
+                        title=s_title,
+                        status=status,
+                        logged_at=p_time
+                    ))
+                    
+                    db.session.add(AiSessionLog(
+                        device_map_id=sam_mapping.id,
+                        domain=s_domain,
+                        duration_seconds=random.randint(60, 600),
+                        logged_at=p_time
+                    ))
+
+            # CHLOE AI Prompt Logs
+            if random.random() < 0.5:
+                num_chloe_prompts = random.randint(1, 4)
+                for _ in range(num_chloe_prompts):
+                    p_hour = random.randint(10, 22)
+                    p_min = random.randint(0, 59)
+                    p_sec = random.randint(0, 59)
+                    p_time = datetime(curr_date.year, curr_date.month, curr_date.day, p_hour, p_min, p_sec, tzinfo=timezone.utc)
+                    
+                    service_name, s_domain, s_url, s_title = random.choice(ai_services)
+                    prompt_text = random.choice(ai_prompts)
+                    status = random.choice(["Allowed", "Allowed", "Allowed", "Flagged", "Blocked"])
+                    
+                    db.session.add(AiPromptLog(
+                        device_map_id=chloe_mapping.id,
+                        service=service_name,
+                        domain=s_domain,
+                        prompt_text=prompt_text,
+                        prompt_length=len(prompt_text),
+                        url=s_url,
+                        title=s_title,
+                        status=status,
+                        logged_at=p_time
+                    ))
+                    
+                    db.session.add(AiSessionLog(
+                        device_map_id=chloe_mapping.id,
+                        domain=s_domain,
+                        duration_seconds=random.randint(60, 900),
+                        logged_at=p_time
+                    ))
+
             # 7e. Agent Alerts
             # Startup alerts
             for dev, user_name in [(sam_device, "sam"), (chloe_device, "chloe"), (leo_device, "leo")]:
@@ -701,7 +786,7 @@ def seed_data():
         db.session.add(chloe_req)
 
         db.session.commit()
-        print("Database seeded successfully with 14 days of history for Sam, Chloe, and Leo!")
+        print("Database seeded successfully with 45 days of history for Sam, Chloe, and Leo!")
 
 
 if __name__ == '__main__':

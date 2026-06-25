@@ -299,10 +299,17 @@
                     <!-- Event items injected dynamically -->
                 </div>
                 
-                <!-- Infinite Scroll Loader at bottom -->
-                <div id="timeline-bottom-loader" class="text-center py-3" style="display: none;">
-                    <div class="spinner-border spinner-border-sm text-primary me-1" role="status"></div>
-                    <span class="small text-secondary fw-semibold">{{ t('pages.stats.loading_older') }}</span>
+                <!-- Infinite Scroll Status Sentinel -->
+                <div id="timeline-scroll-status" class="py-4 text-center">
+                    <div id="timeline-scroll-sentinel" style="height: 10px; margin-bottom: 5px;"></div>
+                    <div id="timeline-bottom-loader" style="display: none;">
+                        <div class="spinner-border spinner-border-sm text-primary me-1" role="status"></div>
+                        <span class="small text-secondary fw-semibold">{{ t('pages.stats.loading_older') }}</span>
+                    </div>
+                    <div id="timeline-end-message" class="text-secondary small fw-semibold px-3" style="display: none;">
+                        <hr class="my-4 opacity-25">
+                        <i class="fas fa-check-circle me-1 text-success"></i> You've caught up! Showing all activities.
+                    </div>
                 </div>
             </div>
 
@@ -319,6 +326,7 @@
 <script>
 (function() {
     // ── Configuration State ─────────────────────────────────────────────────
+    let timelineAbort = null;
     const state = {
         userId: {{ user.id }},
         startDate: '',
@@ -840,16 +848,34 @@
 
     // ── Activity Timeline & Lazy Loading ──────────────────────────────────
     async function loadTimeline(isAppend = false) {
+        if (isAppend && timelineState.loadingMore) return;
+
+        const endMessage = document.getElementById('timeline-end-message');
+        const bottomLoader = document.getElementById('timeline-bottom-loader');
+
         if (!isAppend) {
+            if (timelineObserver) {
+                timelineObserver.disconnect();
+                timelineObserver = null;
+            }
             timelineState.page = 1;
             timelineState.hasMore = true;
             document.getElementById('timeline-loading').style.display = 'block';
             document.getElementById('timeline-container').style.display = 'none';
             document.getElementById('timeline-empty').style.display = 'none';
+            if (bottomLoader) bottomLoader.style.display = 'none';
+            if (endMessage) endMessage.style.display = 'none';
         } else {
             timelineState.loadingMore = true;
-            document.getElementById('timeline-bottom-loader').style.display = 'block';
+            if (bottomLoader) bottomLoader.style.display = 'block';
+            if (endMessage) endMessage.style.display = 'none';
         }
+
+        if (timelineAbort) {
+            timelineAbort.abort();
+        }
+        timelineAbort = new AbortController();
+        const { signal } = timelineAbort;
 
         const params = new URLSearchParams({
             page: timelineState.page,
@@ -872,7 +898,7 @@
         }
 
         try {
-            const res = await fetch(`/api/alerts?${params.toString()}`);
+            const res = await fetch(`/api/alerts?${params.toString()}`, { signal });
             const result = await res.json();
 
             if (result.success) {
@@ -883,13 +909,34 @@
                 
                 // Update Badge Counts
                 updateTimelineSummary(pagination.total_items);
+
+                // Show end-of-list message if no more pages and there is data
+                if (!timelineState.hasMore) {
+                    const listContainer = document.getElementById('timeline-events-list');
+                    if (listContainer && listContainer.children.length > 0) {
+                        if (endMessage) endMessage.style.display = 'block';
+                    }
+                }
+
+                // Set up observer if this was the initial load, letting layout settle first
+                if (!isAppend) {
+                    setTimeout(() => {
+                        if (!signal.aborted) {
+                            setupTimelineInfiniteScroll();
+                        }
+                    }, 100);
+                }
             }
         } catch (e) {
-            console.error('Failed to load activity timeline:', e);
+            if (e.name !== 'AbortError') {
+                console.error('Failed to load activity timeline:', e);
+            }
         } finally {
-            document.getElementById('timeline-loading').style.display = 'none';
-            document.getElementById('timeline-bottom-loader').style.display = 'none';
-            timelineState.loadingMore = false;
+            if (!signal.aborted) {
+                document.getElementById('timeline-loading').style.display = 'none';
+                if (bottomLoader) bottomLoader.style.display = 'none';
+                timelineState.loadingMore = false;
+            }
         }
     }
 
@@ -924,7 +971,19 @@
         const fragment = document.createDocumentFragment();
 
         events.forEach(event => {
-            const eventDateStr = event.occurred_at ? event.occurred_at.substring(0, 10) : 'Unknown';
+            let eventDateStr = 'Unknown';
+            let eventTime = '—';
+
+            if (event.occurred_at) {
+                const d = new Date(event.occurred_at);
+                if (!isNaN(d.getTime())) {
+                    eventDateStr = d.getFullYear() + '-' + 
+                                   String(d.getMonth() + 1).padStart(2, '0') + '-' + 
+                                   String(d.getDate()).padStart(2, '0');
+                    eventTime = String(d.getHours()).padStart(2, '0') + ':' + 
+                                String(d.getMinutes()).padStart(2, '0');
+                }
+            }
             
             // Add date grouping label if date changes
             if (!renderedDays.has(eventDateStr)) {
@@ -936,14 +995,6 @@
             }
 
             const itemDiv = document.createElement('div');
-            
-            let eventTime = '—';
-            if (event.occurred_at) {
-                const parts = event.occurred_at.replace('T', ' ').split(' ');
-                if (parts.length > 1) {
-                    eventTime = parts[1].substring(0, 5);
-                }
-            }
             
             if (event.event_type === 'terminal_command') {
                 // Render terminal command timeline item
@@ -1044,23 +1095,53 @@
         loadTimeline(true);
     }
 
-    // Unified scroll trigger loader
     let timelineObserver = null;
     function setupTimelineInfiniteScroll() {
         if (timelineObserver) {
             timelineObserver.disconnect();
         }
 
-        const loader = document.getElementById('timeline-bottom-loader');
-        if (!loader) return;
+        const sentinel = document.getElementById('timeline-scroll-sentinel');
+        if (!sentinel) return;
 
         timelineObserver = new IntersectionObserver(entries => {
             if (entries[0].isIntersecting && !timelineState.loadingMore && timelineState.hasMore) {
                 loadMoreTimelineEvents();
             }
-        }, { rootMargin: '120px' });
+        }, {
+            root: null,
+            rootMargin: '100px',
+            threshold: 0.1
+        });
 
-        timelineObserver.observe(loader);
+        timelineObserver.observe(sentinel);
+    }
+
+    function teardownStatsPage() {
+        if (timelineAbort) {
+            timelineAbort.abort();
+            timelineAbort = null;
+        }
+        if (timelineObserver) {
+            timelineObserver.disconnect();
+            timelineObserver = null;
+        }
+        if (trendChart) {
+            trendChart.destroy();
+            trendChart = null;
+        }
+        if (appDoughnutChart) {
+            appDoughnutChart.destroy();
+            appDoughnutChart = null;
+        }
+    }
+
+    window.__guardianStatsTeardown = teardownStatsPage;
+    if (!window.__guardianStatsRouteHook) {
+        window.__guardianStatsRouteHook = true;
+        document.addEventListener('guardian:route', () => {
+            window.__guardianStatsTeardown?.();
+        });
     }
 
     // ── Setup UI Event Listeners ───────────────────────────────────────────
@@ -1172,7 +1253,6 @@
 
     loadStats();
     loadTimeline(false);
-    setupTimelineInfiniteScroll();
 
 })();
 </script>

@@ -266,15 +266,16 @@
                     </div>
                 </div>
 
-                <!-- Footer / Pagination -->
-                <div class="card-footer bg-body-secondary p-3 d-flex justify-content-between align-items-center" id="pagination-container" style="display: none;">
-                    <button class="btn btn-sm btn-outline-secondary" id="btn-prev-page">
-                        <i class="fas fa-chevron-left me-1"></i> {{ t('pages.web_video_history.previous') }}
-                    </button>
-                    <span class="small text-secondary fw-semibold" id="page-indicator">Page 1 of 1</span>
-                    <button class="btn btn-sm btn-outline-secondary" id="btn-next-page">
-                        {{ t('pages.web_video_history.next') }} <i class="fas fa-chevron-right ms-1"></i>
-                    </button>
+                <!-- Infinite Scroll Status Sentinel -->
+                <div id="infinite-scroll-status" class="py-4 text-center">
+                    <div id="infinite-scroll-sentinel" style="height: 1px;"></div>
+                    <div id="history-scroll-spinner" class="spinner-border text-primary spinner-border-sm" role="status" style="display: none;">
+                        <span class="visually-hidden">Loading more...</span>
+                    </div>
+                    <div id="history-end-message" class="text-secondary small fw-semibold px-3" style="display: none;">
+                        <hr class="my-4 opacity-25">
+                        <i class="fas fa-check-circle me-1 text-success"></i> You've caught up! Showing all activities.
+                    </div>
                 </div>
             </div>
         </div>
@@ -297,7 +298,10 @@
         history: [],
         analytics: null,
         domainsChart: null,
-        channelsChart: null
+        channelsChart: null,
+        loadingMore: false,
+        hasNextPage: false,
+        scrollObserver: null
     };
 
     // Calculate default date ranges
@@ -370,8 +374,23 @@
     }
 
     // Load data from APIs
-    async function fetchHistory() {
-        showLoadingState(true);
+    async function fetchHistory(isScrollLoad = false) {
+        if (state.loadingMore) return;
+
+        const scrollSpinner = document.getElementById('history-scroll-spinner');
+        const endMessage = document.getElementById('history-end-message');
+
+        if (isScrollLoad) {
+            state.loadingMore = true;
+            if (scrollSpinner) scrollSpinner.style.display = 'inline-block';
+            if (endMessage) endMessage.style.display = 'none';
+        } else {
+            state.page = 1;
+            state.hasNextPage = false;
+            showLoadingState(true);
+            if (scrollSpinner) scrollSpinner.style.display = 'none';
+            if (endMessage) endMessage.style.display = 'none';
+        }
         
         let url = `/api/user/${state.userId}/history?page=${state.page}&per_page=${state.perPage}`;
         if (state.startDate) url += `&start_date=${state.startDate}`;
@@ -380,21 +399,41 @@
         if (state.type !== 'all') url += `&type=${encodeURIComponent(state.type)}`;
 
         try {
-            const response = await fetch(url);
+            const response = await fetch(url, { signal: historyPageAbort ? historyPageAbort.signal : null });
             const payload = await response.json();
             if (payload.success && payload.data) {
-                state.history = payload.data.history || [];
-                state.analytics = payload.data.analytics || {};
+                const pagination = payload.data.pagination || {};
+                state.hasNextPage = pagination.has_next || false;
                 
-                // Render view
-                renderStatsStrip();
-                renderCharts();
-                renderHistoryFeed(payload.data.pagination);
+                if (isScrollLoad) {
+                    const newItems = payload.data.history || [];
+                    state.history = state.history.concat(newItems);
+                    renderHistoryFeedAppend(newItems, pagination);
+                } else {
+                    state.history = payload.data.history || [];
+                    state.analytics = payload.data.analytics || {};
+                    
+                    // Render view
+                    renderStatsStrip();
+                    renderCharts();
+                    renderHistoryFeed(pagination);
+                }
+
+                // Show end-of-list message if no more pages
+                if (!state.hasNextPage && state.history.length > 0) {
+                    if (endMessage) endMessage.style.display = 'block';
+                }
             }
         } catch (error) {
-            console.error('Failed to load history details', error);
+            if (error.name !== 'AbortError') {
+                console.error('Failed to load history details', error);
+            }
         } finally {
-            showLoadingState(false);
+            state.loadingMore = false;
+            if (scrollSpinner) scrollSpinner.style.display = 'none';
+            if (!isScrollLoad) {
+                showLoadingState(false);
+            }
         }
     }
 
@@ -402,13 +441,13 @@
         const loading = document.getElementById('history-loading');
         const empty = document.getElementById('history-empty');
         const list = document.getElementById('history-list-container');
-        const pagination = document.getElementById('pagination-container');
+        const endMessage = document.getElementById('history-end-message');
 
         if (isLoading) {
             loading.style.display = 'block';
             empty.style.display = 'none';
             list.style.display = 'none';
-            pagination.style.display = 'none';
+            if (endMessage) endMessage.style.display = 'none';
             
             document.getElementById('domains-chart-loading').style.display = 'block';
             document.getElementById('domains-chart-wrapper').style.display = 'none';
@@ -443,16 +482,108 @@
         document.getElementById('stat-dest-count').innerText = distinctDestinations;
     }
 
+    // Helper to create a single history item card
+    function createHistoryItemElement(item) {
+        const card = document.createElement('div');
+        
+        if (item.type === 'youtube' || item.type === 'tiktok') {
+            const durationFormatted = formatDuration(item.duration_seconds);
+            const watchedAtFormatted = formatDateTime(item.timestamp);
+            const isTiktok = item.type === 'tiktok';
+            const thumbnailUrl = isTiktok
+                ? '/static/img/video_placeholder.png'
+                : `https://img.youtube.com/vi/${item.video_id}/mqdefault.jpg`;
+
+            card.className = `history-feed-item p-3 border-bottom d-flex gap-3 align-items-start interactive-inspect-row cursor-pointer ${isTiktok ? 'border-tiktok' : 'border-youtube'}`;
+            card.setAttribute('data-inspect-type', 'channel');
+            card.setAttribute('data-inspect-value', item.channel_name);
+            card.setAttribute('data-inspect-platform', item.type);
+            
+            card.innerHTML = `
+                <div class="video-thumbnail-container">
+                    <img class="video-thumbnail" src="${thumbnailUrl}" alt="Thumbnail" onerror="this.src='/static/img/video_placeholder.png'; this.onerror=null;">
+                    <span class="video-duration-badge">${durationFormatted}</span>
+                </div>
+                <div class="flex-grow-1 min-w-0">
+                    <h6 class="mb-1 fw-bold text-truncate-2">
+                        <a href="${item.url}" target="_blank" rel="noopener noreferrer" class="text-decoration-none text-body hover-underline">
+                            ${escapeHtml(item.title)}
+                        </a>
+                    </h6>
+                    <div class="d-flex align-items-center gap-2 flex-wrap small text-secondary">
+                        <span class="badge ${isTiktok ? 'badge-activity-tiktok' : 'badge-activity-yt'} px-2 py-0.5 rounded-pill">
+                            <i class="fab fa-${isTiktok ? 'tiktok' : 'youtube'} me-1"></i>${isTiktok ? 'TikTok' : 'Video'}
+                        </span>
+                        <span class="fw-semibold text-dark-emphasis">${escapeHtml(item.channel_name)}</span>
+                        <span class="text-muted">&bull;</span>
+                        <span class="badge bg-secondary px-2 py-0.5 rounded-pill text-white">${escapeHtml(item.category)}</span>
+                        <span class="text-muted ms-auto">${watchedAtFormatted}</span>
+                    </div>
+                </div>
+            `;
+        } else if (item.type === 'ai_prompt') {
+            const loggedAtFormatted = formatDateTime(item.timestamp);
+            const statusClass = 'badge-status-' + (item.status || 'Allowed').toLowerCase();
+            const displayPrompt = item.prompt_text ? escapeHtml(item.prompt_text) : '<em>Metadata Only</em>';
+            
+            card.className = 'history-feed-item p-3 border-bottom d-flex gap-3 align-items-start interactive-inspect-row cursor-pointer border-ai';
+            card.setAttribute('data-inspect-type', 'domain');
+            card.setAttribute('data-inspect-value', item.domain);
+
+            card.innerHTML = `
+                <div class="d-flex align-items-center justify-content-center bg-body-secondary border rounded" style="width: 48px; height: 48px; flex-shrink: 0; color: #4A6B5D;">
+                    <i class="fas fa-robot fs-4"></i>
+                </div>
+                <div class="flex-grow-1 min-w-0">
+                    <h6 class="mb-1 fw-bold text-truncate-2">
+                        <a href="${item.url}" target="_blank" rel="noopener noreferrer" class="text-decoration-none text-body hover-underline">
+                            ${escapeHtml(item.title)}
+                        </a>
+                    </h6>
+                    <div class="border rounded p-2 mb-2 bg-light text-dark small font-monospace" style="white-space: pre-wrap; font-size: 0.8rem; background-color: var(--bs-tertiary-bg) !important;">${displayPrompt}</div>
+                    <div class="d-flex align-items-center gap-2 flex-wrap small text-secondary">
+                        <span class="badge badge-activity-ai px-2 py-0.5 rounded-pill"><i class="fas fa-robot me-1"></i>AI Prompt</span>
+                        <span class="badge ${statusClass} px-2 py-0.5 rounded-pill">${item.status || 'Allowed'}</span>
+                        <span class="fw-semibold text-dark-emphasis">${escapeHtml(item.domain)}</span>
+                        <span class="text-muted ms-auto">${loggedAtFormatted}</span>
+                    </div>
+                </div>
+            `;
+        } else {
+            const visitedAtFormatted = formatDateTime(item.timestamp);
+            card.className = 'history-feed-item p-3 border-bottom d-flex gap-3 align-items-start interactive-inspect-row cursor-pointer border-web';
+            card.setAttribute('data-inspect-type', 'domain');
+            card.setAttribute('data-inspect-value', item.domain);
+            
+            card.innerHTML = `
+                <div class="d-flex align-items-center justify-content-center bg-body-secondary border rounded" style="width: 48px; height: 48px; flex-shrink: 0;">
+                    <i class="fas fa-globe text-primary fs-4"></i>
+                </div>
+                <div class="flex-grow-1 min-w-0">
+                    <h6 class="mb-1 fw-bold text-truncate-2">
+                        <a href="${item.url}" target="_blank" rel="noopener noreferrer" class="text-decoration-none text-body hover-underline">
+                            ${escapeHtml(item.title)}
+                        </a>
+                    </h6>
+                    <div class="d-flex align-items-center gap-2 flex-wrap small text-secondary">
+                        <span class="badge badge-activity-web px-2 py-0.5 rounded-pill"><i class="fas fa-globe me-1"></i>Web Page</span>
+                        <span class="fw-semibold text-dark-emphasis">${escapeHtml(item.domain)}</span>
+                        <span class="text-muted ms-auto">${visitedAtFormatted}</span>
+                    </div>
+                </div>
+            `;
+        }
+        return card;
+    }
+
     // Render History Feed
     function renderHistoryFeed(pagination) {
         const list = document.getElementById('history-list-container');
         const empty = document.getElementById('history-empty');
         const totalLabel = document.getElementById('history-total-label');
-        const paginationContainer = document.getElementById('pagination-container');
 
         if (state.history.length === 0) {
             list.style.display = 'none';
-            paginationContainer.style.display = 'none';
             empty.style.display = 'block';
             totalLabel.innerText = '0 entries found';
             return;
@@ -464,111 +595,22 @@
         totalLabel.innerText = `${pagination.total_items} item${pagination.total_items === 1 ? '' : 's'} found`;
 
         state.history.forEach(item => {
-            const card = document.createElement('div');
-            
-            if (item.type === 'youtube' || item.type === 'tiktok') {
-                const durationFormatted = formatDuration(item.duration_seconds);
-                const watchedAtFormatted = formatDateTime(item.timestamp);
-                const isTiktok = item.type === 'tiktok';
-                const thumbnailUrl = isTiktok
-                    ? '/static/img/video_placeholder.png'
-                    : `https://img.youtube.com/vi/${item.video_id}/mqdefault.jpg`;
-
-                card.className = `history-feed-item p-3 border-bottom d-flex gap-3 align-items-start interactive-inspect-row cursor-pointer ${isTiktok ? 'border-tiktok' : 'border-youtube'}`;
-                card.setAttribute('data-inspect-type', 'channel');
-                card.setAttribute('data-inspect-value', item.channel_name);
-                card.setAttribute('data-inspect-platform', item.type);
-                
-                card.innerHTML = `
-                    <div class="video-thumbnail-container">
-                        <img class="video-thumbnail" src="${thumbnailUrl}" alt="Thumbnail" onerror="this.src='/static/img/video_placeholder.png'; this.onerror=null;">
-                        <span class="video-duration-badge">${durationFormatted}</span>
-                    </div>
-                    <div class="flex-grow-1 min-w-0">
-                        <h6 class="mb-1 fw-bold text-truncate-2">
-                            <a href="${item.url}" target="_blank" rel="noopener noreferrer" class="text-decoration-none text-body hover-underline">
-                                ${escapeHtml(item.title)}
-                            </a>
-                        </h6>
-                        <div class="d-flex align-items-center gap-2 flex-wrap small text-secondary">
-                            <span class="badge ${isTiktok ? 'badge-activity-tiktok' : 'badge-activity-yt'} px-2 py-0.5 rounded-pill">
-                                <i class="fab fa-${isTiktok ? 'tiktok' : 'youtube'} me-1"></i>${isTiktok ? 'TikTok' : 'Video'}
-                            </span>
-                            <span class="fw-semibold text-dark-emphasis">${escapeHtml(item.channel_name)}</span>
-                            <span class="text-muted">&bull;</span>
-                            <span class="badge bg-secondary px-2 py-0.5 rounded-pill text-white">${escapeHtml(item.category)}</span>
-                            <span class="text-muted ms-auto">${watchedAtFormatted}</span>
-                        </div>
-                    </div>
-                `;
-            } else if (item.type === 'ai_prompt') {
-                const loggedAtFormatted = formatDateTime(item.timestamp);
-                const statusClass = 'badge-status-' + (item.status || 'Allowed').toLowerCase();
-                const displayPrompt = item.prompt_text ? escapeHtml(item.prompt_text) : '<em>Metadata Only</em>';
-                
-                card.className = 'history-feed-item p-3 border-bottom d-flex gap-3 align-items-start interactive-inspect-row cursor-pointer border-ai';
-                card.setAttribute('data-inspect-type', 'domain');
-                card.setAttribute('data-inspect-value', item.domain);
-
-                card.innerHTML = `
-                    <div class="d-flex align-items-center justify-content-center bg-body-secondary border rounded" style="width: 48px; height: 48px; flex-shrink: 0; color: #4A6B5D;">
-                        <i class="fas fa-robot fs-4"></i>
-                    </div>
-                    <div class="flex-grow-1 min-w-0">
-                        <h6 class="mb-1 fw-bold text-truncate-2">
-                            <a href="${item.url}" target="_blank" rel="noopener noreferrer" class="text-decoration-none text-body hover-underline">
-                                ${escapeHtml(item.title)}
-                            </a>
-                        </h6>
-                        <div class="border rounded p-2 mb-2 bg-light text-dark small font-monospace" style="white-space: pre-wrap; font-size: 0.8rem; background-color: var(--bs-tertiary-bg) !important;">${displayPrompt}</div>
-                        <div class="d-flex align-items-center gap-2 flex-wrap small text-secondary">
-                            <span class="badge badge-activity-ai px-2 py-0.5 rounded-pill"><i class="fas fa-robot me-1"></i>AI Prompt</span>
-                            <span class="badge ${statusClass} px-2 py-0.5 rounded-pill">${item.status || 'Allowed'}</span>
-                            <span class="fw-semibold text-dark-emphasis">${escapeHtml(item.domain)}</span>
-                            <span class="text-muted ms-auto">${loggedAtFormatted}</span>
-                        </div>
-                    </div>
-                `;
-            } else {
-                const visitedAtFormatted = formatDateTime(item.timestamp);
-                card.className = 'history-feed-item p-3 border-bottom d-flex gap-3 align-items-start interactive-inspect-row cursor-pointer border-web';
-                card.setAttribute('data-inspect-type', 'domain');
-                card.setAttribute('data-inspect-value', item.domain);
-                
-                card.innerHTML = `
-                    <div class="d-flex align-items-center justify-content-center bg-body-secondary border rounded" style="width: 48px; height: 48px; flex-shrink: 0;">
-                        <i class="fas fa-globe text-primary fs-4"></i>
-                    </div>
-                    <div class="flex-grow-1 min-w-0">
-                        <h6 class="mb-1 fw-bold text-truncate-2">
-                            <a href="${item.url}" target="_blank" rel="noopener noreferrer" class="text-decoration-none text-body hover-underline">
-                                ${escapeHtml(item.title)}
-                            </a>
-                        </h6>
-                        <div class="d-flex align-items-center gap-2 flex-wrap small text-secondary">
-                            <span class="badge badge-activity-web px-2 py-0.5 rounded-pill"><i class="fas fa-globe me-1"></i>Web Page</span>
-                            <span class="fw-semibold text-dark-emphasis">${escapeHtml(item.domain)}</span>
-                            <span class="text-muted ms-auto">${visitedAtFormatted}</span>
-                        </div>
-                    </div>
-                `;
-            }
+            const card = createHistoryItemElement(item);
             list.appendChild(card);
         });
+    }
 
-        // Pagination indicators
-        if (pagination.total_pages > 1) {
-            paginationContainer.style.display = 'flex';
-            document.getElementById('page-indicator').innerText = `Page ${pagination.page} of ${pagination.total_pages}`;
-            
-            const btnPrev = document.getElementById('btn-prev-page');
-            const btnNext = document.getElementById('btn-next-page');
-            
-            btnPrev.disabled = !pagination.has_prev;
-            btnNext.disabled = !pagination.has_next;
-        } else {
-            paginationContainer.style.display = 'none';
-        }
+    // Append to History Feed for Infinite Scroll
+    function renderHistoryFeedAppend(newItems, pagination) {
+        const list = document.getElementById('history-list-container');
+        const totalLabel = document.getElementById('history-total-label');
+
+        totalLabel.innerText = `${pagination.total_items} item${pagination.total_items === 1 ? '' : 's'} found`;
+
+        newItems.forEach(item => {
+            const card = createHistoryItemElement(item);
+            list.appendChild(card);
+        });
     }
 
     function escapeHtml(str) {
@@ -731,6 +773,10 @@
             historyPageAbort.abort();
             historyPageAbort = null;
         }
+        if (state.scrollObserver) {
+            state.scrollObserver.disconnect();
+            state.scrollObserver = null;
+        }
         if (state.domainsChart) {
             state.domainsChart.destroy();
             state.domainsChart = null;
@@ -753,6 +799,8 @@
         state.search = '';
         state.type = 'all';
         state.preset = '7days';
+        state.loadingMore = false;
+        state.hasNextPage = false;
         updateDateBounds();
         fetchHistory();
 
@@ -818,24 +866,27 @@
             }, { signal });
         }
 
-        const btnPrev = document.getElementById('btn-prev-page');
-        if (btnPrev) {
-            btnPrev.addEventListener('click', () => {
-                if (state.page > 1) {
-                    state.page--;
-                    fetchHistory();
-                    document.getElementById('history-list-container').scrollIntoView({ behavior: 'smooth' });
-                }
-            }, { signal });
-        }
+        // Setup Infinite Scroll Intersection Observer
+        const sentinel = document.getElementById('infinite-scroll-sentinel');
+        if (sentinel) {
+            const observerOptions = {
+                root: null, // viewport
+                rootMargin: '100px', // fetch next page when spinner is 100px from coming into view
+                threshold: 0.1
+            };
 
-        const btnNext = document.getElementById('btn-next-page');
-        if (btnNext) {
-            btnNext.addEventListener('click', () => {
-                state.page++;
-                fetchHistory();
-                document.getElementById('history-list-container').scrollIntoView({ behavior: 'smooth' });
-            }, { signal });
+            const observerCallback = (entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting && !state.loadingMore && state.hasNextPage) {
+                        state.page++;
+                        fetchHistory(true);
+                    }
+                });
+            };
+
+            const scrollObserver = new IntersectionObserver(observerCallback, observerOptions);
+            scrollObserver.observe(sentinel);
+            state.scrollObserver = scrollObserver;
         }
     }
 
