@@ -57,6 +57,14 @@ const USE_CDP_EXTENSION_LOAD = isGoogleChromeBranded();
 
 fs.mkdirSync(SCREENSHOTS_DIR, { recursive: true });
 
+const LOCALES_FILE = path.join(EXTENSION_PATH, '_locales', 'en', 'messages.json');
+if (!fs.existsSync(LOCALES_FILE)) {
+    throw new Error(
+        'extension/_locales/en/messages.json is missing (required by manifest default_locale). '
+        + 'Run: python scripts/i18n/manage.py bundle --target extension'
+    );
+}
+
 console.log(`Chrome binary : ${CHROMIUM_PATH}`);
 console.log(`Extension     : ${EXTENSION_PATH}`);
 console.log(`User data dir : ${USER_DATA_DIR}`);

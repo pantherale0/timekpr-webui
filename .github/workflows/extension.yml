@@ -91,6 +91,18 @@ jobs:
         with:
           node-version: "24"
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Bundle extension i18n (_locales)
+        # manifest.json sets default_locale: en — CDP Extensions.loadUnpacked
+        # rejects the extension when extension/_locales/ has not been generated.
+        run: |
+          python -m pip install --disable-pip-version-check PyYAML
+          python scripts/i18n/manage.py bundle --target extension
+
       - name: Install Chrome and Xvfb
         # ubuntu-24.04 runners already ship Google Chrome Stable.
         # Only install from Google's apt repo when it is absent (e.g. self-hosted runners).
