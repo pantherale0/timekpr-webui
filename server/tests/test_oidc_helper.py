@@ -172,3 +172,95 @@ def test_generate_state():
     state2 = OIDCHelper.generate_state()
     assert len(state1) > 10
     assert state1 != state2
+
+
+def test_oidc_helper_custom_scopes_and_params():
+    with patch.dict('os.environ', {
+        'OIDC_SCOPES': 'openid profile custom-scope',
+        'OIDC_EXTRA_AUTH_PARAMS': '{"access_type": "offline", "prompt": "consent"}'
+    }):
+        helper = OIDCHelper()
+        helper.issuer_url = "https://auth.com"
+        helper.client_id = "test-client"
+        helper._endpoints = {'authorization_endpoint': 'https://auth.com/login'}
+
+        url = helper.get_authorization_url("state-xyz", "http://app.com/callback")
+        assert "scope=openid+profile+custom-scope" in url
+        assert "access_type=offline" in url
+        assert "prompt=consent" in url
+
+
+@patch('requests.post')
+def test_refresh_access_token_success(mock_post):
+    mock_response = MagicMock()
+    mock_response.json.return_value = {
+        'access_token': 'new-access-token',
+        'refresh_token': 'new-refresh-token',
+        'expires_in': 1800
+    }
+    mock_response.raise_for_status.return_value = None
+    mock_post.return_value = mock_response
+
+    helper = OIDCHelper()
+    helper.issuer_url = "https://auth.com"
+    helper._endpoints = {'token_endpoint': 'https://auth.com/token'}
+    helper.client_id = "test-client"
+    helper.client_secret = "test-secret"
+
+    tokens = helper.refresh_access_token("old-refresh-token")
+    assert tokens['access_token'] == 'new-access-token'
+    assert tokens['refresh_token'] == 'new-refresh-token'
+    assert tokens['expires_in'] == 1800
+    mock_post.assert_called_once()
+
+
+@patch('requests.post')
+def test_refresh_access_token_http_errors(mock_post):
+    from src.oidc_helper import OIDCRefreshError
+
+    helper = OIDCHelper()
+    helper.issuer_url = "https://auth.com"
+    helper._endpoints = {'token_endpoint': 'https://auth.com/token'}
+    helper.client_id = "test-client"
+    helper.client_secret = "test-secret"
+
+    # Test definitive HTTP 400 error (e.g. invalid grant/revoked token)
+    mock_response_400 = MagicMock()
+    mock_response_400.status_code = 400
+    http_error_400 = requests.HTTPError("Bad Request", response=mock_response_400)
+    mock_post.side_effect = http_error_400
+
+    with pytest.raises(OIDCRefreshError) as exc_info:
+        helper.refresh_access_token("revoked-token")
+    assert not exc_info.value.is_transient
+    assert exc_info.value.status_code == 400
+
+    # Test transient HTTP 503 error
+    mock_response_503 = MagicMock()
+    mock_response_503.status_code = 503
+    http_error_503 = requests.HTTPError("Service Unavailable", response=mock_response_503)
+    mock_post.side_effect = http_error_503
+
+    with pytest.raises(OIDCRefreshError) as exc_info:
+        helper.refresh_access_token("any-token")
+    assert exc_info.value.is_transient
+    assert exc_info.value.status_code == 503
+
+
+@patch('requests.post')
+def test_refresh_access_token_network_errors(mock_post):
+    from src.oidc_helper import OIDCRefreshError
+
+    helper = OIDCHelper()
+    helper.issuer_url = "https://auth.com"
+    helper._endpoints = {'token_endpoint': 'https://auth.com/token'}
+    helper.client_id = "test-client"
+    helper.client_secret = "test-secret"
+
+    # Test connection network error
+    mock_post.side_effect = requests.RequestException("Connection timed out")
+
+    with pytest.raises(OIDCRefreshError) as exc_info:
+        helper.refresh_access_token("any-token")
+    assert exc_info.value.is_transient
+

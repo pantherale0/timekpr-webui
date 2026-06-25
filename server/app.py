@@ -84,6 +84,12 @@ if sentry_dsn:
 app = Flask(__name__)
 app.secret_key = _load_secret_key(app)
 app.config.setdefault('WTF_CSRF_TIME_LIMIT', None)
+
+# Configure Flask permanent session lifetime
+_session_days = int(os.environ.get('PERMANENT_SESSION_LIFETIME_DAYS', '30'))
+from datetime import timedelta
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=_session_days)
+
 csrf = CSRFProtect(app)
 _default_db_uri = 'sqlite:///:memory:' if os.environ.get('TESTING') else 'sqlite:///timekpr.db'
 app.config['SQLALCHEMY_DATABASE_URI'] = (
@@ -172,6 +178,62 @@ def _resolve_request_locale():
     except Exception:
         household_default = None
     g.locale = resolve_locale(session, request.headers.get('Accept-Language'), household_default)
+
+
+@app.before_request
+def _refresh_oidc_tokens():
+    """Check if the OIDC access token is about to expire, and refresh it if needed."""
+    from flask import session, redirect, url_for, jsonify, request
+    import time
+    from src.oidc_helper import OIDCRefreshError
+
+    if not oidc_helper.is_enabled:
+        return
+
+    # Skip token refresh for static assets, service worker, or logout
+    if request.path.startswith('/static/') or request.path == '/sw.js' or request.path == '/logout':
+        return
+
+    # If the user is logged in via OIDC and has a refresh token
+    if session.get('logged_in') and session.get('oidc_refresh_token'):
+        expires_at = session.get('oidc_token_expires_at')
+        # Check if token is expired or about to expire in the next 60 seconds
+        if expires_at is None or expires_at < time.time() + 60:
+            try:
+                _LOGGER.info("OIDC access token is expiring soon; initiating refresh flow.")
+                refresh_token = session['oidc_refresh_token']
+                new_tokens = oidc_helper.refresh_access_token(refresh_token)
+                
+                # Update tokens in session
+                session['oidc_access_token'] = new_tokens.get('access_token')
+                if new_tokens.get('refresh_token'):
+                    session['oidc_refresh_token'] = new_tokens.get('refresh_token')
+                session['oidc_token_expires_at'] = time.time() + new_tokens.get('expires_in', 3600)
+                _LOGGER.info("Successfully refreshed OIDC access token.")
+            except OIDCRefreshError as exc:
+                if exc.is_transient:
+                    # Graceful degradation (Option A): Log warning and allow request to proceed
+                    _LOGGER.warning(
+                        "OIDC token refresh failed with a transient error: %s. "
+                        "Allowing user to remain authenticated temporarily.",
+                        exc
+                    )
+                else:
+                    # Definitive authentication failure: Log out the user
+                    _LOGGER.error("OIDC token refresh failed with a definitive error. Logging out user: %s", exc)
+                    session.pop('logged_in', None)
+                    session.pop('user', None)
+                    session.pop('oidc_access_token', None)
+                    session.pop('oidc_refresh_token', None)
+                    session.pop('oidc_token_expires_at', None)
+                    
+                    # Return 401 for API/AJAX requests, redirect to login for UI requests
+                    if request.path.startswith('/api/') or request.headers.get('X-Guardian-SPA') == 'fragment':
+                        return jsonify({'success': False, 'message': 'Session expired'}), 401
+                    return redirect(url_for('ui_auth.login'))
+            except Exception as exc:
+                # Fallback for unexpected failures: treat as transient to avoid locking out users
+                _LOGGER.error("Unexpected error during OIDC token refresh: %s. Treating as transient.", exc)
 
 
 # Import and register blueprints

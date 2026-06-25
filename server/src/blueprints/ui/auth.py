@@ -1,4 +1,5 @@
 import logging
+import time
 from flask import Blueprint, render_template, request, redirect, url_for, session
 from src.database import Settings
 from src.helpers import ADMIN_USERNAME
@@ -93,6 +94,8 @@ def oidc_callback():
         # Exchange code for tokens
         tokens = oidc_helper.exchange_code(code, redirect_uri)
         access_token = tokens.get('access_token')
+        refresh_token = tokens.get('refresh_token')
+        expires_in = tokens.get('expires_in', 3600)
         
         # Get user details from userinfo endpoint
         user_info = oidc_helper.get_user_info(access_token)
@@ -115,6 +118,13 @@ def oidc_callback():
             'name': user_info.get('name')
         }
         
+        # Store token information and configure permanent session for OIDC
+        session['oidc_access_token'] = access_token
+        if refresh_token:
+            session['oidc_refresh_token'] = refresh_token
+        session['oidc_token_expires_at'] = time.time() + expires_in
+        session.permanent = True
+
         flash_t(
             'flash.auth.oidc_success',
             'success',
@@ -133,6 +143,9 @@ def logout():
     from app import oidc_helper
     session.pop('logged_in', None)
     session.pop('user', None)
+    session.pop('oidc_access_token', None)
+    session.pop('oidc_refresh_token', None)
+    session.pop('oidc_token_expires_at', None)
     if oidc_helper.is_enabled:
         return redirect(url_for('ui_auth.login'))
     flash_t('flash.auth.logout', 'info')

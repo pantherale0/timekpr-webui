@@ -1,5 +1,6 @@
 """Helpers for OpenID Connect discovery and login flows."""
 
+import json
 import logging
 import os
 import secrets
@@ -7,6 +8,14 @@ import secrets
 import requests
 
 logger = logging.getLogger(__name__)
+
+
+class OIDCRefreshError(RuntimeError):
+    """Custom exception raised when OIDC token refresh fails."""
+    def __init__(self, message, is_transient=False, status_code=None):
+        super().__init__(message)
+        self.is_transient = is_transient
+        self.status_code = status_code
 
 
 class OIDCHelper:
@@ -18,6 +27,19 @@ class OIDCHelper:
         self.client_id = os.environ.get('OIDC_CLIENT_ID')
         self.client_secret = os.environ.get('OIDC_CLIENT_SECRET')
         self.redirect_uri_override = os.environ.get('OIDC_REDIRECT_URI')
+
+        self.scopes = os.environ.get('OIDC_SCOPES', 'openid profile email offline_access')
+
+        # Load extra auth parameters from OIDC_EXTRA_AUTH_PARAMS (JSON string)
+        extra_auth_params_raw = os.environ.get('OIDC_EXTRA_AUTH_PARAMS', '{}')
+        try:
+            self.extra_auth_params = json.loads(extra_auth_params_raw)
+            if not isinstance(self.extra_auth_params, dict):
+                logger.warning("OIDC_EXTRA_AUTH_PARAMS is not a valid JSON object. Defaulting to empty dict.")
+                self.extra_auth_params = {}
+        except json.JSONDecodeError as exc:
+            logger.warning("Failed to parse OIDC_EXTRA_AUTH_PARAMS JSON: %s. Defaulting to empty dict.", exc)
+            self.extra_auth_params = {}
 
         # Load verify SSL toggle (default to True)
         verify_ssl_str = os.environ.get('OIDC_VERIFY_SSL', 'true').lower()
@@ -67,9 +89,13 @@ class OIDCHelper:
             'response_type': 'code',
             'client_id': self.client_id,
             'redirect_uri': actual_redirect,
-            'scope': 'openid profile email',
+            'scope': self.scopes,
             'state': state
         }
+
+        # Merge extra auth parameters if specified
+        if self.extra_auth_params:
+            params.update(self.extra_auth_params)
 
         # Construct full URL with query parameters
         req = requests.models.PreparedRequest()
@@ -106,6 +132,54 @@ class OIDCHelper:
         except (requests.RequestException, ValueError) as exc:
             logger.error("Failed to exchange OIDC authorization code: %s", exc)
             raise RuntimeError(f"OIDC code exchange failed: {exc}") from exc
+
+    def refresh_access_token(self, refresh_token):
+        """Refreshes the access token using a refresh token."""
+        endpoints = self._fetch_discovery()
+        token_endpoint = endpoints.get('token_endpoint')
+        if not token_endpoint:
+            raise KeyError("OIDC discovery is missing 'token_endpoint'")
+
+        data = {
+            'grant_type': 'refresh_token',
+            'refresh_token': refresh_token,
+            'client_id': self.client_id,
+            'client_secret': self.client_secret,
+        }
+
+        try:
+            logger.info("Refreshing OIDC tokens at token endpoint: %s", token_endpoint)
+            response = requests.post(
+                token_endpoint,
+                data=data,
+                verify=self.verify_ssl,
+                timeout=10,
+            )
+            response.raise_for_status()
+            return response.json()
+        except requests.HTTPError as exc:
+            status_code = exc.response.status_code if exc.response is not None else None
+            # Standard OAuth2 revocation/auth errors return 400 Bad Request (invalid_grant)
+            # or 401/403. Treat 5xx and others as transient.
+            is_transient = status_code is not None and status_code >= 500
+            logger.error("HTTP error during OIDC token refresh (status %s): %s", status_code, exc)
+            raise OIDCRefreshError(
+                f"OIDC token refresh failed with HTTP status {status_code}: {exc}",
+                is_transient=is_transient,
+                status_code=status_code
+            ) from exc
+        except requests.RequestException as exc:
+            logger.error("Network error during OIDC token refresh: %s", exc)
+            raise OIDCRefreshError(
+                f"OIDC token refresh failed due to network error: {exc}",
+                is_transient=True
+            ) from exc
+        except ValueError as exc:
+            logger.error("Failed to parse OIDC token response: %s", exc)
+            raise OIDCRefreshError(
+                f"OIDC token refresh returned invalid response: {exc}",
+                is_transient=True
+            ) from exc
 
     def get_user_info(self, access_token):
         """Retrieves user profile using access token."""

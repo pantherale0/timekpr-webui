@@ -123,6 +123,104 @@ def test_oidc_callback_route(client, db_session):
             res = client.get('/callback?state=state456&code=code456', follow_redirects=True)
             assert b"not authorized" in res.data.lower()
 
+
+def test_oidc_session_token_refresh(client, db_session):
+    import time
+    from src.oidc_helper import OIDCRefreshError
+
+    # Set up mock endpoints and configuration
+    with patch('src.oidc_helper.OIDCHelper.is_enabled', new=True):
+        # 1. Token NOT expired
+        with client.session_transaction() as sess:
+            sess['logged_in'] = True
+            sess['user'] = {'username': 'oidc-admin'}
+            sess['oidc_refresh_token'] = 'refresh-token-xyz'
+            sess['oidc_token_expires_at'] = time.time() + 300  # 5 minutes in future
+
+        with patch('src.oidc_helper.OIDCHelper.refresh_access_token') as mock_refresh:
+            res = client.get('/dashboard')
+            assert res.status_code == 200
+            mock_refresh.assert_not_called()
+
+        # 2. Token EXPIRED, Refresh Success
+        with client.session_transaction() as sess:
+            sess['logged_in'] = True
+            sess['user'] = {'username': 'oidc-admin'}
+            sess['oidc_access_token'] = 'old-access-token'
+            sess['oidc_refresh_token'] = 'refresh-token-xyz'
+            sess['oidc_token_expires_at'] = time.time() - 10  # expired
+
+        with patch('src.oidc_helper.OIDCHelper.refresh_access_token') as mock_refresh:
+            mock_refresh.return_value = {
+                'access_token': 'new-access-token-abc',
+                'refresh_token': 'new-refresh-token-123',
+                'expires_in': 600
+            }
+            res = client.get('/dashboard')
+            assert res.status_code == 200
+            mock_refresh.assert_called_once_with('refresh-token-xyz')
+            
+            with client.session_transaction() as sess:
+                assert sess['oidc_access_token'] == 'new-access-token-abc'
+                assert sess['oidc_refresh_token'] == 'new-refresh-token-123'
+                assert sess['oidc_token_expires_at'] > time.time() + 500
+
+        # 3. Token EXPIRED, Definitive Revocation (Logs user out)
+        # Test UI route (redirects to login)
+        with client.session_transaction() as sess:
+            sess['logged_in'] = True
+            sess['user'] = {'username': 'oidc-admin'}
+            sess['oidc_access_token'] = 'old-access-token'
+            sess['oidc_refresh_token'] = 'refresh-token-xyz'
+            sess['oidc_token_expires_at'] = time.time() - 10  # expired
+
+        with patch('src.oidc_helper.OIDCHelper.refresh_access_token') as mock_refresh:
+            mock_refresh.side_effect = OIDCRefreshError("Revoked", is_transient=False, status_code=400)
+            res = client.get('/dashboard', follow_redirects=False)
+            assert res.status_code == 302
+            assert res.headers['Location'].endswith('/') or '/login' in res.headers['Location']
+            
+            with client.session_transaction() as sess:
+                assert not sess.get('logged_in')
+                assert 'user' not in sess
+                assert 'oidc_access_token' not in sess
+
+        # Test API route (returns 401 JSON)
+        with client.session_transaction() as sess:
+            sess['logged_in'] = True
+            sess['user'] = {'username': 'oidc-admin'}
+            sess['oidc_access_token'] = 'old-access-token'
+            sess['oidc_refresh_token'] = 'refresh-token-xyz'
+            sess['oidc_token_expires_at'] = time.time() - 10  # expired
+
+        with patch('src.oidc_helper.OIDCHelper.refresh_access_token') as mock_refresh:
+            mock_refresh.side_effect = OIDCRefreshError("Revoked", is_transient=False, status_code=400)
+            res = client.get('/api/device/approve/sys-1')  # API path
+            assert res.status_code == 401
+            assert b"Session expired" in res.data
+            
+            with client.session_transaction() as sess:
+                assert not sess.get('logged_in')
+
+        # 4. Token EXPIRED, Transient Failure (Graceful Degradation - keeps user logged in)
+        with client.session_transaction() as sess:
+            sess['logged_in'] = True
+            sess['user'] = {'username': 'oidc-admin'}
+            sess['oidc_access_token'] = 'old-access-token'
+            sess['oidc_refresh_token'] = 'refresh-token-xyz'
+            sess['oidc_token_expires_at'] = time.time() - 10  # expired
+
+        with patch('src.oidc_helper.OIDCHelper.refresh_access_token') as mock_refresh:
+            mock_refresh.side_effect = OIDCRefreshError("Server offline", is_transient=True, status_code=503)
+            res = client.get('/dashboard')
+            assert res.status_code == 200  # succeeds!
+            mock_refresh.assert_called_once()
+            
+            with client.session_transaction() as sess:
+                assert sess.get('logged_in')
+                assert sess['oidc_access_token'] == 'old-access-token'
+
+
 def test_dashboard_routes(client, db_session):
     # Try accessing when not logged in
     res = client.get('/dashboard')
