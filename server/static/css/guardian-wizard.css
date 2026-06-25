@@ -38,6 +38,10 @@
     overflow: visible;
 }
 
+.guardian-wizard-modal .modal-dialog-scrollable .modal-body {
+    overflow-y: auto;
+}
+
 .guardian-wizard-modal .modal-dialog {
     max-width: 42rem;
 }

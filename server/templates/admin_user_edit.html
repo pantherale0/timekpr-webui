@@ -640,10 +640,9 @@
 <!-- Policy Preset Modal -->
 <div class="modal fade guardian-wizard-modal" id="policyPresetModal" tabindex="-1" aria-labelledby="policyPresetModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-scrollable">
-        <div class="modal-content">
-            <form action="{{ url_for('apply_policy_preset_route', user_id=user.id) }}" method="POST" id="apply-policy-preset-form"
-                data-confirm-title="{{ t('pages.admin_user_edit.baseline_apply_confirm_title') }}"
-                data-confirm-body="{{ t('pages.admin_user_edit.baseline_apply_confirm_body') }}">
+        <form action="{{ url_for('apply_policy_preset_route', user_id=user.id) }}" method="POST" id="apply-policy-preset-form" class="modal-content"
+            data-confirm-title="{{ t('pages.admin_user_edit.baseline_apply_confirm_title') }}"
+            data-confirm-body="{{ t('pages.admin_user_edit.baseline_apply_confirm_body') }}">
                 {{ csrf_field() }}
                 <div class="modal-header">
                     <div>
@@ -707,7 +706,6 @@
                     <button type="submit" class="btn guardian-btn-sage fw-bold">{{ t('pages.admin_user_edit.apply_baseline') }}</button>
                 </div>
             </form>
-        </div>
     </div>
 </div>
 {% endblock %}
