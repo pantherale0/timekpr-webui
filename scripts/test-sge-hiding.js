@@ -147,6 +147,43 @@ function connectWs(url) {
     });
 }
 
+// Chrome ships a built-in Hangouts component extension (background.html) that
+// activates on google.* pages. Only match our MV3 service_worker background.js.
+const COMPONENT_EXTENSION_IDS = new Set([
+    'nkeimhogjdpnpccoofpliimaahmaaome', // Google Hangouts / Meet services
+]);
+
+function findGuardianServiceWorker(targets) {
+    return targets.find((t) => {
+        if (t.type !== 'service_worker' || !t.url.includes('/background.js')) {
+            return false;
+        }
+        const match = t.url.match(/^chrome-extension:\/\/([^/]+)\//);
+        const extId = match ? match[1] : '';
+        return extId && !COMPONENT_EXTENSION_IDS.has(extId);
+    });
+}
+
+async function warmGuardianServiceWorker(label = 'service worker') {
+    const deadline = Date.now() + 10_000;
+    while (Date.now() < deadline) {
+        const targets = await fetchJson(`http://127.0.0.1:${DEBUG_PORT}/json`);
+        const bgTarget = findGuardianServiceWorker(targets);
+        if (bgTarget) {
+            console.log(`Pre-warming Guardian ${label} via CDP (${bgTarget.url})...`);
+            const bgWs = await connectWs(bgTarget.webSocketDebuggerUrl);
+            const bgRpc = makeRpc(bgWs);
+            await bgRpc('Runtime.evaluate', { expression: '1+1', returnByValue: true });
+            bgWs.close();
+            console.log('Guardian service worker warmed.');
+            return true;
+        }
+        await sleep(300);
+    }
+    console.log(`No Guardian service worker found for ${label} — continuing without warmup.`);
+    return false;
+}
+
 function makeRpc(ws) {
     let msgId = 1;
     return (method, params = {}) => new Promise((resolve, reject) => {
@@ -196,23 +233,10 @@ async function main() {
         // In MV3, the background service worker can be killed between events.
         // If it is not alive when content.js sends CHECK_AI_POLICY, the message
         // is silently dropped and the callback receives undefined → no CSS injection.
-        // We connect to the background target via CDP and evaluate a no-op to ensure
-        // the worker is active before the page content script fires.
-        const bgTarget = targets.find(t =>
-            t.url.includes('background.js') ||
-            t.url.includes('background.html') ||
-            t.type === 'service_worker'
-        );
-        if (bgTarget) {
-            console.log('Step 3a: Pre-warming service worker via CDP...');
-            const bgWs = await connectWs(bgTarget.webSocketDebuggerUrl);
-            const bgRpc = makeRpc(bgWs);
-            await bgRpc('Runtime.evaluate', { expression: '1+1', returnByValue: true });
-            bgWs.close();
-            console.log('Service worker warmed.');
-        } else {
-            console.log('Step 3a: No background target found — skipping service worker warmup.');
-        }
+        // On google.* pages Chrome also exposes its built-in Hangouts extension
+        // (background.html) in DevTools — never warm that by mistake.
+        console.log('Step 3a: Pre-warming Guardian service worker via CDP...');
+        await warmGuardianServiceWorker('initial load');
 
         // ── Step 3b: Connect to the test page and reload it ───────────────────
         // The page was already loaded before we warmed the worker. Reload it now

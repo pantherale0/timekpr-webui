@@ -227,11 +227,11 @@ function queueWebLog(logEntry) {
 }
 
 function sendNativeRequest(payload, callback) {
-    // Temporary test mock for Google AI Search mode matching
+    // Temporary test mock for Google AI Search mode matching.
+    // Must respond synchronously: MV3 service workers can terminate before
+    // chrome.storage.local.get callbacks run, dropping sendResponse to content.js.
     if (payload.type === "CHECK_AI_POLICY" && payload.domain === "google.com") {
-        chrome.storage.local.get({ test_google_ai_allowed: false }, (result) => {
-            callback({ allowed: result.test_google_ai_allowed, reason: "blocked" });
-        });
+        callback({ allowed: false, reason: "blocked" });
         return;
     }
 

@@ -659,11 +659,22 @@ if (activeAiDom) {
 // 3. Google Search AI Overview (SGE) hiding + AI Mode button hiding
 if (window.location.hostname.includes('google.') &&
     (window.location.pathname.startsWith('/search') || window.location.pathname === '/' || window.location.pathname === '')) {
+    requestGoogleAiPolicyCheck();
+}
+
+function requestGoogleAiPolicyCheck(attempt = 0) {
     chrome.runtime.sendMessage({
         type: "CHECK_AI_POLICY",
         domain: "google.com"
     }, (res) => {
-        if (res && res.allowed === false) {
+        if (chrome.runtime.lastError || res === undefined) {
+            // MV3 service workers can be asleep on first message; retry briefly.
+            if (attempt < 10) {
+                setTimeout(() => requestGoogleAiPolicyCheck(attempt + 1), 250);
+            }
+            return;
+        }
+        if (res.allowed === false) {
             injectSgeHidingCss();
         }
     });
