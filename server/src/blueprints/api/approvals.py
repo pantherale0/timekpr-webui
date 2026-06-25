@@ -160,6 +160,9 @@ def get_mapping_approval_settings(mapping_id):
             'device_map_id': mapping.id,
             'app_launch_mode': settings.app_launch_mode,
             'domain_access_mode': settings.domain_access_mode,
+            'ai_policy_mode': settings.ai_policy_mode,
+            'ai_prompt_logging': settings.ai_prompt_logging,
+            'ai_daily_time_limit': settings.ai_daily_time_limit,
         },
     })
 
@@ -183,6 +186,9 @@ def update_mapping_approval_settings(mapping_id):
             mapping,
             app_launch_mode=body.get('app_launch_mode'),
             domain_access_mode=body.get('domain_access_mode'),
+            ai_policy_mode=body.get('ai_policy_mode'),
+            ai_prompt_logging=body.get('ai_prompt_logging'),
+            ai_daily_time_limit=body.get('ai_daily_time_limit'),
         )
     except ValueError as exc:
         return jsonify({'success': False, 'message': api_message('validation_error', error=str(exc))}), 400
@@ -194,6 +200,9 @@ def update_mapping_approval_settings(mapping_id):
             'device_map_id': mapping.id,
             'app_launch_mode': settings.app_launch_mode,
             'domain_access_mode': settings.domain_access_mode,
+            'ai_policy_mode': settings.ai_policy_mode,
+            'ai_prompt_logging': settings.ai_prompt_logging,
+            'ai_daily_time_limit': settings.ai_daily_time_limit,
         },
     })
 

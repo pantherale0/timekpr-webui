@@ -28,6 +28,12 @@
         "desc": "Signing up needs a quick approval from your parents or carers. Press the helper button!",
         "note": "To sign up safely, click 'Request Sign-up' and let your guardians know.",
         "target": "New Account"
+      },
+      "ai_blocked": {
+        "title": "Let's ask your grown-up about AI!",
+        "desc": "Artificial intelligence is a helper tool, but it's restricted right now. Ask a parent to explore it with you.",
+        "note": "AI services are blocked for kids under 8.",
+        "target": "AI Service Blocked"
       }
     },
     "eight12": {
@@ -54,6 +60,12 @@
         "desc": "Making new profiles on websites is audited to keep your personal data secure. Let's send a request.",
         "note": "Creating accounts online requires an admin check. Send a request to get verified.",
         "target": "auth-portal-block"
+      },
+      "ai_blocked": {
+        "title": "AI services are restricted",
+        "desc": "Under your Guardian rules, access to AI tools is currently blocked to balance learning and technology.",
+        "note": "Hey! We agreed to limit AI use so we can think and learn on our own first.",
+        "target": "AI Policy: Blocked"
       }
     },
     "teen": {
@@ -80,6 +92,12 @@
         "desc": "Guardian has intercepted a sign-up flow. Creation of external profiles requires active administrative approval.",
         "note": "Signing up? No worries, just submit the approval ticket below so we can keep your details secure.",
         "target": "Registration Audit Trigger"
+      },
+      "ai_blocked": {
+        "title": "AI service blocked by policy",
+        "desc": "Access to this generative AI platform has been suspended under active house rules or study limits.",
+        "note": "AI tools are paused during study hours or restricted by your parents. Talk to them if you need this for homework.",
+        "target": "AI Guard Engine"
       }
     }
   },

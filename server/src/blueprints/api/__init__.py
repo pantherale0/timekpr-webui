@@ -19,6 +19,7 @@ from src.blueprints.api.video import api_video_bp
 from src.blueprints.api.youtube import api_youtube_bp
 from src.blueprints.api.hardware_baseline import api_hardware_baseline_bp
 from src.blueprints.api.windows_laps import api_windows_laps_bp
+from src.blueprints.api.ai import api_ai_bp
 
 __all__ = [
     'api_devices_bp',
@@ -41,4 +42,5 @@ __all__ = [
     'api_youtube_bp',
     'api_hardware_baseline_bp',
     'api_windows_laps_bp',
+    'api_ai_bp',
 ]

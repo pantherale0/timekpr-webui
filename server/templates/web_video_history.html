@@ -85,6 +85,29 @@
         color: #0ea5e9;
         border: 1px solid rgba(14, 165, 233, 0.2);
     }
+    .border-ai {
+        border-left-color: #4A6B5D !important; /* Sage Green */
+    }
+    .badge-activity-ai {
+        background-color: rgba(74, 107, 93, 0.1);
+        color: #4A6B5D;
+        border: 1px solid rgba(74, 107, 93, 0.2);
+    }
+    .badge-status-allowed {
+        background-color: rgba(16, 185, 129, 0.1);
+        color: #10b981;
+        border: 1px solid rgba(16, 185, 129, 0.2);
+    }
+    .badge-status-blocked {
+        background-color: rgba(239, 68, 68, 0.1);
+        color: #ef4444;
+        border: 1px solid rgba(239, 68, 68, 0.2);
+    }
+    .badge-status-flagged {
+        background-color: rgba(245, 158, 11, 0.1);
+        color: #f59e0b;
+        border: 1px solid rgba(245, 158, 11, 0.2);
+    }
 
     /* Skeleton loading animation */
     .skeleton-loader {
@@ -125,21 +148,28 @@
 <div class="history-main">
     <!-- Stats Strip -->
     <div class="row g-3 mb-4">
-        <div class="col-12 col-md-4">
+        <div class="col-12 col-md-3">
             <div class="card shadow-sm border text-center p-3 mb-0 h-100 border-web">
                 <span class="text-secondary small fw-bold text-uppercase d-block mb-1" style="font-size: 0.7rem; letter-spacing: 0.05em;">{{ t('pages.web_video_history.web_pages') }}</span>
                 <strong class="fs-2 text-primary d-block lh-1 fw-bold" id="stat-web-count">—</strong>
                 <span class="small text-muted fw-bold mt-2 d-block">{{ t('pages.web_video_history.total_visits') }}</span>
             </div>
         </div>
-        <div class="col-12 col-md-4">
+        <div class="col-12 col-md-3">
             <div class="card shadow-sm border text-center p-3 mb-0 h-100 border-youtube">
                 <span class="text-secondary small fw-bold text-uppercase d-block mb-1" style="font-size: 0.7rem; letter-spacing: 0.05em;">{{ t('pages.web_video_history.videos_watched') }}</span>
                 <strong class="fs-2 text-danger d-block lh-1 fw-bold" id="stat-video-count">—</strong>
                 <span class="small text-muted fw-bold mt-2 d-block" id="stat-video-time">—</span>
             </div>
         </div>
-        <div class="col-12 col-md-4">
+        <div class="col-12 col-md-3">
+            <div class="card shadow-sm border text-center p-3 mb-0 h-100 border-ai">
+                <span class="text-secondary small fw-bold text-uppercase d-block mb-1" style="font-size: 0.7rem; letter-spacing: 0.05em;">AI Prompts</span>
+                <strong class="fs-2 text-success d-block lh-1 fw-bold" id="stat-ai-count" style="color: #4A6B5D !important;">—</strong>
+                <span class="small text-muted fw-bold mt-2 d-block" id="stat-ai-time">—</span>
+            </div>
+        </div>
+        <div class="col-12 col-md-3">
             <div class="card shadow-sm border text-center p-3 mb-0 h-100">
                 <span class="text-secondary small fw-bold text-uppercase d-block mb-1" style="font-size: 0.7rem; letter-spacing: 0.05em;">{{ t('pages.web_video_history.domains_creators') }}</span>
                 <strong class="fs-2 text-warning d-block lh-1 fw-bold" id="stat-dest-count">—</strong>
@@ -212,6 +242,7 @@
                                 <option value="web">{{ t('pages.web_video_history.filter_web') }}</option>
                                 <option value="youtube">{{ t('pages.web_video_history.filter_youtube') }}</option>
                                 <option value="tiktok">{{ t('pages.web_video_history.filter_tiktok') }}</option>
+                                <option value="ai">AI Prompts</option>
                             </select>
                         </div>
                     </div>
@@ -402,9 +433,13 @@
         document.getElementById('stat-video-count').innerText = videoCount;
         document.getElementById('stat-video-time').innerText = formatDuration(videoSeconds) + ' watch time';
 
+        document.getElementById('stat-ai-count').innerText = analytics.total_ai_prompts || 0;
+        document.getElementById('stat-ai-time').innerText = formatDuration(analytics.total_ai_seconds || 0) + ' active';
+
         const videoCreators = analytics.video_creators || analytics.youtube_channels || [];
         const distinctDestinations = (analytics.web_domains ? analytics.web_domains.length : 0) +
-                                     videoCreators.length;
+                                     videoCreators.length +
+                                     (analytics.ai_services ? analytics.ai_services.length : 0);
         document.getElementById('stat-dest-count').innerText = distinctDestinations;
     }
 
@@ -463,6 +498,34 @@
                             <span class="text-muted">&bull;</span>
                             <span class="badge bg-secondary px-2 py-0.5 rounded-pill text-white">${escapeHtml(item.category)}</span>
                             <span class="text-muted ms-auto">${watchedAtFormatted}</span>
+                        </div>
+                    </div>
+                `;
+            } else if (item.type === 'ai_prompt') {
+                const loggedAtFormatted = formatDateTime(item.timestamp);
+                const statusClass = 'badge-status-' + (item.status || 'Allowed').toLowerCase();
+                const displayPrompt = item.prompt_text ? escapeHtml(item.prompt_text) : '<em>Metadata Only</em>';
+                
+                card.className = 'history-feed-item p-3 border-bottom d-flex gap-3 align-items-start interactive-inspect-row cursor-pointer border-ai';
+                card.setAttribute('data-inspect-type', 'domain');
+                card.setAttribute('data-inspect-value', item.domain);
+
+                card.innerHTML = `
+                    <div class="d-flex align-items-center justify-content-center bg-body-secondary border rounded" style="width: 48px; height: 48px; flex-shrink: 0; color: #4A6B5D;">
+                        <i class="fas fa-robot fs-4"></i>
+                    </div>
+                    <div class="flex-grow-1 min-w-0">
+                        <h6 class="mb-1 fw-bold text-truncate-2">
+                            <a href="${item.url}" target="_blank" rel="noopener noreferrer" class="text-decoration-none text-body hover-underline">
+                                ${escapeHtml(item.title)}
+                            </a>
+                        </h6>
+                        <div class="border rounded p-2 mb-2 bg-light text-dark small font-monospace" style="white-space: pre-wrap; font-size: 0.8rem; background-color: var(--bs-tertiary-bg) !important;">${displayPrompt}</div>
+                        <div class="d-flex align-items-center gap-2 flex-wrap small text-secondary">
+                            <span class="badge badge-activity-ai px-2 py-0.5 rounded-pill"><i class="fas fa-robot me-1"></i>AI Prompt</span>
+                            <span class="badge ${statusClass} px-2 py-0.5 rounded-pill">${item.status || 'Allowed'}</span>
+                            <span class="fw-semibold text-dark-emphasis">${escapeHtml(item.domain)}</span>
+                            <span class="text-muted ms-auto">${loggedAtFormatted}</span>
                         </div>
                     </div>
                 `;

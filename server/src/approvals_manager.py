@@ -71,7 +71,8 @@ def get_or_create_settings(mapping):
     return settings
 
 
-def upsert_settings(mapping, app_launch_mode=None, domain_access_mode=None):
+def upsert_settings(mapping, app_launch_mode=None, domain_access_mode=None,
+                    ai_policy_mode=None, ai_prompt_logging=None, ai_daily_time_limit=None):
     """Update per-mapping approval enforcement modes."""
     settings = get_or_create_settings(mapping)
 
@@ -86,6 +87,30 @@ def upsert_settings(mapping, app_launch_mode=None, domain_access_mode=None):
         if normalized not in MappingApprovalSettings.VALID_DOMAIN_ACCESS_MODES:
             raise ValueError(f'Unsupported domain_access_mode: {domain_access_mode}')
         settings.domain_access_mode = normalized
+
+    if ai_policy_mode is not None:
+        normalized = (ai_policy_mode or '').strip().lower()
+        if normalized not in {'off', 'block', 'monitor', 'approve'}:
+            raise ValueError(f'Unsupported ai_policy_mode: {ai_policy_mode}')
+        settings.ai_policy_mode = normalized
+
+    if ai_prompt_logging is not None:
+        normalized = (ai_prompt_logging or '').strip().lower()
+        if normalized not in {'metadata_only', 'full_text'}:
+            raise ValueError(f'Unsupported ai_prompt_logging: {ai_prompt_logging}')
+        settings.ai_prompt_logging = normalized
+
+    if ai_daily_time_limit is not None:
+        if ai_daily_time_limit == '' or ai_daily_time_limit is None:
+            settings.ai_daily_time_limit = None
+        else:
+            try:
+                val = int(ai_daily_time_limit)
+                if val < 0:
+                    raise ValueError('ai_daily_time_limit must be >= 0')
+                settings.ai_daily_time_limit = val
+            except (TypeError, ValueError):
+                raise ValueError(f'Invalid ai_daily_time_limit: {ai_daily_time_limit}')
 
     db.session.commit()
     _trigger_policy_sync(mapping, reason='approval_settings_changed')

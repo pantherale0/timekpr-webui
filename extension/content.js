@@ -620,3 +620,222 @@ document.addEventListener('input', (event) => {
         evaluateTextContent(text, platform);
     }, 1500);
 });
+
+// ============================================================
+// AI Policy Enforcement, Prompt Interception, SGE Hiding
+// ============================================================
+
+const AI_DOMAINS_LIST = [
+    'chatgpt.com',
+    'openai.com',
+    'claude.ai',
+    'gemini.google.com',
+    'copilot.microsoft.com',
+    'perplexity.ai'
+];
+
+function getActiveAiDomainName() {
+    const host = window.location.hostname.toLowerCase();
+    for (const dom of AI_DOMAINS_LIST) {
+        if (host === dom || host.endsWith('.' + dom)) {
+            return dom;
+        }
+    }
+    return null;
+}
+
+const activeAiDom = getActiveAiDomainName();
+if (activeAiDom) {
+    // 1. Initial page check
+    chrome.runtime.sendMessage({
+        type: "CHECK_AI_POLICY",
+        domain: activeAiDom
+    });
+    
+    // 2. Setup prompt submit interception
+    setupPromptInterception(activeAiDom);
+}
+
+// 3. Google Search AI Overview (SGE) hiding + AI Mode button hiding
+if (window.location.hostname.includes('google.') &&
+    (window.location.pathname.startsWith('/search') || window.location.pathname === '/' || window.location.pathname === '')) {
+    chrome.runtime.sendMessage({
+        type: "CHECK_AI_POLICY",
+        domain: "google.com"
+    }, (res) => {
+        if (res && res.allowed === false) {
+            injectSgeHidingCss();
+        }
+    });
+}
+
+function injectSgeHidingCss() {
+    const style = document.createElement('style');
+    style.id = 'guardian-hide-sge';
+    style.textContent = `
+        /* SGE / AI Overview result containers — data-attributes are stable */
+        div[data-sge], div[data-sge-container], .sge, [id^="sge-"], [class^="sge-"] {
+            display: none !important;
+        }
+        /* AI Mode search results tab — href udm=50 is the stable URL parameter for AI Mode */
+        a[href*="udm=50"]:not([href*="maps.google"]) {
+            display: none !important;
+        }
+        /* AI Mode history sidebar buttons — aria-label is a stable accessibility attribute */
+        [aria-label="AI Mode history"],
+        [title=" AI Mode history "],
+        [title=" Start a new AI Mode search "] {
+            display: none !important;
+        }
+    `;
+    document.documentElement.appendChild(style);
+
+    const observer = new MutationObserver(() => {
+        hideAiOverviewContainers();
+        hideAiModeElements();
+    });
+    observer.observe(document.body || document.documentElement, {
+        childList: true,
+        subtree: true
+    });
+    hideAiOverviewContainers();
+    hideAiModeElements();
+}
+
+function hideAiOverviewContainers() {
+    const headings = document.querySelectorAll('h1, h2, h3, h4, div');
+    headings.forEach(el => {
+        if (el.textContent && el.textContent.trim().startsWith('AI Overview')) {
+            let parent = el.parentElement;
+            for (let i = 0; i < 4; i++) {
+                if (parent && (parent.tagName === 'DIV' || parent.tagName === 'SECTION')) {
+                    if (parent.id === 'search') break;
+                    parent.style.display = 'none';
+                    parent = parent.parentElement;
+                }
+            }
+        }
+    });
+}
+
+// Hide the "AI Mode" button/tab dynamically via stable text-content and semantic-attribute matching.
+// CSS classes like .XVMlrc, .olrp5b are Google's obfuscated Closure names — they WILL change
+// on redeployment, so we rely on text-content and aria/title attributes here instead.
+function hideAiModeElements() {
+    // Strategy 1: hide any listitem/nav element whose sole visible text is exactly "AI Mode"
+    // Role="listitem" is a stable ARIA role used in Google's search tab bar
+    const listItems = document.querySelectorAll('[role="listitem"]');
+    listItems.forEach(item => {
+        if (item.textContent && item.textContent.trim() === 'AI Mode') {
+            item.style.display = 'none';
+        }
+    });
+
+    // Strategy 2: walk up from any element whose trimmed textContent is "AI Mode"
+    // to find and hide the nearest interactive ancestor (link or button).
+    // This covers the homepage search bar button regardless of its CSS class name.
+    const allEls = document.querySelectorAll('span, div, a');
+    allEls.forEach(el => {
+        // Only match leaf-ish nodes to avoid hiding large containers
+        if (el.children.length < 4 &&
+            el.textContent &&
+            el.textContent.trim() === 'AI Mode') {
+            let ancestor = el;
+            for (let i = 0; i < 6; i++) {
+                ancestor = ancestor.parentElement;
+                if (!ancestor) break;
+                const tag = ancestor.tagName;
+                const role = ancestor.getAttribute('role') || '';
+                if (tag === 'A' || tag === 'BUTTON' || role === 'button' || role === 'link') {
+                    ancestor.style.display = 'none';
+                    break;
+                }
+            }
+        }
+    });
+}
+
+
+let skipPromptIntercept = false;
+
+function setupPromptInterception(aiDomain) {
+    const serviceName = aiDomain.split('.')[0];
+
+    function getPromptText() {
+        const els = document.querySelectorAll('textarea, div[contenteditable="true"]');
+        for (const el of els) {
+            const val = (el.tagName === 'TEXTAREA' ? el.value : el.innerText || el.textContent) || '';
+            if (val.trim()) {
+                return val.trim();
+            }
+        }
+        return '';
+    }
+
+    function handleSubmission(event, triggerSubmitFn) {
+        if (skipPromptIntercept) return;
+
+        const text = getPromptText();
+        if (!text) return;
+
+        event.preventDefault();
+        event.stopPropagation();
+
+        chrome.runtime.sendMessage({
+            type: "CHECK_AI_PROMPT",
+            service: serviceName,
+            domain: aiDomain,
+            prompt_text: text,
+            url: window.location.href,
+            title: document.title
+        }, (res) => {
+            if (res && res.allowed !== false) {
+                skipPromptIntercept = true;
+                triggerSubmitFn();
+                setTimeout(() => {
+                    skipPromptIntercept = false;
+                }, 1000);
+            }
+        });
+    }
+
+    document.addEventListener('click', (e) => {
+        if (skipPromptIntercept) return;
+
+        const target = e.target.closest('button, [role="button"], .send-button');
+        if (!target) return;
+
+        const label = (target.getAttribute('aria-label') || target.getAttribute('title') || target.innerText || '').toLowerCase();
+        const testId = (target.getAttribute('data-testid') || '').toLowerCase();
+        const isSend = label.includes('send') || label.includes('submit') || label.includes('prompt') || testId.includes('send') || target.classList.contains('send-button');
+
+        if (isSend) {
+            handleSubmission(e, () => {
+                target.click();
+            });
+        }
+    }, true);
+
+    document.addEventListener('keydown', (e) => {
+        if (skipPromptIntercept) return;
+
+        if (e.key === 'Enter' && !e.shiftKey) {
+            const target = e.target;
+            const isInput = target.tagName === 'TEXTAREA' || target.getAttribute('contenteditable') === 'true';
+            if (isInput) {
+                handleSubmission(e, () => {
+                    const eventInit = {
+                        key: 'Enter',
+                        code: 'Enter',
+                        keyCode: 13,
+                        which: 13,
+                        bubbles: true,
+                        cancelable: true
+                    };
+                    const enterEvent = new KeyboardEvent('keydown', eventInit);
+                    target.dispatchEvent(enterEvent);
+                });
+            }
+        }
+    }, true);
+}

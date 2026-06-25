@@ -318,6 +318,9 @@
         const appMode = document.querySelector(`.approval-app-mode[data-mapping-id="${mappingId}"]`);
         const domainMode = document.querySelector(`.approval-domain-mode[data-mapping-id="${mappingId}"]`);
         const registrationMode = document.querySelector(`.approval-registration[data-mapping-id="${mappingId}"]`);
+        const aiMode = document.querySelector(`.approval-ai-mode[data-mapping-id="${mappingId}"]`);
+        const aiLogging = document.querySelector(`.approval-ai-logging[data-mapping-id="${mappingId}"]`);
+        const aiLimit = document.querySelector(`.approval-ai-limit[data-mapping-id="${mappingId}"]`);
         return fetch(`/api/mappings/${mappingId}/approval-settings`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
@@ -325,6 +328,9 @@
                 app_launch_mode: appMode ? appMode.value : 'open',
                 domain_access_mode: domainMode ? domainMode.value : 'blocklist_only',
                 registration_approval_enabled: registrationMode ? registrationMode.checked : false,
+                ai_policy_mode: aiMode ? aiMode.value : 'off',
+                ai_prompt_logging: aiLogging ? aiLogging.value : 'metadata_only',
+                ai_daily_time_limit: aiLimit && aiLimit.value !== '' ? parseInt(aiLimit.value, 10) : null,
             }),
         }).then((response) => response.json());
     }
@@ -405,9 +411,34 @@
             const mappingId = card.dataset.mappingId;
             const groupId = `approval-${mappingId}`;
             const statusEl = card.querySelector('.guardian-autosave-status');
-            GuardianAutosave.configure(groupId, { statusEl });
+            GuardianAutosave.configure(groupId, { statusEl, debounceMs: 600 });
+
+            const aiModeSelect = card.querySelector('.approval-ai-mode');
+            const aiLoggingSec = card.querySelector(`#ai-logging-section-${mappingId}`);
+            const aiLimitSec = card.querySelector(`#ai-limit-section-${mappingId}`);
+
+            const toggleAiSections = () => {
+                const mode = aiModeSelect ? aiModeSelect.value : 'off';
+                if (mode === 'off') {
+                    if (aiLoggingSec) aiLoggingSec.classList.add('d-none');
+                    if (aiLimitSec) aiLimitSec.classList.remove('d-none');
+                } else if (mode === 'block') {
+                    if (aiLoggingSec) aiLoggingSec.classList.add('d-none');
+                    if (aiLimitSec) aiLimitSec.classList.add('d-none');
+                } else { // monitor or approve
+                    if (aiLoggingSec) aiLoggingSec.classList.remove('d-none');
+                    if (aiLimitSec) aiLimitSec.classList.remove('d-none');
+                }
+            };
+
+            if (aiModeSelect) {
+                aiModeSelect.addEventListener('change', toggleAiSections);
+                toggleAiSections();
+            }
+
             card.querySelectorAll('select, input').forEach((input) => {
-                input.addEventListener('change', () => {
+                const eventName = input.type === 'number' ? 'input' : 'change';
+                input.addEventListener(eventName, () => {
                     GuardianAutosave.schedule(groupId, () => saveApprovalSettings(mappingId));
                 });
             });

@@ -39,6 +39,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         return true;
     }
 
+    if (message.type === "CHECK_AI_POLICY" && message.domain) {
+        handleCheckAiPolicy(message, sender, sendResponse);
+        return true;
+    }
+
+    if (message.type === "CHECK_AI_PROMPT" && message.domain) {
+        handleCheckAiPrompt(message, sender, sendResponse);
+        return true;
+    }
+
     if (message.type === "REQUEST_REGISTRATION" && message.domain) {
         sendNativeRequest({ type: "REQUEST_REGISTRATION", domain: message.domain }, () => {});
         return false;
@@ -217,6 +227,14 @@ function queueWebLog(logEntry) {
 }
 
 function sendNativeRequest(payload, callback) {
+    // Temporary test mock for Google AI Search mode matching
+    if (payload.type === "CHECK_AI_POLICY" && payload.domain === "google.com") {
+        chrome.storage.local.get({ test_google_ai_allowed: false }, (result) => {
+            callback({ allowed: result.test_google_ai_allowed, reason: "blocked" });
+        });
+        return;
+    }
+
     chrome.runtime.sendNativeMessage('com.guardian.agent', payload, (response) => {
         if (chrome.runtime.lastError) {
             console.warn(
@@ -361,3 +379,153 @@ function flushWebBufferQueue() {
         });
     });
 }
+
+// ============================================================
+// AI Policy & Session Time Tracking
+// ============================================================
+
+const AI_DOMAINS = [
+    'chatgpt.com',
+    'openai.com',
+    'claude.ai',
+    'gemini.google.com',
+    'copilot.microsoft.com',
+    'perplexity.ai'
+];
+
+function handleCheckAiPolicy(message, sender, sendResponse) {
+    sendNativeRequest(
+        { type: "CHECK_AI_POLICY", domain: message.domain },
+        (response) => {
+            if (!response || response.allowed !== false) {
+                sendResponse(response || { allowed: true });
+                return;
+            }
+
+            if (message.domain !== "google.com" && sender && sender.tab && sender.tab.id) {
+                const lang = (navigator.language || "en").split("-")[0];
+                const blockUrl =
+                    chrome.runtime.getURL("blockedv2.html") +
+                    "?reason=ai_blocked" +
+                    "&lang=" + encodeURIComponent(lang) +
+                    "&device=" + encodeURIComponent(message.domain || "") +
+                    "&url=" + encodeURIComponent((sender && sender.tab && sender.tab.url) || "") +
+                    "&sub_reason=" + encodeURIComponent(response.reason || "");
+
+                chrome.tabs.update(sender.tab.id, { url: blockUrl });
+            }
+            sendResponse(response);
+        }
+    );
+}
+
+function handleCheckAiPrompt(message, sender, sendResponse) {
+    sendNativeRequest(
+        {
+            type: "CHECK_AI_PROMPT",
+            service: message.service,
+            domain: message.domain,
+            prompt_text: message.prompt_text,
+            url: message.url,
+            title: message.title
+        },
+        (response) => {
+            if (!response || response.allowed !== false) {
+                sendResponse(response || { allowed: true });
+                return;
+            }
+
+            if (sender && sender.tab && sender.tab.id) {
+                const lang = (navigator.language || "en").split("-")[0];
+                const blockUrl =
+                    chrome.runtime.getURL("blockedv2.html") +
+                    "?reason=ai_blocked" +
+                    "&lang=" + encodeURIComponent(lang) +
+                    "&device=" + encodeURIComponent(message.domain || "") +
+                    "&url=" + encodeURIComponent((sender && sender.tab && sender.tab.url) || "") +
+                    "&sub_reason=" + encodeURIComponent(response.reason || "");
+
+                chrome.tabs.update(sender.tab.id, { url: blockUrl });
+            }
+            sendResponse(response);
+        }
+    );
+}
+
+let activeAiDomain = null;
+let aiStartTime = null;
+let aiDurationBuffer = {};
+
+function getAiDomainFromUrl(url) {
+    if (!url) return null;
+    try {
+        const parsed = new URL(url);
+        const host = parsed.hostname.toLowerCase();
+        for (const dom of AI_DOMAINS) {
+            if (host === dom || host.endsWith('.' + dom)) {
+                return dom;
+            }
+        }
+    } catch (e) {}
+    return null;
+}
+
+function updateActiveAiTab() {
+    chrome.tabs.query({ active: true, lastFocusedWindow: true }, (tabs) => {
+        const activeTab = tabs[0];
+        const newDomain = activeTab ? getAiDomainFromUrl(activeTab.url) : null;
+        
+        if (newDomain !== activeAiDomain) {
+            flushAiSession();
+            activeAiDomain = newDomain;
+            if (newDomain) {
+                aiStartTime = Date.now();
+            }
+        }
+    });
+}
+
+function flushAiSession() {
+    if (activeAiDomain && aiStartTime) {
+        const elapsedSeconds = Math.round((Date.now() - aiStartTime) / 1000);
+        if (elapsedSeconds > 0) {
+            aiDurationBuffer[activeAiDomain] = (aiDurationBuffer[activeAiDomain] || 0) + elapsedSeconds;
+        }
+        aiStartTime = Date.now();
+    }
+
+    for (const dom in aiDurationBuffer) {
+        const sec = aiDurationBuffer[dom];
+        if (sec > 0) {
+            sendNativeRequest({
+                type: "AI_SESSION_LOG",
+                domain: dom,
+                duration_seconds: sec
+            }, (res) => {
+                if (res && res.success) {
+                    delete aiDurationBuffer[dom];
+                }
+            });
+        }
+    }
+}
+
+// Active tab and window focus listeners
+chrome.tabs.onActivated.addListener(updateActiveAiTab);
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+    if (changeInfo.status === 'complete' || changeInfo.url) {
+        updateActiveAiTab();
+    }
+});
+chrome.windows.onFocusChanged.addListener((windowId) => {
+    if (windowId === chrome.windows.WINDOW_ID_NONE) {
+        flushAiSession();
+        activeAiDomain = null;
+        aiStartTime = null;
+    } else {
+        updateActiveAiTab();
+    }
+});
+
+// Periodic flush every 30 seconds
+setInterval(flushAiSession, 30000);

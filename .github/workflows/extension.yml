@@ -1,0 +1,159 @@
+name: Extension CI
+
+on:
+  pull_request:
+    paths:
+      - "extension/**"
+      - "scripts/test-*.js"
+      - "scripts/package-extension.py"
+      - "i18n/**"
+      - "scripts/i18n/**"
+      - ".github/workflows/extension.yml"
+  push:
+    branches:
+      - "master"
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      extension_changed: ${{ steps.filter.outputs.extension }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Detect extension-related changes
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            extension:
+              - "extension/**"
+              - "scripts/test-*.js"
+              - "scripts/package-extension.py"
+              - "i18n/**"
+              - "scripts/i18n/**"
+              - ".github/workflows/extension.yml"
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Job 1: Pure unit tests — no browser required
+  # Tests the utility modules (youtube_utils.js, tiktok_utils.js) using Node
+  # ─────────────────────────────────────────────────────────────────────────
+  unit-tests:
+    needs: changes
+    if: needs.changes.outputs.extension_changed == 'true' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Run YouTube utils unit tests
+        run: node scripts/test-youtube-utils.js
+
+      - name: Run TikTok utils unit tests
+        run: node scripts/test-tiktok-utils.js
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Job 2: Browser integration test
+  # Verifies that the extension correctly hides Google AI Mode elements and
+  # SGE containers while leaving regular search results visible.
+  #
+  # Chrome extensions cannot run in --headless mode (a Chrome limitation), so
+  # we use Xvfb (virtual framebuffer) to provide a virtual X11 display for a
+  # headed Chromium instance.  The test communicates with Chromium via the
+  # Chrome DevTools Protocol (CDP) WebSocket.
+  # ─────────────────────────────────────────────────────────────────────────
+  browser-integration-test:
+    needs: changes
+    if: needs.changes.outputs.extension_changed == 'true' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Chromium and Xvfb
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            chromium-browser \
+            xvfb \
+            x11-utils \
+            dbus-x11
+
+      - name: Locate Chromium binary
+        id: chromium
+        run: |
+          path="$(which chromium-browser 2>/dev/null || which chromium 2>/dev/null || echo '')"
+          if [[ -z "$path" ]]; then
+            echo "Could not find Chromium binary" >&2
+            exit 1
+          fi
+          echo "path=$path" >> "$GITHUB_OUTPUT"
+          echo "Chromium found at: $path"
+          "$path" --version
+
+      - name: Start Xvfb virtual display
+        run: |
+          # Start virtual framebuffer on display :99
+          Xvfb :99 -screen 0 1920x1080x24 -ac &
+          echo "XVFB_PID=$!" >> "$GITHUB_ENV"
+          sleep 1
+          # Verify the display is up
+          DISPLAY=:99 xdpyinfo >/dev/null 2>&1 && echo "Xvfb is running" || { echo "Xvfb failed to start" >&2; exit 1; }
+
+      - name: Run extension browser integration tests
+        env:
+          DISPLAY: ":99"
+          CHROMIUM_PATH: ${{ steps.chromium.outputs.path }}
+          DEBUG_PORT: "9223"
+          HTTP_PORT: "8085"
+        run: node scripts/test-sge-hiding.js
+
+      - name: Stop Xvfb
+        if: always()
+        run: |
+          if [[ -n "${XVFB_PID:-}" ]]; then
+            kill "$XVFB_PID" 2>/dev/null || true
+          fi
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Job 3: i18n validation — verify all translation files are valid before
+  # the extension is bundled into a release image
+  # ─────────────────────────────────────────────────────────────────────────
+  i18n-validate:
+    needs: changes
+    if: needs.changes.outputs.extension_changed == 'true' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install PyYAML
+        run: python -m pip install --disable-pip-version-check PyYAML
+
+      - name: Validate i18n catalog
+        run: python scripts/i18n/manage.py validate
+
+      - name: Bundle extension translations (dry-run check)
+        run: python scripts/i18n/manage.py bundle --target extension

@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Google Search Mock</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; background: #fff; color: #202124; }
+        .container { max-width: 700px; }
+        .result { margin-bottom: 20px; }
+        h2 { font-size: 20px; color: #1a0dab; }
+        .ai-card { border: 1px solid #dadce0; border-radius: 8px; padding: 16px; margin: 8px 0; background: #f8f9fa; }
+    </style>
+</head>
+<body>
+    <div class="container" id="search">
+        <h1>Google Search (Mock)</h1>
+
+        <!-- ============================================================ -->
+        <!-- 1. SEARCH TAB BAR: AI Mode tab with udm=50 href (stable)     -->
+        <!-- Matches CSS: a[href*="udm=50"]:not([href*="maps.google"])     -->
+        <!-- ============================================================ -->
+        <div role="navigation" style="border: 1px solid #ccc; padding: 8px; margin-bottom: 12px;">
+            <div role="list" style="display: flex; gap: 8px;">
+                <!-- Normal tab (must remain visible) -->
+                <div role="listitem" id="tab-all">
+                    <a href="/search?q=test&udm=2">All</a>
+                </div>
+                <!-- AI Mode tab — hidden by href-based CSS rule -->
+                <div role="listitem" id="ai-mode-tab-listitem">
+                    <a href="/search?q=test&udm=50" id="ai-mode-tab-link">AI Mode</a>
+                </div>
+                <!-- Images tab (must remain visible) -->
+                <div role="listitem" id="tab-images">
+                    <a href="/search?q=test&udm=2&tbm=isch">Images</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================================ -->
+        <!-- 2. AI MODE HISTORY SIDEBAR BUTTON (stable aria-label)        -->
+        <!-- Matches CSS: [aria-label="AI Mode history"]                  -->
+        <!-- ============================================================ -->
+        <div style="border: 1px solid #ccc; padding: 8px; margin-bottom: 12px;">
+            <strong>Sidebar area:</strong>
+            <button aria-label="AI Mode history" id="ai-mode-history-btn">🤖 AI History</button>
+            <a title=" AI Mode history " id="ai-mode-history-link" href="#">AI History (link)</a>
+            <a title=" Start a new AI Mode search " id="ai-mode-new-search" href="#">New AI Search</a>
+            <button id="normal-button">Normal Button (keep visible)</button>
+        </div>
+
+        <!-- ============================================================ -->
+        <!-- 3. HOMEPAGE SEARCH BAR AI MODE BUTTON                        -->
+        <!-- Matches JS: text-content walk (finds "AI Mode" text nodes)   -->
+        <!-- ============================================================ -->
+        <div style="border: 1px solid #ccc; padding: 8px; margin-bottom: 12px;">
+            <strong>Homepage search bar area:</strong>
+            <!-- Simulated homepage AI Mode button: no stable CSS class, hidden by text-walk -->
+            <a role="link" id="ai-mode-homepage-btn">
+                <div>
+                    <span>
+                        <span>AI Mode</span>
+                    </span>
+                </div>
+            </a>
+            <span style="margin-left: 10px; font-style: italic;">(regular search bar element — keep visible)</span>
+        </div>
+
+        <!-- ============================================================ -->
+        <!-- 4. SEARCH RESULTS TAB listitem text-walk target              -->
+        <!-- Matches JS: [role="listitem"] with textContent === "AI Mode" -->
+        <!-- ============================================================ -->
+        <div style="border: 1px solid #ccc; padding: 8px; margin-bottom: 12px;">
+            <div role="list">
+                <div role="listitem" id="ai-mode-tab-textmatch">AI Mode</div>
+                <div role="listitem" id="normal-listitem">Images</div>
+            </div>
+        </div>
+
+        <!-- ============================================================ -->
+        <!-- 5. SGE / AI OVERVIEW CONTAINERS                               -->
+        <!-- ============================================================ -->
+        <div data-sge id="sge-1" style="background: #fce; padding: 10px; margin: 10px 0;">
+            <h3>SGE Block (data-sge) — should be hidden</h3>
+        </div>
+        <div class="sge" id="sge-class-1" style="background: #fce; padding: 10px; margin: 10px 0;">
+            <h3>SGE Block (.sge) — should be hidden</h3>
+        </div>
+        <div class="ai-card-outer" id="ai-overview-outer">
+            <div class="ai-card-inner">
+                <div class="ai-card">
+                    <h2>AI Overview</h2>
+                    <p>Should be hidden by MutationObserver text walk.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================================ -->
+        <!-- 6. REGULAR SEARCH RESULTS (must remain visible)              -->
+        <!-- ============================================================ -->
+        <div class="result" id="result-1">
+            <h2>Regular Result 1</h2>
+            <p>This is a standard search result that must remain visible.</p>
+        </div>
+        <div class="result" id="result-2">
+            <h2>Regular Result 2</h2>
+            <p>Another standard search result that must remain visible.</p>
+        </div>
+    </div>
+</body>
+</html>

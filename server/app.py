@@ -264,6 +264,7 @@ from src.blueprints import (
     api_windows_laps_bp,
     api_access_requests_bp,
     websocket_bp,
+    api_ai_bp,
 )
 
 app.register_blueprint(ui_auth_bp)
@@ -295,6 +296,8 @@ csrf.exempt(api_windows_laps_bp)
 csrf.exempt(api_youtube_bp)
 app.register_blueprint(api_access_requests_bp)
 csrf.exempt(api_access_requests_bp)
+app.register_blueprint(api_ai_bp)
+csrf.exempt(api_ai_bp)
 app.register_blueprint(websocket_bp)
 
 # Register WebSocket endpoint via Flask-Sock

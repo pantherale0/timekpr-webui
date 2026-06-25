@@ -1,6 +1,6 @@
 use std::fs;
 use std::path::Path;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use std::sync::{Arc, Mutex};
 use tokio::sync::mpsc;
 
@@ -128,6 +128,23 @@ enum IpcRequest {
     SentimentBreach {
         platform: String,
         details: serde_json::Value,
+    },
+    #[serde(rename = "CHECK_AI_POLICY")]
+    CheckAiPolicy {
+        domain: String,
+    },
+    #[serde(rename = "CHECK_AI_PROMPT")]
+    CheckAiPrompt {
+        service: String,
+        domain: String,
+        prompt_text: String,
+        url: String,
+        title: String,
+    },
+    #[serde(rename = "AI_SESSION_LOG")]
+    AiSessionLog {
+        domain: String,
+        duration_seconds: i32,
     },
 }
 
@@ -280,6 +297,33 @@ async fn process_ipc_messages<R: tokio::io::AsyncReadExt + Unpin, W: tokio::io::
             }
             IpcRequest::SentimentBreach { platform, details } => {
                 let response = handle_dialogue_alert(username, "sentiment_breach", platform, details, active_client_tx.clone()).await;
+                if let Ok(res_bytes) = serde_json::to_vec(&response) {
+                    if let Err(e) = write_framed_message(writer, &res_bytes).await {
+                        eprintln!("IPC error writing response: {}", e);
+                        break;
+                    }
+                }
+            }
+            IpcRequest::CheckAiPolicy { domain } => {
+                let response = handle_check_ai_policy(username, domain).await;
+                if let Ok(res_bytes) = serde_json::to_vec(&response) {
+                    if let Err(e) = write_framed_message(writer, &res_bytes).await {
+                        eprintln!("IPC error writing response: {}", e);
+                        break;
+                    }
+                }
+            }
+            IpcRequest::CheckAiPrompt { service, domain, prompt_text, url, title } => {
+                let response = handle_check_ai_prompt(username, service, domain, prompt_text, url, title).await;
+                if let Ok(res_bytes) = serde_json::to_vec(&response) {
+                    if let Err(e) = write_framed_message(writer, &res_bytes).await {
+                        eprintln!("IPC error writing response: {}", e);
+                        break;
+                    }
+                }
+            }
+            IpcRequest::AiSessionLog { domain, duration_seconds } => {
+                let response = handle_ai_session_log(username, domain, duration_seconds).await;
                 if let Ok(res_bytes) = serde_json::to_vec(&response) {
                     if let Err(e) = write_framed_message(writer, &res_bytes).await {
                         eprintln!("IPC error writing response: {}", e);
@@ -791,4 +835,173 @@ pub async fn run_native_messaging_proxy() {
     };
 
     tokio::join!(to_socket, to_stdout);
+}
+
+async fn handle_check_ai_policy(username: &str, domain: String) -> serde_json::Value {
+    let Some(config) = load_agent_config() else {
+        return serde_json::json!({
+            "success": false,
+            "message": "Local agent config missing or unreadable"
+        });
+    };
+
+    let rest_url = convert_ws_to_http(&config.server_url);
+    let target_url = format!("{}/api/ai/check-policy", rest_url);
+    let token = config.agent_token.as_deref().unwrap_or("");
+
+    let payload = serde_json::json!({
+        "linux_username": username,
+        "domain": domain,
+    });
+
+    let payload_str = serde_json::to_string(&payload).unwrap_or_default();
+
+    let client = reqwest::Client::new();
+    match client.post(&target_url)
+        .header("Authorization", format!("Bearer {}", token))
+        .header("Content-Type", "application/json")
+        .body(payload_str)
+        .send()
+        .await
+    {
+        Ok(res) => {
+            let status = res.status();
+            if status.is_success() {
+                let text = res.text().await.unwrap_or_default();
+                serde_json::from_str::<serde_json::Value>(&text).unwrap_or_else(|_| {
+                    serde_json::json!({ "success": true, "allowed": true })
+                })
+            } else {
+                let err_msg = res.text().await.unwrap_or_default();
+                serde_json::json!({
+                    "success": false,
+                    "message": format!("Server returned HTTP {}: {}", status.as_u16(), err_msg)
+                })
+            }
+        }
+        Err(e) => {
+            serde_json::json!({
+                "success": false,
+                "message": format!("Failed to route request to backend: {}", e)
+            })
+        }
+    }
+}
+
+async fn handle_check_ai_prompt(
+    username: &str,
+    service: String,
+    domain: String,
+    prompt_text: String,
+    url: String,
+    title: String,
+) -> serde_json::Value {
+    let Some(config) = load_agent_config() else {
+        return serde_json::json!({
+            "success": false,
+            "message": "Local agent config missing or unreadable"
+        });
+    };
+
+    let rest_url = convert_ws_to_http(&config.server_url);
+    let target_url = format!("{}/api/ai/check-prompt", rest_url);
+    let token = config.agent_token.as_deref().unwrap_or("");
+
+    let payload = serde_json::json!({
+        "linux_username": username,
+        "service": service,
+        "domain": domain,
+        "prompt_text": prompt_text,
+        "url": url,
+        "title": title,
+    });
+
+    let payload_str = serde_json::to_string(&payload).unwrap_or_default();
+
+    let client = reqwest::Client::new();
+    match client.post(&target_url)
+        .header("Authorization", format!("Bearer {}", token))
+        .header("Content-Type", "application/json")
+        .body(payload_str)
+        .send()
+        .await
+    {
+        Ok(res) => {
+            let status = res.status();
+            if status.is_success() {
+                let text = res.text().await.unwrap_or_default();
+                serde_json::from_str::<serde_json::Value>(&text).unwrap_or_else(|_| {
+                    serde_json::json!({ "success": true, "allowed": true })
+                })
+            } else {
+                let err_msg = res.text().await.unwrap_or_default();
+                serde_json::json!({
+                    "success": false,
+                    "message": format!("Server returned HTTP {}: {}", status.as_u16(), err_msg)
+                })
+            }
+        }
+        Err(e) => {
+            serde_json::json!({
+                "success": false,
+                "message": format!("Failed to route request to backend: {}", e)
+            })
+        }
+    }
+}
+
+async fn handle_ai_session_log(
+    username: &str,
+    domain: String,
+    duration_seconds: i32,
+) -> serde_json::Value {
+    let Some(config) = load_agent_config() else {
+        return serde_json::json!({
+            "success": false,
+            "message": "Local agent config missing or unreadable"
+        });
+    };
+
+    let rest_url = convert_ws_to_http(&config.server_url);
+    let target_url = format!("{}/api/ai/log-session", rest_url);
+    let token = config.agent_token.as_deref().unwrap_or("");
+
+    let payload = serde_json::json!({
+        "linux_username": username,
+        "domain": domain,
+        "duration_seconds": duration_seconds,
+    });
+
+    let payload_str = serde_json::to_string(&payload).unwrap_or_default();
+
+    let client = reqwest::Client::new();
+    match client.post(&target_url)
+        .header("Authorization", format!("Bearer {}", token))
+        .header("Content-Type", "application/json")
+        .body(payload_str)
+        .send()
+        .await
+    {
+        Ok(res) => {
+            let status = res.status();
+            if status.is_success() {
+                let text = res.text().await.unwrap_or_default();
+                serde_json::from_str::<serde_json::Value>(&text).unwrap_or_else(|_| {
+                    serde_json::json!({ "success": true })
+                })
+            } else {
+                let err_msg = res.text().await.unwrap_or_default();
+                serde_json::json!({
+                    "success": false,
+                    "message": format!("Server returned HTTP {}: {}", status.as_u16(), err_msg)
+                })
+            }
+        }
+        Err(e) => {
+            serde_json::json!({
+                "success": false,
+                "message": format!("Failed to route request to backend: {}", e)
+            })
+        }
+    }
 }

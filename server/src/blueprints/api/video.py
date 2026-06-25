@@ -10,6 +10,8 @@ from src.database import (
     VideoHistory,
     WebHistory,
     ManagedUser,
+    AiPromptLog,
+    AiSessionLog,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -483,7 +485,7 @@ def get_user_youtube_history(user_id):
 
 @api_video_bp.route('/api/user/<int:user_id>/history', methods=['GET'])
 def get_user_combined_history(user_id):
-    """Combined web and video platform history."""
+    """Combined web, video, and AI prompt history."""
     if not session.get('logged_in'):
         return jsonify({'success': False, 'message': 'Not authenticated'}), 401
 
@@ -495,7 +497,7 @@ def get_user_combined_history(user_id):
     page = int(request.args.get('page', 1))
     per_page = int(request.args.get('per_page', 20))
 
-    from sqlalchemy import literal_column, desc, or_
+    from sqlalchemy import literal_column, desc, or_, text
 
     video_query = db.session.query(
         VideoHistory.id.label('id'),
@@ -506,6 +508,8 @@ def get_user_combined_history(user_id):
         VideoHistory.category.label('category'),
         VideoHistory.duration_seconds.label('duration_seconds'),
         VideoHistory.watched_at.label('timestamp'),
+        literal_column("'Allowed'").label('status'),
+        db.null().label('prompt_text'),
     ).filter(VideoHistory.managed_user_id == user.id)
 
     web_query = db.session.query(
@@ -517,7 +521,40 @@ def get_user_combined_history(user_id):
         literal_column("'Web Page'").label('category'),
         literal_column("0").label('duration_seconds'),
         WebHistory.visited_at.label('timestamp'),
+        literal_column("'Allowed'").label('status'),
+        db.null().label('prompt_text'),
     ).filter(WebHistory.managed_user_id == user.id)
+
+    # Resolve device mapping IDs for AI logs
+    device_map_ids = [m.id for m in user.device_mappings]
+
+    if device_map_ids:
+        ai_query = db.session.query(
+            AiPromptLog.id.label('id'),
+            literal_column("'ai_prompt'").label('activity_type'),
+            AiPromptLog.title.label('title'),
+            AiPromptLog.url.label('url_or_id'),
+            AiPromptLog.domain.label('domain_or_channel'),
+            AiPromptLog.service.label('category'),
+            literal_column("0").label('duration_seconds'),
+            AiPromptLog.logged_at.label('timestamp'),
+            AiPromptLog.status.label('status'),
+            AiPromptLog.prompt_text.label('prompt_text'),
+        ).filter(AiPromptLog.device_map_id.in_(device_map_ids))
+    else:
+        # Dummy query returning no rows if no devices are mapped
+        ai_query = db.session.query(
+            AiPromptLog.id.label('id'),
+            literal_column("'ai_prompt'").label('activity_type'),
+            AiPromptLog.title.label('title'),
+            AiPromptLog.url.label('url_or_id'),
+            AiPromptLog.domain.label('domain_or_channel'),
+            AiPromptLog.service.label('category'),
+            literal_column("0").label('duration_seconds'),
+            AiPromptLog.logged_at.label('timestamp'),
+            AiPromptLog.status.label('status'),
+            AiPromptLog.prompt_text.label('prompt_text'),
+        ).filter(literal_column("1") == literal_column("0"))
 
     start_date = None
     end_date = None
@@ -530,6 +567,7 @@ def get_user_combined_history(user_id):
             )
             video_query = video_query.filter(VideoHistory.watched_at >= start_date)
             web_query = web_query.filter(WebHistory.visited_at >= start_date)
+            ai_query = ai_query.filter(AiPromptLog.logged_at >= start_date)
         except ValueError:
             pass
 
@@ -540,6 +578,7 @@ def get_user_combined_history(user_id):
             )
             video_query = video_query.filter(VideoHistory.watched_at <= end_date)
             web_query = web_query.filter(WebHistory.visited_at <= end_date)
+            ai_query = ai_query.filter(AiPromptLog.logged_at <= end_date)
         except ValueError:
             pass
 
@@ -557,16 +596,28 @@ def get_user_combined_history(user_id):
                 WebHistory.domain.ilike(search_filter),
             )
         )
+        ai_query = ai_query.filter(
+            or_(
+                AiPromptLog.title.ilike(search_filter),
+                AiPromptLog.url.ilike(search_filter),
+                AiPromptLog.domain.ilike(search_filter),
+                AiPromptLog.prompt_text.ilike(search_filter),
+            )
+        )
 
     if activity_type in VideoHistory.SUPPORTED_PLATFORMS:
         video_query = video_query.filter(VideoHistory.platform == activity_type)
-        union_query = video_query
+        union_stmt = video_query
     elif activity_type == 'web':
-        union_query = web_query
+        union_stmt = web_query
+    elif activity_type == 'ai':
+        union_stmt = ai_query
     else:
-        union_query = video_query.union_all(web_query)
+        from sqlalchemy import union_all
+        union_stmt = union_all(video_query, web_query, ai_query)
 
-    paginated = union_query.order_by(desc('timestamp')).paginate(
+    union_sub = union_stmt.subquery()
+    paginated = db.session.query(union_sub).order_by(union_sub.c.timestamp.desc()).paginate(
         page=page, per_page=per_page, error_out=False
     )
 
@@ -577,6 +628,7 @@ def get_user_combined_history(user_id):
             'type': row.activity_type,
             'title': row.title or "Untitled Page",
             'timestamp': row.timestamp.isoformat() if row.timestamp else None,
+            'status': row.status,
         }
         if row.activity_type in VideoHistory.SUPPORTED_PLATFORMS:
             item_dict.update({
@@ -586,6 +638,13 @@ def get_user_combined_history(user_id):
                 'category': row.category or "Unknown",
                 'duration_seconds': int(row.duration_seconds or 0),
                 'url': _video_url(row.activity_type, row.url_or_id),
+            })
+        elif row.activity_type == 'ai_prompt':
+            item_dict.update({
+                'url': row.url_or_id,
+                'domain': row.domain_or_channel or "Unknown Domain",
+                'category': row.category or "AI Service",
+                'prompt_text': row.prompt_text,
             })
         else:
             item_dict.update({
@@ -688,6 +747,41 @@ def get_user_combined_history(user_id):
         for row in web_domain_results
     ]
 
+    # AI Stats and Services
+    ai_prompt_stats_results = []
+    total_ai_seconds = 0
+    if device_map_ids:
+        ai_prompt_stats_query = db.session.query(
+            AiPromptLog.service,
+            db.func.count(AiPromptLog.id).label('prompt_count'),
+        ).filter(AiPromptLog.device_map_id.in_(device_map_ids))
+
+        if start_date:
+            ai_prompt_stats_query = ai_prompt_stats_query.filter(AiPromptLog.logged_at >= start_date)
+        if end_date:
+            ai_prompt_stats_query = ai_prompt_stats_query.filter(AiPromptLog.logged_at <= end_date)
+        if search:
+            ai_prompt_stats_query = ai_prompt_stats_query.filter(
+                or_(
+                    AiPromptLog.title.ilike(search_filter),
+                    AiPromptLog.url.ilike(search_filter),
+                    AiPromptLog.domain.ilike(search_filter),
+                    AiPromptLog.prompt_text.ilike(search_filter),
+                )
+            )
+        ai_prompt_stats_results = ai_prompt_stats_query.group_by(AiPromptLog.service).all()
+
+        ai_time_query = db.session.query(
+            db.func.sum(AiSessionLog.duration_seconds).label('total_duration')
+        ).filter(AiSessionLog.device_map_id.in_(device_map_ids))
+
+        if start_date:
+            ai_time_query = ai_time_query.filter(AiSessionLog.logged_at >= start_date)
+        if end_date:
+            ai_time_query = ai_time_query.filter(AiSessionLog.logged_at <= end_date)
+
+        total_ai_seconds = ai_time_query.scalar() or 0
+
     total_video_seconds = sum(cat['total_seconds'] for cat in video_categories_data)
     total_video_count = sum(cat['count'] for cat in video_categories_data)
     total_web_visits = sum(dom['count'] for dom in domains_data)
@@ -724,6 +818,15 @@ def get_user_combined_history(user_id):
                 'youtube_channels': youtube_channels,
                 'total_youtube_seconds': sum(cat['total_seconds'] for cat in youtube_categories),
                 'total_youtube_videos': sum(cat['count'] for cat in youtube_categories),
+                'total_ai_prompts': sum(row.prompt_count for row in ai_prompt_stats_results),
+                'total_ai_seconds': int(total_ai_seconds),
+                'ai_services': [
+                    {
+                        'service': row.service,
+                        'count': row.prompt_count
+                    }
+                    for row in ai_prompt_stats_results
+                ]
             },
         },
     })

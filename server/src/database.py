@@ -1443,6 +1443,21 @@ class MappingApprovalSettings(db.Model):
         nullable=False,
         default=False,
     )
+    ai_policy_mode = db.Column(
+        db.String(32),
+        nullable=False,
+        default='off',
+    )
+    ai_prompt_logging = db.Column(
+        db.String(32),
+        nullable=False,
+        default='metadata_only',
+    )
+    ai_daily_time_limit = db.Column(
+        db.Integer,
+        nullable=True,
+        default=None,
+    )
     created_at = db.Column(
         db.DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
@@ -2124,4 +2139,78 @@ class ChannelBlockRule(db.Model):
             'channel_name': self.channel_name,
             'is_blocked': self.is_blocked,
             'created_at': self.created_at.isoformat() if self.created_at else None,
+        }
+
+
+class AiPromptLog(db.Model):
+    __tablename__ = 'ai_prompt_log'
+
+    id = db.Column(db.Integer, primary_key=True)
+    device_map_id = db.Column(
+        db.Integer,
+        db.ForeignKey('managed_user_device_map.id'),
+        nullable=False,
+    )
+    service = db.Column(db.String(64), nullable=False)
+    domain = db.Column(db.String(128), nullable=False)
+    prompt_text = db.Column(db.Text, nullable=True)
+    prompt_length = db.Column(db.Integer, nullable=False)
+    url = db.Column(db.String(1024), nullable=False)
+    title = db.Column(db.String(256), nullable=False)
+    status = db.Column(db.String(32), nullable=False)
+    logged_at = db.Column(db.DateTime(timezone=True), nullable=False)
+
+    device_map = db.relationship(
+        'ManagedUserDeviceMap',
+        backref=db.backref('ai_prompt_logs', cascade='all, delete-orphan'),
+    )
+
+    __table_args__ = (
+        db.Index('ai_prompt_log_map_idx', 'device_map_id', 'logged_at'),
+    )
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'device_map_id': self.device_map_id,
+            'service': self.service,
+            'domain': self.domain,
+            'prompt_text': self.prompt_text,
+            'prompt_length': self.prompt_length,
+            'url': self.url,
+            'title': self.title,
+            'status': self.status,
+            'logged_at': self.logged_at.isoformat() if self.logged_at else None,
+        }
+
+
+class AiSessionLog(db.Model):
+    __tablename__ = 'ai_session_log'
+
+    id = db.Column(db.Integer, primary_key=True)
+    device_map_id = db.Column(
+        db.Integer,
+        db.ForeignKey('managed_user_device_map.id'),
+        nullable=False,
+    )
+    domain = db.Column(db.String(128), nullable=False)
+    duration_seconds = db.Column(db.Integer, nullable=False)
+    logged_at = db.Column(db.DateTime(timezone=True), nullable=False)
+
+    device_map = db.relationship(
+        'ManagedUserDeviceMap',
+        backref=db.backref('ai_session_logs', cascade='all, delete-orphan'),
+    )
+
+    __table_args__ = (
+        db.Index('ai_session_log_map_idx', 'device_map_id', 'logged_at'),
+    )
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'device_map_id': self.device_map_id,
+            'domain': self.domain,
+            'duration_seconds': self.duration_seconds,
+            'logged_at': self.logged_at.isoformat() if self.logged_at else None,
         }

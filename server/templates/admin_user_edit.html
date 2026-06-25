@@ -467,12 +467,33 @@
                                         </div>
                                         {% set mapping_platform = ((mapping.device.platform if mapping.device else None) or 'linux') | lower %}
                                         {% if mapping_platform in ('linux', 'windows') %}
-                                        <div class="form-check form-switch mt-2 mb-0">
+                                        <div class="form-check form-switch mt-2 mb-2">
                                             <input class="form-check-input approval-registration" type="checkbox" data-mapping-id="{{ mapping.id }}" id="approval-registration-{{ mapping.id }}" {% if settings.registration_approval_enabled %}checked{% endif %}>
                                             <label class="form-check-label small fw-semibold" for="approval-registration-{{ mapping.id }}">{{ t('pages.admin_user_edit.enforce_signup') }}</label>
                                             <span class="text-secondary d-block mt-0" style="font-size: 0.65rem;">{{ t('pages.admin_user_edit.signup_hint') }}</span>
                                         </div>
                                         {% endif %}
+                                        <hr class="my-2">
+                                        <div class="mb-2">
+                                            <label class="form-label fw-bold small text-muted text-uppercase mb-1" style="font-size: 0.7rem;">AI Policy Mode</label>
+                                            <select class="form-select form-select-sm approval-ai-mode" data-mapping-id="{{ mapping.id }}">
+                                                <option value="off" {% if settings.ai_policy_mode == 'off' or not settings.ai_policy_mode %}selected{% endif %}>Off / Allow</option>
+                                                <option value="block" {% if settings.ai_policy_mode == 'block' %}selected{% endif %}>Block AI Services</option>
+                                                <option value="monitor" {% if settings.ai_policy_mode == 'monitor' %}selected{% endif %}>Monitor & Log Prompts</option>
+                                                <option value="approve" {% if settings.ai_policy_mode == 'approve' %}selected{% endif %}>Require Approval</option>
+                                            </select>
+                                        </div>
+                                        <div class="mb-2 approval-ai-logging-section {% if settings.ai_policy_mode == 'off' or settings.ai_policy_mode == 'block' or not settings.ai_policy_mode %}d-none{% endif %}" id="ai-logging-section-{{ mapping.id }}">
+                                            <label class="form-label fw-bold small text-muted text-uppercase mb-1" style="font-size: 0.7rem;">Prompt Logging</label>
+                                            <select class="form-select form-select-sm approval-ai-logging" data-mapping-id="{{ mapping.id }}">
+                                                <option value="metadata_only" {% if settings.ai_prompt_logging == 'metadata_only' or not settings.ai_prompt_logging %}selected{% endif %}>Metadata Only (Length & Service)</option>
+                                                <option value="full_text" {% if settings.ai_prompt_logging == 'full_text' %}selected{% endif %}>Full Text (Logs Prompts)</option>
+                                            </select>
+                                        </div>
+                                        <div class="mb-0 approval-ai-limit-section {% if settings.ai_policy_mode == 'block' %}d-none{% endif %}" id="ai-limit-section-{{ mapping.id }}">
+                                            <label class="form-label fw-bold small text-muted text-uppercase mb-1" style="font-size: 0.7rem;">Daily AI Limit (Minutes)</label>
+                                            <input type="number" min="0" placeholder="Unlimited" class="form-control form-control-sm approval-ai-limit" data-mapping-id="{{ mapping.id }}" value="{{ settings.ai_daily_time_limit or '' }}">
+                                        </div>
                                     </div>
                                 {% endfor %}
                             </div>

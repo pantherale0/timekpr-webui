@@ -48,6 +48,7 @@ ALLOWED_AGENT_ALERT_TYPES = {
     'hardware_non_compliant',
     'dialogue_flag',
     'sentiment_breach',
+    'ai_bypass_attempt',
 }
 
 
