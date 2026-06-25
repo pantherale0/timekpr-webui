@@ -88,23 +88,38 @@ jobs:
         with:
           node-version: "24"
 
-      - name: Install Google Chrome Stable (Debian package)
-        # We explicitly use the Google Chrome apt repository to get a real Debian
-        # package. This is the only way to reliably support --load-extension in CI.
-        # Ubuntu's chromium-browser package redirects to a Snap that blocks extensions.
+      - name: Install Chrome and Xvfb
+        # ubuntu-24.04 runners already ship Google Chrome Stable.
+        # Only install from Google's apt repo when it is absent (e.g. self-hosted runners).
+        # gpg requires --batch --yes in non-interactive (no-TTY) CI environments.
         run: |
           set -euo pipefail
-          curl -fsSL https://dl.google.com/linux/linux_signing_key.pub \
-            | sudo gpg --dearmor -o /usr/share/keyrings/google-chrome.gpg
-          echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google-chrome.gpg] \
-            https://dl.google.com/linux/chrome/deb/ stable main" \
-            | sudo tee /etc/apt/sources.list.d/google-chrome.list
-          sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends \
-            google-chrome-stable \
-            xvfb \
-            x11-utils
-          google-chrome-stable --version
+          if ! command -v google-chrome-stable &>/dev/null && ! command -v google-chrome &>/dev/null; then
+            echo "Chrome not found — installing from Google apt repository..."
+            curl -fsSL https://dl.google.com/linux/linux_signing_key.pub \
+              | sudo gpg --batch --yes --dearmor -o /usr/share/keyrings/google-chrome.gpg
+            echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google-chrome.gpg] https://dl.google.com/linux/chrome/deb/ stable main" \
+              | sudo tee /etc/apt/sources.list.d/google-chrome.list
+            sudo apt-get update -qq
+            sudo apt-get install -y --no-install-recommends google-chrome-stable
+          else
+            echo "Google Chrome already installed — skipping apt install."
+          fi
+          sudo apt-get install -y --no-install-recommends xvfb x11-utils
+
+      - name: Locate Chrome binary
+        id: chrome
+        run: |
+          path="$(command -v google-chrome-stable 2>/dev/null \
+            || command -v google-chrome 2>/dev/null \
+            || echo '')"
+          if [[ -z "$path" ]]; then
+            echo "Could not find a Google Chrome binary" >&2
+            exit 1
+          fi
+          echo "path=$path" >> "$GITHUB_OUTPUT"
+          echo "Chrome found at: $path"
+          "$path" --version
 
       - name: Start Xvfb virtual display
         run: |
@@ -118,7 +133,7 @@ jobs:
       - name: Run extension browser integration tests
         env:
           DISPLAY: ":99"
-          CHROMIUM_PATH: /usr/bin/google-chrome-stable
+          CHROMIUM_PATH: ${{ steps.chrome.outputs.path }}
           DEBUG_PORT: "9223"
           HTTP_PORT: "8085"
           SCREENSHOTS_DIR: "/tmp/ext-test-screenshots"
