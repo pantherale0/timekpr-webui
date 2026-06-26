@@ -78,6 +78,10 @@ python scripts/i18n/manage.py add-string server common.save "Save" --force
 python scripts/i18n/manage.py validate
 python scripts/i18n/manage.py validate --strict   # fail on [TODO] strings
 
+# Validate key references in code/templates and warn on hardcoded UI strings
+python scripts/i18n/manage.py check-usage
+python scripts/i18n/manage.py check-usage --changed-file server/templates/dashboard.html
+
 # List locales and missing keys vs English
 python scripts/i18n/manage.py list-locales
 python scripts/i18n/manage.py list-missing fr --service server
@@ -104,7 +108,16 @@ Use `{parameter}` placeholders in server strings. Android uses `%1$s` style in `
 
 ### CI integration
 
+- **i18n check** (`.github/workflows/i18n-check.yml`): reusable workflow that runs `validate` + `check-usage`. **Server Image CI** and **Agent CI** call it as a required `i18n` job before any build steps; a failed translation check blocks those builds. Also runs standalone on PRs/pushes (with PR comments). Missing translation keys **fail** the check; hardcoded user-visible strings produce **warnings**.
 - **Server image** (`.github/workflows/server-image.yml`): `validate` + `bundle --target server` + `bundle --target extension` before Docker build and CRX packaging; staged server catalogs ship inside the image at `/app/i18n`.
 - **Agent builds** (`.github/workflows/rust-agent.yml`): `validate` + `bundle --target agent` before `cargo check` / Gradle (Android `strings.xml`, overlay `overlay-i18n.*.js`, Rust `resources/i18n/*.json`).
+
+Local usage check:
+
+```bash
+python scripts/i18n/manage.py check-usage
+python scripts/i18n/manage.py check-usage --changed-file server/templates/dashboard.html
+python scripts/i18n/manage.py check-usage --report-md /tmp/i18n-report.md
+```
 
 Override catalog location at runtime with `GUARDIAN_I18N_ROOT` (server) or `GUARDIAN_LOCALE` / `LANG` (Rust desktop toasts).

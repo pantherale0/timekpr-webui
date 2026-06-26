@@ -16,6 +16,7 @@ common:
   install: Install
   never: Never
   unknown: Unknown
+  shared: Shared
   success: Success
   error: Error
   approve: Approve
@@ -28,6 +29,7 @@ common:
 nav:
   toggle_sidebar: Toggle sidebar
   family_home: Family Home
+  active_household: Active Home
   dialogue: Dialogue
   dialogue_count: "{count} Dialogue"
   tasks_offline: Tasks Offline
@@ -193,6 +195,21 @@ flash:
       ALLOWED_OIDC_ADMIN_DOMAINS, ALLOWED_OIDC_ADMIN_ROLES, or ALLOWED_OIDC_ADMIN_GROUPS.
     oidc_denied_unauthorized: You are not authorized to access the admin console.
     oidc_denied_generic: "Access denied: {reason}"
+    household_name_required: Please enter a name for your home.
+    household_created: 'Created home "{name}". Welcome!'
+    household_create_failed: Could not create your home. Please try again.
+    invite_code_required: Please enter an invite code.
+    invalid_invite_code: That invite code is invalid or has expired.
+    already_member: You are already a member of this home.
+    household_joined: You joined the home successfully.
+    household_join_failed: Could not join the home. Please try again.
+    share_code_required: Please enter a child profile share code.
+    invalid_share_code: That share code is invalid or has expired.
+    already_shared: You already have access to this child profile.
+    child_share_redeemed: Child profile access granted successfully.
+    child_share_failed: Could not redeem the share code. Please try again.
+    unauthorized_household: You do not have access to that home.
+    household_switched: Active home switched successfully.
   common:
     fields_required: All fields are required
     invalid_values: Invalid setting values provided
@@ -311,6 +328,7 @@ api:
   no_mappings: No device mappings configured for this user
   devices_offline: All mapped devices are offline. Adjustment saved on the server and will rebalance when a mapped device reconnects.
   partial_apply: Adjustment stored on the server. Applied immediately to {applied}/{total} online mapping(s).
+  time_adjustment_partial: Adjustment stored on the server. Applied immediately to {applied}/{total} online mapping(s).
   adjustment_applied: Adjustment applied to {count} mapping(s).
   pending_online_retry: "{count} online mapping(s) need retry"
   pending_offline_rebalance: "{count} offline mapping(s) will rebalance on reconnect"
@@ -323,6 +341,7 @@ api:
   profile_exists: Child profile "{username}" already exists
   invalid_date: Invalid date format. Use YYYY-MM-DD
   invalid_age_tier: "overlay_age_tier must be one of: {values}"
+  overlay_age_tier_invalid: "overlay_age_tier must be one of: {tiers}"
   alerts_pruned: Successfully pruned {count} alerts.
   request_approved: Request approved
   request_denied: Request denied
@@ -497,6 +516,7 @@ js:
   profile_sync_live: Protected · Up to date
   profile_sync_unknown: Unable to check status
   profile_app_approved: App approved
+  profile_approve_failed: Could not approve this app. Please try again.
   profile_app_revoked: Approval revoked
   profile_revoke_failed: Failed to revoke approval
   profile_revoke_confirm: Revoke approval for this app?
@@ -1465,6 +1485,9 @@ pages:
     analytics_unassigned_desc: No mapped accounts are available to track on this device.
     locked_recovery: Locked Device Recovery
     locked_recovery_lead: Use when the phone cannot unlock after reboot
+    locked_recovery_body: >-
+      Copy the device token and recovery commands below onto a trusted computer with ADB access.
+      This restores agent connectivity after a locked boot without wiping the device.
     device_token: Device token
     diagnostic_alerts: Diagnostic Alert History
     no_audit_title: No Audit Records Found

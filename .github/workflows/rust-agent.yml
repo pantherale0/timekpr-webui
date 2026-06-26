@@ -24,6 +24,9 @@ env:
   CARGO_PROFILE_DEV_DEBUG: 0
 
 jobs:
+  i18n:
+    uses: ./.github/workflows/i18n-check.yml
+
   changes:
     runs-on: ubuntu-latest
     outputs:
@@ -49,7 +52,7 @@ jobs:
               - ".github/workflows/rust-agent.yml"
 
   linux-check:
-    needs: changes
+    needs: [i18n, changes]
     if: (!startsWith(github.ref, 'refs/tags/v')) && (needs.changes.outputs.linux_agent_changed == 'true' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     steps:
@@ -64,7 +67,6 @@ jobs:
       - name: Bundle agent i18n artifacts
         run: |
           python -m pip install --disable-pip-version-check PyYAML
-          python scripts/i18n/manage.py validate
           python scripts/i18n/manage.py bundle --target agent
 
       - name: Install Rust toolchain
@@ -79,7 +81,7 @@ jobs:
         run: cargo check --manifest-path agent/Cargo.toml
 
   windows-check:
-    needs: changes
+    needs: [i18n, changes]
     if: (!startsWith(github.ref, 'refs/tags/v')) && (needs.changes.outputs.linux_agent_changed == 'true' || github.event_name == 'workflow_dispatch')
     runs-on: windows-latest
     steps:
@@ -103,7 +105,7 @@ jobs:
         run: cargo test --manifest-path agent/Cargo.toml --target x86_64-pc-windows-msvc
 
   android-check:
-    needs: changes
+    needs: [i18n, changes]
     if: (!startsWith(github.ref, 'refs/tags/v')) && (needs.changes.outputs.android_agent_changed == 'true' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     steps:
@@ -118,7 +120,6 @@ jobs:
       - name: Bundle Android strings from i18n
         run: |
           python -m pip install --disable-pip-version-check PyYAML
-          python scripts/i18n/manage.py validate
           python scripts/i18n/manage.py bundle --target agent
 
       - name: Set up JDK
@@ -185,6 +186,7 @@ jobs:
           echo "APK signature checksum: $checksum"
 
   linux-release-build:
+    needs: i18n
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     strategy:
@@ -200,7 +202,6 @@ jobs:
       - name: Bundle agent i18n artifacts
         run: |
           python -m pip install --disable-pip-version-check PyYAML
-          python scripts/i18n/manage.py validate
           python scripts/i18n/manage.py bundle --target agent
 
       - name: Install Rust toolchain with target
@@ -254,6 +255,7 @@ jobs:
             dist/guardian-agent-${{ matrix.target }}.tar.gz.sha256
 
   windows-release-build:
+    needs: i18n
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: windows-latest
     steps:
@@ -264,7 +266,6 @@ jobs:
         shell: bash
         run: |
           python -m pip install --disable-pip-version-check PyYAML
-          python scripts/i18n/manage.py validate
           python scripts/i18n/manage.py bundle --target agent
 
       - name: Install Rust toolchain with target
@@ -325,6 +326,7 @@ jobs:
             dist/guardian-agent-x86_64-pc-windows-msvc.msi.sha256
 
   android-rust-build:
+    needs: i18n
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     strategy:
@@ -378,7 +380,7 @@ jobs:
           path: agent/target/${{ matrix.target_rust }}/release/libguardian_agent.so
 
   android-release-build:
-    needs: android-rust-build
+    needs: [i18n, android-rust-build]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     steps:
@@ -393,7 +395,6 @@ jobs:
       - name: Bundle Android strings from i18n
         run: |
           python -m pip install --disable-pip-version-check PyYAML
-          python scripts/i18n/manage.py validate
           python scripts/i18n/manage.py bundle --target agent
 
       - name: Set up JDK

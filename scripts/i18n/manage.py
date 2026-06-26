@@ -85,6 +85,56 @@ def _cmd_validate(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_check_usage(args: argparse.Namespace) -> int:
+    import json
+
+    from check_usage import format_markdown, format_text, load_changed_files, run_check
+
+    changed_files = None if args.no_warn_hardcoded else load_changed_files(
+        args.changed_files,
+        args.changed_files_list or None,
+    )
+    report = run_check(
+        changed_files=changed_files,
+        warn_hardcoded=not args.no_warn_hardcoded,
+    )
+    print(format_text(report))
+
+    if args.json:
+        payload = {
+            'failed': report.failed,
+            'keys_checked': report.keys_checked,
+            'catalog_errors': report.catalog_errors,
+            'missing_keys': [
+                {
+                    'key': ref.catalog_key,
+                    'file': ref.file,
+                    'line': ref.line,
+                    'service': ref.service,
+                }
+                for ref in report.missing_keys
+            ],
+            'hardcoded': [
+                {
+                    'file': item.file,
+                    'line': item.line,
+                    'text': item.text,
+                    'kind': item.kind,
+                }
+                for item in report.hardcoded
+            ],
+        }
+        args.json.write_text(json.dumps(payload, indent=2) + '\n', encoding='utf-8')
+
+    if args.report_md:
+        args.report_md.write_text(
+            format_markdown(report, changed_files=changed_files) + '\n',
+            encoding='utf-8',
+        )
+
+    return 1 if report.failed else 0
+
+
 def _cmd_bundle(args: argparse.Namespace) -> int:
     targets = {
         'all': ('server', 'agent'),
@@ -212,6 +262,27 @@ def build_parser() -> argparse.ArgumentParser:
         help='Fail on [TODO] prefixed strings in non-English locales',
     )
     validate_parser.set_defaults(func=_cmd_validate)
+
+    check_usage_parser = sub.add_parser(
+        'check-usage',
+        help='Validate translation key references and warn on hardcoded UI strings',
+    )
+    check_usage_parser.add_argument('--json', type=Path, help='Write machine-readable report JSON')
+    check_usage_parser.add_argument('--report-md', type=Path, help='Write Markdown report (for PR comments)')
+    check_usage_parser.add_argument(
+        '--changed-files',
+        type=Path,
+        help='Newline-separated repo-relative paths; limits hardcoded-string warnings',
+    )
+    check_usage_parser.add_argument(
+        '--changed-file',
+        action='append',
+        dest='changed_files_list',
+        default=[],
+        help='Repo-relative changed file (repeatable)',
+    )
+    check_usage_parser.add_argument('--no-warn-hardcoded', action='store_true')
+    check_usage_parser.set_defaults(func=_cmd_check_usage)
 
     bundle_parser = sub.add_parser(
         'bundle',

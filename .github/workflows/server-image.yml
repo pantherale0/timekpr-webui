@@ -21,6 +21,9 @@ permissions:
   contents: read
 
 jobs:
+  i18n:
+    uses: ./.github/workflows/i18n-check.yml
+
   changes:
     runs-on: ubuntu-latest
     outputs:
@@ -44,7 +47,7 @@ jobs:
               - ".github/workflows/server-image.yml"
 
   build-and-publish:
-    needs: changes
+    needs: [i18n, changes]
     if: startsWith(github.ref, 'refs/tags/v') || needs.changes.outputs.server_changed == 'true' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     permissions:
@@ -84,10 +87,9 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Validate and stage i18n catalogs
+      - name: Stage i18n catalogs
         run: |
           python -m pip install --disable-pip-version-check PyYAML
-          python scripts/i18n/manage.py validate
           python scripts/i18n/manage.py bundle --target server
           python scripts/i18n/manage.py bundle --target extension
 

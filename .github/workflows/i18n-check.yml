@@ -1,0 +1,144 @@
+name: i18n Check
+
+on:
+  workflow_call:
+  pull_request:
+    paths:
+      - "server/**"
+      - "extension/**"
+      - "agent/**"
+      - "android-agent/**"
+      - "i18n/**"
+      - "scripts/i18n/**"
+      - ".github/workflows/i18n-check.yml"
+      - ".github/workflows/server-image.yml"
+      - ".github/workflows/rust-agent.yml"
+  push:
+    branches:
+      - "master"
+    tags:
+      - "v*"
+    paths:
+      - "server/**"
+      - "extension/**"
+      - "agent/**"
+      - "android-agent/**"
+      - "i18n/**"
+      - "scripts/i18n/**"
+      - ".github/workflows/i18n-check.yml"
+      - ".github/workflows/server-image.yml"
+      - ".github/workflows/rust-agent.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install PyYAML
+        run: python -m pip install --disable-pip-version-check PyYAML
+
+      - name: List changed files for hardcoded-string warnings
+        if: github.event_name == 'pull_request'
+        id: changed
+        run: |
+          git fetch origin "${{ github.base_ref }}" --depth=1
+          git diff --name-only "origin/${{ github.base_ref }}...HEAD" > /tmp/changed-files.txt
+          echo "count=$(wc -l < /tmp/changed-files.txt | tr -d ' ')" >> "$GITHUB_OUTPUT"
+
+      - name: Validate translation catalogs
+        run: python scripts/i18n/manage.py validate
+
+      - name: Check translation key usage
+        id: usage
+        run: |
+          set -o pipefail
+          args=(check-usage --report-md /tmp/i18n-report.md --json /tmp/i18n-report.json)
+          if [[ "${{ github.event_name }}" == "pull_request" && -s /tmp/changed-files.txt ]]; then
+            args+=(--changed-files /tmp/changed-files.txt)
+          fi
+          if python scripts/i18n/manage.py "${args[@]}" | tee /tmp/i18n-check.log; then
+            echo "passed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "passed=false" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+
+      - name: Upload i18n report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: i18n-report-${{ github.run_id }}
+          path: |
+            /tmp/i18n-report.md
+            /tmp/i18n-report.json
+            /tmp/i18n-check.log
+          if-no-files-found: ignore
+          retention-days: 14
+
+  comment:
+    needs: check
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Download i18n report
+        uses: actions/download-artifact@v4
+        with:
+          name: i18n-report-${{ github.run_id }}
+
+      - name: Comment on pull request
+        uses: actions/github-script@v7
+        env:
+          REPORT_PATH: i18n-report.md
+        with:
+          script: |
+            const fs = require('fs');
+            const marker = '<!-- guardian-i18n-check -->';
+            const reportPath = process.env.REPORT_PATH;
+            let body = fs.existsSync(reportPath)
+              ? fs.readFileSync(reportPath, 'utf8').trim()
+              : `${marker}\n## 🌐 Translation check\n\nThe i18n check did not produce a report. See the workflow logs for details.`;
+
+            const { owner, repo } = context.repo;
+            const issue_number = context.payload.pull_request.number;
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner,
+              repo,
+              issue_number,
+              per_page: 100,
+            });
+
+            const existing = comments.find((comment) =>
+              comment.user?.type === 'Bot' && comment.body?.includes(marker),
+            );
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner,
+                repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number,
+                body,
+              });
+            }

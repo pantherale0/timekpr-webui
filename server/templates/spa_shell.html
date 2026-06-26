@@ -275,7 +275,7 @@
                         {% if oidc_enabled and parent_households|length > 0 %}
                         <li class="nav-item px-3 mb-3 mt-2">
                             <form action="{{ url_for('ui_auth.switch_household', household_id=0) }}" method="POST" id="switch-household-form">
-                                <label class="form-label small text-secondary mb-1 d-block">{{ t('nav.active_household', 'Active Home') }}</label>
+                                <label class="form-label small text-secondary mb-1 d-block">{{ t('nav.active_household') }}</label>
                                 <select class="form-select form-select-sm bg-dark text-white border-secondary" 
                                         style="border-color: #4A6B5D !important;"
                                         onchange="this.form.action=this.form.action.replace('/0', '/' + this.value); this.form.submit();">
