@@ -165,6 +165,36 @@ def inject_server_version():
     return {'server_version': _startup_version}
 
 
+@app.context_processor
+def inject_household_context():
+    from flask import session
+    from src.database import ParentAccount, Household
+    
+    parent_id = session.get('parent_account_id')
+    active_hh_id = session.get('active_household_id')
+    households = []
+    active_hh = None
+    
+    if session.get('logged_in'):
+        if not parent_id:
+            parent = ParentAccount.query.filter_by(email='admin@local').first()
+            if parent:
+                parent_id = parent.id
+                
+        if parent_id:
+            parent = ParentAccount.query.get(parent_id)
+            if parent:
+                households = [m.household for m in parent.memberships if m.household]
+                
+        if active_hh_id:
+            active_hh = Household.query.get(active_hh_id)
+            
+    return {
+        'parent_households': households,
+        'active_household': active_hh,
+    }
+
+
 @app.before_request
 def _resolve_request_locale():
     """Resolve active UI locale for this request."""
@@ -266,6 +296,58 @@ from src.blueprints import (
     websocket_bp,
     api_ai_bp,
 )
+
+@app.before_request
+def enforce_household_isolation():
+    """Enforce tenant/household boundaries for logged-in multi-tenant parents.
+
+    Only activates when parent_account_id is present in the session (OIDC flow).
+    Local admin mode and test environments without a parent account pass through
+    unaffected, preserving backward compatibility.
+    """
+    from flask import request, session, abort
+    parent_id = session.get('parent_account_id')
+    # Only enforce when we have an explicit parent account identity in the session.
+    # Local admin (no parent_account_id) is implicitly trusted — its sessions
+    # cannot span multiple tenants by definition.
+    if not session.get('logged_in') or not parent_id or not request.view_args:
+        return
+
+    from src.helpers import parent_has_access_to_child, parent_has_access_to_device
+    from src.database import ManagedUserDeviceMap
+
+    # 1. user_id path param → verify child access
+    if 'user_id' in request.view_args:
+        try:
+            user_id = int(request.view_args['user_id'])
+            if not parent_has_access_to_child(parent_id, user_id):
+                abort(403)
+        except (ValueError, TypeError):
+            pass
+
+    # 2. system_id path param → verify device access
+    if 'system_id' in request.view_args:
+        try:
+            system_id = str(request.view_args['system_id'])
+            if not parent_has_access_to_device(parent_id, system_id):
+                abort(403)
+        except (ValueError, TypeError):
+            pass
+
+    # 3. mapping_id path param → verify via the mapping's child + device
+    if 'mapping_id' in request.view_args:
+        try:
+            mapping_id = int(request.view_args['mapping_id'])
+            mapping = ManagedUserDeviceMap.query.get(mapping_id)
+            if not mapping:
+                abort(404)
+            if not parent_has_access_to_child(parent_id, mapping.managed_user_id):
+                abort(403)
+            if not parent_has_access_to_device(parent_id, mapping.system_id):
+                abort(403)
+        except (ValueError, TypeError):
+            pass
+
 
 app.register_blueprint(ui_auth_bp)
 app.register_blueprint(ui_dashboard_bp)
@@ -417,6 +499,102 @@ def _init_admin_password():
         _LOGGER.warning("Warning: Could not initialize admin password: %s", exc)
 
 
+def _backfill_household_multitenancy():
+    from src.database import Household, ManagedUser, AgentDevice, ParentAccount, HouseholdParentMembership
+    import secrets
+    try:
+        # 1. Ensure Default Household exists
+        default_hh = Household.query.get(1)
+        if not default_hh:
+            default_hh = Household(id=1, name="Default Household", enrollment_token=secrets.token_hex(32))
+            db.session.add(default_hh)
+            db.session.commit()
+            _LOGGER.info("Default Household (ID: 1) created.")
+        else:
+            if not default_hh.enrollment_token:
+                default_hh.enrollment_token = secrets.token_hex(32)
+                db.session.commit()
+
+        # 2. Backfill ManagedUsers without household_id
+        unassigned_users = ManagedUser.query.filter(ManagedUser.household_id == None).all()
+        if unassigned_users:
+            for user in unassigned_users:
+                user.household_id = 1
+            db.session.commit()
+            _LOGGER.info("Backfilled %d ManagedUser(s) to Default Household.", len(unassigned_users))
+
+        # 3. Backfill AgentDevices without household_id
+        unassigned_devices = AgentDevice.query.filter(AgentDevice.household_id == None).all()
+        if unassigned_devices:
+            for device in unassigned_devices:
+                device.household_id = 1
+            db.session.commit()
+            _LOGGER.info("Backfilled %d AgentDevice(s) to Default Household.", len(unassigned_devices))
+
+        # 4. Map the local legacy 'admin' parent account if not using OIDC
+        admin_parent = ParentAccount.query.filter_by(email='admin@local').first()
+        if not admin_parent:
+            admin_parent = ParentAccount(
+                email='admin@local',
+                name='Local Admin',
+                oidc_sub=None
+            )
+            db.session.add(admin_parent)
+            db.session.commit()
+            _LOGGER.info("Local Admin ParentAccount created.")
+
+        # Ensure the admin has owner membership in the Default Household
+        membership = HouseholdParentMembership.query.filter_by(
+            household_id=1,
+            parent_account_id=admin_parent.id
+        ).first()
+        if not membership:
+            membership = HouseholdParentMembership(
+                household_id=1,
+                parent_account_id=admin_parent.id,
+                permissions_json={"is_owner": True}
+            )
+            db.session.add(membership)
+            db.session.commit()
+            _LOGGER.info("Local Admin assigned as owner of Default Household.")
+
+        # 5. Pre-seed and map OIDC admin emails from ALLOWED_OIDC_ADMINS to the Default Household
+        allowed_admins_str = os.environ.get('ALLOWED_OIDC_ADMINS', '')
+        if allowed_admins_str:
+            emails = [e.strip().lower() for e in allowed_admins_str.split(',') if e.strip()]
+            for email in emails:
+                if email == 'admin@local':
+                    continue
+                parent = ParentAccount.query.filter_by(email=email).first()
+                if not parent:
+                    parent = ParentAccount(
+                        email=email,
+                        name=email.split('@')[0].capitalize(),
+                        oidc_sub=None
+                    )
+                    db.session.add(parent)
+                    db.session.commit()
+                    _LOGGER.info("Seeded OIDC Admin ParentAccount for %s", email)
+
+                membership = HouseholdParentMembership.query.filter_by(
+                    household_id=1,
+                    parent_account_id=parent.id
+                ).first()
+                if not membership:
+                    membership = HouseholdParentMembership(
+                        household_id=1,
+                        parent_account_id=parent.id,
+                        permissions_json={"is_owner": True}
+                    )
+                    db.session.add(membership)
+                    db.session.commit()
+                    _LOGGER.info("OIDC Admin %s assigned as owner of Default Household.", email)
+
+    except Exception as exc:
+        db.session.rollback()
+        _LOGGER.warning("Warning: Failed to backfill household multitenancy: %s", exc)
+
+
 def _runtime_init_lock_path():
     os.makedirs(app.instance_path, exist_ok=True)
     return os.path.join(app.instance_path, '.runtime_init.lock')
@@ -502,6 +680,7 @@ def _initialize_database():
 
             _sync_postgres_sequences()
             _init_admin_password()
+            _backfill_household_multitenancy()
         finally:
             fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
 
@@ -626,7 +805,11 @@ def initialize_runtime(start_background_tasks=False):
 
 
 def _should_initialize_on_import():
+    import sys
     if os.environ.get('TESTING'):
+        return False
+    # Do not initialize when running via flask command (CLI)
+    if 'flask' in sys.argv[0] or any(arg in sys.argv for arg in ('db', 'migrate', 'upgrade', 'init')):
         return False
     # app.py executed directly handles initialization in __main__.
     if __name__ == '__main__':

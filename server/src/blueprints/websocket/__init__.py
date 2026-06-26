@@ -137,9 +137,34 @@ def ws_agent_handler(ws):
                 device = AgentDevice.query.get(system_id)
                 
                 if not device:
-                    if expected_reg_token and reg_token != expected_reg_token:
+                    # Look up household by enrollment token
+                    from src.database import Household
+                    household = None
+                    if reg_token:
+                        household = Household.query.filter_by(enrollment_token=reg_token).first()
+
+                    # Fallback: global registration token → first/default household
+                    if not household and expected_reg_token and reg_token == expected_reg_token:
+                        household = Household.query.first()
+
+                    # Open registration mode (no REGISTRATION_TOKEN configured) →
+                    # assign to the first household, creating one if needed.
+                    # This preserves single-tenant backward compatibility and
+                    # handles fresh installations / test environments gracefully.
+                    if not household and not expected_reg_token:
+                        household = Household.query.first()
+                        if not household:
+                            household = Household(
+                                name='Home',
+                                enrollment_token=secrets.token_hex(16),
+                            )
+                            db.session.add(household)
+                            db.session.commit()  # Commit immediately to get household.id cleanly
+                            _LOGGER.info("Auto-created default household for open-registration mode")
+
+                    if not household:
                         _LOGGER.warning(
-                            "Registration rejected: Invalid registration token from %s",
+                            "Registration rejected: Invalid registration/enrollment token from %s",
                             system_id,
                         )
                         ws.send(json.dumps({"type": "auth_result", "success": False, "message": "Invalid registration token"}))
@@ -150,6 +175,7 @@ def ws_agent_handler(ws):
                         system_hostname=system_hostname,
                         system_ip=remote_ip,
                         status='pending',
+                        household_id=household.id,
                     )
                     db.session.add(device)
                     _LOGGER.info(
@@ -227,14 +253,29 @@ def ws_agent_handler(ws):
                     return
     
                 if device.status == 'approved' and not paired:
-                    if expected_reg_token and reg_token != expected_reg_token:
-                        _LOGGER.warning(
-                            "Token delivery rejected: Invalid registration token from %s",
-                            system_id,
+                    # When the server has a registration token (locked-down mode),
+                    # verify that the reconnecting client also knows it — this prevents
+                    # arbitrary connections from harvesting the device token via device ID.
+                    # In open-registration mode (no token configured) we trust the device
+                    # ID alone, preserving backward compatibility.
+                    from src.database import Household
+                    hh = Household.query.get(device.household_id) if device.household_id else None
+                    hh_token = hh.enrollment_token if hh else None
+
+                    is_locked_down = bool(expected_reg_token or hh_token)
+                    if is_locked_down:
+                        token_valid = (
+                            (hh_token and reg_token == hh_token) or
+                            (expected_reg_token and reg_token == expected_reg_token)
                         )
-                        ws.send(json.dumps({"type": "auth_result", "success": False, "message": "Invalid registration token"}))
-                        return
-                    
+                        if not token_valid:
+                            _LOGGER.warning(
+                                "Token delivery rejected: Invalid registration token from %s",
+                                system_id,
+                            )
+                            ws.send(json.dumps({"type": "auth_result", "success": False, "message": "Invalid registration token"}))
+                            return
+
                     _LOGGER.info(
                         "Device %s is approved but client reports it is unpaired. Delivering token.",
                         system_id,
@@ -420,7 +461,7 @@ def ws_agent_handler(ws):
                         )
                     except SQLAlchemyError as exc:
                         db.session.rollback()
-                        _LOGGER.error(
+                        _LOGGER.exception(
                             "Failed to store alert payload from %s: %s",
                             system_id,
                             exc,

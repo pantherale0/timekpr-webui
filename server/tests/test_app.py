@@ -108,7 +108,9 @@ def test_oidc_callback_route(client, db_session):
             mock_userinfo.return_value = {'preferred_username': 'oidc-admin', 'email': 'admin@oidc.com'}
 
             res = client.get('/callback?state=state123&code=code123', follow_redirects=True)
-            assert b"Dashboard" in res.data
+            # A brand-new OIDC user with no household is redirected to the
+            # onboarding flow to create or join a household.
+            assert b"Setup Your Account" in res.data
             # Clean session
             client.get('/logout')
 

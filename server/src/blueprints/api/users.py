@@ -554,7 +554,18 @@ def get_all_users():
     if not session.get('logged_in'):
         return jsonify({'success': False, 'message': api_message('not_authenticated')}), 401
     
-    users = ManagedUser.query.order_by(ManagedUser.username.asc()).all()
+    active_hh_id = session.get('active_household_id')
+    if not active_hh_id:
+        from src.database import ParentAccount
+        p = ParentAccount.query.filter_by(email='admin@local').first()
+        if p and p.memberships:
+            active_hh_id = p.memberships[0].household_id
+
+    query = ManagedUser.query
+    if active_hh_id:
+        query = query.filter_by(household_id=active_hh_id)
+
+    users = query.order_by(ManagedUser.username.asc()).all()
     return jsonify({
         'success': True,
         'users': [{'id': u.id, 'username': u.username} for u in users]
@@ -583,7 +594,14 @@ def api_create_user():
             'message': api_message('profile_exists', username=username),
         }), 400
         
-    user = ManagedUser(username=username, is_valid=False, system_ip='Unassigned')
+    active_hh_id = session.get('active_household_id')
+    if not active_hh_id:
+        from src.database import ParentAccount
+        p = ParentAccount.query.filter_by(email='admin@local').first()
+        if p and p.memberships:
+            active_hh_id = p.memberships[0].household_id
+
+    user = ManagedUser(username=username, is_valid=False, system_ip='Unassigned', household_id=active_hh_id)
     db.session.add(user)
     db.session.commit()
     return jsonify({

@@ -39,11 +39,16 @@ db = importlib.import_module('src.database').db
 @pytest.fixture(scope='session')
 def app():
     """Return the Flask app configured for isolated in-memory tests."""
+    from sqlalchemy.pool import StaticPool
     flask_app.config.update({
         'TESTING': True,
         'SQLALCHEMY_DATABASE_URI': 'sqlite:///:memory:',
         'SQLALCHEMY_TRACK_MODIFICATIONS': False,
-        'WTF_CSRF_ENABLED': False
+        'WTF_CSRF_ENABLED': False,
+        'SQLALCHEMY_ENGINE_OPTIONS': {
+            'poolclass': StaticPool,
+            'connect_args': {'check_same_thread': False}
+        }
     })
     return flask_app
 

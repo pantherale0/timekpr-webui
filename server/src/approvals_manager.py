@@ -186,6 +186,14 @@ def _resolve_mapping(system_id, linux_username):
     ).first()
     if mapping is None:
         raise ValueError(f'No mapping for {username} on device {system_id}')
+        
+    from src.database import AgentDevice
+    device = AgentDevice.query.get(system_id)
+    if device and mapping.managed_user and mapping.managed_user.household_id != device.household_id:
+        raise ValueError(
+            f'Household mismatch: child profile {mapping.managed_user.username} is in household '
+            f'{mapping.managed_user.household_id}, but device is in household {device.household_id}'
+        )
     return mapping
 
 
@@ -329,6 +337,8 @@ def list_pending_requests(
     request_type=None,
     managed_user_id=None,
     limit=50,
+    active_household_id=None,
+    parent_account_id=None,
 ):
     """Return approval requests ordered by requested_at descending."""
     query = ApprovalRequest.query
@@ -345,6 +355,26 @@ def list_pending_requests(
         query = query.join(ManagedUserDeviceMap).filter(
             ManagedUserDeviceMap.managed_user_id == int(managed_user_id),
         )
+
+    # Scoping filter
+    if active_household_id is not None or parent_account_id is not None:
+        from src.database import ManagedUser, ManagedUserDeviceMap, ManagedUserShare, db
+        if managed_user_id is None:
+            query = query.join(ManagedUserDeviceMap)
+        query = query.join(ManagedUser, ManagedUser.id == ManagedUserDeviceMap.managed_user_id)
+        
+        filters = []
+        if active_household_id is not None:
+            filters.append(ManagedUser.household_id == active_household_id)
+        if parent_account_id is not None:
+            shared_user_ids_subquery = db.session.query(ManagedUserShare.managed_user_id).filter(
+                ManagedUserShare.parent_account_id == parent_account_id
+            ).subquery()
+            filters.append(ManagedUser.id.in_(shared_user_ids_subquery))
+            
+        if filters:
+            from sqlalchemy import or_
+            query = query.filter(or_(*filters))
 
     return (
         query.order_by(ApprovalRequest.requested_at.desc())
@@ -378,9 +408,9 @@ def build_request_summary(request_row):
     }
 
 
-def build_pending_approvals_snapshot(limit=5):
+def build_pending_approvals_snapshot(limit=5, active_household_id=None, parent_account_id=None):
     """Build dashboard pending approval counts and preview items."""
-    pending = list_pending_requests(limit=200)
+    pending = list_pending_requests(limit=200, active_household_id=active_household_id, parent_account_id=parent_account_id)
     by_user = {}
     items = []
 

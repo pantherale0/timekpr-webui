@@ -69,7 +69,10 @@
                     <div class="card-header d-flex justify-content-between align-items-center py-3">
                         <div class="d-flex align-items-center gap-2">
                             <span id="status-dot-{{ user.id }}" class="status-dot rounded-circle" style="display: inline-block; width: 10px; height: 10px; background-color: {{ 'var(--guardian-status-connected)' if user.is_online else 'var(--guardian-text-secondary)' }};" title="{{ t('pages.dashboard.agent_online') if user.is_online else t('pages.dashboard.agent_offline') }}"></span>
-                            <h5 class="mb-0 fw-bold text-truncate" style="max-width: 150px;">{{ user.username }}</h5>
+                            <h5 class="mb-0 fw-bold text-truncate" style="max-width: 120px;">{{ user.username }}</h5>
+                            {% if user.is_shared %}
+                                <span class="badge" style="font-size: 0.65rem; color: #4A6B5D; border: 1px solid #4A6B5D !important; background-color: #EBF1EE;">{{ t('common.shared', 'Shared') }}</span>
+                            {% endif %}
                         </div>
                         <div class="d-flex flex-column gap-1 align-items-end">
                             <span id="pending-badge-{{ user.id }}" class="badge bg-warning text-dark" style="font-size: 0.7rem;{% if user.id|string not in pending_adjustments %} display: none;{% endif %}">

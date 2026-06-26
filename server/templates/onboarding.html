@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="{{ locale }}" data-bs-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Welcome to Guardian - Setup Your Account</title>
+    
+    <!-- Bootstrap 5.3 & AdminLTE 4 & FontAwesome 6 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/admin-lte@4.0.0/dist/css/adminlte.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap" rel="stylesheet">
+    
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v=server_version) }}">
+    <script src="{{ url_for('static', filename='js/theme.js', v=server_version) }}"></script>
+    <style>
+        body {
+            font-family: 'Atkinson Hyperlegible', sans-serif;
+            background: linear-gradient(160deg, var(--guardian-ivory, #FBFBF9) 0%, var(--guardian-sage-subtle, #E6ECE9) 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .onboarding-box {
+            width: 500px;
+            margin: 1.5rem;
+        }
+        .brand-icon-shield {
+            font-size: 2.5rem;
+            color: #4A6B5D; /* Sage Green */
+            margin-bottom: 0.5rem;
+        }
+        .onboarding-card-body {
+            border-radius: 0.5rem;
+        }
+        .nav-tabs .nav-link {
+            color: #4A6B5D;
+            font-weight: 600;
+        }
+        .nav-tabs .nav-link.active {
+            color: #1e293b;
+            border-bottom-color: #4A6B5D;
+            border-bottom-width: 3px;
+        }
+        .btn-cta {
+            background-color: #4A6B5D;
+            border-color: #4A6B5D;
+            color: white;
+        }
+        .btn-cta:hover {
+            background-color: #3b5449;
+            border-color: #3b5449;
+            color: white;
+        }
+    </style>
+</head>
+<body class="bg-body-tertiary">
+    <div class="onboarding-box">
+        <div class="text-center mb-4">
+            <i class="fas fa-shield-alt brand-icon-shield"></i>
+            <h3 class="fw-bold mb-1">Setup Your Account</h3>
+            <span class="text-secondary small fw-bold text-uppercase tracking-wider" style="font-size: 0.75rem; letter-spacing: 0.05em;">Welcome to Guardian Parental Control</span>
+        </div>
+
+        <div class="card shadow-lg border-0">
+            <div class="card-body onboarding-card-body p-4">
+                <p class="text-center text-muted mb-4 fw-medium">Choose an option below to get started. You can create a new household, join an existing household, or accept a shared profile.</p>
+
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <div class="alert alert-{{ 'danger' if category == 'error' or category == 'danger' else 'warning' if category == 'warning' else 'success' }} alert-dismissible fade show small" role="alert">
+                                <i class="fas {% if category == 'success' %}fa-check-circle{% elif category == 'warning' %}fa-exclamation-triangle{% else %}fa-times-circle{% endif %} me-1"></i>
+                                {{ message }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+
+                <!-- Tabs Navigation -->
+                <ul class="nav nav-tabs justify-content-center mb-4" id="onboardingTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="create-tab" data-bs-toggle="tab" data-bs-target="#create-pane" type="button" role="tab" aria-controls="create-pane" aria-selected="true">
+                            <i class="fas fa-home me-1"></i> Create
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="join-tab" data-bs-toggle="tab" data-bs-target="#join-pane" type="button" role="tab" aria-controls="join-pane" aria-selected="false">
+                            <i class="fas fa-key me-1"></i> Join Home
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="share-tab" data-bs-toggle="tab" data-bs-target="#share-pane" type="button" role="tab" aria-controls="share-pane" aria-selected="false">
+                            <i class="fas fa-user-friends me-1"></i> Shared Child
+                        </button>
+                    </li>
+                </ul>
+
+                <!-- Tabs Content -->
+                <div class="tab-content" id="onboardingTabsContent">
+                    <!-- Create Household Pane -->
+                    <div class="tab-pane fade show active" id="create-pane" role="tabpanel" aria-labelledby="create-tab">
+                        <form method="POST" action="{{ url_for('ui_auth.onboarding_create') }}" class="m-0">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <div class="mb-3">
+                                <label for="household_name" class="form-label fw-bold text-slate">Household Name</label>
+                                <input type="text" id="household_name" name="household_name" class="form-control shadow-sm" placeholder="e.g., The Smith Home" required>
+                                <div class="form-text text-muted small">This is the name of your home. You will be the owner and can pair devices to it.</div>
+                            </div>
+                            <button type="submit" class="btn btn-cta w-100 fw-bold py-2 shadow-sm mt-3">
+                                <i class="fas fa-plus-circle me-1"></i> Create Household
+                            </button>
+                        </form>
+                    </div>
+
+                    <!-- Join Household Pane -->
+                    <div class="tab-pane fade" id="join-pane" role="tabpanel" aria-labelledby="join-tab">
+                        <form method="POST" action="{{ url_for('ui_auth.onboarding_join') }}" class="m-0">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <div class="mb-3">
+                                <label for="invite_code" class="form-label fw-bold text-slate">Household Invite Code</label>
+                                <input type="text" id="invite_code" name="invite_code" class="form-control shadow-sm" placeholder="Enter invitation code" required>
+                                <div class="form-text text-muted small">Ask the household owner to generate an invite code for you. Joining will give you access to all devices and children in that home.</div>
+                            </div>
+                            <button type="submit" class="btn btn-cta w-100 fw-bold py-2 shadow-sm mt-3">
+                                <i class="fas fa-door-open me-1"></i> Join Household
+                            </button>
+                        </form>
+                    </div>
+
+                    <!-- Redeem Share Pane -->
+                    <div class="tab-pane fade" id="share-pane" role="tabpanel" aria-labelledby="share-tab">
+                        <form method="POST" action="{{ url_for('ui_auth.onboarding_redeem_share') }}" class="m-0">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <div class="mb-3">
+                                <label for="share_code" class="form-label fw-bold text-slate">Child Share Code</label>
+                                <input type="text" id="share_code" name="share_code" class="form-control shadow-sm" placeholder="Enter child share code" required>
+                                <div class="form-text text-muted small">Enter a child profile share code to access a single child profile with restricted permissions (e.g., viewing logs or managing limits).</div>
+                            </div>
+                            <button type="submit" class="btn btn-cta w-100 fw-bold py-2 shadow-sm mt-3">
+                                <i class="fas fa-user-plus me-1"></i> Accept Shared Profile
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+                <div class="text-center mt-4 pt-3 border-top">
+                    <a href="{{ url_for('ui_auth.logout') }}" class="btn btn-outline-secondary btn-sm">
+                        <i class="fas fa-sign-out-alt me-1"></i> Logout
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap Bundle JS (includes Popper) -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

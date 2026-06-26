@@ -176,3 +176,88 @@ def wants_json_response() -> bool:
         return True
     return request.headers.get('X-Requested-With') == 'XMLHttpRequest'
 
+
+def parent_has_access_to_child(parent_id: int, child_id: int, required_perm: str = None) -> bool:
+    """Verify if a parent has access to a specific child profile."""
+    from src.database import db, HouseholdParentMembership, ManagedUser, ManagedUserShare
+    # 1. Check if the child belongs to a Household the parent is in
+    membership = db.session.query(HouseholdParentMembership).join(
+        ManagedUser, ManagedUser.household_id == HouseholdParentMembership.household_id
+    ).filter(
+        HouseholdParentMembership.parent_account_id == parent_id,
+        ManagedUser.id == child_id
+    ).first()
+    
+    if membership:
+        perms = membership.permissions_json or {}
+        if perms.get('is_owner') or perms.get('is_admin'):
+            return True
+        if required_perm:
+            return perms.get(required_perm, False)
+        return True # Default structural membership access
+        
+    # 2. Check if the child is individually shared with this parent
+    share = ManagedUserShare.query.filter_by(parent_account_id=parent_id, managed_user_id=child_id).first()
+    if share:
+        perms = share.permissions_json or {}
+        if not required_perm:
+            return True
+        return perms.get(required_perm, False)
+        
+    return False
+
+
+def parent_has_access_to_device(parent_id: int, system_id: str) -> bool:
+    """Verify if a parent has access to a specific device."""
+    from src.database import db, HouseholdParentMembership, AgentDevice
+    if not system_id:
+        return False
+    # Check if the device belongs to a Household the parent is in
+    membership = db.session.query(HouseholdParentMembership).join(
+        AgentDevice, AgentDevice.household_id == HouseholdParentMembership.household_id
+    ).filter(
+        HouseholdParentMembership.parent_account_id == parent_id,
+        AgentDevice.system_id == system_id
+    ).first()
+    
+    return membership is not None
+
+
+def check_parent_child_access(child_id: int, required_perm: str = None):
+    """Raise 403 if the logged in parent does not have access to the child.
+
+    When no parent identity can be resolved (local admin mode or test environments
+    where admin@local does not yet exist), access is granted. Tenant isolation only
+    engages when a concrete parent_id is established.
+    """
+    from flask import session, abort
+    from src.database import ParentAccount
+    parent_id = session.get('parent_account_id')
+    if not parent_id and session.get('logged_in'):
+        p = ParentAccount.query.filter_by(email='admin@local').first()
+        parent_id = p.id if p else None
+    # No parent identity → single-tenant local mode, allow through.
+    if not parent_id:
+        return
+    if not parent_has_access_to_child(parent_id, child_id, required_perm):
+        abort(403)
+
+
+def check_parent_device_access(system_id: str):
+    """Raise 403 if the logged in parent does not have access to the device.
+
+    Falls through when no parent identity is available (local admin / test mode).
+    """
+    from flask import session, abort
+    from src.database import ParentAccount
+    parent_id = session.get('parent_account_id')
+    if not parent_id and session.get('logged_in'):
+        p = ParentAccount.query.filter_by(email='admin@local').first()
+        parent_id = p.id if p else None
+    # No parent identity → single-tenant local mode, allow through.
+    if not parent_id:
+        return
+    if not parent_has_access_to_device(parent_id, system_id):
+        abort(403)
+
+

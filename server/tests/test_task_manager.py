@@ -8,6 +8,7 @@ from unittest.mock import MagicMock, patch
 
 from src.agent_helper import AgentConnectionManager
 from src.database import (
+    utc_today,
     AgentAlert,
     AgentDevice,
     BlocklistDomain,
@@ -327,7 +328,7 @@ def test_task_manager_retains_same_day_usage_for_offline_mappings(app, db_sessio
         manager._update_user_data()
 
     refreshed_user = ManagedUser.query.filter_by(id=user.id).first()
-    usage = UserTimeUsage.query.filter_by(user_id=user.id, date=date.today()).first()
+    usage = UserTimeUsage.query.filter_by(user_id=user.id, date=utc_today()).first()
     assert usage.time_spent == 2250
     assert refreshed_user.get_config_value("TIME_SPENT_DAY") == 2250
 
@@ -337,7 +338,7 @@ def test_task_manager_retains_same_day_usage_for_offline_mappings(app, db_sessio
         manager._update_user_data()
 
     refreshed_user = ManagedUser.query.filter_by(id=user.id).first()
-    usage = UserTimeUsage.query.filter_by(user_id=user.id, date=date.today()).first()
+    usage = UserTimeUsage.query.filter_by(user_id=user.id, date=utc_today()).first()
     assert usage.time_spent == 2250
     assert refreshed_user.get_config_value("TIME_SPENT_DAY") == 2250
 
@@ -365,7 +366,7 @@ def test_task_manager_rebalances_shared_time_left_across_devices(app, db_session
         'saturday_hours',
         'sunday_hours',
     )
-    setattr(schedule, weekday_columns[date.today().weekday()], 1.0)
+    setattr(schedule, weekday_columns[utc_today().weekday()], 1.0)
     db_session.add(schedule)
 
     offline_mapping = ManagedUserDeviceMap(
@@ -400,7 +401,7 @@ def test_task_manager_rebalances_shared_time_left_across_devices(app, db_session
     assert rebalance_calls[-1]["args"] == {"operation": "-", "seconds": 1200}
 
     refreshed_user = ManagedUser.query.filter_by(id=user.id).first()
-    usage = UserTimeUsage.query.filter_by(user_id=user.id, date=date.today()).first()
+    usage = UserTimeUsage.query.filter_by(user_id=user.id, date=utc_today()).first()
     assert usage.time_spent == 1800
     assert refreshed_user.get_config_value("TIME_LEFT_DAY") == 1800
     assert online_mapping.get_config_value("TIME_LEFT_DAY") == 1800
@@ -430,7 +431,7 @@ def test_task_manager_uses_server_daily_adjustment_when_rebalancing(app, db_sess
         'saturday_hours',
         'sunday_hours',
     )
-    setattr(schedule, weekday_columns[date.today().weekday()], 1.0)
+    setattr(schedule, weekday_columns[utc_today().weekday()], 1.0)
     db_session.add(schedule)
 
     mapping = ManagedUserDeviceMap(
@@ -440,7 +441,7 @@ def test_task_manager_uses_server_daily_adjustment_when_rebalancing(app, db_sess
         is_valid=True,
     )
     db_session.add(mapping)
-    user.apply_daily_limit_adjustment('+', 300, date.today())
+    user.apply_daily_limit_adjustment('+', 300, utc_today())
     db_session.commit()
 
     ws = StatefulTimeWS(time_spent=600, time_left=3000)
@@ -485,7 +486,7 @@ def test_task_manager_ignores_small_time_drift_within_tolerance(app, db_session)
         'saturday_hours',
         'sunday_hours',
     )
-    setattr(schedule, weekday_columns[date.today().weekday()], 1.0)
+    setattr(schedule, weekday_columns[utc_today().weekday()], 1.0)
     db_session.add(schedule)
 
     mapping = ManagedUserDeviceMap(

@@ -1,6 +1,21 @@
 """Build template context for SPA fragment routes."""
 
-from flask import request
+from flask import request, session, abort
+
+from src.database import ParentAccount
+
+def get_current_parent_and_household():
+    """Retrieve the current parent account ID and active household ID from session, with fallback for local admin."""
+    parent_id = session.get('parent_account_id')
+    active_household_id = session.get('active_household_id')
+    if session.get('logged_in') and not parent_id:
+        # Fallback for local admin or testing environments
+        parent = ParentAccount.query.filter_by(email='admin@local').first()
+        if parent:
+            parent_id = parent.id
+            if not active_household_id and parent.memberships:
+                active_household_id = parent.memberships[0].household_id
+    return parent_id, active_household_id
 
 from src.agent_helper import AgentConnectionManager
 from src.alerts_manager import _build_device_alert_entries, _build_user_alert_groups
@@ -160,9 +175,10 @@ def _build_device_protection_summary(
 
 def build_dashboard_context():
     from src.policy_preset_manager import get_matrix_metadata_for_ui
+    parent_id, active_hh_id = get_current_parent_and_household()
 
     db.session.expire_all()
-    snapshot = build_dashboard_snapshot()
+    snapshot = build_dashboard_snapshot(active_household_id=active_hh_id, parent_account_id=parent_id)
     return {
         'template': 'dashboard.html',
         'users': snapshot['users'],
@@ -173,11 +189,18 @@ def build_dashboard_context():
 
 def build_admin_users_context():
     from src.policy_preset_manager import get_matrix_metadata_for_ui
+    parent_id, active_hh_id = get_current_parent_and_household()
+
+    users_query = ManagedUser.query
+    devices_query = AgentDevice.query.filter_by(status='approved')
+    if active_hh_id:
+        users_query = users_query.filter_by(household_id=active_hh_id)
+        devices_query = devices_query.filter_by(household_id=active_hh_id)
 
     return {
         'template': 'admin_users.html',
-        'users': ManagedUser.query.order_by(ManagedUser.username.asc()).all(),
-        'approved_devices': AgentDevice.query.filter_by(status='approved').all(),
+        'users': users_query.order_by(ManagedUser.username.asc()).all(),
+        'approved_devices': devices_query.all(),
         'device_labels': _get_device_label_map(),
         'policy_preset_matrix': get_matrix_metadata_for_ui(),
     }
@@ -189,6 +212,9 @@ def build_edit_user_profile_context(user_id):
     from src.linux_device_policy_manager import get_or_create_policy as get_or_create_linux_policy
     from src.marketplace_manager import load_marketplace_presets
     from src.policy_preset_manager import get_matrix_metadata_for_ui
+    from src.helpers import check_parent_child_access
+
+    check_parent_child_access(user_id)
 
     user = ManagedUser.query.get_or_404(user_id)
     blocklist_sync_status = _build_user_blocklist_sync_status(user)
@@ -299,7 +325,8 @@ def build_admin_approvals_context():
     import json
     from src.approvals_manager import build_request_summary, list_pending_requests
 
-    pending_rows = list_pending_requests(limit=100)
+    parent_id, active_hh_id = get_current_parent_and_household()
+    pending_rows = list_pending_requests(limit=100, active_household_id=active_hh_id, parent_account_id=parent_id)
     device_labels = _get_device_label_map()
     pending_approvals = []
     for row in pending_rows:
@@ -319,10 +346,17 @@ def build_admin_approvals_context():
 
 
 def build_admin_devices_context():
+    parent_id, active_hh_id = get_current_parent_and_household()
+    devices_approved = AgentDevice.query.filter_by(status='approved')
+    devices_pending = AgentDevice.query.filter_by(status='pending')
+    if active_hh_id:
+        devices_approved = devices_approved.filter_by(household_id=active_hh_id)
+        devices_pending = devices_pending.filter_by(household_id=active_hh_id)
+
     return {
         'template': 'admin_devices.html',
-        'approved_devices': AgentDevice.query.filter_by(status='approved').all(),
-        'pending_devices': AgentDevice.query.filter_by(status='pending').all(),
+        'approved_devices': devices_approved.all(),
+        'pending_devices': devices_pending.all(),
         'device_labels': _get_device_label_map(),
         'AgentConnectionManager': AgentConnectionManager,
     }
@@ -331,10 +365,16 @@ def build_admin_devices_context():
 def build_admin_restrictions_context():
     from src.marketplace_manager import load_marketplace_presets
 
+    parent_id, active_hh_id = get_current_parent_and_household()
     blocklist_sources = _get_blocklist_sources(include_domains=True)
     custom_sources = [s for s in blocklist_sources if not s.get('is_marketplace')]
     marketplace_presets = load_marketplace_presets()
-    users = ManagedUser.query.order_by(ManagedUser.username.asc()).all()
+    
+    users_query = ManagedUser.query
+    if active_hh_id:
+        users_query = users_query.filter_by(household_id=active_hh_id)
+    users = users_query.order_by(ManagedUser.username.asc()).all()
+
     subscribed_map = {preset['id']: [] for preset in marketplace_presets}
     for user in users:
         for assignment in user.blocklist_assignments:
@@ -357,7 +397,17 @@ def _build_pairing_qr_context():
         request,
         configured_url=_get_agent_websocket_url(),
     )
-    registration_token = AgentConnectionManager.registration_token
+    parent_id, active_hh_id = get_current_parent_and_household()
+    registration_token = None
+    if active_hh_id:
+        from src.database import Household
+        hh = Household.query.get(active_hh_id)
+        if hh:
+            registration_token = hh.enrollment_token
+            
+    if not registration_token:
+        registration_token = AgentConnectionManager.registration_token
+
     pairing_payload = pairing_payload_json(server_url, registration_token)
     pairing_qr_data_uri = render_pairing_qr_data_uri(pairing_payload)
     return {
@@ -421,6 +471,9 @@ def build_admin_settings_context():
 
 
 def build_user_stats_context(user_id):
+    from src.helpers import check_parent_child_access
+    check_parent_child_access(user_id)
+
     user = ManagedUser.query.get_or_404(user_id)
     alert_search = (request.args.get('alert_search') or '').strip()
     return {
@@ -446,6 +499,9 @@ def _split_user_alert_context(user, alert_search):
 
 
 def build_device_detail_context(system_id):
+    from src.helpers import check_parent_device_access
+    check_parent_device_access(system_id)
+
     device = AgentDevice.query.get_or_404(system_id)
     alert_search = (request.args.get('alert_search') or '').strip()
     alert_entries, alert_summary = _build_device_alert_entries(device, search_query=alert_search)
@@ -568,6 +624,9 @@ def build_device_detail_context(system_id):
 
 
 def build_user_combined_history_context(user_id):
+    from src.helpers import check_parent_child_access
+    check_parent_child_access(user_id)
+
     user = ManagedUser.query.get_or_404(user_id)
     return {
         'template': 'web_video_history.html',
@@ -576,6 +635,9 @@ def build_user_combined_history_context(user_id):
 
 
 def build_user_online_accounts_context(user_id):
+    from src.helpers import check_parent_child_access
+    check_parent_child_access(user_id)
+
     user = ManagedUser.query.get_or_404(user_id)
     return {
         'template': 'online_accounts.html',
@@ -584,7 +646,12 @@ def build_user_online_accounts_context(user_id):
 
 
 def build_weekly_schedule_context():
-    users = ManagedUser.query.order_by(ManagedUser.username.asc()).all()
+    parent_id, active_hh_id = get_current_parent_and_household()
+    users_query = ManagedUser.query
+    if active_hh_id:
+        users_query = users_query.filter_by(household_id=active_hh_id)
+    users = users_query.order_by(ManagedUser.username.asc()).all()
+
     db_changed = False
     for user in users:
         if not user.weekly_schedule:
@@ -600,6 +667,9 @@ def build_weekly_schedule_context():
 
 
 def build_weekly_schedule_user_context(user_id):
+    from src.helpers import check_parent_child_access
+    check_parent_child_access(user_id)
+
     user = ManagedUser.query.get_or_404(user_id)
     if not user.weekly_schedule:
         schedule = UserWeeklySchedule(user_id=user.id)
@@ -620,11 +690,17 @@ def build_admin_app_policies_context():
     from src.apparmor_manager import CURATED_APPARMOR_APPS
     from src.installed_apps_manager import list_discovered_apps_for_platform
 
+    parent_id, active_hh_id = get_current_parent_and_household()
     policies = AppPolicy.query.order_by(AppPolicy.name.asc()).all()
+    
+    users_query = ManagedUser.query
+    if active_hh_id:
+        users_query = users_query.filter_by(household_id=active_hh_id)
+
     return {
         'template': 'restrictions_app.html',
         'policies': policies,
-        'managed_users': ManagedUser.query.order_by(ManagedUser.username.asc()).all(),
+        'managed_users': users_query.order_by(ManagedUser.username.asc()).all(),
         'curated_options': CURATED_APPARMOR_APPS,
         'discovered_apps_by_policy': {
             policy.id: list_discovered_apps_for_platform(policy.platform)

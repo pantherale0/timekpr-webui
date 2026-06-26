@@ -86,12 +86,39 @@ def list_access_requests():
         system_id (str, optional) – filter by device
         limit     (int, optional) – max results, capped at 200 (default 50)
     """
+    from flask import session, abort
+    if not session.get('logged_in'):
+        return jsonify({"error": "Unauthorized"}), 401
+
     system_id = request.args.get("system_id")
     limit = min(int(request.args.get("limit", 50)), 200)
+
+    parent_id = session.get('parent_account_id')
+    active_hh_id = session.get('active_household_id')
+    if not parent_id:
+        from src.database import ParentAccount
+        p = ParentAccount.query.filter_by(email='admin@local').first()
+        if p:
+            parent_id = p.id
+            if not active_hh_id and p.memberships:
+                active_hh_id = p.memberships[0].household_id
+
+    if system_id:
+        from src.helpers import parent_has_access_to_device
+        if not parent_id or not parent_has_access_to_device(parent_id, system_id):
+            abort(403)
 
     query = AgentAlert.query.filter_by(event_type="access_requested")
     if system_id:
         query = query.filter_by(system_id=system_id)
+    elif active_hh_id:
+        query = query.join(AgentDevice, AgentDevice.system_id == AgentAlert.system_id).filter(
+            AgentDevice.household_id == active_hh_id
+        )
+    else:
+        # If no active household and no specific device, return empty list to prevent leakage
+        return jsonify([])
+
     alerts = query.order_by(AgentAlert.occurred_at.desc()).limit(limit).all()
 
     return jsonify([

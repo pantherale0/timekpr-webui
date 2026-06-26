@@ -347,7 +347,35 @@ class BackgroundTaskManager:
 
         # Web history background tasks
         self._prune_web_history()
+
+        # Prune expired invites
+        self._prune_expired_invites()
     
+    def _prune_expired_invites(self):
+        """Automatically prune expired household and child share invites."""
+        try:
+            from src.database import HouseholdInvite, ManagedUserShareInvite
+            now = datetime.now(timezone.utc)
+            
+            deleted_hh_invites = HouseholdInvite.query.filter(
+                HouseholdInvite.expires_at < now
+            ).delete(synchronize_session=False)
+            
+            deleted_share_invites = ManagedUserShareInvite.query.filter(
+                ManagedUserShareInvite.expires_at < now
+            ).delete(synchronize_session=False)
+            
+            if deleted_hh_invites > 0 or deleted_share_invites > 0:
+                db.session.commit()
+                logger.info(
+                    "Automatically pruned %d expired household invites and %d expired child share invites",
+                    deleted_hh_invites,
+                    deleted_share_invites,
+                )
+        except Exception as exc:
+            logger.warning("Failed to automatically prune expired invites: %s", exc)
+            db.session.rollback()
+
     def _prune_old_alerts(self):
         """Automatically prune alerts older than the configured threshold."""
         try:
@@ -1501,14 +1529,30 @@ class BackgroundTaskManager:
         active_sources = BlocklistSource.query.filter_by(is_enabled=True).all()
         active_source_ids = {source.id for source in active_sources}
         source_state_map = build_source_state_map(active_sources)
+        
+        from src.database import AgentDevice
+        device = AgentDevice.query.get(system_id)
+        device_household_id = device.household_id if device else None
+
         mappings = ManagedUserDeviceMap.query.filter_by(system_id=system_id).order_by(
             ManagedUserDeviceMap.id.asc(),
         ).all()
 
         mapping_state = []
         for mapping in mappings:
+            child = mapping.managed_user
+            if child and child.household_id != device_household_id:
+                logger.warning(
+                    "Skipping domain policy sync for child %s mapped to device %s: Household mismatch (Child: %s, Device: %s)",
+                    child.id,
+                    system_id,
+                    child.household_id,
+                    device_household_id
+                )
+                continue
+
             assigned_source_ids = _assigned_source_ids_for_user(
-                mapping.managed_user,
+                child,
                 active_source_ids=active_source_ids,
             )
             summary = summarize_mapping_blocklist_sync(mapping, source_state_map, assigned_source_ids)
