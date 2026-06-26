@@ -80,7 +80,7 @@ python scripts/i18n/manage.py validate --strict   # fail on [TODO] strings
 
 # Validate key references in code/templates and warn on hardcoded UI strings
 python scripts/i18n/manage.py check-usage
-python scripts/i18n/manage.py check-usage --changed-file server/templates/dashboard.html
+python scripts/i18n/manage.py check-usage --changed-file server/templates/dashboard.html  # diff mode (CI)
 
 # List locales and missing keys vs English
 python scripts/i18n/manage.py list-locales

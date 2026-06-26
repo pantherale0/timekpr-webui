@@ -116,6 +116,41 @@ def test_dynamic_template_key_suffix_is_ignored(tmp_path, monkeypatch):
     assert report.missing_keys == []
 
 
+def test_diff_mode_ignores_unchanged_files(tmp_path, monkeypatch):
+    repo = tmp_path / 'repo'
+    server = repo / 'server' / 'src'
+    server.mkdir(parents=True)
+    (server / 'changed.py').write_text(
+        "from src.i18n.catalog import flash_t\nflash_t('flash.auth.missing_in_diff', 'danger')\n",
+        encoding='utf-8',
+    )
+    (server / 'unchanged.py').write_text(
+        "from src.i18n.catalog import flash_t\nflash_t('flash.auth.missing_elsewhere', 'danger')\n",
+        encoding='utf-8',
+    )
+
+    i18n_root = repo / 'i18n' / 'en'
+    i18n_root.mkdir(parents=True)
+    (i18n_root / 'server.yaml').write_text(
+        'meta:\n  locale: en\n  label: English\nflash:\n  auth:\n    login_success: ok\n',
+        encoding='utf-8',
+    )
+
+    monkeypatch.setattr(check_usage, 'REPO_ROOT', repo)
+    monkeypatch.setattr(lib, 'I18N_ROOT', repo / 'i18n')
+    monkeypatch.setattr(lib, 'REPO_ROOT', repo)
+
+    full_report = check_usage.run_check()
+    assert any(ref.catalog_key == 'flash.auth.missing_in_diff' for ref in full_report.missing_keys)
+    assert any(ref.catalog_key == 'flash.auth.missing_elsewhere' for ref in full_report.missing_keys)
+
+    diff_report = check_usage.run_check(changed_files={'server/src/changed.py'})
+    assert diff_report.diff_mode is True
+    missing = {ref.catalog_key for ref in diff_report.missing_keys}
+    assert 'flash.auth.missing_in_diff' in missing
+    assert 'flash.auth.missing_elsewhere' not in missing
+
+
 def test_manage_cli_check_usage():
     manage_path = Path(__file__).resolve().parents[2] / 'scripts' / 'i18n' / 'manage.py'
     spec = importlib.util.spec_from_file_location('i18n_manage', manage_path)

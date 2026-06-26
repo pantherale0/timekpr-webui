@@ -110,6 +110,7 @@ class CheckReport:
     hardcoded: list[HardcodedString] = field(default_factory=list)
     catalog_errors: list[str] = field(default_factory=list)
     keys_checked: int = 0
+    diff_mode: bool = False
 
     @property
     def failed(self) -> bool:
@@ -344,25 +345,25 @@ def _filter_paths(paths: list[Path], changed_only: set[str] | None) -> list[Path
     return [path for path in paths if _rel(path) in changed_only]
 
 
-def collect_key_references() -> list[KeyReference]:
+def collect_key_references(changed_only: set[str] | None = None) -> list[KeyReference]:
     refs: list[KeyReference] = []
     seen: set[tuple[str, str, int]] = set()
 
-    for path in _iter_files(('*.py',), (REPO_ROOT / 'server',)):
+    for path in _filter_paths(_iter_files(('*.py',), (REPO_ROOT / 'server',)), changed_only):
         if path.name.startswith('test_'):
             continue
         content = path.read_text(encoding='utf-8')
         _scan_python_keys(path, content, refs, seen)
 
-    for path in _iter_files(('*.html',), (REPO_ROOT / 'server' / 'templates',)):
+    for path in _filter_paths(_iter_files(('*.html',), (REPO_ROOT / 'server' / 'templates',)), changed_only):
         content = path.read_text(encoding='utf-8')
         _scan_template_keys(path, content, refs, seen)
 
-    for path in _iter_files(('*.js',), (REPO_ROOT / 'server' / 'static' / 'js',)):
+    for path in _filter_paths(_iter_files(('*.js',), (REPO_ROOT / 'server' / 'static' / 'js',)), changed_only):
         content = path.read_text(encoding='utf-8')
         _scan_js_keys(path, content, refs, seen, service='server')
 
-    for path in _iter_files(('*.js',), (REPO_ROOT / 'extension',)):
+    for path in _filter_paths(_iter_files(('*.js',), (REPO_ROOT / 'extension',)), changed_only):
         if path.name.startswith('overlay-i18n.'):
             continue
         content = path.read_text(encoding='utf-8')
@@ -421,12 +422,18 @@ def validate_references(refs: list[KeyReference]) -> list[KeyReference]:
 
 def run_check(*, changed_files: set[str] | None = None, warn_hardcoded: bool = True) -> CheckReport:
     report = CheckReport()
+    report.diff_mode = changed_files is not None
     report.catalog_errors = validate_catalogs()
 
-    refs = collect_key_references()
+    scope = changed_files
+    refs = collect_key_references(changed_only=scope)
     report.keys_checked = len(refs)
     report.missing_keys = validate_references(refs)
-    report.hardcoded = collect_hardcoded_strings(changed_files) if warn_hardcoded else []
+    report.hardcoded = (
+        collect_hardcoded_strings(changed_only=scope)
+        if warn_hardcoded
+        else []
+    )
     return report
 
 
@@ -439,6 +446,9 @@ def _truncate(text: str, limit: int = 72) -> str:
 
 def format_markdown(report: CheckReport, *, changed_files: set[str] | None = None) -> str:
     lines = [COMMENT_MARKER, '## 🌐 Translation check', '']
+    if report.diff_mode:
+        lines.append('_Scanning translation usage in changed files only (catalog structure is always validated)._')
+        lines.append('')
 
     if report.catalog_errors:
         lines.append('### ❌ Catalog structure errors')
@@ -458,11 +468,15 @@ def format_markdown(report: CheckReport, *, changed_files: set[str] | None = Non
             lines.append(f'| `{ref.catalog_key}` | `{ref.file}:{ref.line}` |')
         lines.append('')
     else:
-        lines.append(f'✅ All **{report.keys_checked}** referenced translation keys exist in English catalogs.')
+        scope = 'changed files in this diff' if report.diff_mode else 'the project'
+        lines.append(
+            f'✅ All **{report.keys_checked}** translation key reference(s) in {scope} '
+            'exist in English catalogs.'
+        )
         lines.append('')
 
     if report.hardcoded:
-        scope = 'changed files' if changed_files else 'scanned files'
+        scope = 'changed files in this diff' if report.diff_mode else 'scanned files'
         lines.append(f'### ⚠️ Hardcoded user-visible strings ({len(report.hardcoded)} in {scope})')
         lines.append('')
         lines.append(
@@ -480,8 +494,8 @@ def format_markdown(report: CheckReport, *, changed_files: set[str] | None = Non
             lines.append('')
             lines.append(f'_…and {len(report.hardcoded) - 100} more._')
         lines.append('')
-    elif changed_files:
-        lines.append('✅ No new hardcoded user-visible strings detected in changed files.')
+    elif report.diff_mode:
+        lines.append('✅ No hardcoded user-visible strings detected in changed files.')
         lines.append('')
 
     if report.failed:
@@ -495,6 +509,8 @@ def format_markdown(report: CheckReport, *, changed_files: set[str] | None = Non
 
 def format_text(report: CheckReport) -> str:
     lines: list[str] = []
+    if report.diff_mode:
+        lines.append('Diff mode: checking changed files only.')
     if report.catalog_errors:
         lines.append('Catalog errors:')
         lines.extend(f'  - {error}' for error in report.catalog_errors)
@@ -508,15 +524,19 @@ def format_text(report: CheckReport) -> str:
             lines.append(f'  - {item.file}:{item.line} [{item.kind}] {_truncate(item.text, 60)}')
         if len(report.hardcoded) > 20:
             lines.append(f'  …and {len(report.hardcoded) - 20} more')
-    if not lines:
-        lines.append(f'OK — {report.keys_checked} translation key reference(s) validated.')
+    if not report.catalog_errors and not report.missing_keys and not report.hardcoded:
+        scope = 'changed files' if report.diff_mode else 'project'
+        lines.append(f'OK — {report.keys_checked} translation key reference(s) validated in {scope}.')
     return '\n'.join(lines)
 
 
 def load_changed_files(path: Path | None, raw: list[str] | None) -> set[str] | None:
+    """Return None for a full-repo scan, or a (possibly empty) set for diff mode."""
     if raw:
         return {line.strip() for line in raw if line.strip()}
-    if path and path.is_file():
+    if path is not None:
+        if not path.is_file():
+            return set()
         return {line.strip() for line in path.read_text(encoding='utf-8').splitlines() if line.strip()}
     return None
 
@@ -528,7 +548,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         '--changed-files',
         type=Path,
-        help='Newline-separated repo-relative paths; limits hardcoded-string warnings to these files',
+        help='Newline-separated repo-relative paths; limits checks to these files (CI diff mode)',
     )
     parser.add_argument(
         '--changed-file',
@@ -543,7 +563,7 @@ def main(argv: list[str] | None = None) -> int:
 
     changed_files = load_changed_files(args.changed_files, args.changed_files_list or None)
     report = run_check(
-        changed_files=changed_files if args.warn_hardcoded else None,
+        changed_files=changed_files,
         warn_hardcoded=args.warn_hardcoded,
     )
 
@@ -554,6 +574,7 @@ def main(argv: list[str] | None = None) -> int:
         payload = {
             'failed': report.failed,
             'keys_checked': report.keys_checked,
+            'diff_mode': report.diff_mode,
             'catalog_errors': report.catalog_errors,
             'missing_keys': [
                 {

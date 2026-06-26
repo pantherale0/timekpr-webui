@@ -51,12 +51,21 @@ jobs:
       - name: Install PyYAML
         run: python -m pip install --disable-pip-version-check PyYAML
 
-      - name: List changed files for hardcoded-string warnings
-        if: github.event_name == 'pull_request'
+      - name: List changed files
         id: changed
         run: |
-          git fetch origin "${{ github.base_ref }}" --depth=1
-          git diff --name-only "origin/${{ github.base_ref }}...HEAD" > /tmp/changed-files.txt
+          set -euo pipefail
+          : > /tmp/changed-files.txt
+          use_diff=false
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            git fetch origin "${{ github.base_ref }}" --depth=1
+            git diff --name-only "origin/${{ github.base_ref }}...HEAD" > /tmp/changed-files.txt
+            use_diff=true
+          elif [[ "${{ github.event_name }}" == "push" && "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]]; then
+            git diff --name-only "${{ github.event.before }}" "${{ github.event.after }}" > /tmp/changed-files.txt
+            use_diff=true
+          fi
+          echo "use_diff=${use_diff}" >> "$GITHUB_OUTPUT"
           echo "count=$(wc -l < /tmp/changed-files.txt | tr -d ' ')" >> "$GITHUB_OUTPUT"
 
       - name: Validate translation catalogs
@@ -67,7 +76,7 @@ jobs:
         run: |
           set -o pipefail
           args=(check-usage --report-md /tmp/i18n-report.md --json /tmp/i18n-report.json)
-          if [[ "${{ github.event_name }}" == "pull_request" && -s /tmp/changed-files.txt ]]; then
+          if [[ "${{ steps.changed.outputs.use_diff }}" == "true" ]]; then
             args+=(--changed-files /tmp/changed-files.txt)
           fi
           if python scripts/i18n/manage.py "${args[@]}" | tee /tmp/i18n-check.log; then

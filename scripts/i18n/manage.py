@@ -90,10 +90,7 @@ def _cmd_check_usage(args: argparse.Namespace) -> int:
 
     from check_usage import format_markdown, format_text, load_changed_files, run_check
 
-    changed_files = None if args.no_warn_hardcoded else load_changed_files(
-        args.changed_files,
-        args.changed_files_list or None,
-    )
+    changed_files = load_changed_files(args.changed_files, args.changed_files_list or None)
     report = run_check(
         changed_files=changed_files,
         warn_hardcoded=not args.no_warn_hardcoded,
@@ -104,6 +101,7 @@ def _cmd_check_usage(args: argparse.Namespace) -> int:
         payload = {
             'failed': report.failed,
             'keys_checked': report.keys_checked,
+            'diff_mode': report.diff_mode,
             'catalog_errors': report.catalog_errors,
             'missing_keys': [
                 {
@@ -272,7 +270,7 @@ def build_parser() -> argparse.ArgumentParser:
     check_usage_parser.add_argument(
         '--changed-files',
         type=Path,
-        help='Newline-separated repo-relative paths; limits hardcoded-string warnings',
+        help='Newline-separated repo-relative paths; limits checks to these files (CI diff mode)',
     )
     check_usage_parser.add_argument(
         '--changed-file',
