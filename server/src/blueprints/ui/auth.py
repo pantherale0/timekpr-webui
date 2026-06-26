@@ -3,8 +3,8 @@ import time
 import secrets
 from datetime import datetime, timezone
 from flask import Blueprint, render_template, request, redirect, url_for, session
-from src.database import db, Settings, ParentAccount, Household, HouseholdParentMembership, HouseholdInvite, ManagedUserShare, ManagedUserShareInvite
-from src.helpers import ADMIN_USERNAME
+from src.models import db, Settings, ParentAccount, Household, HouseholdParentMembership, HouseholdInvite, ManagedUserShare, ManagedUserShareInvite
+from src.common.helpers import ADMIN_USERNAME
 from src.i18n.catalog import flash_t, t
 
 _LOGGER = logging.getLogger(__name__)
@@ -342,7 +342,7 @@ def switch_household(household_id):
     if not parent_id:
         return redirect(url_for('ui_auth.login'))
         
-    from src.database import HouseholdParentMembership
+    from src.models import HouseholdParentMembership
     membership = HouseholdParentMembership.query.filter_by(
         household_id=household_id,
         parent_account_id=parent_id

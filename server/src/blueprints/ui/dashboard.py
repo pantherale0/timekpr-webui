@@ -1,11 +1,11 @@
 import logging
 from flask import Blueprint, request, redirect, url_for, session
 from src.i18n.catalog import flash_t
-from src.database import AgentDevice, Settings
-from src.agent_helper import AgentConnectionManager, refresh_installed_apps
-from src.settings_manager import encrypt_setting
+from src.models import AgentDevice, Settings
+from src.agent.helper import AgentConnectionManager, refresh_installed_apps
+from src.common.settings import encrypt_setting
 from src.blueprints.ui.spa import render_spa_shell
-from src.pairing_helper import (
+from src.agent.pairing import (
     has_uploaded_android_apk,
     normalize_agent_websocket_url,
     remove_uploaded_android_apk,
@@ -182,7 +182,7 @@ def admin_settings():
             else:
                 try:
                     if webhook_url:
-                        from src.url_safety import validate_safe_outbound_url
+                        from src.common.url_safety import validate_safe_outbound_url
                         webhook_url = validate_safe_outbound_url(webhook_url)
                 except ValueError as exc:
                     flash_t('flash.common.generic_error', 'danger', error=str(exc))

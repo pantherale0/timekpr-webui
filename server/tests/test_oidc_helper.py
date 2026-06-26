@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 import requests
 
-from src.oidc_helper import OIDCHelper
+from src.common.oidc import OIDCHelper
 
 def test_oidc_disabled():
     helper = OIDCHelper()
@@ -216,7 +216,7 @@ def test_refresh_access_token_success(mock_post):
 
 @patch('requests.post')
 def test_refresh_access_token_http_errors(mock_post):
-    from src.oidc_helper import OIDCRefreshError
+    from src.common.oidc import OIDCRefreshError
 
     helper = OIDCHelper()
     helper.issuer_url = "https://auth.com"
@@ -249,7 +249,7 @@ def test_refresh_access_token_http_errors(mock_post):
 
 @patch('requests.post')
 def test_refresh_access_token_network_errors(mock_post):
-    from src.oidc_helper import OIDCRefreshError
+    from src.common.oidc import OIDCRefreshError
 
     helper = OIDCHelper()
     helper.issuer_url = "https://auth.com"

@@ -88,7 +88,7 @@ def test_yaml_is_valid(catalog_path):
 
 
 def test_language_form_sets_session(client):
-    from src.database import Settings
+    from src.models import Settings
 
     Settings.set_admin_password('admin')
     client.post('/', data={'username': 'admin', 'password': 'admin'})

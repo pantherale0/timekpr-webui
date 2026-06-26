@@ -3,13 +3,13 @@ from datetime import datetime, timedelta, timezone
 from flask import Blueprint, request, jsonify, session
 from src.i18n.catalog import api_message
 from sqlalchemy import or_, desc, asc
-from src.database import db, AgentAlert, ManagedUser, AgentDevice
-from src.alerts_manager import (
+from src.models import db, AgentAlert, ManagedUser, AgentDevice
+from src.alerts.manager import (
     _format_alert_event_label,
     _alert_details_to_text,
     _build_alert_entry,
 )
-from src.helpers import _get_device_label_map
+from src.common.helpers import _get_device_label_map
 
 _LOGGER = logging.getLogger(__name__)
 

@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 from pynintendoparental.enum import DeviceTimerMode
 
-from src.nintendo_sync import (
+from src.common.nintendo_sync import (
     build_nintendo_console_stats,
     build_nintendo_console_view_context,
     format_nintendo_last_sync,
@@ -81,7 +81,7 @@ def test_push_nintendo_schedule_skips_bedtime_when_unconfigured(app, db_session)
 
 def test_run_async_with_running_event_loop():
     import asyncio
-    from src.nintendo_sync import run_async
+    from src.common.nintendo_sync import run_async
 
     async def sample():
         return 'ok'
@@ -93,7 +93,7 @@ def test_run_async_with_running_event_loop():
 
 
 def test_build_nintendo_console_view_context(app, db_session):
-    from src.database import AgentDevice, ManagedUser, ManagedUserDeviceMap
+    from src.models import AgentDevice, ManagedUser, ManagedUserDeviceMap
     import json
 
     device = AgentDevice(system_id='switch-ui', platform='nintendo', status='approved')

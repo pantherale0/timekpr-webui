@@ -3,7 +3,7 @@ import logging
 from datetime import datetime, timezone
 from flask import Blueprint, request, jsonify, send_from_directory, current_app, session
 import dateutil.parser
-from src.database import (
+from src.models import (
     db,
     AgentDevice,
     ManagedUserDeviceMap,

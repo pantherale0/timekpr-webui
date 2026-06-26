@@ -3,7 +3,7 @@ import logging
 from datetime import datetime, timezone, timedelta, time
 from flask import Blueprint, session, request, jsonify, redirect, url_for
 from src.i18n.catalog import flash_t, api_message, t
-from src.database import (
+from src.models import (
     db,
     ManagedUser,
     AgentDevice,
@@ -13,10 +13,10 @@ from src.database import (
     stamp_usage_snapshot,
     utc_today,
 )
-from src.helpers import _device_display_label, _get_device_label_map, _mapping_display_label
-from src.users_manager import _refresh_managed_user_summary
-from src.agent_helper import AgentClient
-from src.installed_apps_manager import list_installed_apps_for_managed_user
+from src.common.helpers import _device_display_label, _get_device_label_map, _mapping_display_label
+from src.user.manager import _refresh_managed_user_summary
+from src.agent.helper import AgentClient
+from src.device.installed_apps import list_installed_apps_for_managed_user
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -87,7 +87,7 @@ def create_managed_user():
     db.session.commit()
 
     if policy_age_bracket and policy_maturity_level:
-        from src.policy_preset_manager import apply_policy_preset
+        from src.policy.presets import apply_policy_preset
         try:
             apply_policy_preset(managed_user, policy_age_bracket, policy_maturity_level)
         except ValueError as exc:
@@ -105,7 +105,7 @@ def create_managed_user():
             )
             flash_t('flash.users.preset_not_applied', 'warning')
     elif selected_preset_ids:
-        from src.marketplace_manager import sync_marketplace_subscriptions
+        from src.blocklist.marketplace import sync_marketplace_subscriptions
         try:
             sync_marketplace_subscriptions(managed_user, selected_preset_ids)
         except Exception as exc:
@@ -113,7 +113,7 @@ def create_managed_user():
 
     # Advanced override: individual filter packs after composite preset
     if selected_preset_ids and policy_age_bracket and policy_maturity_level:
-        from src.marketplace_manager import sync_marketplace_subscriptions
+        from src.blocklist.marketplace import sync_marketplace_subscriptions
         try:
             sync_marketplace_subscriptions(managed_user, selected_preset_ids)
         except Exception as exc:
@@ -141,7 +141,7 @@ def apply_policy_preset_route(user_id):
         flash_t('flash.users.preset_fields_required', 'danger')
         return redirect(url_for('ui_dashboard.edit_user_profile', user_id=user.id))
 
-    from src.policy_preset_manager import apply_policy_preset
+    from src.policy.presets import apply_policy_preset
 
     try:
         apply_policy_preset(user, policy_age_bracket, policy_maturity_level)
@@ -293,7 +293,7 @@ def connect_user_mapping(user_id):
     _refresh_managed_user_summary(user)
     db.session.commit()
 
-    from src.dashboard_events import notify_dashboard_changed
+    from src.common.dashboard_events import notify_dashboard_changed
     notify_dashboard_changed('mapping_changed')
 
     policy_hint_system_ids = set()
@@ -386,7 +386,7 @@ def add_user():
 
     selected_preset_ids = request.form.getlist('preset_ids')
     if selected_preset_ids:
-        from src.marketplace_manager import sync_marketplace_subscriptions
+        from src.blocklist.marketplace import sync_marketplace_subscriptions
         try:
             sync_marketplace_subscriptions(user, selected_preset_ids)
         except Exception as exc:
@@ -426,7 +426,7 @@ def validate_user(user_id):
     _refresh_managed_user_summary(user)
 
     db.session.commit()
-    from src.dashboard_events import notify_dashboard_changed
+    from src.common.dashboard_events import notify_dashboard_changed
     notify_dashboard_changed('mapping_changed')
     if policy_hint_system_ids:
         from app import task_manager
@@ -460,7 +460,7 @@ def validate_mapping(user_id, mapping_id):
 
     _refresh_managed_user_summary(user)
     db.session.commit()
-    from src.dashboard_events import notify_dashboard_changed
+    from src.common.dashboard_events import notify_dashboard_changed
     notify_dashboard_changed('mapping_changed')
     if uid_changed or mapping.linux_uid != previous_linux_uid:
         from app import task_manager
@@ -494,7 +494,7 @@ def delete_mapping(user_id, mapping_id):
     db.session.flush()
     _refresh_managed_user_summary(user)
     db.session.commit()
-    from src.dashboard_events import notify_dashboard_changed
+    from src.common.dashboard_events import notify_dashboard_changed
     notify_dashboard_changed('mapping_changed')
 
     from app import task_manager
@@ -556,7 +556,7 @@ def get_all_users():
     
     active_hh_id = session.get('active_household_id')
     if not active_hh_id:
-        from src.database import ParentAccount
+        from src.models import ParentAccount
         p = ParentAccount.query.filter_by(email='admin@local').first()
         if p and p.memberships:
             active_hh_id = p.memberships[0].household_id
@@ -596,7 +596,7 @@ def api_create_user():
         
     active_hh_id = session.get('active_household_id')
     if not active_hh_id:
-        from src.database import ParentAccount
+        from src.models import ParentAccount
         p = ParentAccount.query.filter_by(email='admin@local').first()
         if p and p.memberships:
             active_hh_id = p.memberships[0].household_id
@@ -769,7 +769,7 @@ def inspect_item(user_id):
     if not inspect_type or not value:
         return jsonify({'success': False, 'message': 'Type and value are required'}), 400
 
-    from src.database import WebHistory, AppUsageHistory, BlocklistSource, PolicyApprovalGrant, BlocklistDomain, AppArmorRule
+    from src.models import WebHistory, AppUsageHistory, BlocklistSource, PolicyApprovalGrant, BlocklistDomain, AppArmorRule
     from sqlalchemy import func
 
     devices_distribution = {}
@@ -890,8 +890,8 @@ def whitelist_item(user_id):
     if not inspect_type or not value:
         return jsonify({'success': False, 'message': 'Type and value are required'}), 400
 
-    from src.approvals_manager import create_grant, get_session_actor
-    from src.database import PolicyApprovalGrant, ApprovalRequest
+    from src.user.approvals import create_grant, get_session_actor
+    from src.models import PolicyApprovalGrant, ApprovalRequest
 
     actor = get_session_actor() or 'admin'
     
@@ -942,8 +942,8 @@ def block_item(user_id):
         return jsonify({'success': False, 'message': 'Type and value are required'}), 400
 
     if inspect_type == 'domain':
-        from src.database import BlocklistSource, BlocklistDomain, ManagedUserBlocklistAssignment
-        from src.blocklist_helper import normalize_domain, compute_source_revision
+        from src.models import BlocklistSource, BlocklistDomain, ManagedUserBlocklistAssignment
+        from src.blocklist.helper import normalize_domain, compute_source_revision
 
         try:
             domain = normalize_domain(value)
@@ -995,8 +995,8 @@ def block_item(user_id):
         })
 
     elif inspect_type == 'app':
-        from src.database import AppPolicy, AppPolicyRule, ManagedUserAppPolicyAssignment
-        from src.apparmor_manager import compile_user_apparmor_rules
+        from src.models import AppPolicy, AppPolicyRule, ManagedUserAppPolicyAssignment
+        from src.policy.apparmor import compile_user_apparmor_rules
         from src.blueprints.ui.apparmor import _sync_mapping_app_policy_to_agent
 
         policy_name = f"Custom App Rules for {user.username}"
@@ -1043,7 +1043,7 @@ def get_manual_blocklists():
     if not session.get('logged_in'):
         return jsonify({'success': False, 'message': 'Not authenticated'}), 401
 
-    from src.database import BlocklistSource
+    from src.models import BlocklistSource
     sources = BlocklistSource.query.filter_by(source_type=BlocklistSource.TYPE_MANUAL).all()
     return jsonify({
         'success': True,

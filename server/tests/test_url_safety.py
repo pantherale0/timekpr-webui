@@ -4,11 +4,11 @@ from unittest.mock import patch
 
 import pytest
 
-from src.url_safety import is_safe_outbound_url, validate_safe_outbound_url
+from src.common.url_safety import is_safe_outbound_url, validate_safe_outbound_url
 
 
 def test_validate_safe_outbound_url_accepts_public_host():
-    with patch('src.url_safety.socket.getaddrinfo', return_value=[(2, 1, 6, '', ('93.184.216.34', 0))]):
+    with patch('src.common.url_safety.socket.getaddrinfo', return_value=[(2, 1, 6, '', ('93.184.216.34', 0))]):
         assert validate_safe_outbound_url('https://example.com/list.txt') == 'https://example.com/list.txt'
 
 
@@ -26,5 +26,5 @@ def test_validate_safe_outbound_url_rejects_unsafe_targets(url):
 
 
 def test_is_safe_outbound_url_rejects_private_dns_resolution():
-    with patch('src.url_safety.socket.getaddrinfo', return_value=[(2, 1, 6, '', ('10.0.0.12', 0))]):
+    with patch('src.common.url_safety.socket.getaddrinfo', return_value=[(2, 1, 6, '', ('10.0.0.12', 0))]):
         assert not is_safe_outbound_url('https://public.example.com/list.txt')

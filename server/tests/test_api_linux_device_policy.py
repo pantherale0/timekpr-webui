@@ -2,7 +2,7 @@
 
 import pytest
 
-from src.database import AgentDevice, ManagedUser, ManagedUserDeviceMap
+from src.models import AgentDevice, ManagedUser, ManagedUserDeviceMap
 
 
 @pytest.fixture
@@ -52,7 +52,7 @@ def test_get_linux_device_policy_defaults(auth_client, linux_policy_fixture):
 def test_put_linux_device_policy(auth_client, linux_policy_fixture, monkeypatch):
     mapping_id = linux_policy_fixture['mapping'].id
     monkeypatch.setattr(
-        'src.linux_device_policy_manager.push_mapping_device_policy',
+        'src.policy.linux.push_mapping_device_policy',
         lambda mapping: (False, 'Agent offline'),
     )
     response = auth_client.put(

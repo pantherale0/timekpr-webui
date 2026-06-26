@@ -10,13 +10,13 @@ from unittest.mock import patch
 
 import pytest
 
-from src.agent_helper import AgentClient, AgentConnectionManager
-from src.agent_helper import (
+from src.agent.helper import AgentClient, AgentConnectionManager
+from src.agent.helper import (
     agent_versions_compatible,
     normalize_agent_alert_payload,
     parse_agent_alert_timestamp,
 )
-from src.database import AgentDevice
+from src.models import AgentDevice
 
 class DummyWS:
     """Minimal websocket double that auto-responds to RPC-style requests."""

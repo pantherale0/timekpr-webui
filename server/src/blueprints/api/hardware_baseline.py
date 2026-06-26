@@ -5,8 +5,8 @@ import os
 
 from flask import Blueprint, current_app, jsonify, request, send_from_directory, session
 
-from src.database import AgentDevice
-from src.hardware_baseline_manager import (
+from src.models import AgentDevice
+from src.device.hardware_baseline import (
     apply_hardware_baseline,
     audit_hardware_baseline,
     get_hardware_baseline_status,

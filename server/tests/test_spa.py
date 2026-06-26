@@ -2,7 +2,7 @@
 
 import pytest
 
-from src.database import Settings
+from src.models import Settings
 
 
 @pytest.fixture
@@ -82,7 +82,7 @@ def test_spa_fragment_admin_settings(auth_client):
 
 
 def test_spa_fragment_user_profile(auth_client, db_session):
-    from src.database import ManagedUser
+    from src.models import ManagedUser
 
     user = ManagedUser(username='spa-test-child', system_ip='Unassigned', is_valid=True)
     db_session.add(user)
@@ -114,7 +114,7 @@ def test_manifest_served(auth_client):
 
 
 def test_spa_fragment_weekly_schedule_nav_regions(auth_client, db_session):
-    from src.database import ManagedUser, UserWeeklySchedule
+    from src.models import ManagedUser, UserWeeklySchedule
 
     user = ManagedUser(username='routine-nav-user', system_ip='Unassigned', is_valid=True)
     db_session.add(user)

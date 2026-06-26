@@ -2,8 +2,8 @@ import aiohttp
 import logging
 from datetime import datetime, timezone
 from flask import Blueprint, jsonify, request, session
-from src.database import db, AgentDevice, Settings
-from src.xbox_sync import run_async
+from src.models import db, AgentDevice, Settings
+from src.common.xbox_sync import run_async
 from pyfamilysafety import Authenticator, FamilySafety
 
 _LOGGER = logging.getLogger(__name__)

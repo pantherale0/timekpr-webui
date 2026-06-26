@@ -5,8 +5,8 @@ from unittest.mock import patch
 
 import pytest
 
-from src.agent_helper import AgentConnectionManager
-from src.database import (
+from src.agent.helper import AgentConnectionManager
+from src.models import (
     AgentDevice,
     ManagedUser,
     ManagedUserDeviceMap,
@@ -14,7 +14,7 @@ from src.database import (
     UserDailyTimeInterval,
     UserWeeklySchedule,
 )
-from src.pending_commands_manager import (
+from src.agent.pending_commands import (
     DOMAIN_RECONCILE_ACTION,
     enqueue_command,
     enqueue_domain_reconcile,

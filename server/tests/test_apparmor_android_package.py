@@ -2,8 +2,8 @@
 
 import pytest
 
-from src.apparmor_manager import _validate_apparmor_rule_target
-from src.database import AppArmorRule
+from src.policy.apparmor import _validate_apparmor_rule_target
+from src.models import AppArmorRule
 
 
 def test_validate_android_package_match_type():

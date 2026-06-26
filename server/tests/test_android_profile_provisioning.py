@@ -2,9 +2,9 @@
 
 import pytest
 
-from src.agent_push import update_device_push_metadata
-from src.database import AgentDevice, ManagedUser, ManagedUserDeviceMap, Settings
-from src.users_manager import sync_mapping_linux_uids_from_device
+from src.agent.push import update_device_push_metadata
+from src.models import AgentDevice, ManagedUser, ManagedUserDeviceMap, Settings
+from src.user.manager import sync_mapping_linux_uids_from_device
 
 
 @pytest.fixture

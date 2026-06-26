@@ -1,6 +1,6 @@
 import pytest
-from src.database import db, ManagedUser, BlocklistSource, BlocklistDomain, ManagedUserBlocklistAssignment
-from src.marketplace_manager import (
+from src.models import db, ManagedUser, BlocklistSource, BlocklistDomain, ManagedUserBlocklistAssignment
+from src.blocklist.marketplace import (
     load_marketplace_presets,
     get_marketplace_presets_dict,
     sync_marketplace_subscriptions,
@@ -147,7 +147,7 @@ def test_create_user_with_presets_api(auth_client, db_session):
         }
     )
     # Note: approved-test-device needs to exist
-    from src.database import AgentDevice
+    from src.models import AgentDevice
     device = AgentDevice(system_id='approved-test-device', status='approved')
     db_session.add(device)
     db_session.commit()

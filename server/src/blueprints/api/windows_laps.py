@@ -2,9 +2,9 @@ import logging
 
 from flask import Blueprint, jsonify, request, session
 
-from src.database import AgentDevice
+from src.models import AgentDevice
 from src.i18n.catalog import api_message
-from src.windows_laps_manager import (
+from src.device.windows_laps import (
     clear_safe_mode_lockdown,
     get_windows_laps_status,
     reveal_escrowed_password,

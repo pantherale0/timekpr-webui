@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 import pytest
 
-from src.database import Settings
+from src.models import Settings
 
 
 @pytest.fixture
@@ -50,7 +50,7 @@ def test_provisioning_config_requires_auth(client):
     assert response.status_code == 401
 
 
-@patch('src.pairing_helper._fetch_release_signature_checksum', return_value=None)
+@patch('src.agent.pairing._fetch_release_signature_checksum', return_value=None)
 def test_provisioning_config_not_ready_without_overrides(mock_fetch, auth_client):
     Settings.set_value('android_agent_signature_checksum', '')
     response = auth_client.get('/api/pairing/provisioning/config')
@@ -61,7 +61,7 @@ def test_provisioning_config_not_ready_without_overrides(mock_fetch, auth_client
     assert payload['payload'] is None
 
 
-@patch('src.pairing_helper.has_uploaded_android_apk', return_value=True)
+@patch('src.agent.pairing.has_uploaded_android_apk', return_value=True)
 def test_provisioning_config_ready_with_uploaded_apk(mock_uploaded, auth_client):
     Settings.set_value('android_agent_signature_checksum', 'test-checksum-value')
     response = auth_client.get('/api/pairing/provisioning/config')
@@ -75,14 +75,14 @@ def test_provisioning_config_ready_with_uploaded_apk(mock_uploaded, auth_client)
     assert 'android.app.extra.PROVISIONING_DEVICE_ADMIN_COMPONENT_NAME' in payload['payload']
 
 
-@patch('src.pairing_helper._fetch_release_signature_checksum', return_value=None)
+@patch('src.agent.pairing._fetch_release_signature_checksum', return_value=None)
 def test_provisioning_qr_png_requires_ready_config(mock_fetch, auth_client):
     Settings.set_value('android_agent_signature_checksum', '')
     response = auth_client.get('/api/pairing/provisioning/qr.png')
     assert response.status_code == 400
 
 
-@patch('src.pairing_helper.has_uploaded_android_apk', return_value=True)
+@patch('src.agent.pairing.has_uploaded_android_apk', return_value=True)
 def test_provisioning_qr_png_authenticated(mock_uploaded, auth_client):
     Settings.set_value('android_agent_signature_checksum', 'test-checksum-value')
     response = auth_client.get('/api/pairing/provisioning/qr.png')
@@ -97,7 +97,7 @@ def test_provisioning_apk_requires_upload(mock_uploaded, client):
     assert response.status_code == 404
 
 
-@patch('src.pairing_helper.has_uploaded_android_apk', return_value=True)
+@patch('src.agent.pairing.has_uploaded_android_apk', return_value=True)
 def test_provisioning_apk_serves_uploaded_file(mock_uploaded, client, tmp_path, monkeypatch):
     apk_path = tmp_path / 'android-agent.apk'
     apk_path.write_bytes(b'PK\x03\x04fake-apk')

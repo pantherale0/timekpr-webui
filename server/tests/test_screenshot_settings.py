@@ -6,14 +6,14 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from src.database import AgentDevice, DeviceScreenshotSettings, DeviceScreenshot
-from src.screenshot_settings_manager import (
+from src.models import AgentDevice, DeviceScreenshotSettings, DeviceScreenshot
+from src.device.screenshot_settings import (
     build_screenshot_policy_payload,
     compute_revision,
     get_or_create_settings,
     upsert_settings,
 )
-from src.screenshot_manager import (
+from src.device.screenshots import (
     handle_screenshot_report,
     list_screenshots_for_device,
     normalize_screenshot_report,

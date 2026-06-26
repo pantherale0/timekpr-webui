@@ -4,8 +4,8 @@ from datetime import datetime, timezone
 
 import pytest
 
-from src.blocklist_helper import compute_mapping_policy_hash
-from src.approvals_manager import (
+from src.blocklist.helper import compute_mapping_policy_hash
+from src.user.approvals import (
     approve_request,
     build_app_approval_sync_extras,
     build_domain_allowed_domains,
@@ -16,7 +16,7 @@ from src.approvals_manager import (
     revoke_grant,
     upsert_settings,
 )
-from src.database import (
+from src.models import (
     AgentDevice,
     AppArmorRule,
     ApprovalRequest,
@@ -26,7 +26,7 @@ from src.database import (
     MappingApprovalSettings,
     PolicyApprovalGrant,
 )
-from src.installed_apps_manager import ANDROID_PACKAGE_PREFIX
+from src.device.installed_apps import ANDROID_PACKAGE_PREFIX
 
 
 @pytest.fixture
@@ -336,7 +336,7 @@ def test_policy_hash_includes_approval_revision(approval_mapping, db_session):
 
 
 def test_ingest_dialogue_flag_alert(approval_mapping, db_session):
-    from src.approvals_manager import ingest_dialogue_flag_alert
+    from src.user.approvals import ingest_dialogue_flag_alert
     alert = {
         'event_type': 'dialogue_flag',
         'linux_username': 'child',

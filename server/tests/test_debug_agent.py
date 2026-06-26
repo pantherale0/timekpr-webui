@@ -3,7 +3,7 @@
 import hashlib
 import hmac
 
-from src.debug_agent import (
+from src.agent.debug import (
     DebugAgentProtocol,
     _is_linux_device_terminal_executable,
     _linux_device_policy_entry_for_user,

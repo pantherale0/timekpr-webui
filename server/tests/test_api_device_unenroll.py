@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 import pytest
 
-from src.database import AgentDevice
+from src.models import AgentDevice
 
 
 @pytest.fixture
@@ -58,8 +58,8 @@ def test_unenroll_invalid_mode(auth_client, approved_device):
     assert payload['success'] is False
 
 
-@patch('src.device_lifecycle_manager.AgentConnectionManager.is_online', return_value=True)
-@patch('src.device_lifecycle_manager.AgentClient.unenroll_device', return_value=(True, 'cleared'))
+@patch('src.device.lifecycle.AgentConnectionManager.is_online', return_value=True)
+@patch('src.device.lifecycle.AgentClient.unenroll_device', return_value=(True, 'cleared'))
 def test_unenroll_success(mock_unenroll, mock_online, auth_client, approved_device, db_session):
     response = auth_client.post(
         f'/api/device/{approved_device.system_id}/unenroll',

@@ -2,8 +2,8 @@
 
 import pytest
 
-from src.database import AgentDevice, db
-from src.settings_manager import encrypt_setting
+from src.models import AgentDevice, db
+from src.common.settings import encrypt_setting
 
 
 @pytest.fixture
@@ -42,7 +42,7 @@ def test_windows_laps_status_defaults(auth_client, windows_device):
 
 
 def test_persist_credential_escrow(auth_client, windows_device, app):
-    from src.windows_laps_manager import get_windows_laps_status, persist_credential_escrow
+    from src.device.windows_laps import get_windows_laps_status, persist_credential_escrow
 
     with app.app_context():
         persist_credential_escrow(
@@ -74,7 +74,7 @@ def test_reveal_escrowed_password(auth_client, windows_device):
 
 def test_clear_safe_mode_lockdown_offline(auth_client, windows_device, monkeypatch):
     monkeypatch.setattr(
-        'src.windows_laps_manager.AgentConnectionManager.is_online',
+        'src.device.windows_laps.AgentConnectionManager.is_online',
         lambda _system_id: False,
     )
     response = auth_client.post(

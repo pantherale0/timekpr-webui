@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 import pytest
 
-from src.database import AgentDevice, ManagedUser, ManagedUserDeviceMap, Settings
+from src.models import AgentDevice, ManagedUser, ManagedUserDeviceMap, Settings
 
 
 @pytest.fixture
@@ -62,7 +62,7 @@ def test_connect_user_mapping_creates_and_validates(auth_client, db_session):
     db_session.add_all([device, user])
     db_session.commit()
 
-    with patch('src.agent_helper.AgentClient.validate_user') as mock_validate:
+    with patch('src.agent.helper.AgentClient.validate_user') as mock_validate:
         mock_validate.return_value = (True, 'ok', {'LINUX_UID': 1000})
         response = auth_client.post(
             f'/api/managed-users/{user.id}/mappings/connect',

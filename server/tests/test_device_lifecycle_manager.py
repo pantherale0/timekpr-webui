@@ -5,8 +5,8 @@ from unittest.mock import patch
 
 import pytest
 
-from src.database import AgentDevice, ManagedUser, ManagedUserDeviceMap, PendingCommand
-from src.device_lifecycle_manager import (
+from src.models import AgentDevice, ManagedUser, ManagedUserDeviceMap, PendingCommand
+from src.device.lifecycle import (
     MODE_FACTORY_RESET,
     MODE_UNENROLL,
     deliver_pending_factory_reset_on_connect,
@@ -70,9 +70,9 @@ def test_factory_reset_blocked_on_linux(approved_linux_device):
     assert result['status_code'] == 400
 
 
-@patch('src.device_lifecycle_manager.AgentConnectionManager.is_online', return_value=False)
-@patch('src.device_lifecycle_manager.device_prefers_push', return_value=True)
-@patch('src.device_lifecycle_manager.AgentClient.factory_reset_device', return_value=(False, 'offline'))
+@patch('src.device.lifecycle.AgentConnectionManager.is_online', return_value=False)
+@patch('src.device.lifecycle.device_prefers_push', return_value=True)
+@patch('src.device.lifecycle.AgentClient.factory_reset_device', return_value=(False, 'offline'))
 def test_factory_reset_queues_command_when_push_delivery_fails(
     mock_factory_reset,
     mock_push,
@@ -101,8 +101,8 @@ def test_factory_reset_queues_command_when_push_delivery_fails(
     assert pending == 1
 
 
-@patch('src.device_lifecycle_manager.AgentConnectionManager.is_online', return_value=False)
-@patch('src.device_lifecycle_manager.device_prefers_push', return_value=False)
+@patch('src.device.lifecycle.AgentConnectionManager.is_online', return_value=False)
+@patch('src.device.lifecycle.device_prefers_push', return_value=False)
 def test_offline_unenroll_queues_agent_cleanup(
     mock_push,
     mock_online,
@@ -123,8 +123,8 @@ def test_offline_unenroll_queues_agent_cleanup(
     assert pending == 1
 
 
-@patch('src.device_lifecycle_manager.AgentConnectionManager.is_online', return_value=True)
-@patch('src.device_lifecycle_manager.AgentClient.unenroll_device', return_value=(True, 'cleared'))
+@patch('src.device.lifecycle.AgentConnectionManager.is_online', return_value=True)
+@patch('src.device.lifecycle.AgentClient.unenroll_device', return_value=(True, 'cleared'))
 def test_unenroll_revokes_and_records_timestamp(
     mock_unenroll,
     mock_online,
@@ -144,13 +144,13 @@ def test_unenroll_revokes_and_records_timestamp(
     assert refreshed.unenrolled_at is not None
 
 
-@patch('src.pending_commands_manager.flush_pending_commands')
+@patch('src.agent.pending_commands.flush_pending_commands')
 def test_deliver_pending_factory_reset_uses_queue(
     mock_flush,
     approved_android_device,
     db_session,
 ):
-    from src.pending_commands_manager import FlushResult
+    from src.agent.pending_commands import FlushResult
 
     approved_android_device.pending_factory_reset = True
     approved_android_device.status = 'rejected'

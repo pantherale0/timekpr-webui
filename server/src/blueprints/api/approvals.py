@@ -5,7 +5,7 @@ import logging
 
 from flask import Blueprint, jsonify, request, session
 
-from src.approvals_manager import (
+from src.user.approvals import (
     approve_request,
     build_grant_summary,
     build_request_summary,
@@ -18,7 +18,7 @@ from src.approvals_manager import (
     revoke_grant,
     upsert_settings,
 )
-from src.database import db, ApprovalRequest, ManagedUserDeviceMap, PolicyApprovalGrant, AgentDevice, UserOnlineAccount
+from src.models import db, ApprovalRequest, ManagedUserDeviceMap, PolicyApprovalGrant, AgentDevice, UserOnlineAccount
 from src.i18n.catalog import api_message
 
 _LOGGER = logging.getLogger(__name__)
@@ -389,7 +389,7 @@ def request_registration_approval():
         db.session.add(request_row)
         db.session.commit()
         
-    from src.dashboard_events import notify_dashboard_changed
+    from src.common.dashboard_events import notify_dashboard_changed
     notify_dashboard_changed('approval_requested')
     
     return jsonify({
@@ -449,7 +449,7 @@ def get_user_online_accounts(user_id):
     if not session.get('logged_in'):
         return jsonify({'success': False, 'message': api_message('not_authenticated')}), 401
         
-    from src.database import ManagedUser, UserOnlineAccount
+    from src.models import ManagedUser, UserOnlineAccount
     user = ManagedUser.query.get_or_404(user_id)
     
     # Query all online accounts for this user

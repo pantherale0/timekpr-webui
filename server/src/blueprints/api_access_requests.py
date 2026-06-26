@@ -5,9 +5,9 @@ from datetime import datetime, timezone
 
 from flask import Blueprint, jsonify, request
 
-from src.database import AgentAlert, AgentDevice, db
-from src.agent_helper import normalize_agent_alert_payload
-from src.settings_manager import _get_alert_webhook_settings
+from src.models import AgentAlert, AgentDevice, db
+from src.agent.helper import normalize_agent_alert_payload
+from src.common.settings import _get_alert_webhook_settings
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -96,7 +96,7 @@ def list_access_requests():
     parent_id = session.get('parent_account_id')
     active_hh_id = session.get('active_household_id')
     if not parent_id:
-        from src.database import ParentAccount
+        from src.models import ParentAccount
         p = ParentAccount.query.filter_by(email='admin@local').first()
         if p:
             parent_id = p.id
@@ -104,7 +104,7 @@ def list_access_requests():
                 active_hh_id = p.memberships[0].household_id
 
     if system_id:
-        from src.helpers import parent_has_access_to_device
+        from src.common.helpers import parent_has_access_to_device
         if not parent_id or not parent_has_access_to_device(parent_id, system_id):
             abort(403)
 

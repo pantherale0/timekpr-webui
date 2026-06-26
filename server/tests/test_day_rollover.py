@@ -2,9 +2,9 @@
 
 from datetime import datetime, timedelta, timezone
 
-from src.task_manager import BackgroundTaskManager
-from src.users_manager import _refresh_managed_user_summary
-from src.database import (
+from src.common.tasks import BackgroundTaskManager
+from src.user.manager import _refresh_managed_user_summary
+from src.models import (
     AgentDevice,
     ManagedUser,
     ManagedUserDeviceMap,

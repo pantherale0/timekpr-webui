@@ -2,7 +2,7 @@
 
 import pytest
 
-from src.database import ManagedUser, AppPolicy, BlocklistSource, db
+from src.models import ManagedUser, AppPolicy, BlocklistSource, db
 
 
 @pytest.fixture

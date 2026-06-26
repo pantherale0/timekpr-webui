@@ -4,8 +4,8 @@ import queue
 
 from flask import Blueprint, Response, jsonify, session, stream_with_context
 
-from src.dashboard_helper import build_dashboard_json_snapshot
-from src.dashboard_events import build_sse_snapshot, dashboard_events_hub
+from src.common.dashboard_helper import build_dashboard_json_snapshot
+from src.common.dashboard_events import build_sse_snapshot, dashboard_events_hub
 
 _LOGGER = logging.getLogger(__name__)
 

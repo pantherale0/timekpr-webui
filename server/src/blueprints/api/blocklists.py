@@ -2,15 +2,15 @@ import logging
 from datetime import datetime, timezone
 from flask import Blueprint, session, request, jsonify, flash, redirect, url_for, abort
 from src.i18n.catalog import flash_t, t, api_message
-from src.helpers import wants_json_response
-from src.database import db, BlocklistSource, BlocklistDomain, ManagedUserBlocklistAssignment, ManagedUser
-from src.blocklist_helper import (
+from src.common.helpers import wants_json_response
+from src.models import db, BlocklistSource, BlocklistDomain, ManagedUserBlocklistAssignment, ManagedUser
+from src.blocklist.helper import (
     validate_external_source_url,
     parse_blocklist_text,
     compute_source_revision,
     normalize_domain,
 )
-from src.blocklists_manager import _build_user_blocklist_sync_status
+from src.blocklist.manager import _build_user_blocklist_sync_status
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -282,7 +282,7 @@ def subscribe_user_marketplace(user_id):
     selected_preset_ids = request.form.getlist('preset_ids')
     redirect_target = request.form.get('redirect_to') or 'profile'
 
-    from src.marketplace_manager import sync_marketplace_subscriptions
+    from src.blocklist.marketplace import sync_marketplace_subscriptions
     try:
         sync_marketplace_subscriptions(user, selected_preset_ids)
     except Exception as exc:
@@ -316,7 +316,7 @@ def subscribe_preset_users():
         flash_t('flash.blocklists.preset_required', 'danger')
         return redirect(url_for('ui_dashboard.admin_restrictions'))
 
-    from src.marketplace_manager import get_marketplace_presets_dict, sync_marketplace_subscriptions
+    from src.blocklist.marketplace import get_marketplace_presets_dict, sync_marketplace_subscriptions
     presets = get_marketplace_presets_dict()
     if preset_id not in presets:
         flash_t('flash.blocklists.preset_not_found', 'danger')

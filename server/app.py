@@ -15,12 +15,12 @@ from flask_sock import Sock
 from flask_migrate import Migrate
 
 # Import DB and models for registration
-from src.database import db, Settings, AgentDevice
-from src.task_manager import BackgroundTaskManager
-from src.oidc_helper import OIDCHelper
+from src.models import db, Settings, AgentDevice
+from src.common.tasks import BackgroundTaskManager
+from src.common.oidc import OIDCHelper
 
 # Import helpers for direct exposure and backwards-compatibility
-from src.helpers import (
+from src.common.helpers import (
     _resolve_local_timezone,
     _env_flag_enabled,
     inject_oidc_status,
@@ -32,7 +32,7 @@ from src.helpers import (
     LOCAL_TIMEZONE,
     ADMIN_USERNAME,
 )
-from src.blocklists_manager import _get_blocklist_sources
+from src.blocklist.manager import _get_blocklist_sources
 from src.blueprints.websocket import ws_agent_handler
 
 _LOGGER = logging.getLogger(__name__)
@@ -168,7 +168,7 @@ def inject_server_version():
 @app.context_processor
 def inject_household_context():
     from flask import session
-    from src.database import ParentAccount, Household
+    from src.models import ParentAccount, Household
     
     parent_id = session.get('parent_account_id')
     active_hh_id = session.get('active_household_id')
@@ -199,7 +199,7 @@ def inject_household_context():
 def _resolve_request_locale():
     """Resolve active UI locale for this request."""
     from flask import g, request, session
-    from src.database import Settings
+    from src.models import Settings
     from src.i18n.catalog import resolve_locale
 
     household_default = None
@@ -215,7 +215,7 @@ def _refresh_oidc_tokens():
     """Check if the OIDC access token is about to expire, and refresh it if needed."""
     from flask import session, redirect, url_for, jsonify, request
     import time
-    from src.oidc_helper import OIDCRefreshError
+    from src.common.oidc import OIDCRefreshError
 
     if not oidc_helper.is_enabled:
         return
@@ -313,8 +313,8 @@ def enforce_household_isolation():
     if not session.get('logged_in') or not parent_id or not request.view_args:
         return
 
-    from src.helpers import parent_has_access_to_child, parent_has_access_to_device
-    from src.database import ManagedUserDeviceMap
+    from src.common.helpers import parent_has_access_to_child, parent_has_access_to_device
+    from src.models import ManagedUserDeviceMap
 
     # 1. user_id path param → verify child access
     if 'user_id' in request.view_args:
@@ -500,7 +500,7 @@ def _init_admin_password():
 
 
 def _backfill_household_multitenancy():
-    from src.database import Household, ManagedUser, AgentDevice, ParentAccount, HouseholdParentMembership
+    from src.models import Household, ManagedUser, AgentDevice, ParentAccount, HouseholdParentMembership
     import secrets
     try:
         # 1. Ensure Default Household exists
@@ -689,7 +689,7 @@ def migrate_data_sqlite_to_pg(sqlite_db_path):
     """Migrates all data from an existing SQLite database to the current PostgreSQL database."""
     from sqlalchemy import create_engine, select
     from sqlalchemy import inspect as sqla_inspect
-    from src.database import (
+    from src.models import (
         Settings as DbSettings,
         AgentDevice as DbAgentDevice,
         ManagedUser as DbManagedUser,
@@ -791,7 +791,7 @@ def initialize_runtime(start_background_tasks=False):
     with _runtime_init_lock:
         with app.app_context():
             _initialize_database()
-            from src.pending_commands_manager import backfill_pending_factory_reset_commands
+            from src.agent.pending_commands import backfill_pending_factory_reset_commands
 
             backfilled = backfill_pending_factory_reset_commands()
             if backfilled:

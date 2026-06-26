@@ -1,6 +1,6 @@
 import pytest
 
-from src.database import (
+from src.models import (
     AgentDevice,
     BlocklistSource,
     ManagedUser,
@@ -10,7 +10,7 @@ from src.database import (
     MappingLinuxDevicePolicy,
     UserWeeklySchedule,
 )
-from src.policy_preset_manager import (
+from src.policy.presets import (
     VALID_AGE_BRACKETS,
     VALID_MATURITY_LEVELS,
     apply_policy_preset,

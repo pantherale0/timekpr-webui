@@ -1,5 +1,5 @@
 import pytest
-from src.database import (
+from src.models import (
     ManagedUser,
     AgentDevice,
     ManagedUserDeviceMap,

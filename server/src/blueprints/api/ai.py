@@ -3,7 +3,7 @@ import re
 from datetime import datetime, timezone
 from flask import Blueprint, request, jsonify
 
-from src.database import (
+from src.models import (
     db,
     AgentDevice,
     ManagedUserDeviceMap,
@@ -14,8 +14,8 @@ from src.database import (
     PolicyApprovalGrant,
     utc_today,
 )
-from src.agent_helper import normalize_agent_alert_payload
-from src.alerts_manager import _store_agent_alert
+from src.agent.helper import normalize_agent_alert_payload
+from src.alerts.manager import _store_agent_alert
 
 _LOGGER = logging.getLogger(__name__)
 

@@ -3,7 +3,7 @@ import json
 from datetime import datetime, timezone, timedelta
 from unittest.mock import patch, MagicMock
 import pytest
-from src.database import VideoHistory, WebHistory, ManagedUser, AgentDevice, ManagedUserDeviceMap
+from src.models import VideoHistory, WebHistory, ManagedUser, AgentDevice, ManagedUserDeviceMap
 
 
 @pytest.fixture
@@ -196,7 +196,7 @@ def test_get_user_youtube_history_success(auth_client, yt_setup, db_session):
     assert data['history'][0]['video_id'] == 'vid1'
 
 
-@patch('src.task_manager.requests.get')
+@patch('src.common.tasks.requests.get')
 def test_category_fetcher_worker_task(mock_get, yt_setup, db_session):
     user, device, _ = yt_setup
     h = VideoHistory(
@@ -211,7 +211,7 @@ def test_category_fetcher_worker_task(mock_get, yt_setup, db_session):
     db_session.add(h)
     db_session.commit()
 
-    with patch('src.settings_manager._get_youtube_api_key', return_value='dummy-key'):
+    with patch('src.common.settings._get_youtube_api_key', return_value='dummy-key'):
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.json.return_value = {
@@ -224,7 +224,7 @@ def test_category_fetcher_worker_task(mock_get, yt_setup, db_session):
         }
         mock_get.return_value = mock_response
 
-        from src.task_manager import BackgroundTaskManager
+        from src.common.tasks import BackgroundTaskManager
         manager = BackgroundTaskManager()
         manager._fetch_youtube_categories()
 
@@ -235,7 +235,7 @@ def test_category_fetcher_worker_task(mock_get, yt_setup, db_session):
 
 def test_prune_video_history_worker_task(yt_setup, db_session):
     user, device, _ = yt_setup
-    with patch('src.settings_manager._get_video_history_retention_days', return_value=2):
+    with patch('src.common.settings._get_video_history_retention_days', return_value=2):
         h_recent = VideoHistory(
             device_id=device.system_id,
             managed_user_id=user.id,
@@ -255,7 +255,7 @@ def test_prune_video_history_worker_task(yt_setup, db_session):
         db_session.add_all([h_recent, h_old])
         db_session.commit()
 
-        from src.task_manager import BackgroundTaskManager
+        from src.common.tasks import BackgroundTaskManager
         manager = BackgroundTaskManager()
         manager._prune_video_history()
 

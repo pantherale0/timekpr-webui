@@ -1,6 +1,6 @@
 import time
 from unittest import mock
-from src.helpers import generate_parental_access_code
+from src.common.helpers import generate_parental_access_code
 
 def test_generate_parental_access_code_deterministic():
     secret = "test_agent_secret_key_12345"

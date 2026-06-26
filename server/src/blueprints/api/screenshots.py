@@ -5,19 +5,19 @@ import logging
 from flask import Blueprint, jsonify, request, session, send_file
 from io import BytesIO
 
-from src.database import AgentDevice
-from src.screenshot_settings_manager import (
+from src.models import AgentDevice
+from src.device.screenshot_settings import (
     build_settings_summary,
     get_or_create_settings,
     sync_screenshot_policy_for_device,
     upsert_settings,
 )
-from src.screenshot_manager import (
+from src.device.screenshots import (
     delete_all_screenshots_for_device,
     get_screenshot_by_id,
     list_screenshots_for_device,
 )
-from src.agent_helper import AgentConnectionManager
+from src.agent.helper import AgentConnectionManager
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -78,7 +78,7 @@ def update_device_screenshot_settings(system_id):
     body = request.get_json(silent=True) or {}
     try:
         settings = upsert_settings(device, body)
-        from src.database import db
+        from src.models import db
         db.session.commit()
     except ValueError as exc:
         return jsonify({'success': False, 'message': str(exc)}), 400
@@ -174,7 +174,7 @@ def capture_device_screenshot(system_id):
     body = request.get_json(silent=True) or {}
     linux_username = (body.get('linux_username') or '').strip() or None
 
-    from src.agent_helper import AgentClient
+    from src.agent.helper import AgentClient
 
     try:
         result = AgentClient(system_id).capture_screenshot(linux_username)

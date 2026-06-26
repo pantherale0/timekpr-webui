@@ -5,7 +5,7 @@ import json
 from datetime import date, datetime, timezone
 from unittest.mock import MagicMock
 
-from src.xbox_sync import (
+from src.common.xbox_sync import (
     build_xbox_console_stats,
     build_xbox_console_view_context,
     format_xbox_last_sync,
@@ -81,7 +81,7 @@ def test_update_xbox_players():
 
 
 def test_apply_xbox_playtime(app, db_session):
-    from src.database import ManagedUser, ManagedUserDeviceMap, UserTimeUsage
+    from src.models import ManagedUser, ManagedUserDeviceMap, UserTimeUsage
 
     with app.app_context():
         user = ManagedUser(username='child', system_ip='Unassigned', is_valid=True)
@@ -107,7 +107,7 @@ def test_apply_xbox_playtime(app, db_session):
 
 
 def test_build_xbox_console_view_context(app, db_session):
-    from src.database import AgentDevice, ManagedUser, ManagedUserDeviceMap
+    from src.models import AgentDevice, ManagedUser, ManagedUserDeviceMap
 
     with app.app_context():
         device = AgentDevice(system_id='xbox-view', platform='xbox', status='approved')
@@ -138,7 +138,7 @@ def test_build_xbox_console_view_context(app, db_session):
 
 
 def test_run_async_with_running_event_loop():
-    from src.xbox_sync import run_async
+    from src.common.xbox_sync import run_async
 
     async def sample():
         return 'ok'
@@ -151,8 +151,8 @@ def test_run_async_with_running_event_loop():
 
 def test_push_xbox_schedule_changes(app, db_session):
     from unittest.mock import AsyncMock
-    from src.database import ManagedUser, ManagedUserDeviceMap, UserWeeklySchedule
-    from src.xbox_sync import push_xbox_schedule_changes
+    from src.models import ManagedUser, ManagedUserDeviceMap, UserWeeklySchedule
+    from src.common.xbox_sync import push_xbox_schedule_changes
     from pyfamilysafety.enum import DayOfWeek, OverrideTarget
 
     with app.app_context():
@@ -229,8 +229,8 @@ def test_push_xbox_schedule_changes(app, db_session):
 
 def test_push_xbox_schedule_changes_no_schedule(app, db_session):
     from unittest.mock import AsyncMock
-    from src.database import ManagedUser, ManagedUserDeviceMap
-    from src.xbox_sync import push_xbox_schedule_changes
+    from src.models import ManagedUser, ManagedUserDeviceMap
+    from src.common.xbox_sync import push_xbox_schedule_changes
 
     with app.app_context():
         user = ManagedUser(username='child2', system_ip='Unassigned', is_valid=True)
@@ -267,8 +267,8 @@ def test_push_xbox_schedule_changes_no_schedule(app, db_session):
 
 def test_push_xbox_schedule_changes_already_synced(app, db_session):
     from unittest.mock import AsyncMock
-    from src.database import ManagedUser, ManagedUserDeviceMap, UserWeeklySchedule
-    from src.xbox_sync import push_xbox_schedule_changes
+    from src.models import ManagedUser, ManagedUserDeviceMap, UserWeeklySchedule
+    from src.common.xbox_sync import push_xbox_schedule_changes
 
     with app.app_context():
         user = ManagedUser(username='child3', system_ip='Unassigned', is_valid=True)

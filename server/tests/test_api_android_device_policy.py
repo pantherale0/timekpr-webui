@@ -6,7 +6,7 @@ import zipfile
 
 import pytest
 
-from src.database import AgentDevice, ManagedUser, ManagedUserDeviceMap
+from src.models import AgentDevice, ManagedUser, ManagedUserDeviceMap
 
 
 @pytest.fixture
@@ -57,7 +57,7 @@ def test_get_android_device_policy_defaults(auth_client, android_policy_fixture)
 def test_put_android_device_policy(auth_client, android_policy_fixture, monkeypatch):
     system_id = android_policy_fixture['mapping'].system_id
     monkeypatch.setattr(
-        'src.android_device_policy_manager.push_device_policy',
+        'src.policy.android.push_device_policy',
         lambda device: (False, 'Agent offline'),
     )
     response = auth_client.put(

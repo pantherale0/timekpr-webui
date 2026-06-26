@@ -4,15 +4,15 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.agent_push import (
+from src.agent.push import (
     android_push_wake_available,
     android_should_use_persistent_websocket,
     device_prefers_push,
     notify_device_message,
     update_device_push_metadata,
 )
-from src.database import AgentDevice
-from src.fcm_helper import is_fcm_configured, send_data_message
+from src.models import AgentDevice
+from src.common.fcm import is_fcm_configured, send_data_message
 
 
 def test_is_fcm_configured_env(monkeypatch):
@@ -24,7 +24,7 @@ def test_is_fcm_configured_env(monkeypatch):
     assert is_fcm_configured() is True
 
 
-@patch('src.fcm_helper.requests.post')
+@patch('src.common.fcm.requests.post')
 def test_send_data_message_legacy(mock_post, monkeypatch):
     monkeypatch.setenv('FCM_SERVER_KEY', 'legacy-key')
     monkeypatch.delenv('FIREBASE_CREDENTIALS_JSON', raising=False)
@@ -102,7 +102,7 @@ def test_android_should_use_persistent_websocket(monkeypatch, db_session):
     assert android_should_use_persistent_websocket(android) is False
 
 
-@patch('src.agent_push.notify_android_agent', return_value=(True, 'sent'))
+@patch('src.agent.push.notify_android_agent', return_value=(True, 'sent'))
 def test_notify_device_message_uses_fcm_when_offline(mock_notify, app, db_session):
     device = AgentDevice(
         system_id='android-offline',

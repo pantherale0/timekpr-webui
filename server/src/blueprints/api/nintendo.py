@@ -2,8 +2,8 @@ import aiohttp
 import logging
 from datetime import datetime, timezone
 from flask import Blueprint, jsonify, request, session
-from src.database import db, AgentDevice, Settings
-from src.nintendo_sync import run_async
+from src.models import db, AgentDevice, Settings
+from src.common.nintendo_sync import run_async
 from pynintendoparental import Authenticator, NintendoParental
 
 _LOGGER = logging.getLogger(__name__)

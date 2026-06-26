@@ -2,9 +2,9 @@ import logging
 
 from flask import Blueprint, Response, jsonify, request, session
 
-from src.agent_helper import refresh_installed_apps as agent_refresh_installed_apps
-from src.database import AgentDevice, ManagedUser
-from src.installed_apps_manager import (
+from src.agent.helper import refresh_installed_apps as agent_refresh_installed_apps
+from src.models import AgentDevice, ManagedUser
+from src.device.installed_apps import (
     get_icon,
     list_installed_apps_for_device,
     list_installed_apps_for_managed_user,

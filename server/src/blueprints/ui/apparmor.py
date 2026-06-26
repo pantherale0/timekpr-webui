@@ -1,8 +1,8 @@
 import logging
 from flask import Blueprint, session, redirect, url_for, render_template, request, jsonify
 from src.i18n.catalog import flash_t, api_message
-from src.helpers import wants_json_response
-from src.database import (
+from src.common.helpers import wants_json_response
+from src.models import (
     db,
     ManagedUserDeviceMap,
     AppArmorRule,
@@ -11,10 +11,10 @@ from src.database import (
     AppPolicyRule,
     ManagedUserAppPolicyAssignment,
 )
-from src.agent_helper import AgentConnectionManager, AgentClient
-from src.helpers import _get_device_label_map
-from src.installed_apps_manager import list_discovered_apps_for_platform
-from src.apparmor_manager import (
+from src.agent.helper import AgentConnectionManager, AgentClient
+from src.common.helpers import _get_device_label_map
+from src.device.installed_apps import list_discovered_apps_for_platform
+from src.policy.apparmor import (
     CURATED_APPARMOR_APPS,
     CURATED_APPARMOR_PATHS,
     _get_apparmor_usage_summary,
@@ -31,7 +31,7 @@ ui_apparmor_bp = Blueprint('ui_apparmor', __name__)
 
 def _sync_mapping_app_policy_to_agent(mapping):
     """Push restrictive rules plus approval overlay to an online agent."""
-    from src.approvals_manager import build_full_app_policy_sync_payload
+    from src.user.approvals import build_full_app_policy_sync_payload
 
     policies_list, _, approval_policy = build_full_app_policy_sync_payload(mapping)
     if not AgentConnectionManager.is_online(mapping.system_id):
@@ -267,8 +267,8 @@ def update_user_app_policies(user_id):
     compile_user_apparmor_rules(user)
 
     # Sync down to all linked devices of this user
-    from src.agent_helper import AgentConnectionManager, AgentClient
-    from src.helpers import _get_device_label_map
+    from src.agent.helper import AgentConnectionManager, AgentClient
+    from src.common.helpers import _get_device_label_map
     device_labels = _get_device_label_map()
 
     sync_count = 0

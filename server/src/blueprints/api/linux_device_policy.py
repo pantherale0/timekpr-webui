@@ -4,8 +4,8 @@ import logging
 
 from flask import Blueprint, jsonify, request, session
 
-from src.database import ManagedUserDeviceMap
-from src.linux_device_policy_manager import (
+from src.models import ManagedUserDeviceMap
+from src.policy.linux import (
     build_policy_summary,
     get_or_create_policy,
     upsert_policy,

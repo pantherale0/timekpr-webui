@@ -2,7 +2,7 @@ import logging
 from flask import Blueprint, redirect, url_for, flash, session
 
 from src.blueprints.ui.spa import render_spa_shell
-from src.database import db, ManagedUser, UserWeeklySchedule
+from src.models import db, ManagedUser, UserWeeklySchedule
 
 _LOGGER = logging.getLogger(__name__)
 

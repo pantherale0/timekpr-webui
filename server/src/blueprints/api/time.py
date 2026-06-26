@@ -2,9 +2,9 @@ import logging
 from datetime import datetime, timezone
 from flask import Blueprint, request, jsonify, session
 from src.i18n.catalog import api_message
-from src.database import db, ManagedUser
-from src.agent_helper import AgentConnectionManager, AgentClient
-from src.helpers import _get_device_label_map, _mapping_display_label
+from src.models import db, ManagedUser
+from src.agent.helper import AgentConnectionManager, AgentClient
+from src.common.helpers import _get_device_label_map, _mapping_display_label
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -45,7 +45,7 @@ def modify_time():
     user.pending_time_operation = None
     user.last_checked = datetime.now(timezone.utc)
     db.session.commit()
-    from src.dashboard_events import notify_dashboard_changed
+    from src.common.dashboard_events import notify_dashboard_changed
     notify_dashboard_changed('time_adjusted')
 
     online_mappings = [mapping for mapping in mappings if AgentConnectionManager.is_online(mapping.system_id)]

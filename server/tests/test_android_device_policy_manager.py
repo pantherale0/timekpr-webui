@@ -2,13 +2,13 @@
 
 import pytest
 
-from src.android_device_policy_manager import (
+from src.policy.android import (
     build_device_policy_payload,
     compute_revision,
     get_or_create_policy,
     upsert_policy,
 )
-from src.database import AgentDevice, ManagedUser, ManagedUserDeviceMap, MappingAndroidDevicePolicy
+from src.models import AgentDevice, ManagedUser, ManagedUserDeviceMap, MappingAndroidDevicePolicy
 
 
 @pytest.fixture
@@ -162,7 +162,7 @@ def test_compute_revision_is_stable(android_device):
 
 def test_upsert_policy_updates_fields(android_device, monkeypatch):
     monkeypatch.setattr(
-        'src.android_device_policy_manager.push_device_policy',
+        'src.policy.android.push_device_policy',
         lambda device: (False, 'Agent offline'),
     )
     policy = upsert_policy(android_device, {
@@ -195,7 +195,7 @@ def test_upsert_rejects_linux_mapping(linux_device):
 
 def test_upsert_support_messages_use_parental_controls_wording(android_device, monkeypatch):
     monkeypatch.setattr(
-        'src.android_device_policy_manager.push_device_policy',
+        'src.policy.android.push_device_policy',
         lambda device: (True, 'ok'),
     )
     policy = upsert_policy(android_device, {
@@ -211,7 +211,7 @@ def test_upsert_support_messages_use_parental_controls_wording(android_device, m
 
 def test_upsert_rejects_empty_support_message(android_device, monkeypatch):
     monkeypatch.setattr(
-        'src.android_device_policy_manager.push_device_policy',
+        'src.policy.android.push_device_policy',
         lambda device: (True, 'ok'),
     )
     with pytest.raises(ValueError, match='short_support_message'):
@@ -220,7 +220,7 @@ def test_upsert_rejects_empty_support_message(android_device, monkeypatch):
 
 def test_upsert_rejects_invalid_camera_access(android_device, monkeypatch):
     monkeypatch.setattr(
-        'src.android_device_policy_manager.push_device_policy',
+        'src.policy.android.push_device_policy',
         lambda device: (True, 'ok'),
     )
     with pytest.raises(ValueError, match='camera_access'):
@@ -229,7 +229,7 @@ def test_upsert_rejects_invalid_camera_access(android_device, monkeypatch):
 
 def test_upsert_rejects_invalid_usb_data_access(android_device, monkeypatch):
     monkeypatch.setattr(
-        'src.android_device_policy_manager.push_device_policy',
+        'src.policy.android.push_device_policy',
         lambda device: (True, 'ok'),
     )
     with pytest.raises(ValueError, match='usb_data_access'):
@@ -238,7 +238,7 @@ def test_upsert_rejects_invalid_usb_data_access(android_device, monkeypatch):
 
 def test_upsert_policy_with_force_installed_apps(android_device, monkeypatch, db_session):
     monkeypatch.setattr(
-        'src.android_device_policy_manager.push_device_policy',
+        'src.policy.android.push_device_policy',
         lambda device: (True, 'ok'),
     )
     policy = upsert_policy(android_device, {

@@ -3,8 +3,8 @@ from datetime import timezone
 from flask import Blueprint, session, request, jsonify, redirect, url_for
 from src.i18n.catalog import flash_t, api_message
 from sqlalchemy.exc import SQLAlchemyError
-from src.database import db, ManagedUser, UserWeeklySchedule, UserDailyTimeInterval
-from src.schedule_manager import (
+from src.models import db, ManagedUser, UserWeeklySchedule, UserDailyTimeInterval
+from src.schedule.manager import (
     INTERVAL_STEP_MINUTES,
     _serialize_interval,
     _build_intervals_for_day,

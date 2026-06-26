@@ -4,8 +4,8 @@ import os
 from flask import Blueprint, jsonify, request, send_file, session, redirect
 from io import BytesIO
 
-from src.agent_helper import AgentConnectionManager
-from src.pairing_helper import (
+from src.agent.helper import AgentConnectionManager
+from src.agent.pairing import (
     build_agent_websocket_url,
     build_pairing_payload,
     get_android_apk_storage_path,
@@ -18,7 +18,7 @@ from src.pairing_helper import (
     is_dev_server_version,
     GITHUB_RELEASE_REPO,
 )
-from src.settings_manager import (
+from src.common.settings import (
     _get_agent_websocket_url,
     _get_android_agent_signature_checksum,
 )

@@ -2,7 +2,7 @@ from datetime import datetime, timedelta, timezone
 import pytest
 from werkzeug.exceptions import Forbidden
 
-from src.database import (
+from src.models import (
     db,
     Household,
     ParentAccount,
@@ -13,13 +13,13 @@ from src.database import (
     ManagedUserShare,
     ManagedUserShareInvite,
 )
-from src.helpers import (
+from src.common.helpers import (
     parent_has_access_to_child,
     parent_has_access_to_device,
     check_parent_child_access,
     check_parent_device_access,
 )
-from src.task_manager import BackgroundTaskManager
+from src.common.tasks import BackgroundTaskManager
 
 
 def test_household_isolation(app, db_session):

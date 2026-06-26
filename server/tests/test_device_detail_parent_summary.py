@@ -2,8 +2,8 @@
 
 import pytest
 
-from src.database import AgentDevice, ManagedUser, ManagedUserDeviceMap
-from src.spa_view_builders import _build_device_protection_summary
+from src.models import AgentDevice, ManagedUser, ManagedUserDeviceMap
+from src.common.spa_view_builders import _build_device_protection_summary
 
 
 @pytest.fixture

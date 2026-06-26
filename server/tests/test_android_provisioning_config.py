@@ -4,8 +4,8 @@ import json
 from unittest.mock import patch
 import pytest
 
-from src.database import Settings
-from src.settings_manager import (
+from src.models import Settings
+from src.common.settings import (
     encrypt_setting,
     decrypt_setting,
     _get_android_provisioning_skip_user_setup,
@@ -14,7 +14,7 @@ from src.settings_manager import (
     _get_android_provisioning_wifi_security_type,
     _get_android_provisioning_wifi_password,
 )
-from src.pairing_helper import (
+from src.agent.pairing import (
     build_android_provisioning_payload,
     resolve_android_provisioning,
     PROVISIONING_KEY_SKIP_USER_SETUP,
@@ -109,7 +109,7 @@ def test_build_android_provisioning_payload_wifi_included():
     assert payload[PROVISIONING_KEY_WIFI_PASSWORD] == 'password123'
 
 
-@patch('src.pairing_helper.has_uploaded_android_apk', return_value=True)
+@patch('src.agent.pairing.has_uploaded_android_apk', return_value=True)
 def test_resolve_android_provisioning_includes_new_options(mock_uploaded, db_session, app):
     with app.app_context():
         Settings.set_value('android_provisioning_skip_user_setup', '0')

@@ -34,7 +34,7 @@ if os.path.isdir(venv_site_packages):
 
 app_module = importlib.import_module('app')
 flask_app = app_module.app
-db = importlib.import_module('src.database').db
+db = importlib.import_module('src.models').db
 
 @pytest.fixture(scope='session')
 def app():

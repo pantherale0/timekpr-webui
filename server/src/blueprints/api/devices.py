@@ -3,11 +3,11 @@ import logging
 import secrets
 from flask import Blueprint, request, session, jsonify
 from src.i18n.catalog import api_message
-from src.database import db, AgentDevice
-from src.agent_helper import AgentConnectionManager
-from src.agent_push import notify_pairing_approved
-from src.device_lifecycle_manager import unenroll_device as lifecycle_unenroll_device
-from src.helpers import _device_display_label, _build_device_label_map
+from src.models import db, AgentDevice
+from src.agent.helper import AgentConnectionManager
+from src.agent.push import notify_pairing_approved
+from src.device.lifecycle import unenroll_device as lifecycle_unenroll_device
+from src.common.helpers import _device_display_label, _build_device_label_map
 
 _LOGGER = logging.getLogger(__name__)
 

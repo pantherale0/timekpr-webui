@@ -5,8 +5,8 @@ import hashlib
 
 import pytest
 
-from src.database import AgentDevice, ApplicationIcon, DeviceInstalledApplication, ManagedUser, ManagedUserDeviceMap
-from src.installed_apps_manager import (
+from src.models import AgentDevice, ApplicationIcon, DeviceInstalledApplication, ManagedUser, ManagedUserDeviceMap
+from src.device.installed_apps import (
     finalize_report,
     get_icon,
     handle_app_icon_report,

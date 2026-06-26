@@ -10,7 +10,7 @@ server_dir = os.path.abspath(os.path.dirname(__file__))
 sys.path.insert(0, server_dir)
 
 from app import app
-from src.database import (
+from src.models import (
     db,
     AgentDevice,
     ManagedUser,
@@ -30,7 +30,7 @@ from src.database import (
     AiPromptLog,
     AiSessionLog
 )
-from src.policy_preset_manager import apply_policy_preset
+from src.policy.presets import apply_policy_preset
 
 
 def random_token():

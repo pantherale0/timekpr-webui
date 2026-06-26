@@ -5,18 +5,18 @@ import threading
 from datetime import datetime, timezone
 from flask import Blueprint, request
 from sqlalchemy.exc import SQLAlchemyError
-from src.database import db, AgentDevice
-from src.agent_helper import (
+from src.models import db, AgentDevice
+from src.agent.helper import (
     AgentConnectionManager,
     agent_versions_compatible,
     normalize_agent_alert_payload,
 )
-from src.agent_push import android_should_use_persistent_websocket, update_device_push_metadata
-from src.alerts_manager import _store_agent_alert
-from src.apparmor_manager import _store_app_usage_from_alert
-from src.installed_apps_manager import handle_app_icon_report, handle_installed_apps_report
-from src.screenshot_manager import handle_screenshot_report
-from src.pairing_helper import resolve_android_update_info
+from src.agent.push import android_should_use_persistent_websocket, update_device_push_metadata
+from src.alerts.manager import _store_agent_alert
+from src.policy.apparmor import _store_app_usage_from_alert
+from src.device.installed_apps import handle_app_icon_report, handle_installed_apps_report
+from src.device.screenshots import handle_screenshot_report
+from src.agent.pairing import resolve_android_update_info
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -35,7 +35,7 @@ websocket_bp = Blueprint('websocket', __name__)
 
 def _flush_pending_commands_on_connect(system_id, flask_app):
     """Drain persisted pending commands after a device authenticates."""
-    from src.pending_commands_manager import flush_pending_commands
+    from src.agent.pending_commands import flush_pending_commands
 
     try:
         result = flush_pending_commands(system_id, app=flask_app)
@@ -138,7 +138,7 @@ def ws_agent_handler(ws):
                 
                 if not device:
                     # Look up household by enrollment token
-                    from src.database import Household
+                    from src.models import Household
                     household = None
                     if reg_token:
                         household = Household.query.filter_by(enrollment_token=reg_token).first()
@@ -193,7 +193,7 @@ def ws_agent_handler(ws):
                 policy_hint_system_ids = set()
                 if linux_users is not None:
                     device.linux_users_json = json.dumps(linux_users)
-                    from src.users_manager import sync_mapping_linux_uids_from_device
+                    from src.user.manager import sync_mapping_linux_uids_from_device
                     policy_hint_system_ids = sync_mapping_linux_uids_from_device(device)
 
                 update_device_push_metadata(device, hello_msg)
@@ -258,7 +258,7 @@ def ws_agent_handler(ws):
                     # arbitrary connections from harvesting the device token via device ID.
                     # In open-registration mode (no token configured) we trust the device
                     # ID alone, preserving backward compatibility.
-                    from src.database import Household
+                    from src.models import Household
                     hh = Household.query.get(device.household_id) if device.household_id else None
                     hh_token = hh.enrollment_token if hh else None
 
@@ -339,7 +339,7 @@ def ws_agent_handler(ws):
                     )
 
                     if pending_factory_reset:
-                        from src.device_lifecycle_manager import deliver_pending_factory_reset_on_connect
+                        from src.device.lifecycle import deliver_pending_factory_reset_on_connect
 
                         if deliver_pending_factory_reset_on_connect(system_id):
                             return
@@ -395,7 +395,7 @@ def ws_agent_handler(ws):
                             _store_app_usage_from_alert(system_id, normalized_alert)
                         elif alert.event_type in {'access_requested', 'app_blocked'}:
                             try:
-                                from src.approvals_manager import ingest_access_request
+                                from src.user.approvals import ingest_access_request
                                 ingest_access_request(
                                     system_id,
                                     normalized_alert,
@@ -415,7 +415,7 @@ def ws_agent_handler(ws):
                                 )
                         elif alert.event_type in {'dialogue_flag', 'sentiment_breach'}:
                             try:
-                                from src.approvals_manager import ingest_dialogue_flag_alert
+                                from src.user.approvals import ingest_dialogue_flag_alert
                                 ingest_dialogue_flag_alert(
                                     system_id,
                                     normalized_alert,
@@ -435,7 +435,7 @@ def ws_agent_handler(ws):
                                 )
                         elif alert.event_type == 'clock_tamper':
                             try:
-                                from src.dashboard_events import notify_dashboard_changed
+                                from src.common.dashboard_events import notify_dashboard_changed
                                 notify_dashboard_changed('clock_tamper')
                             except Exception as exc:
                                 _LOGGER.error(
@@ -445,7 +445,7 @@ def ws_agent_handler(ws):
                                 )
                         elif alert.event_type == 'boot_config_tamper':
                             try:
-                                from src.dashboard_events import notify_dashboard_changed
+                                from src.common.dashboard_events import notify_dashboard_changed
                                 notify_dashboard_changed('boot_config_tamper')
                             except Exception as exc:
                                 _LOGGER.error(
@@ -468,8 +468,8 @@ def ws_agent_handler(ws):
                         )
                 elif msg_type == "credential_escrow":
                     try:
-                        from src.windows_laps_manager import persist_credential_escrow
-                        from src.agent_helper import parse_agent_alert_timestamp
+                        from src.device.windows_laps import persist_credential_escrow
+                        from src.agent.helper import parse_agent_alert_timestamp
 
                         credential_type = (msg.get("credential_type") or "").strip()
                         rotation_id = (msg.get("rotation_id") or "").strip()
@@ -501,7 +501,7 @@ def ws_agent_handler(ws):
                     try:
                         result = handle_installed_apps_report(system_id, msg)
                         if result.get("success") and not result.get("pending"):
-                            from src.approvals_manager import push_approval_policies_after_inventory
+                            from src.user.approvals import push_approval_policies_after_inventory
                             push_approval_policies_after_inventory(
                                 system_id,
                                 msg.get("linux_username"),

@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta, timezone
-from src.users_manager import _refresh_managed_user_summary
-from src.database import (
+from src.user.manager import _refresh_managed_user_summary
+from src.models import (
     coerce_time_left_day,
     coerce_time_spent_day,
     get_mapping_time_spent_for_day,

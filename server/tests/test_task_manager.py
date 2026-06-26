@@ -6,8 +6,8 @@ import json
 from datetime import date, datetime, timedelta, timezone
 from unittest.mock import MagicMock, patch
 
-from src.agent_helper import AgentConnectionManager
-from src.database import (
+from src.agent.helper import AgentConnectionManager
+from src.models import (
     utc_today,
     AgentAlert,
     AgentDevice,
@@ -21,7 +21,7 @@ from src.database import (
     UserDailyTimeInterval,
     Settings,
 )
-from src.task_manager import BackgroundTaskManager
+from src.common.tasks import BackgroundTaskManager
 
 class DummyWS:
     """Simple websocket double that auto-responds to RPC requests."""
@@ -684,7 +684,7 @@ def test_task_manager_syncs_domain_policy_payloads(app, db_session):
 
 
 def test_task_manager_syncs_android_device_policy(app, db_session):
-    from src.android_device_policy_manager import upsert_policy
+    from src.policy.android import upsert_policy
 
     manager = BackgroundTaskManager(app)
     user = ManagedUser(username="android-policy-user", system_ip="Unassigned", is_valid=True)
@@ -732,7 +732,7 @@ def test_task_manager_syncs_android_device_policy(app, db_session):
 
 
 def test_task_manager_syncs_linux_device_policy(app, db_session):
-    from src.linux_device_policy_manager import upsert_policy
+    from src.policy.linux import upsert_policy
 
     manager = BackgroundTaskManager(app)
     user = ManagedUser(username="linux-policy-user", system_ip="Unassigned", is_valid=True)
@@ -778,7 +778,7 @@ def test_task_manager_syncs_linux_device_policy(app, db_session):
 
 
 def test_task_manager_manifest_includes_domain_access_mode(app, db_session):
-    from src.approvals_manager import upsert_settings
+    from src.user.approvals import upsert_settings
 
     manager = BackgroundTaskManager(app)
     user = ManagedUser(username="approval-domain-user", system_ip="Unassigned", is_valid=True)
@@ -1030,8 +1030,8 @@ def test_task_manager_refreshes_external_blocklists_in_chunks(app, db_session):
     response = StreamingResponse()
 
     with app.app_context(), \
-         patch('src.url_safety.is_safe_outbound_url', return_value=True), \
-         patch('src.task_manager.requests.get', return_value=response):
+         patch('src.common.url_safety.is_safe_outbound_url', return_value=True), \
+         patch('src.common.tasks.requests.get', return_value=response):
         success, message = manager.refresh_external_blocklist_source(source.id, force=True)
 
     assert success
@@ -1081,8 +1081,8 @@ def test_task_manager_delivers_pending_alerts(app, db_session):
         text = ''
 
     with app.app_context(), \
-         patch('src.url_safety.is_safe_outbound_url', return_value=True), \
-         patch('src.task_manager.requests.post', return_value=DummyResponse()) as mock_post:
+         patch('src.common.url_safety.is_safe_outbound_url', return_value=True), \
+         patch('src.common.tasks.requests.post', return_value=DummyResponse()) as mock_post:
         manager._deliver_pending_alerts()
 
     delivered_alert = AgentAlert.query.get(alert.id)
@@ -1125,8 +1125,8 @@ def test_task_manager_retries_failed_alert_deliveries(app, db_session):
     Settings.set_value('alert_webhook_url', 'https://hooks.example.test/timekpr')
 
     with app.app_context(), \
-         patch('src.url_safety.is_safe_outbound_url', return_value=True), \
-         patch('src.task_manager.requests.post', side_effect=RuntimeError('boom')):
+         patch('src.common.url_safety.is_safe_outbound_url', return_value=True), \
+         patch('src.common.tasks.requests.post', side_effect=RuntimeError('boom')):
         manager._deliver_pending_alerts()
 
     refreshed_retry = AgentAlert.query.get(retry_alert.id)
@@ -1135,7 +1135,7 @@ def test_task_manager_retries_failed_alert_deliveries(app, db_session):
     assert 'boom' in refreshed_retry.last_delivery_error
 
     Settings.set_value('alert_webhook_enabled', '0')
-    with app.app_context(), patch('src.task_manager.requests.post') as mock_post:
+    with app.app_context(), patch('src.common.tasks.requests.post') as mock_post:
         manager._deliver_pending_alerts()
     assert not mock_post.called
 

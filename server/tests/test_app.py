@@ -14,7 +14,7 @@ from app import (
     _get_blocklist_sources,
     task_manager,
 )
-from src.database import (
+from src.models import (
     AgentAlert,
     AgentDevice,
     AppArmorRule,
@@ -31,7 +31,7 @@ from src.database import (
     ManagedUserAppPolicyAssignment,
     db,
 )
-from src.agent_helper import AgentConnectionManager
+from src.agent.helper import AgentConnectionManager
 
 class MockWS:
     def __init__(self, messages):
@@ -77,8 +77,8 @@ def test_login_routes(client, db_session):
     assert b"logged out" in res.data
 
 def test_oidc_login_redirect(client, db_session):
-    with patch('src.oidc_helper.OIDCHelper.is_enabled', new=True), \
-         patch('src.oidc_helper.OIDCHelper.get_authorization_url') as mock_auth_url:
+    with patch('src.common.oidc.OIDCHelper.is_enabled', new=True), \
+         patch('src.common.oidc.OIDCHelper.get_authorization_url') as mock_auth_url:
         mock_auth_url.return_value = "https://auth.example.com/login?state=123"
         
         res = client.get('/', follow_redirects=False)
@@ -86,7 +86,7 @@ def test_oidc_login_redirect(client, db_session):
         assert "https://auth.example.com/login" in res.headers['Location']
 
 def test_oidc_callback_route(client, db_session):
-    with patch('src.oidc_helper.OIDCHelper.is_enabled', new=True):
+    with patch('src.common.oidc.OIDCHelper.is_enabled', new=True):
         # Simulate OIDC Callback with missing code
         with client.session_transaction() as sess:
             sess['oidc_state'] = 'state123'
@@ -101,8 +101,8 @@ def test_oidc_callback_route(client, db_session):
         with client.session_transaction() as sess:
             sess['oidc_state'] = 'state123'
         
-        with patch('src.oidc_helper.OIDCHelper.exchange_code') as mock_exchange, \
-             patch('src.oidc_helper.OIDCHelper.get_user_info') as mock_userinfo, \
+        with patch('src.common.oidc.OIDCHelper.exchange_code') as mock_exchange, \
+             patch('src.common.oidc.OIDCHelper.get_user_info') as mock_userinfo, \
              patch.dict('os.environ', {'ALLOWED_OIDC_ADMINS': 'admin@oidc.com'}):
             mock_exchange.return_value = {'access_token': 'access-token'}
             mock_userinfo.return_value = {'preferred_username': 'oidc-admin', 'email': 'admin@oidc.com'}
@@ -116,8 +116,8 @@ def test_oidc_callback_route(client, db_session):
 
         with client.session_transaction() as sess:
             sess['oidc_state'] = 'state456'
-        with patch('src.oidc_helper.OIDCHelper.exchange_code') as mock_exchange, \
-             patch('src.oidc_helper.OIDCHelper.get_user_info') as mock_userinfo, \
+        with patch('src.common.oidc.OIDCHelper.exchange_code') as mock_exchange, \
+             patch('src.common.oidc.OIDCHelper.get_user_info') as mock_userinfo, \
              patch.dict('os.environ', {'ALLOWED_OIDC_ADMINS': 'admin@oidc.com'}):
             mock_exchange.return_value = {'access_token': 'access-token'}
             mock_userinfo.return_value = {'preferred_username': 'child', 'email': 'child@school.edu'}
@@ -128,10 +128,10 @@ def test_oidc_callback_route(client, db_session):
 
 def test_oidc_session_token_refresh(client, db_session):
     import time
-    from src.oidc_helper import OIDCRefreshError
+    from src.common.oidc import OIDCRefreshError
 
     # Set up mock endpoints and configuration
-    with patch('src.oidc_helper.OIDCHelper.is_enabled', new=True):
+    with patch('src.common.oidc.OIDCHelper.is_enabled', new=True):
         # 1. Token NOT expired
         with client.session_transaction() as sess:
             sess['logged_in'] = True
@@ -139,7 +139,7 @@ def test_oidc_session_token_refresh(client, db_session):
             sess['oidc_refresh_token'] = 'refresh-token-xyz'
             sess['oidc_token_expires_at'] = time.time() + 300  # 5 minutes in future
 
-        with patch('src.oidc_helper.OIDCHelper.refresh_access_token') as mock_refresh:
+        with patch('src.common.oidc.OIDCHelper.refresh_access_token') as mock_refresh:
             res = client.get('/dashboard')
             assert res.status_code == 200
             mock_refresh.assert_not_called()
@@ -152,7 +152,7 @@ def test_oidc_session_token_refresh(client, db_session):
             sess['oidc_refresh_token'] = 'refresh-token-xyz'
             sess['oidc_token_expires_at'] = time.time() - 10  # expired
 
-        with patch('src.oidc_helper.OIDCHelper.refresh_access_token') as mock_refresh:
+        with patch('src.common.oidc.OIDCHelper.refresh_access_token') as mock_refresh:
             mock_refresh.return_value = {
                 'access_token': 'new-access-token-abc',
                 'refresh_token': 'new-refresh-token-123',
@@ -176,7 +176,7 @@ def test_oidc_session_token_refresh(client, db_session):
             sess['oidc_refresh_token'] = 'refresh-token-xyz'
             sess['oidc_token_expires_at'] = time.time() - 10  # expired
 
-        with patch('src.oidc_helper.OIDCHelper.refresh_access_token') as mock_refresh:
+        with patch('src.common.oidc.OIDCHelper.refresh_access_token') as mock_refresh:
             mock_refresh.side_effect = OIDCRefreshError("Revoked", is_transient=False, status_code=400)
             res = client.get('/dashboard', follow_redirects=False)
             assert res.status_code == 302
@@ -195,7 +195,7 @@ def test_oidc_session_token_refresh(client, db_session):
             sess['oidc_refresh_token'] = 'refresh-token-xyz'
             sess['oidc_token_expires_at'] = time.time() - 10  # expired
 
-        with patch('src.oidc_helper.OIDCHelper.refresh_access_token') as mock_refresh:
+        with patch('src.common.oidc.OIDCHelper.refresh_access_token') as mock_refresh:
             mock_refresh.side_effect = OIDCRefreshError("Revoked", is_transient=False, status_code=400)
             res = client.get('/api/device/approve/sys-1')  # API path
             assert res.status_code == 401
@@ -212,7 +212,7 @@ def test_oidc_session_token_refresh(client, db_session):
             sess['oidc_refresh_token'] = 'refresh-token-xyz'
             sess['oidc_token_expires_at'] = time.time() - 10  # expired
 
-        with patch('src.oidc_helper.OIDCHelper.refresh_access_token') as mock_refresh:
+        with patch('src.common.oidc.OIDCHelper.refresh_access_token') as mock_refresh:
             mock_refresh.side_effect = OIDCRefreshError("Server offline", is_transient=True, status_code=503)
             res = client.get('/dashboard')
             assert res.status_code == 200  # succeeds!
@@ -321,7 +321,7 @@ def test_settings_page(client, db_session):
     assert b"updated successfully" in res.data
 
     # POST alert webhook settings
-    with patch('src.url_safety.is_safe_outbound_url', return_value=True):
+    with patch('src.common.url_safety.is_safe_outbound_url', return_value=True):
         res = client.post('/admin/settings', data={
             'form_name': 'alert_webhook',
             'alert_webhook_enabled': 'on',
@@ -737,7 +737,7 @@ def test_user_operations(client, db_session):
     assert alice_mapping is not None
 
     # 5. Validate user manual triggers
-    with patch('src.agent_helper.AgentClient.validate_user') as mock_val:
+    with patch('src.agent.helper.AgentClient.validate_user') as mock_val:
         mock_val.return_value = (True, "Valid User", {"TIME_SPENT_DAY": 1200})
         res = client.get(f'/users/validate/{bob_user.id}', follow_redirects=True)
         assert b"Validated" in res.data
@@ -820,7 +820,7 @@ def test_websocket_handler(app, db_session):
     assert json.loads(ws_missing.sent_messages[0])['message'] == "Missing system_id"
 
     # 4. Hello invalid registration token firewall check
-    with patch('src.agent_helper.REGISTRATION_TOKEN', new='secret-firewall-token'):
+    with patch('src.agent.helper.REGISTRATION_TOKEN', new='secret-firewall-token'):
         ws_firewall = MockWS([json.dumps({
             "type": "hello",
             "system_id": "sys-fw",
@@ -1340,8 +1340,8 @@ def test_new_endpoints(client, db_session):
     ws = DummyWS()
     AgentConnectionManager.register("sys-new", ws, "127.0.0.1")
     
-    with patch('src.agent_helper.AgentClient.modify_time_left') as mock_modify, \
-         patch('src.agent_helper.AgentClient.validate_user') as mock_val:
+    with patch('src.agent.helper.AgentClient.modify_time_left') as mock_modify, \
+         patch('src.agent.helper.AgentClient.validate_user') as mock_val:
         mock_modify.return_value = (True, "Time modified successfully")
         mock_val.return_value = (True, "Valid User", {"TIME_SPENT_DAY": 1200})
         res = client.post('/api/modify-time', data={
@@ -1674,14 +1674,14 @@ def test_delete_app_policy_rule_recompiles_and_resyncs(client, db_session):
     db_session.commit()
 
     # Compile initial rules
-    from src.apparmor_manager import compile_user_apparmor_rules
+    from src.policy.apparmor import compile_user_apparmor_rules
     compile_user_apparmor_rules(user)
 
     # Verify compiled rule exists
     assert AppArmorRule.query.filter_by(device_map_id=mapping.id, executable_path='/usr/bin/obs').first() is not None
 
     with patch.object(AgentConnectionManager, 'is_online', return_value=True), \
-         patch('src.agent_helper.AgentClient.sync_apparmor_policy') as mock_sync:
+         patch('src.agent.helper.AgentClient.sync_apparmor_policy') as mock_sync:
         mock_sync.return_value = (True, 'ok')
         res = client.post(
             f'/admin/app-policies/rule/{rule.id}/delete',
@@ -1742,7 +1742,7 @@ def test_modify_time_tracks_server_daily_adjustment_for_scheduled_users(client, 
 
     AgentConnectionManager.register("sched-online", DummyWS(), "127.0.0.1")
 
-    with patch('src.agent_helper.AgentClient.modify_time_left') as mock_modify:
+    with patch('src.agent.helper.AgentClient.modify_time_left') as mock_modify:
         mock_modify.return_value = (True, "Time modified successfully")
         res = client.post('/api/modify-time', data={
             'user_id': user.id,
@@ -1816,7 +1816,7 @@ def test_app_policies_compiles_and_resolves_precedence(client, db_session):
     db_session.add_all([assign_allow, assign_block])
     db_session.commit()
 
-    from src.apparmor_manager import compile_user_apparmor_rules
+    from src.policy.apparmor import compile_user_apparmor_rules
     compile_user_apparmor_rules(user)
 
     active_rules = AppArmorRule.query.filter_by(device_map_id=mapping.id).all()

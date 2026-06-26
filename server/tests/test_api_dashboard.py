@@ -6,14 +6,14 @@ from datetime import datetime, timezone
 
 import pytest
 
-from src.database import (
+from src.models import (
     AgentDevice,
     ApprovalRequest,
     ManagedUser,
     ManagedUserDeviceMap,
     Settings,
 )
-from src.dashboard_events import DashboardEventsHub, build_sse_snapshot
+from src.common.dashboard_events import DashboardEventsHub, build_sse_snapshot
 
 
 @pytest.fixture

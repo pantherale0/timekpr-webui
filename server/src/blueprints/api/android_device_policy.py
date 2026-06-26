@@ -9,13 +9,13 @@ from urllib.parse import urljoin
 import requests
 from flask import Blueprint, jsonify, request, session
 
-from src.android_device_policy_manager import (
+from src.policy.android import (
     build_policy_summary,
     get_or_create_policy,
     upsert_policy,
 )
-from src.database import AgentDevice
-from src.url_safety import validate_safe_outbound_url
+from src.models import AgentDevice
+from src.common.url_safety import validate_safe_outbound_url
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -89,7 +89,7 @@ def update_android_device_policy(system_id):
 
 @api_android_device_policy_bp.route('/api/mappings/<int:mapping_id>/android-device-policy', methods=['GET'])
 def get_android_device_policy_legacy(mapping_id):
-    from src.database import ManagedUserDeviceMap
+    from src.models import ManagedUserDeviceMap
     auth_response = _require_auth()
     if auth_response is not None:
         return auth_response
@@ -101,7 +101,7 @@ def get_android_device_policy_legacy(mapping_id):
 
 @api_android_device_policy_bp.route('/api/mappings/<int:mapping_id>/android-device-policy', methods=['PUT'])
 def update_android_device_policy_legacy(mapping_id):
-    from src.database import ManagedUserDeviceMap
+    from src.models import ManagedUserDeviceMap
     auth_response = _require_auth()
     if auth_response is not None:
         return auth_response

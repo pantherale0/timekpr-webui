@@ -8,7 +8,7 @@ from unittest.mock import patch
 import pytest
 from werkzeug.datastructures import FileStorage
 
-from src.pairing_helper import (
+from src.agent.pairing import (
     ANDROID_DPC_COMPONENT,
     ANDROID_EXTRA_REGISTRATION_TOKEN,
     ANDROID_EXTRA_SERVER_URL,
@@ -55,7 +55,7 @@ def test_build_agent_websocket_url_from_request(app):
     with app.test_request_context('/', base_url='https://timekpr.example'):
         from flask import request
 
-        from src.pairing_helper import build_agent_websocket_url
+        from src.agent.pairing import build_agent_websocket_url
 
         assert build_agent_websocket_url(request) == 'wss://timekpr.example/ws'
 
@@ -64,7 +64,7 @@ def test_build_agent_websocket_url_explicit_override(app):
     with app.test_request_context('/'):
         from flask import request
 
-        from src.pairing_helper import build_agent_websocket_url
+        from src.agent.pairing import build_agent_websocket_url
 
         assert build_agent_websocket_url(request, explicit_url='wss://custom/ws') == 'wss://custom/ws'
 
@@ -73,7 +73,7 @@ def test_build_agent_websocket_url_configured_override(app):
     with app.test_request_context('/', base_url='https://timekpr.example'):
         from flask import request
 
-        from src.pairing_helper import build_agent_websocket_url
+        from src.agent.pairing import build_agent_websocket_url
 
         assert build_agent_websocket_url(
             request,
@@ -113,14 +113,14 @@ def test_resolve_android_apk_url_release_default(app):
         assert 'timekpr-android-agent-v0.10.apk' in url
 
 
-@patch('src.pairing_helper.has_uploaded_android_apk', return_value=True)
+@patch('src.agent.pairing.has_uploaded_android_apk', return_value=True)
 def test_resolve_android_apk_url_uses_agent_server_host(mock_uploaded):
     url = resolve_android_apk_url('v0.0.0-dev', server_url='ws://10.10.5.25:5000/ws')
     assert url == 'http://10.10.5.25:5000/api/pairing/provisioning/apk'
 
 
 def test_build_uploaded_android_apk_url_uses_wss_origin():
-    from src.pairing_helper import build_uploaded_android_apk_url
+    from src.agent.pairing import build_uploaded_android_apk_url
 
     url = build_uploaded_android_apk_url('wss://timekpr.example/ws')
     assert url == 'https://timekpr.example/api/pairing/provisioning/apk'
@@ -130,7 +130,7 @@ def test_resolve_android_signature_checksum_prefers_override():
     assert resolve_android_signature_checksum('v0.10', 'checksum-override') == 'checksum-override'
 
 
-@patch('src.pairing_helper._fetch_release_signature_checksum', return_value='release-checksum')
+@patch('src.agent.pairing._fetch_release_signature_checksum', return_value='release-checksum')
 def test_resolve_android_signature_checksum_fetches_release(mock_fetch):
     assert resolve_android_signature_checksum('v0.10', '') == 'release-checksum'
     mock_fetch.assert_called_once_with('v0.10')
@@ -161,8 +161,8 @@ def test_provisioning_payload_json_roundtrip():
     assert parsed[PROVISIONING_KEY_COMPONENT] == ANDROID_DPC_COMPONENT
 
 
-@patch('src.pairing_helper.has_uploaded_android_apk', return_value=False)
-@patch('src.pairing_helper._fetch_release_signature_checksum', return_value='release-checksum')
+@patch('src.agent.pairing.has_uploaded_android_apk', return_value=False)
+@patch('src.agent.pairing._fetch_release_signature_checksum', return_value='release-checksum')
 def test_resolve_android_provisioning_ready_with_release_assets(mock_fetch, mock_uploaded):
     context = resolve_android_provisioning(
         'wss://example.com/ws',
@@ -181,8 +181,8 @@ def test_resolve_android_provisioning_not_ready_for_dev_without_overrides():
     assert context['is_dev_version'] is True
 
 
-@patch('src.pairing_helper.has_uploaded_android_apk', return_value=False)
-@patch('src.pairing_helper._fetch_release_signature_checksum', return_value='release-checksum')
+@patch('src.agent.pairing.has_uploaded_android_apk', return_value=False)
+@patch('src.agent.pairing._fetch_release_signature_checksum', return_value='release-checksum')
 def test_resolve_android_update_info_with_release_assets(mock_fetch, mock_uploaded):
     info = resolve_android_update_info('v0.10', server_url='wss://example.com/ws')
     assert info['update_available'] is True
@@ -190,7 +190,7 @@ def test_resolve_android_update_info_with_release_assets(mock_fetch, mock_upload
     assert info['signature_checksum'] == 'release-checksum'
 
 
-@patch('src.pairing_helper.has_uploaded_android_apk', return_value=False)
+@patch('src.agent.pairing.has_uploaded_android_apk', return_value=False)
 def test_resolve_android_update_info_not_available_for_dev_without_upload(mock_uploaded):
     info = resolve_android_update_info('v0.0.0-dev', server_url='wss://example.com/ws')
     assert info['update_available'] is False
@@ -198,7 +198,7 @@ def test_resolve_android_update_info_not_available_for_dev_without_upload(mock_u
     assert info['signature_checksum'] == ''
 
 
-@patch('src.pairing_helper.has_uploaded_android_apk', return_value=True)
+@patch('src.agent.pairing.has_uploaded_android_apk', return_value=True)
 def test_resolve_android_provisioning_ready_with_uploaded_apk(mock_uploaded):
     context = resolve_android_provisioning(
         'ws://10.10.5.25:5000/ws',
@@ -224,18 +224,18 @@ def _make_apk_filestorage():
 
 
 def test_validate_android_apk_upload_rejects_non_apk():
-    from src.pairing_helper import _validate_android_apk_upload
+    from src.agent.pairing import _validate_android_apk_upload
 
     storage = FileStorage(stream=io.BytesIO(b'plain-text'), filename='notes.txt')
     with pytest.raises(ValueError, match='.apk'):
         _validate_android_apk_upload(storage)
 
 
-@patch('src.pairing_helper.compute_apk_signature_checksum', return_value='checksum-value')
+@patch('src.agent.pairing.compute_apk_signature_checksum', return_value='checksum-value')
 def test_save_uploaded_android_apk_persists_file(mock_checksum, tmp_path, monkeypatch):
     import os
 
-    from src.pairing_helper import get_android_apk_storage_path, save_uploaded_android_apk
+    from src.agent.pairing import get_android_apk_storage_path, save_uploaded_android_apk
 
     monkeypatch.setenv('TIMEKPR_ANDROID_APK_PATH', str(tmp_path / 'android-agent.apk'))
     filename, checksum = save_uploaded_android_apk(_make_apk_filestorage())
@@ -245,15 +245,15 @@ def test_save_uploaded_android_apk_persists_file(mock_checksum, tmp_path, monkey
 
 
 def test_validate_signature_checksum_rejects_empty_hash():
-    from src.pairing_helper import _validate_signature_checksum
+    from src.agent.pairing import _validate_signature_checksum
 
     with pytest.raises(RuntimeError, match='invalid'):
         _validate_signature_checksum('47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU')
 
 
-@patch('src.pairing_helper._checksum_from_apksigner', return_value='real-checksum')
+@patch('src.agent.pairing._checksum_from_apksigner', return_value='real-checksum')
 def test_compute_apk_signature_checksum_uses_apksigner(mock_apksigner, tmp_path):
-    from src.pairing_helper import compute_apk_signature_checksum
+    from src.agent.pairing import compute_apk_signature_checksum
 
     apk_path = tmp_path / 'agent.apk'
     apk_path.write_bytes(b'placeholder')
@@ -262,9 +262,9 @@ def test_compute_apk_signature_checksum_uses_apksigner(mock_apksigner, tmp_path)
 
 
 def test_fetch_release_signature_checksum_ignores_empty_hash():
-    with patch('src.pairing_helper.requests.get') as mock_get:
+    with patch('src.agent.pairing.requests.get') as mock_get:
         mock_get.return_value.status_code = 200
         mock_get.return_value.text = '47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU'
-        from src.pairing_helper import _fetch_release_signature_checksum
+        from src.agent.pairing import _fetch_release_signature_checksum
 
         assert _fetch_release_signature_checksum('v0.32') is None

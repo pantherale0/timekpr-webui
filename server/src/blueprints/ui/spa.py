@@ -5,7 +5,7 @@ from functools import wraps
 
 from flask import Blueprint, abort, redirect, render_template, request, session, url_for
 
-from src.spa_view_builders import (
+from src.common.spa_view_builders import (
     build_admin_app_policies_context,
     build_admin_approvals_context,
     build_admin_devices_context,

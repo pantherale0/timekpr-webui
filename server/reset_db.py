@@ -1,7 +1,7 @@
 import logging
 import os
 from flask import Flask
-from src.database import db
+from src.models import db
 
 # Configure logging
 logging.basicConfig(

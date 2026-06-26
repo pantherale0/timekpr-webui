@@ -2,7 +2,7 @@
 
 import pytest
 from datetime import datetime, timezone, timedelta, date
-from src.database import (
+from src.models import (
     AgentDevice,
     ManagedUser,
     ManagedUserDeviceMap,

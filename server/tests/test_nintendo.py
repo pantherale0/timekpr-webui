@@ -4,8 +4,8 @@ import json
 from unittest.mock import patch, MagicMock
 import pytest
 from datetime import datetime, timezone, timedelta
-from src.database import AgentDevice, Settings
-from src.agent_helper import AgentConnectionManager
+from src.models import AgentDevice, Settings
+from src.agent.helper import AgentConnectionManager
 
 @pytest.fixture
 def auth_client(client):
@@ -148,7 +148,7 @@ def test_agent_connection_manager_online_status(db_session):
     db_session.commit()
 
     # Mapped account config with recent timestamp
-    from src.database import ManagedUserDeviceMap, ManagedUser, db
+    from src.models import ManagedUserDeviceMap, ManagedUser, db
     user = ManagedUser(username='test_child', system_ip='Unassigned', is_valid=True)
     db_session.add(user)
     db_session.commit()
@@ -176,7 +176,7 @@ def test_agent_connection_manager_online_status(db_session):
 
 def test_mapping_display_linux_username_uses_nintendo_nickname(db_session):
     import json
-    from src.database import ManagedUser, ManagedUserDeviceMap
+    from src.models import ManagedUser, ManagedUserDeviceMap
 
     device = AgentDevice(
         system_id='switch-nick',

@@ -2,12 +2,12 @@
 
 import pytest
 
-from src.apparmor_manager import (
+from src.policy.apparmor import (
     compile_user_apparmor_rules,
     validate_policy_rule_for_platform,
     _build_apparmor_policy_sync_payload,
 )
-from src.database import (
+from src.models import (
     AgentDevice,
     AppArmorRule,
     AppPolicy,
@@ -16,7 +16,7 @@ from src.database import (
     ManagedUserAppPolicyAssignment,
     ManagedUserDeviceMap,
 )
-from src.installed_apps_manager import finalize_report, ingest_chunk, list_discovered_apps_for_platform
+from src.device.installed_apps import finalize_report, ingest_chunk, list_discovered_apps_for_platform
 
 
 @pytest.fixture

@@ -2,7 +2,7 @@
 import json
 from datetime import datetime, timezone, timedelta
 import pytest
-from src.database import (
+from src.models import (
     db,
     ManagedUser,
     AgentDevice,

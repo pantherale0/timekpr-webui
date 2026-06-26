@@ -2,8 +2,8 @@
 
 import pytest
 
-from src.database import AgentDevice, ManagedUser, ManagedUserDeviceMap, MappingLinuxDevicePolicy
-from src.linux_device_policy_manager import (
+from src.models import AgentDevice, ManagedUser, ManagedUserDeviceMap, MappingLinuxDevicePolicy
+from src.policy.linux import (
     build_device_policy_payload,
     compute_revision,
     get_or_create_policy,
@@ -84,7 +84,7 @@ def test_build_device_policy_payload_defaults(linux_mapping):
 
 def test_upsert_policy_chrome(linux_mapping, monkeypatch):
     monkeypatch.setattr(
-        'src.linux_device_policy_manager.push_mapping_device_policy',
+        'src.policy.linux.push_mapping_device_policy',
         lambda mapping: (True, 'ok'),
     )
     policy = upsert_policy(linux_mapping, {
@@ -124,7 +124,7 @@ def test_compute_revision_is_stable(linux_mapping):
 
 def test_upsert_policy_updates_fields(linux_mapping, monkeypatch):
     monkeypatch.setattr(
-        'src.linux_device_policy_manager.push_mapping_device_policy',
+        'src.policy.linux.push_mapping_device_policy',
         lambda mapping: (False, 'Agent offline'),
     )
     policy = upsert_policy(linux_mapping, {
@@ -152,7 +152,7 @@ def test_upsert_rejects_android_mapping(android_mapping):
 
 def test_upsert_support_message(linux_mapping, monkeypatch):
     monkeypatch.setattr(
-        'src.linux_device_policy_manager.push_mapping_device_policy',
+        'src.policy.linux.push_mapping_device_policy',
         lambda mapping: (True, 'ok'),
     )
     policy = upsert_policy(linux_mapping, {
@@ -165,7 +165,7 @@ def test_upsert_support_message(linux_mapping, monkeypatch):
 
 def test_upsert_rejects_empty_support_message(linux_mapping, monkeypatch):
     monkeypatch.setattr(
-        'src.linux_device_policy_manager.push_mapping_device_policy',
+        'src.policy.linux.push_mapping_device_policy',
         lambda mapping: (True, 'ok'),
     )
     with pytest.raises(ValueError, match='support_message'):
@@ -174,7 +174,7 @@ def test_upsert_rejects_empty_support_message(linux_mapping, monkeypatch):
 
 def test_upsert_policy_chrome_extensions(linux_mapping, monkeypatch):
     monkeypatch.setattr(
-        'src.linux_device_policy_manager.push_mapping_device_policy',
+        'src.policy.linux.push_mapping_device_policy',
         lambda mapping: (True, 'ok'),
     )
     

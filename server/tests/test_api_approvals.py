@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 
 import pytest
 
-from src.database import AgentDevice, ApprovalRequest, ManagedUser, ManagedUserDeviceMap
+from src.models import AgentDevice, ApprovalRequest, ManagedUser, ManagedUserDeviceMap
 
 
 @pytest.fixture

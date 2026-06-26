@@ -3,7 +3,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from src.blocklist_helper import (
+from src.blocklist.helper import (
     EXTERNAL_SYNC_INTERVAL,
     BlocklistStreamParser,
     should_refresh_external_source,
