@@ -86,7 +86,7 @@
                                         {% endif %}
                                         <a href="{{ url_for('ui_dashboard.device_detail', system_id=device.system_id) }}"
                                             class="fw-bold text-decoration-none text-primary">
-                                            {{ device_labels.get(device.system_id, device.display_name) }}
+                                            {{ device_labels.get(device.system_id, device.display_name) }}{% if has_multiple_households and device.household %} <small class="text-muted" style="font-size: 0.75rem;">({{ device.household.name }})</small>{% endif %}
                                         </a>
                                         {% if AgentConnectionManager.is_online(device.system_id) %}
                                         <span
@@ -168,7 +168,7 @@
                                         {% endif %}
                                         <a href="{{ url_for('ui_dashboard.device_detail', system_id=device.system_id) }}"
                                             class="fw-bold text-decoration-none text-primary">
-                                            {{ device_labels.get(device.system_id, device.display_name) }}
+                                            {{ device_labels.get(device.system_id, device.display_name) }}{% if has_multiple_households and device.household %} <small class="text-muted" style="font-size: 0.75rem;">({{ device.household.name }})</small>{% endif %}
                                         </a>
                                         {% if AgentConnectionManager.is_online(device.system_id) %}
                                         <span

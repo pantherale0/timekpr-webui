@@ -44,7 +44,7 @@
                             </div>
                             <div>
                                 <div class="d-flex align-items-center gap-2 flex-wrap">
-                                    <h5 class="mb-0 fw-bold">{{ user.username }}</h5>
+                                    <h5 class="mb-0 fw-bold">{{ user.username }}{% if has_multiple_households and user.household %} <small class="text-muted" style="font-size: 0.75rem;">({{ user.household.name }})</small>{% endif %}</h5>
                                     {% if user.policy_age_bracket and user.policy_maturity_level %}
                                         {% set age_meta = policy_preset_matrix.age_brackets.get(user.policy_age_bracket, {}) %}
                                         {% set mat_meta = policy_preset_matrix.maturity_levels.get(user.policy_maturity_level, {}) %}

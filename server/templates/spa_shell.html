@@ -272,22 +272,7 @@
                 <nav>
                     <ul class="nav sidebar-menu flex-column" data-lte-toggle="treeview" role="menu"
                         data-accordion="false">
-                        {% if oidc_enabled and parent_households|length > 0 %}
-                        <li class="nav-item px-3 mb-3 mt-2">
-                            <form action="{{ url_for('ui_auth.switch_household', household_id=0) }}" method="POST" id="switch-household-form">
-                                <label class="form-label small text-secondary mb-1 d-block">{{ t('nav.active_household') }}</label>
-                                <select class="form-select form-select-sm bg-dark text-white border-secondary" 
-                                        style="border-color: #4A6B5D !important;"
-                                        onchange="this.form.action=this.form.action.replace('/0', '/' + this.value); this.form.submit();">
-                                    {% for hh in parent_households %}
-                                        <option value="{{ hh.id }}" {% if active_household and active_household.id == hh.id %}selected{% endif %}>
-                                            {{ hh.name }}
-                                        </option>
-                                    {% endfor %}
-                                </select>
-                            </form>
-                        </li>
-                        {% endif %}
+
                         <li class="nav-header guardian-nav-section-header">{{ t('nav.main') }}</li>
                         <li class="nav-item">
                             <a href="/dashboard" data-spa-nav="/dashboard"
@@ -466,6 +451,16 @@
 
                     <!-- STEP 1: Select Platform -->
                     <div class="wizard-step-panel" id="step-panel-1">
+                        {% if parent_households and parent_households|length > 1 %}
+                        <div class="mb-4 mx-auto" style="max-width: 400px;">
+                            <label for="wizard-household-select" class="form-label fw-bold small text-muted">Select Target Household</label>
+                            <select id="wizard-household-select" class="form-select" onchange="onWizardHouseholdChange()">
+                                {% for hh in parent_households %}
+                                    <option value="{{ hh.id }}">{{ hh.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        {% endif %}
                         <div class="row g-3 justify-content-center">
                             <div class="col-sm-6 col-md-4">
                                 <div class="platform-card p-3 text-center h-100" onclick="selectPlatform('linux')">
@@ -1201,14 +1196,23 @@
             }
         }
 
+        function onWizardHouseholdChange() {
+            if (wizardState.platform) {
+                selectPlatform(wizardState.platform);
+            }
+        }
+
         function selectPlatform(platform) {
             wizardState.platform = platform;
 
             // Highlight card
             document.querySelectorAll('.platform-card').forEach(c => c.classList.remove('selected'));
 
+            const hhSelect = document.getElementById('wizard-household-select');
+            const hhId = hhSelect ? hhSelect.value : '';
+
             // Load Pairing Details via AJAX
-            fetch('/api/pairing/config')
+            fetch(`/api/pairing/config?pairing_household_id=${hhId}`)
                 .then(r => r.json())
                 .then(data => {
                     if (data.success) {
@@ -1229,17 +1233,17 @@
                                 `wget -qO- ${window.location.origin}/scripts/install-agent.sh | sudo bash -s -- --url "${wizardState.wsUrl}"`;
                         } else if (platform === 'android') {
                             document.getElementById('setup-instruction-android').classList.remove('d-none');
-                            document.getElementById('android-qr-img').src = '/api/pairing/qr.png';
+                            document.getElementById('android-qr-img').src = `/api/pairing/qr.png?pairing_household_id=${hhId}`;
                             document.getElementById('android-ws-url').textContent = wizardState.wsUrl;
 
                             // Load MDM Provisioning details
-                            fetch('/api/pairing/provisioning/config')
+                            fetch(`/api/pairing/provisioning/config?pairing_household_id=${hhId}`)
                                 .then(r => r.json())
                                 .then(pData => {
                                     const mdrQr = document.getElementById('android-mdm-qr-img');
                                     const mdmAlert = document.getElementById('mdm-unavailable-alert');
                                     if (pData.success && pData.provisioning_ready) {
-                                        mdrQr.src = '/api/pairing/provisioning/qr.png';
+                                        mdrQr.src = `/api/pairing/provisioning/qr.png?pairing_household_id=${hhId}`;
                                         mdrQr.classList.remove('d-none');
                                         mdmAlert.classList.add('d-none');
                                     } else {
@@ -1476,10 +1480,12 @@
 
             let userPromise;
             if (isNewUser) {
+                const hhSelect = document.getElementById('wizard-household-select');
+                const hhId = hhSelect ? hhSelect.value : '';
                 userPromise = fetch('/api/user/create', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username: newName })
+                    body: JSON.stringify({ username: newName, household_id: hhId })
                 })
                     .then(r => r.json())
                     .then(data => {

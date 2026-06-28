@@ -32,6 +32,16 @@
                             <input type="text" id="username" name="username" class="form-control form-control-lg"
                                 placeholder="e.g. Sam" autocomplete="off" aria-describedby="username-hint">
                             <div class="invalid-feedback">Please enter a profile name to continue.</div>
+                            {% if parent_households and parent_households|length > 1 %}
+                            <div class="mt-3">
+                                <label for="create-household-id" class="form-label fw-semibold small">Household</label>
+                                <select id="create-household-id" name="household_id" class="form-select">
+                                    {% for hh in parent_households %}
+                                        <option value="{{ hh.id }}">{{ hh.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            {% endif %}
                             <div class="guardian-nudge mt-3" id="username-hint">
                                 <strong>Profile flexibility choice:</strong> Consolidating multiple kids on one profile is completely free.
                                 However, they will share the exact same bedtimes, browsing shields, and activity reports.

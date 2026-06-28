@@ -40,7 +40,25 @@ def pairing_config():
         explicit_url=explicit_url,
         configured_url=_get_agent_websocket_url(),
     )
-    registration_token = AgentConnectionManager.registration_token
+    
+    household_id = request.args.get('pairing_household_id')
+    registration_token = None
+    if household_id:
+        try:
+            from src.models import Household, ParentAccount
+            parent_id = session.get('parent_account_id')
+            if parent_id:
+                p = ParentAccount.query.get(parent_id)
+                if p and any(m.household_id == int(household_id) for m in p.memberships):
+                    hh = Household.query.get(int(household_id))
+                    if hh:
+                        registration_token = hh.enrollment_token
+        except (ValueError, TypeError):
+            pass
+
+    if not registration_token:
+        registration_token = AgentConnectionManager.registration_token
+
     payload = build_pairing_payload(server_url, registration_token)
     return jsonify({'success': True, 'payload': payload})
 
@@ -57,7 +75,25 @@ def pairing_qr_png():
         explicit_url=explicit_url,
         configured_url=_get_agent_websocket_url(),
     )
-    registration_token = AgentConnectionManager.registration_token
+    
+    household_id = request.args.get('pairing_household_id')
+    registration_token = None
+    if household_id:
+        try:
+            from src.models import Household, ParentAccount
+            parent_id = session.get('parent_account_id')
+            if parent_id:
+                p = ParentAccount.query.get(parent_id)
+                if p and any(m.household_id == int(household_id) for m in p.memberships):
+                    hh = Household.query.get(int(household_id))
+                    if hh:
+                        registration_token = hh.enrollment_token
+        except (ValueError, TypeError):
+            pass
+
+    if not registration_token:
+        registration_token = AgentConnectionManager.registration_token
+
     payload_json = pairing_payload_json(server_url, registration_token)
     png_bytes = render_pairing_qr_png(payload_json)
     return send_file(
@@ -75,7 +111,25 @@ def _resolve_provisioning_context():
         explicit_url=explicit_url,
         configured_url=_get_agent_websocket_url(),
     )
-    registration_token = AgentConnectionManager.registration_token
+    
+    household_id = request.args.get('pairing_household_id')
+    registration_token = None
+    if household_id:
+        try:
+            from src.models import Household, ParentAccount
+            parent_id = session.get('parent_account_id')
+            if parent_id:
+                p = ParentAccount.query.get(parent_id)
+                if p and any(m.household_id == int(household_id) for m in p.memberships):
+                    hh = Household.query.get(int(household_id))
+                    if hh:
+                        registration_token = hh.enrollment_token
+        except (ValueError, TypeError):
+            pass
+
+    if not registration_token:
+        registration_token = AgentConnectionManager.registration_token
+
     return resolve_android_provisioning(
         server_url,
         get_server_version(),

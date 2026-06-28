@@ -94,14 +94,18 @@ def list_access_requests():
     limit = min(int(request.args.get("limit", 50)), 200)
 
     parent_id = session.get('parent_account_id')
-    active_hh_id = session.get('active_household_id')
     if not parent_id:
         from src.models import ParentAccount
         p = ParentAccount.query.filter_by(email='admin@local').first()
         if p:
             parent_id = p.id
-            if not active_hh_id and p.memberships:
-                active_hh_id = p.memberships[0].household_id
+
+    hh_ids = []
+    if parent_id:
+        from src.models import ParentAccount
+        p = ParentAccount.query.get(parent_id)
+        if p:
+            hh_ids = [m.household_id for m in p.memberships if m.household_id]
 
     if system_id:
         from src.common.helpers import parent_has_access_to_device
@@ -111,12 +115,12 @@ def list_access_requests():
     query = AgentAlert.query.filter_by(event_type="access_requested")
     if system_id:
         query = query.filter_by(system_id=system_id)
-    elif active_hh_id:
+    elif hh_ids:
         query = query.join(AgentDevice, AgentDevice.system_id == AgentAlert.system_id).filter(
-            AgentDevice.household_id == active_hh_id
+            AgentDevice.household_id.in_(hh_ids)
         )
     else:
-        # If no active household and no specific device, return empty list to prevent leakage
+        # If no households, return empty list to prevent leakage
         return jsonify([])
 
     alerts = query.order_by(AgentAlert.occurred_at.desc()).limit(limit).all()

@@ -65,6 +65,7 @@ def create_managed_user():
         return jsonify({'success': False, 'message': api_message('not_authenticated')}), 401
 
     username = (request.form.get('username') or '').strip()
+    household_id = request.form.get('household_id')
     selected_preset_ids = request.form.getlist('preset_ids')
     policy_age_bracket = (request.form.get('policy_age_bracket') or '').strip()
     policy_maturity_level = (request.form.get('policy_maturity_level') or '').strip()
@@ -78,10 +79,31 @@ def create_managed_user():
         flash_t('flash.users.already_exists', 'warning', username=username)
         return redirect(url_for('ui_dashboard.admin'))
 
+    parent_id = session.get('parent_account_id')
+    if not parent_id:
+        from src.models import ParentAccount
+        p = ParentAccount.query.filter_by(email='admin@local').first()
+        if p:
+            parent_id = p.id
+
+    target_hh_id = None
+    if household_id:
+        try:
+            target_hh_id = int(household_id)
+        except (ValueError, TypeError):
+            pass
+
+    if not target_hh_id and parent_id:
+        from src.models import ParentAccount
+        p = ParentAccount.query.get(parent_id)
+        if p and p.memberships:
+            target_hh_id = p.memberships[0].household_id
+
     managed_user = ManagedUser(
         username=username,
         is_valid=False,
         system_ip='Unassigned',
+        household_id=target_hh_id,
     )
     db.session.add(managed_user)
     db.session.commit()
@@ -554,16 +576,23 @@ def get_all_users():
     if not session.get('logged_in'):
         return jsonify({'success': False, 'message': api_message('not_authenticated')}), 401
     
-    active_hh_id = session.get('active_household_id')
-    if not active_hh_id:
+    parent_id = session.get('parent_account_id')
+    if not parent_id:
         from src.models import ParentAccount
         p = ParentAccount.query.filter_by(email='admin@local').first()
-        if p and p.memberships:
-            active_hh_id = p.memberships[0].household_id
+        if p:
+            parent_id = p.id
+
+    hh_ids = []
+    if parent_id:
+        from src.models import ParentAccount
+        p = ParentAccount.query.get(parent_id)
+        if p:
+            hh_ids = [m.household_id for m in p.memberships if m.household_id]
 
     query = ManagedUser.query
-    if active_hh_id:
-        query = query.filter_by(household_id=active_hh_id)
+    if hh_ids:
+        query = query.filter(ManagedUser.household_id.in_(hh_ids))
 
     users = query.order_by(ManagedUser.username.asc()).all()
     return jsonify({
@@ -578,11 +607,14 @@ def api_create_user():
     if not session.get('logged_in'):
         return jsonify({'success': False, 'message': api_message('not_authenticated')}), 401
     
+    household_id = None
     if request.is_json:
         data = request.json or {}
         username = (data.get('username') or '').strip()
+        household_id = data.get('household_id')
     else:
         username = (request.form.get('username') or '').strip()
+        household_id = request.form.get('household_id')
         
     if not username:
         return jsonify({'success': False, 'message': api_message('profile_name_required')}), 400
@@ -594,14 +626,27 @@ def api_create_user():
             'message': api_message('profile_exists', username=username),
         }), 400
         
-    active_hh_id = session.get('active_household_id')
-    if not active_hh_id:
+    parent_id = session.get('parent_account_id')
+    if not parent_id:
         from src.models import ParentAccount
         p = ParentAccount.query.filter_by(email='admin@local').first()
-        if p and p.memberships:
-            active_hh_id = p.memberships[0].household_id
+        if p:
+            parent_id = p.id
 
-    user = ManagedUser(username=username, is_valid=False, system_ip='Unassigned', household_id=active_hh_id)
+    target_hh_id = None
+    if household_id:
+        try:
+            target_hh_id = int(household_id)
+        except (ValueError, TypeError):
+            pass
+
+    if not target_hh_id and parent_id:
+        from src.models import ParentAccount
+        p = ParentAccount.query.get(parent_id)
+        if p and p.memberships:
+            target_hh_id = p.memberships[0].household_id
+
+    user = ManagedUser(username=username, is_valid=False, system_ip='Unassigned', household_id=target_hh_id)
     db.session.add(user)
     db.session.commit()
     return jsonify({

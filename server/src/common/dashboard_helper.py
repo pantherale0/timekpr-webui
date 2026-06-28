@@ -18,7 +18,7 @@ def _schedule_is_synced(user):
     return bool(user.weekly_schedule.is_synced)
 
 
-def _build_user_entry(user, active_household_id=None):
+def _build_user_entry(user, active_household_id=None, has_multiple_households=False):
     usage_data = user.get_recent_usage(days=7)
     mapping_count = len(user.device_mappings)
     online_mapping_count = sum(
@@ -32,7 +32,12 @@ def _build_user_entry(user, active_household_id=None):
         local_dt = localtime_filter(user.last_checked)
         last_checked_display = local_dt.strftime('%H:%M') if local_dt else None
 
-    is_shared = (active_household_id is not None) and (user.household_id != active_household_id)
+    is_shared = False
+    if active_household_id is not None:
+        if isinstance(active_household_id, (list, tuple)):
+            is_shared = user.household_id not in active_household_id
+        else:
+            is_shared = user.household_id != active_household_id
 
     return {
         'id': user.id,
@@ -50,6 +55,8 @@ def _build_user_entry(user, active_household_id=None):
         'policy_age_bracket': user.policy_age_bracket,
         'policy_maturity_level': user.policy_maturity_level,
         'is_shared': is_shared,
+        'household_name': user.household.name if user.household else None,
+        'has_multiple_households': has_multiple_households,
     }
 
 
@@ -58,7 +65,10 @@ def build_dashboard_snapshot(active_household_id=None, parent_account_id=None):
     users = []
     
     if active_household_id:
-        users.extend(ManagedUser.query.filter_by(household_id=active_household_id).all())
+        if isinstance(active_household_id, (list, tuple)):
+            users.extend(ManagedUser.query.filter(ManagedUser.household_id.in_(active_household_id)).all())
+        else:
+            users.extend(ManagedUser.query.filter_by(household_id=active_household_id).all())
         
     if parent_account_id:
         from src.models import ManagedUserShare
@@ -76,11 +86,18 @@ def build_dashboard_snapshot(active_household_id=None, parent_account_id=None):
     if not active_household_id and not parent_account_id:
         users = ManagedUser.query.all()
 
+    has_multiple_households = False
+    if parent_account_id:
+        from src.models import ParentAccount
+        parent = ParentAccount.query.get(parent_account_id)
+        if parent:
+            has_multiple_households = len(parent.memberships) > 1
+
     pending_adjustments = {}
     user_data = []
 
     for user in users:
-        entry = _build_user_entry(user, active_household_id=active_household_id)
+        entry = _build_user_entry(user, active_household_id=active_household_id, has_multiple_households=has_multiple_households)
         if entry['pending_adjustment']:
             pending_adjustments[str(user.id)] = entry['pending_adjustment']
         user_data.append(entry)
@@ -104,10 +121,17 @@ def build_dashboard_snapshot(active_household_id=None, parent_account_id=None):
 def build_dashboard_json_snapshot():
     """Build a JSON-serializable dashboard snapshot."""
     from flask import has_request_context, session
-    active_household_id = session.get('active_household_id') if has_request_context() else None
     parent_account_id = session.get('parent_account_id') if has_request_context() else None
 
-    snapshot = build_dashboard_snapshot(active_household_id, parent_account_id)
+    # Resolve all parent households if logged in
+    household_ids = []
+    if parent_account_id:
+        from src.models import ParentAccount
+        p = ParentAccount.query.get(parent_account_id)
+        if p:
+            household_ids = [m.household_id for m in p.memberships if m.household_id]
+
+    snapshot = build_dashboard_snapshot(household_ids, parent_account_id)
     users = []
     for user in snapshot['users']:
         users.append({
@@ -126,6 +150,8 @@ def build_dashboard_json_snapshot():
             'policy_age_bracket': user['policy_age_bracket'],
             'policy_maturity_level': user['policy_maturity_level'],
             'is_shared': user.get('is_shared', False),
+            'household_name': user.get('household_name'),
+            'has_multiple_households': user.get('has_multiple_households', False),
         })
     return {
         'users': users,

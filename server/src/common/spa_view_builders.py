@@ -5,17 +5,21 @@ from flask import request, session, abort
 from src.models import ParentAccount
 
 def get_current_parent_and_household():
-    """Retrieve the current parent account ID and active household ID from session, with fallback for local admin."""
+    """Retrieve the current parent account ID and list of household IDs from session, with fallback for local admin."""
     parent_id = session.get('parent_account_id')
-    active_household_id = session.get('active_household_id')
     if session.get('logged_in') and not parent_id:
         # Fallback for local admin or testing environments
         parent = ParentAccount.query.filter_by(email='admin@local').first()
         if parent:
             parent_id = parent.id
-            if not active_household_id and parent.memberships:
-                active_household_id = parent.memberships[0].household_id
-    return parent_id, active_household_id
+            
+    household_ids = []
+    if parent_id:
+        parent = ParentAccount.query.get(parent_id)
+        if parent:
+            household_ids = [m.household_id for m in parent.memberships if m.household_id]
+            
+    return parent_id, household_ids
 
 from src.agent.helper import AgentConnectionManager
 from src.alerts.manager import _build_device_alert_entries, _build_user_alert_groups
@@ -175,27 +179,40 @@ def _build_device_protection_summary(
 
 def build_dashboard_context():
     from src.policy.presets import get_matrix_metadata_for_ui
-    parent_id, active_hh_id = get_current_parent_and_household()
+    from src.models import Household
+    parent_id, hh_ids = get_current_parent_and_household()
 
     db.session.expire_all()
-    snapshot = build_dashboard_snapshot(active_household_id=active_hh_id, parent_account_id=parent_id)
+    snapshot = build_dashboard_snapshot(active_household_id=hh_ids, parent_account_id=parent_id)
+    
+    households = []
+    if hh_ids:
+        households = Household.query.filter(Household.id.in_(hh_ids)).all()
+
     return {
         'template': 'dashboard.html',
         'users': snapshot['users'],
         'pending_adjustments': snapshot['pending_adjustments'],
         'policy_preset_matrix': get_matrix_metadata_for_ui(),
+        'parent_households': households,
+        'has_multiple_households': len(hh_ids) > 1,
     }
 
 
 def build_admin_users_context():
     from src.policy.presets import get_matrix_metadata_for_ui
-    parent_id, active_hh_id = get_current_parent_and_household()
+    from src.models import Household
+    parent_id, hh_ids = get_current_parent_and_household()
 
     users_query = ManagedUser.query
     devices_query = AgentDevice.query.filter_by(status='approved')
-    if active_hh_id:
-        users_query = users_query.filter_by(household_id=active_hh_id)
-        devices_query = devices_query.filter_by(household_id=active_hh_id)
+    if hh_ids:
+        users_query = users_query.filter(ManagedUser.household_id.in_(hh_ids))
+        devices_query = devices_query.filter(AgentDevice.household_id.in_(hh_ids))
+
+    households = []
+    if hh_ids:
+        households = Household.query.filter(Household.id.in_(hh_ids)).all()
 
     return {
         'template': 'admin_users.html',
@@ -203,6 +220,8 @@ def build_admin_users_context():
         'approved_devices': devices_query.all(),
         'device_labels': _get_device_label_map(),
         'policy_preset_matrix': get_matrix_metadata_for_ui(),
+        'parent_households': households,
+        'has_multiple_households': len(hh_ids) > 1,
     }
 
 
@@ -346,12 +365,12 @@ def build_admin_approvals_context():
 
 
 def build_admin_devices_context():
-    parent_id, active_hh_id = get_current_parent_and_household()
+    parent_id, hh_ids = get_current_parent_and_household()
     devices_approved = AgentDevice.query.filter_by(status='approved')
     devices_pending = AgentDevice.query.filter_by(status='pending')
-    if active_hh_id:
-        devices_approved = devices_approved.filter_by(household_id=active_hh_id)
-        devices_pending = devices_pending.filter_by(household_id=active_hh_id)
+    if hh_ids:
+        devices_approved = devices_approved.filter(AgentDevice.household_id.in_(hh_ids))
+        devices_pending = devices_pending.filter(AgentDevice.household_id.in_(hh_ids))
 
     return {
         'template': 'admin_devices.html',
@@ -359,20 +378,21 @@ def build_admin_devices_context():
         'pending_devices': devices_pending.all(),
         'device_labels': _get_device_label_map(),
         'AgentConnectionManager': AgentConnectionManager,
+        'has_multiple_households': len(hh_ids) > 1,
     }
 
 
 def build_admin_restrictions_context():
     from src.blocklist.marketplace import load_marketplace_presets
 
-    parent_id, active_hh_id = get_current_parent_and_household()
+    parent_id, hh_ids = get_current_parent_and_household()
     blocklist_sources = _get_blocklist_sources(include_domains=True)
     custom_sources = [s for s in blocklist_sources if not s.get('is_marketplace')]
     marketplace_presets = load_marketplace_presets()
     
     users_query = ManagedUser.query
-    if active_hh_id:
-        users_query = users_query.filter_by(household_id=active_hh_id)
+    if hh_ids:
+        users_query = users_query.filter(ManagedUser.household_id.in_(hh_ids))
     users = users_query.order_by(ManagedUser.username.asc()).all()
 
     subscribed_map = {preset['id']: [] for preset in marketplace_presets}
@@ -397,11 +417,11 @@ def _build_pairing_qr_context():
         request,
         configured_url=_get_agent_websocket_url(),
     )
-    parent_id, active_hh_id = get_current_parent_and_household()
+    parent_id, hh_ids = get_current_parent_and_household()
     registration_token = None
-    if active_hh_id:
+    if hh_ids:
         from src.models import Household
-        hh = Household.query.get(active_hh_id)
+        hh = Household.query.get(hh_ids[0])
         if hh:
             registration_token = hh.enrollment_token
             
@@ -646,10 +666,10 @@ def build_user_online_accounts_context(user_id):
 
 
 def build_weekly_schedule_context():
-    parent_id, active_hh_id = get_current_parent_and_household()
+    parent_id, hh_ids = get_current_parent_and_household()
     users_query = ManagedUser.query
-    if active_hh_id:
-        users_query = users_query.filter_by(household_id=active_hh_id)
+    if hh_ids:
+        users_query = users_query.filter(ManagedUser.household_id.in_(hh_ids))
     users = users_query.order_by(ManagedUser.username.asc()).all()
 
     db_changed = False
@@ -690,12 +710,12 @@ def build_admin_app_policies_context():
     from src.policy.apparmor import CURATED_APPARMOR_APPS
     from src.device.installed_apps import list_discovered_apps_for_platform
 
-    parent_id, active_hh_id = get_current_parent_and_household()
+    parent_id, hh_ids = get_current_parent_and_household()
     policies = AppPolicy.query.order_by(AppPolicy.name.asc()).all()
     
     users_query = ManagedUser.query
-    if active_hh_id:
-        users_query = users_query.filter_by(household_id=active_hh_id)
+    if hh_ids:
+        users_query = users_query.filter(ManagedUser.household_id.in_(hh_ids))
 
     return {
         'template': 'restrictions_app.html',

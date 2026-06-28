@@ -365,7 +365,11 @@ def list_pending_requests(
         
         filters = []
         if active_household_id is not None:
-            filters.append(ManagedUser.household_id == active_household_id)
+            if isinstance(active_household_id, (list, tuple)):
+                if active_household_id:
+                    filters.append(ManagedUser.household_id.in_(active_household_id))
+            else:
+                filters.append(ManagedUser.household_id == active_household_id)
         if parent_account_id is not None:
             shared_user_ids_subquery = db.session.query(ManagedUserShare.managed_user_id).filter(
                 ManagedUserShare.parent_account_id == parent_account_id
