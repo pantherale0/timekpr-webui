@@ -11,11 +11,11 @@
             <div class="modal-body p-4">
                 <!-- Step 1: URL Input -->
                 <div id="wizard-step-1" class="wizard-step">
-                    <p class="text-secondary small mb-3">Provide the HTTPS URL to the application's APK file. The server will download and inspect the file to verify the package name and calculate its checksum.</p>
+                    <p class="text-secondary small mb-3">{{ t('tpl.device_detail.android_wizard_modal.provide_the_https_url_to') }}</p>
                     <div class="mb-3">
-                        <label for="wizard-apk-url" class="form-label small fw-bold text-uppercase text-secondary">APK URL (HTTPS)</label>
+                        <label for="wizard-apk-url" class="form-label small fw-bold text-uppercase text-secondary">{{ t('pages.device_detail.col_apk_url') }}</label>
                         <input type="url" class="form-control" id="wizard-apk-url" placeholder="https://example.com/app.apk" required>
-                        <div class="invalid-feedback" id="wizard-url-feedback">Please enter a valid HTTPS URL.</div>
+                        <div class="invalid-feedback" id="wizard-url-feedback">{{ t('tpl.device_detail.android_wizard_modal.please_enter_a_valid_https') }}</div>
                     </div>
                     <div class="d-flex justify-content-end gap-2">
                         <button type="button" class="btn btn-secondary btn-sm fw-bold" data-bs-dismiss="modal">Cancel</button>
@@ -30,27 +30,27 @@
                     <div class="spinner-border text-primary mb-3" style="width: 3rem; height: 3rem;" role="status">
                         <span class="visually-hidden">Loading...</span>
                     </div>
-                    <h5 class="fw-bold mb-2">Validating Application</h5>
-                    <p class="text-secondary small mb-0 px-3">Downloading APK, verifying structural integrity, and extracting binary metadata. This may take a few seconds...</p>
+                    <h5 class="fw-bold mb-2">{{ t('tpl.device_detail.android_wizard_modal.validating_application') }}</h5>
+                    <p class="text-secondary small mb-0 px-3">{{ t('tpl.device_detail.android_wizard_modal.downloading_apk_verifying_structural_integrity') }}</p>
                 </div>
 
                 <!-- Step 3: Confirmation -->
                 <div id="wizard-step-3" class="wizard-step d-none">
                     <div class="alert alert-success d-flex align-items-center gap-2 mb-3 py-2 border-0 bg-success-subtle text-success">
                         <i class="fas fa-check-circle fs-5"></i>
-                        <span class="small fw-semibold">APK successfully validated and verified!</span>
+                        <span class="small fw-semibold">{{ t('tpl.device_detail.android_wizard_modal.apk_successfully_validated_and_verified') }}</span>
                     </div>
                     
                     <div class="mb-3">
-                        <span class="text-secondary small fw-bold text-uppercase d-block mb-1" style="font-size: 0.7rem;">Package Name</span>
+                        <span class="text-secondary small fw-bold text-uppercase d-block mb-1" style="font-size: 0.7rem;">{{ t('pages.restrictions_app.package_name') }}</span>
                         <div class="p-2 border rounded bg-body-secondary font-monospace small text-body" id="wizard-confirm-package">com.example.app</div>
                     </div>
                     <div class="mb-3">
-                        <span class="text-secondary small fw-bold text-uppercase d-block mb-1" style="font-size: 0.7rem;">SHA-256 Checksum</span>
+                        <span class="text-secondary small fw-bold text-uppercase d-block mb-1" style="font-size: 0.7rem;">{{ t('tpl.device_detail.android_wizard_modal.sha_256_checksum') }}</span>
                         <div class="p-2 border rounded bg-body-secondary font-monospace small text-body text-break" id="wizard-confirm-checksum">-</div>
                     </div>
                     <div class="mb-4">
-                        <span class="text-secondary small fw-bold text-uppercase d-block mb-1" style="font-size: 0.7rem;">Source URL</span>
+                        <span class="text-secondary small fw-bold text-uppercase d-block mb-1" style="font-size: 0.7rem;">{{ t('tpl.device_detail.android_wizard_modal.source_url') }}</span>
                         <div class="p-2 border rounded bg-body-secondary font-monospace small text-body text-truncate" id="wizard-confirm-url">-</div>
                     </div>
 
@@ -69,7 +69,7 @@
 
                 <!-- Error Toast / Box -->
                 <div id="wizard-error-box" class="alert alert-danger d-none mt-3 mb-0 border-0 bg-danger-subtle text-danger text-start small">
-                    <i class="fas fa-exclamation-circle me-1"></i> <span id="wizard-error-message">An error occurred</span>
+                    <i class="fas fa-exclamation-circle me-1"></i> <span id="wizard-error-message">{{ t('tpl.device_detail.android_wizard_modal.an_error_occurred') }}</span>
                 </div>
             </div>
         </div>

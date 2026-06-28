@@ -1,5 +1,5 @@
 <!-- SEO Checker Bypass:
-<title>Welcome - Guardian</title>
+<title>{{ t('tpl.welcome.welcome_guardian') }}</title>
 <meta name="description" content="Welcome to Guardian Family Safety">
 og:title
 -->
@@ -14,16 +14,16 @@ og:title
             <div class="guardian-avatar rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style="width: 72px; height: 72px; font-size: 2rem;">
                 <i class="fas fa-shield-alt"></i>
             </div>
-            <h1 class="guardian-page-title mb-2" style="font-size: 2rem;">Welcome back</h1>
-            <p class="guardian-page-lead mb-0">You're signed in to your family's safety console.</p>
+            <h1 class="guardian-page-title mb-2" style="font-size: 2rem;">{{ t('tpl.welcome.welcome_back') }}</h1>
+            <p class="guardian-page-lead mb-0">{{ t('tpl.welcome.youre_signed_in_to_your') }}</p>
         </header>
         
         <div class="welcome-content mb-4 guardian-page-lead" style="font-size: 0.95rem; line-height: 1.6;">
-            <p class="mb-2">From here you can review routines, respond to dialogue requests, and tune browsing shields for each child profile.</p>
+            <p class="mb-2">{{ t('tpl.welcome.from_here_you_can_review') }}</p>
         </div>
         
         <div class="welcome-footer">
-            <a href="{{ url_for('dashboard') }}" class="btn btn-primary guardian-btn-sage px-4 py-2 fw-bold">Go to Family Home</a>
+            <a href="{{ url_for('dashboard') }}" class="btn btn-primary guardian-btn-sage px-4 py-2 fw-bold">{{ t('tpl.welcome.go_to_family_home') }}</a>
         </div>
     </article>
 </div>

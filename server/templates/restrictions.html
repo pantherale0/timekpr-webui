@@ -72,7 +72,7 @@
 
                             <div id="panel-manual-domains" class="mb-3" style="display: block;">
                                 <label for="manual_domains" class="form-label fw-bold small text-muted text-uppercase mb-1" style="font-size: 0.75rem; letter-spacing: 0.05em;">{{ t('pages.restrictions.initial_domains') }}</label>
-                                <textarea id="manual_domains" name="manual_domains" class="form-control text-monospace" rows="3" placeholder="youtube.com&#10;tiktok.com&#10;facebook.com" style="font-family: monospace;"></textarea>
+                                <textarea id="manual_domains" name="manual_domains" class="form-control text-monospace" rows="3" placeholder="{{ t('tpl.restrictions.youtubecom10tiktokcom10facebookcom') }}" style="font-family: monospace;"></textarea>
                             </div>
 
                             <div class="text-end">
@@ -145,7 +145,7 @@
                                     {{ csrf_field() }}
                                     <div class="col-12 col-md-9">
                                         <label class="form-label fw-bold small text-muted text-uppercase mb-1" style="font-size: 0.7rem; letter-spacing: 0.05em;">{{ t('pages.restrictions.add_domain') }}</label>
-                                        <input type="text" name="domain" class="form-control form-control-sm" placeholder="e.g. reddit.com, instagram.com" required>
+                                        <input type="text" name="domain" class="form-control form-control-sm" placeholder="{{ t('tpl.restrictions.eg_redditcom_instagramcom') }}" required>
                                     </div>
                                     <div class="col-12 col-md-3">
                                         <button type="submit" class="btn btn-sm btn-secondary fw-bold w-100" style="height: 31px;"><i class="fas fa-plus me-1"></i> {{ t('pages.restrictions.add_domain_btn') }}</button>
@@ -160,7 +160,7 @@
                                             <code class="small text-body fw-bold text-truncate" style="max-width: 80%;">{{ domain.domain }}</code>
                                             <form action="{{ url_for('delete_blocklist_domain', source_id=source.id, domain_id=domain.id) }}" method="POST" class="m-0">
                                                 {{ csrf_field() }}
-                                                <button type="submit" class="btn btn-xs btn-outline-danger p-0 d-flex align-items-center justify-content-center" style="width: 20px; height: 20px; font-size: 0.75rem;" title="Remove domain restriction">&times;</button>
+                                                <button type="submit" class="btn btn-xs btn-outline-danger p-0 d-flex align-items-center justify-content-center" style="width: 20px; height: 20px; font-size: 0.75rem;" title="{{ t('tpl.restrictions.remove_domain_restriction') }}">&times;</button> {# noqa: i18n #}
                                             </form>
                                         </div>
                                     </div>

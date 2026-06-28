@@ -147,7 +147,7 @@
                                     </div>
                                     <div class="col-12 col-md-6 custom-field-{{ policy.id }}">
                                         <label class="form-label fw-bold small text-muted mb-1" style="font-size: 0.75rem;">{{ t('pages.restrictions_app.executable_path') }}</label>
-                                        <input type="text" name="executable_path" class="form-control form-control-sm" placeholder="/usr/bin/name or $HOME/Downloads/**">
+                                        <input type="text" name="executable_path" class="form-control form-control-sm" placeholder="/usr/bin/name or $HOME/Downloads/**"> {# noqa: i18n #}
                                     </div>
                                     {% else %}
                                     <input type="hidden" name="match_type" value="package">
@@ -198,7 +198,7 @@
                                                 </div>
                                                 <form action="{{ url_for('ui_apparmor.delete_app_policy_rule', rule_id=rule.id) }}" method="POST" class="m-0 flex-shrink-0">
 
-                                                {{ csrf_field() }}                                                    <button type="submit" class="btn btn-xs btn-outline-danger p-0 d-flex align-items-center justify-content-center" style="width: 20px; height: 20px; font-size: 0.75rem;" title="Remove this rule">&times;</button>
+                                                {{ csrf_field() }}                                                    <button type="submit" class="btn btn-xs btn-outline-danger p-0 d-flex align-items-center justify-content-center" style="width: 20px; height: 20px; font-size: 0.75rem;" title="{{ t('tpl.restrictions_app.remove_this_rule') }}">&times;</button> {# noqa: i18n #}
                                                 </form>
                                             </div>
                                         </div>

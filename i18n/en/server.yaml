@@ -1,7 +1,6 @@
 meta:
   locale: en
   label: English
-
 common:
   close: Close
   back: Back
@@ -25,13 +24,12 @@ common:
   mins: mins
   minutes_short: m
   hours_short: h
-
 nav:
   toggle_sidebar: Toggle sidebar
   family_home: Family Home
   active_household: Active Home
   dialogue: Dialogue
-  dialogue_count: "{count} Dialogue"
+  dialogue_count: '{count} Dialogue'
   tasks_offline: Tasks Offline
   pending_dialogue: Pending dialogue
   tasks_offline_title: Tasks offline
@@ -55,7 +53,6 @@ nav:
   brand_subtitle: Family Safety
   main_navigation: Main navigation
   open_actions_menu: Open actions menu
-
 shell:
   title: Guardian Family Safety
   meta_description: Guardian Family Safety console. Calm routines, browsing shields, and family dialogue for your household.
@@ -66,7 +63,7 @@ shell:
   profile_hub_aria: Account and session controls
   profile_overlay_kicker: User settings overlay
   profile_admin_title: Admin account profile
-  profile_workspace: "Workspace: {workspace}"
+  profile_workspace: 'Workspace: {workspace}'
   profile_workspace_name: Family Home
   profile_manage_prefs: Manage account preferences
   profile_view_auth: View authentication settings
@@ -105,41 +102,45 @@ shell:
   platform_android_device: Android Device
   platform_nintendo_account: Nintendo Account
   platform_xbox_account: Xbox Live Account
-  linux_setup_lead: "On the Linux computer, open a terminal and run this one-line installer to connect Guardian:"
+  linux_setup_lead: 'On the Linux computer, open a terminal and run this one-line installer to connect Guardian:'
   linux_setup_hint: Guardian installs quietly in the background and starts a secure pairing handshake with this console.
   android_tab_standard: Standard Pairing QR
   android_tab_mdm: MDM Provisioning QR
-  android_qr_lead: "Download the Guardian APK, open it on the child's Android device, and scan the QR code to connect:"
+  android_qr_lead: 'Download the Guardian APK, open it on the child''s Android device, and scan the QR code to connect:'
   android_qr_alt: Pairing QR
-  android_mdm_lead: "For a fresh setup, tap the welcome screen 6 times, scan the QR code below to enroll as Device Owner:"
+  android_mdm_lead: 'For a fresh setup, tap the welcome screen 6 times, scan the QR code below to enroll as Device Owner:'
   android_mdm_alt: MDM QR
   android_mdm_unavailable: MDM provisioning is unavailable. Make sure an Android APK has been uploaded in Settings.
-  windows_setup_lead: "On the Windows computer, open PowerShell as Administrator and paste this command to install Guardian:"
+  windows_setup_lead: 'On the Windows computer, open PowerShell as Administrator and paste this command to install Guardian:'
   windows_download_alt: Alternatively, you can download the MSI installer package directly and run it
   windows_download_btn: Download MSI Installer
-  windows_setup_hint: The installer registers the background monitoring service and configures autostart components for user sessions.
+  windows_setup_hint: The installer registers the background monitoring service and configures autostart components for user
+    sessions.
   nintendo_session_expired: Your Nintendo Account session has expired. Link again to continue adding consoles.
-  nintendo_link_lead: "Link your Nintendo Account to enable console monitoring:"
+  nintendo_link_lead: 'Link your Nintendo Account to enable console monitoring:'
   nintendo_step1: Click the button below to sign in to Nintendo.
-  nintendo_step2: 'Log in, and on the final "Select this person" screen, right-click (or tap and hold) the button, copy its link address, and paste it below.'
+  nintendo_step2: Log in, and on the final "Select this person" screen, right-click (or tap and hold) the button, copy its
+    link address, and paste it below.
   nintendo_sign_in: Sign In to Nintendo Account
   nintendo_redirect_label: REDIRECT LINK ADDRESS
   nintendo_redirect_placeholder: Paste npf... redirect URL here
   nintendo_link_continue: Link Account & Continue
   xbox_session_expired: Your Xbox Live/Microsoft session has expired. Link again to continue adding consoles.
-  xbox_link_lead: "Link your Microsoft Xbox Live Account to enable console monitoring:"
+  xbox_link_lead: 'Link your Microsoft Xbox Live Account to enable console monitoring:'
   xbox_step1: Click the button below to sign in to Microsoft Live.
-  xbox_step2: Log in, and on the final blank screen (after clicking Yes/Accept), copy the complete address/URL of the page, and paste it below.
+  xbox_step2: Log in, and on the final blank screen (after clicking Yes/Accept), copy the complete address/URL of the page,
+    and paste it below.
   xbox_sign_in: Sign In to Microsoft Account
   xbox_redirect_label: REDIRECT LINK ADDRESS
   xbox_redirect_placeholder: Paste Microsoft redirect URL here
   xbox_link_continue: Link Account & Continue
   wizard_ran_scanned: I have run/scanned it
   wizard_scanning: Scanning for new agent connections...
-  wizard_scanning_hint: Guardian is waiting for the device client to connect to the WebSocket hub. This usually takes a few seconds.
+  wizard_scanning_hint: Guardian is waiting for the device client to connect to the WebSocket hub. This usually takes a few
+    seconds.
   wizard_device_connected: Device Connected!
   wizard_device_label: Device nickname
-  wizard_device_placeholder: "e.g. Jordan's Laptop"
+  wizard_device_placeholder: e.g. Jordan's Laptop
   wizard_approve_continue: Continue
   wizard_nintendo_found: Nintendo Console Found
   wizard_nintendo_select: SELECT SWITCH CONSOLE
@@ -160,21 +161,20 @@ shell:
   wizard_linux_uid: LINUX UID (OPTIONAL)
   wizard_linux_uid_placeholder: e.g. 1000
   wizard_complete: Complete Onboarding
-
 login:
   title: Login - Guardian
   meta_description: Sign in to Guardian Family Safety — calm routines, browsing shields, and family dialogue.
   og_title: Login - Guardian
-  og_description: Secure administrative login console for Guardian parental controls. Log in to manage screen time, user limits, schedules, and application locks.
+  og_description: Secure administrative login console for Guardian parental controls. Log in to manage screen time, user limits,
+    schedules, and application locks.
   brand_subtitle: Parental Control Console
   sign_in_lead: Sign in to start your parent session
-  local_fallback: "Local Fallback Mode:"
+  local_fallback: 'Local Fallback Mode:'
   local_fallback_detail: Outbound OIDC is unconfigured. Login using local parent credentials.
   username_placeholder: Parent username
   password_placeholder: Password
   sign_in_btn: Sign in
-  default_keys: "Default fallback keys:"
-
+  default_keys: 'Default fallback keys:'
 flash:
   auth:
     login_success: Login successful!
@@ -182,21 +182,18 @@ flash:
     logout: You have been logged out
     invalid_credentials: Invalid credentials. Please try again.
     oidc_disabled: OIDC is not enabled.
-    oidc_init_failed: >-
-      OIDC Login failed to initialize: OIDC provider is offline or
-      misconfigured. Falling back to local credentials.
-    oidc_csrf: "Authentication failed: Invalid state token (CSRF attempt prevented)."
-    oidc_no_code: "Authentication failed: No authorization code returned from provider."
-    oidc_success: "Logged in successfully as {username}!"
-    oidc_failed: "Authentication failed: {error}"
+    oidc_init_failed: 'OIDC Login failed to initialize: OIDC provider is offline or misconfigured. Falling back to local credentials.'
+    oidc_csrf: 'Authentication failed: Invalid state token (CSRF attempt prevented).'
+    oidc_no_code: 'Authentication failed: No authorization code returned from provider.'
+    oidc_success: Logged in successfully as {username}!
+    oidc_failed: 'Authentication failed: {error}'
     oidc_denied_missing_user: Missing user information from identity provider
-    oidc_denied_not_configured: >-
-      OIDC admin access is not configured. Set ALLOWED_OIDC_ADMINS,
-      ALLOWED_OIDC_ADMIN_DOMAINS, ALLOWED_OIDC_ADMIN_ROLES, or ALLOWED_OIDC_ADMIN_GROUPS.
+    oidc_denied_not_configured: OIDC admin access is not configured. Set ALLOWED_OIDC_ADMINS, ALLOWED_OIDC_ADMIN_DOMAINS,
+      ALLOWED_OIDC_ADMIN_ROLES, or ALLOWED_OIDC_ADMIN_GROUPS.
     oidc_denied_unauthorized: You are not authorized to access the admin console.
-    oidc_denied_generic: "Access denied: {reason}"
+    oidc_denied_generic: 'Access denied: {reason}'
     household_name_required: Please enter a name for your home.
-    household_created: 'Created home "{name}". Welcome!'
+    household_created: Created home "{name}". Welcome!
     household_create_failed: Could not create your home. Please try again.
     invite_code_required: Please enter an invite code.
     invalid_invite_code: That invite code is invalid or has expired.
@@ -212,16 +209,16 @@ flash:
     household_switched: Active home switched successfully.
   sharing:
     redeem_success: Profile invitation redeemed successfully.
-    redeem_error: "Failed to redeem invitation: {reason}"
+    redeem_error: 'Failed to redeem invitation: {reason}'
   common:
     fields_required: All fields are required
     invalid_values: Invalid setting values provided
-    generic_error: "{error}"
+    generic_error: '{error}'
   settings:
     pairing_url_updated: Agent pairing URL updated successfully
     pairing_url_reset: Agent pairing URL reset to auto-detect
     apk_removed: Uploaded Android APK removed
-    apk_process_failed: "Failed to process uploaded APK: {error}"
+    apk_process_failed: 'Failed to process uploaded APK: {error}'
     apk_uploaded: Android APK uploaded successfully
     mdm_updated: MDM provisioning configuration updated successfully
     webhook_required: Webhook URL is required when alert delivery is enabled
@@ -241,12 +238,12 @@ flash:
     language_saved: Language preference saved.
   apparmor:
     policy_name_required: Policy name is required
-    policy_exists: 'Policy "{name}" already exists'
-    policy_created: 'App Policy "{name}" created successfully'
-    policy_deleted: 'App Policy "{policy_name}" deleted successfully'
+    policy_exists: Policy "{name}" already exists
+    policy_created: App Policy "{name}" created successfully
+    policy_deleted: App Policy "{policy_name}" deleted successfully
     app_name_required: Application name and target are required
-    rule_added: 'Added rule for "{app_name}" to policy "{policy_name}"'
-    rule_removed: 'Removed rule for "{app_name}" from policy "{policy_name}"'
+    rule_added: Added rule for "{app_name}" to policy "{policy_name}"
+    rule_removed: Removed rule for "{app_name}" from policy "{policy_name}"
     policies_missing: One or more selected app policies no longer exist
     policies_updated_synced: Updated app policies for {username} and synced to online devices
     policies_updated_sync_partial: Updated app policies for {username}, but sync failed for some devices
@@ -254,28 +251,28 @@ flash:
   users:
     name_required: Managed user name is required
     already_exists: Managed user {username} already exists
-    preset_partial: "Profile created but policy preset failed: {error}"
+    preset_partial: 'Profile created but policy preset failed: {error}'
     preset_not_applied: Profile created but policy preset could not be applied
     created: Managed user {username} created
     preset_fields_required: Age bracket and technical understanding level are required
     preset_applied: Policy preset applied for {username}
-    preset_failed: "Failed to apply policy preset: {error}"
+    preset_failed: 'Failed to apply policy preset: {error}'
     preset_apply_failed: Failed to apply policy preset
     mapping_fields_required: Device and Linux username are required
     device_not_registered: Device {device} is not registered or approved
-    already_linked: "{username} is already linked to {device}"
+    already_linked: '{username} is already linked to {device}'
     uid_numeric: Linux UID must be numeric
-    mapping_added: "Mapping added: {username} -> {linux_username}@{device}"
+    mapping_added: 'Mapping added: {username} -> {linux_username}@{device}'
     mapping_fields_both: Both username and device are required
     user_device_exists: User {username} on {device} already exists
     created_with_mapping: Managed user {username} and mapping added
     no_mappings: No device mappings configured for this managed user
     mappings_validated: Validated {valid}/{total} mapping(s) for {username}
-    validation_failed: "User validation failed: {details}"
+    validation_failed: 'User validation failed: {details}'
     no_mappings_validated: No mappings validated
-    mapping_validated: "Mapping validated: {label}"
-    mapping_validation_failed: "Mapping validation failed: {message}"
-    mapping_removed: "Mapping removed: {label}"
+    mapping_validated: 'Mapping validated: {label}'
+    mapping_validation_failed: 'Mapping validation failed: {message}'
+    mapping_removed: 'Mapping removed: {label}'
     user_removed: User {username} removed successfully
   blocklists:
     name_required: Blocklist name is required
@@ -287,7 +284,7 @@ flash:
     enabled: enabled
     disabled: disabled
     manual_only: Only manual blocklists support direct domain editing
-    domain_exists: "{domain} is already present in \"{name}\""
+    domain_exists: '{domain} is already present in "{name}"'
     domain_added: Added {domain} to "{name}"
     domain_removed: Removed {domain} from "{name}"
     missing: One or more selected blocklists no longer exist
@@ -301,50 +298,50 @@ flash:
     user_id_required: User ID is required
     user_id_invalid: Invalid user ID
     updated: Weekly schedule updated for {username}
-    update_failed: "Error updating schedule: {error}"
+    update_failed: 'Error updating schedule: {error}'
   tasks:
     restarted: Background tasks restarted
-
 api:
   not_authenticated: Not authenticated
   device_not_found: Device not found
   mapping_not_found: Mapping not found
   approval_request_not_found: Approval request not found
   approval_grant_not_found: Approval grant not found
-  device_not_pending: "Device is not pending (status: {status})"
+  device_not_pending: 'Device is not pending (status: {status})'
   device_not_registered: Device {device} is not registered or approved
   mapping_fields_required: Device and sign-in account are required
-  already_linked: "{username} is already connected to {device}"
+  already_linked: '{username} is already connected to {device}'
   uid_numeric: Account ID must be numeric
-  mapping_connected: "Connected {username} to {device}"
+  mapping_connected: Connected {username} to {device}
   device_label_required: A device name is required
-  device_not_approved: "Device is not approved (status: {status})"
+  device_not_approved: 'Device is not approved (status: {status})'
   device_label_updated: Renamed device to {device}
   device_approved: Device {device} approved successfully.
   device_rejected: Device {device} rejected successfully.
   invalid_json: Request body must be a JSON object
   request_body_must_be_object: Request body must be an object
-  validation_error: "{error}"
+  validation_error: '{error}'
   missing_params: Missing required parameters
   invalid_params: Invalid parameter format
   invalid_operation: Operation must be '+' or '-'
   no_mappings: No device mappings configured for this user
-  devices_offline: All mapped devices are offline. Adjustment saved on the server and will rebalance when a mapped device reconnects.
+  devices_offline: All mapped devices are offline. Adjustment saved on the server and will rebalance when a mapped device
+    reconnects.
   partial_apply: Adjustment stored on the server. Applied immediately to {applied}/{total} online mapping(s).
   time_adjustment_partial: Adjustment stored on the server. Applied immediately to {applied}/{total} online mapping(s).
   adjustment_applied: Adjustment applied to {count} mapping(s).
-  pending_online_retry: "{count} online mapping(s) need retry"
-  pending_offline_rebalance: "{count} offline mapping(s) will rebalance on reconnect"
+  pending_online_retry: '{count} online mapping(s) need retry'
+  pending_offline_rebalance: '{count} offline mapping(s) will rebalance on reconnect'
   no_data: No data provided
   intervals_invalid: Intervals payload must be an object
-  invalid_day: "Invalid day value: {day}"
+  invalid_day: 'Invalid day value: {day}'
   intervals_updated: Time intervals updated for {username}
-  intervals_error: "Error updating intervals: {error}"
+  intervals_error: 'Error updating intervals: {error}'
   profile_name_required: Profile name is required
   profile_exists: Child profile "{username}" already exists
   invalid_date: Invalid date format. Use YYYY-MM-DD
-  invalid_age_tier: "overlay_age_tier must be one of: {values}"
-  overlay_age_tier_invalid: "overlay_age_tier must be one of: {tiers}"
+  invalid_age_tier: 'overlay_age_tier must be one of: {values}'
+  overlay_age_tier_invalid: 'overlay_age_tier must be one of: {tiers}'
   alerts_pruned: Successfully pruned {count} alerts.
   request_approved: Request approved
   request_denied: Request denied
@@ -354,7 +351,7 @@ api:
   missing_auth_header: Missing or invalid authorization header
   invalid_token: Invalid token
   missing_linux_username: Missing linux_username
-  no_user_mapping: "No user mapping for user {linux_username} on this device"
+  no_user_mapping: No user mapping for user {linux_username} on this device
   missing_domain: Missing domain
   missing_domain_or_username: Missing domain or username
   approval_request_raised: Approval request raised successfully
@@ -368,13 +365,12 @@ api:
   apparmor_policies_updated_synced: Updated app routine locks for {username} and synced to online devices
   apparmor_policies_updated_sync_partial: Updated app routine locks for {username}, but sync failed for some devices
   apparmor_policies_updated_offline: Updated app routine locks for {username}. Will sync when devices reconnect.
-
 js:
   save_saving: Saving…
   save_saved: Changes saved
   save_failed: Couldn't save — try again
   save_sync_pending: Saved — syncing to devices when they reconnect
-  shell_dialogue_count: "{count} Dialogue"
+  shell_dialogue_count: '{count} Dialogue'
   shell_toast_saved: Changes saved
   shell_wizard_step1_title: Choose Platform
   shell_wizard_step1_subtitle: Select the hardware type you wish to enroll under Guardian.
@@ -392,19 +388,21 @@ js:
   shell_platform_nintendo: Nintendo Account
   shell_platform_xbox: Xbox Live Account
   shell_copy_success: Command copied to clipboard!
-  shell_nintendo_login_failed: "Failed to get Nintendo login URL: {message}"
-  shell_xbox_login_failed: "Failed to get Xbox login URL: {message}"
-  shell_device_connected: "Device Connected: {name} ({ip})"
+  shell_nintendo_login_failed: 'Failed to get Nintendo login URL: {message}'
+  shell_xbox_login_failed: 'Failed to get Xbox login URL: {message}'
+  shell_device_connected: 'Device Connected: {name} ({ip})'
   shell_select_child: Select child account
   shell_select_profile_required: Please select an existing child profile or check the box to create one.
   shell_profile_name_required: Please enter a profile name.
-  shell_mapping_nintendo: "Select which Nintendo Switch player profile should be mapped to this child account:"
-  shell_mapping_xbox: "Select which Xbox Live member profile should be mapped to this child account:"
+  shell_mapping_nintendo: 'Select which Nintendo Switch player profile should be mapped to this child account:'
+  shell_mapping_xbox: 'Select which Xbox Live member profile should be mapped to this child account:'
   shell_nintendo_player: NINTENDO PLAYER PROFILE
   shell_xbox_player: XBOX MEMBER PROFILE
   shell_no_players: No player profiles found.
-  shell_mapping_linux: "Guardian found the following local accounts on the device. Select which local user account should be locked under this profile:"
-  shell_mapping_android: "Guardian found the following Android profiles on the device. Select which Android profile should be locked under this child account:"
+  shell_mapping_linux: 'Guardian found the following local accounts on the device. Select which local user account should
+    be locked under this profile:'
+  shell_mapping_android: 'Guardian found the following Android profiles on the device. Select which Android profile should
+    be locked under this child account:'
   shell_local_username: LOCAL OS USERNAME
   shell_android_profile: ANDROID PROFILE
   shell_linux_uid: LINUX UID (OPTIONAL)
@@ -414,7 +412,7 @@ js:
   shell_no_linux_accounts: No local accounts reported. Type username manually below
   shell_no_android_profiles: No Android profiles reported.
   shell_onboarding_success: Device paired and child account linked successfully!
-  shell_onboarding_error: "Error completing onboarding: {message}"
+  shell_onboarding_error: 'Error completing onboarding: {message}'
   device_link_who_signs_in: Who signs in on this device?
   device_link_android_profile: Which Android profile?
   device_link_player_nintendo: Which Switch player?
@@ -426,28 +424,28 @@ js:
   device_link_account_required: Please choose who signs in on this device
   device_link_connect_failed: Could not connect — please try again
   shell_nintendo_redirect_required: Please paste the redirect URL from the Nintendo login process.
-  shell_nintendo_auth_failed: "Authentication failed: {message}"
+  shell_nintendo_auth_failed: 'Authentication failed: {message}'
   shell_nintendo_auth_error: Failed to connect to authentication API.
   shell_nintendo_loading: Loading Nintendo consoles...
   shell_nintendo_all_enrolled: All consoles are already enrolled
   shell_nintendo_select_console: Select a console
   shell_nintendo_none: No consoles found or failed to fetch
-  shell_nintendo_load_failed: "Failed to load consoles: {message}"
+  shell_nintendo_load_failed: 'Failed to load consoles: {message}'
   shell_nintendo_load_error: Error loading consoles
   shell_nintendo_select_required: Please select a Nintendo Switch console.
-  shell_nintendo_import_failed: "Failed to import device: {message}"
+  shell_nintendo_import_failed: 'Failed to import device: {message}'
   shell_nintendo_import_error: Error importing device.
   shell_xbox_redirect_required: Please paste the redirect URL from the Microsoft login process.
-  shell_xbox_auth_failed: "Authentication failed: {message}"
+  shell_xbox_auth_failed: 'Authentication failed: {message}'
   shell_xbox_auth_error: Failed to connect to authentication API.
   shell_xbox_loading: Loading Xbox consoles...
   shell_xbox_all_enrolled: All consoles are already enrolled
   shell_xbox_select_console: Select a console
   shell_xbox_none: No consoles found or failed to fetch
-  shell_xbox_load_failed: "Failed to load consoles: {message}"
+  shell_xbox_load_failed: 'Failed to load consoles: {message}'
   shell_xbox_load_error: Error loading consoles
   shell_xbox_select_required: Please select an Xbox console.
-  shell_xbox_import_failed: "Failed to import device: {message}"
+  shell_xbox_import_failed: 'Failed to import device: {message}'
   shell_xbox_import_error: Error importing device.
   shell_default_switch: Nintendo Switch
   shell_default_xbox: Xbox Console
@@ -469,7 +467,7 @@ js:
   dashboard_agent_online: Online
   dashboard_agent_offline: Offline
   dashboard_unsynced: Protected · Sync pending
-  dashboard_mapping_summary: "{count} device mapping(s) ({online} online)"
+  dashboard_mapping_summary: '{count} device mapping(s) ({online} online)'
   dashboard_requests: request(s)
   dashboard_connecting: Connecting
   dashboard_live: Live
@@ -479,14 +477,15 @@ js:
   dashboard_applying: Applying changes...
   dashboard_adjust_success: Success! Adjusted successfully.
   dashboard_time_modified: Time modified successfully!
-  dashboard_error_prefix: "Error: {message}"
+  dashboard_error_prefix: 'Error: {message}'
   hours_short: h
   minutes_short: m
   routine_no_limit: No limit
   routine_hard_lock: Hard lock
-  routine_allowed_suffix: " allowed"
-  routine_per_day_suffix: " / day"
-  routine_window_hint: "🕒 Devices are unlocked and usable between <strong>{start}</strong> and <strong>{end}</strong>. Standard kernel filtering remains active in the background during all operational windows."
+  routine_allowed_suffix: ' allowed'
+  routine_per_day_suffix: ' / day'
+  routine_window_hint: 🕒 Devices are unlocked and usable between <strong>{start}</strong> and <strong>{end}</strong>. Standard
+    kernel filtering remains active in the background during all operational windows.
   routine_choose_window: Choose a window with a start and end time.
   routine_marker_bedtime: Bedtime
   routine_marker_school: School / morning hours
@@ -512,7 +511,7 @@ js:
   wizard_slider_assisted: Assisted Steps
   wizard_baseline_title: Baseline Summary
   wizard_baseline_preview: Choose a growth milestone and responsibility level to preview your family baseline.
-  wizard_baseline_profile: "Baseline Summary: {profile} Profile (Age {age})"
+  wizard_baseline_profile: 'Baseline Summary: {profile} Profile (Age {age})'
   profile_sync_none: No browsing shields assigned
   profile_sync_awaiting_uid: Protected · Finishing setup
   profile_sync_pending: Protected · Sync pending
@@ -532,15 +531,31 @@ js:
   dashboard_sync_updating: Protected · Updating...
   dashboard_sync_offline: Protected · Offline
   never: Never
-
+  device-detail:
+    failed_to_prune_alerts: Failed to prune alerts.
+    please_enter_a_valid_number: Please enter a valid number of days.
+    release_safe_mode_lockdown_on: Release Safe Mode lockdown on this device?
+    reveal_the_escrowed_local_administrator: Reveal the escrowed local Administrator password? This action is logged.
+    reveal_the_escrowed_supervisor_password: Reveal the escrowed supervisor password? This action is logged.
+    apply_hardware_lockdown_settings_this: Apply hardware lockdown settings? This may change BIOS passwords and boot options.
+  guardian-inspector:
+    please_select_an_existing_shield: Please select an existing shield list or enter a name for a new one.
+  guardian-wizard:
+    ai_chat_assistants: AI chat assistants
+    anti_bypass_watching_vpn_proxy: Anti-Bypass Watching (VPN & proxy)
+    misleading_news_sources: Misleading news sources
+    social_networks: Social networks
+    gambling_sites: Gambling sites
+    adult_explicit_content: Adult & explicit content
+    malware_phishing_shields: Malware & phishing shields
 settings:
   language:
     label: Language
-    description: Choose the language for the Guardian console. This applies to your session; household members can set their own preference after signing in.
+    description: Choose the language for the Guardian console. This applies to your session; household members can set their
+      own preference after signing in.
     household_default: Household default language
     save: Save language
     saved: Language preference saved.
-
 pages:
   settings:
     title: Household Settings - Guardian
@@ -549,24 +564,28 @@ pages:
     simple_pairing_heading: Connect a device
     simple_pairing_intro: Scan this code from the Guardian app when adding a new phone, tablet, or computer to your household.
     pairing_heading: Device pairing
-    pairing_intro: Scan the pairing QR from the Guardian Android app during setup, or use the WebSocket URL when installing Linux agents.
+    pairing_intro: Scan the pairing QR from the Guardian Android app during setup, or use the WebSocket URL when installing
+      Linux agents.
     websocket_url_label: AGENT WEBSOCKET URL
     websocket_url_placeholder: wss://your-server.example/ws
-    websocket_url_help: Leave blank to auto-detect from your current browser session. Set a custom URL when agents connect through a reverse proxy or public hostname.
+    websocket_url_help: Leave blank to auto-detect from your current browser session. Set a custom URL when agents connect
+      through a reverse proxy or public hostname.
     save_pairing_url: Save Pairing URL
     pairing_qr_alt: Guardian pairing QR code
     websocket_url_heading: WebSocket URL
     payload_heading: Payload
     download_qr_png: Download QR PNG
     mdm_heading: Android MDM Provisioning QR
-    mdm_intro: Use this QR during factory-reset setup (tap the welcome screen six times, then scan). Android downloads the agent APK, sets device owner, and applies the server URL automatically.
+    mdm_intro: Use this QR during factory-reset setup (tap the welcome screen six times, then scan). Android downloads the
+      agent APK, sets device owner, and applies the server URL automatically.
     uploaded_apk_heading: Uploaded APK
     signature_checksum_help: Signature checksum computed automatically on upload.
     remove_uploaded_apk: Remove Uploaded APK
     skip_setup_wizard: Skip Setup Wizard (Google Account & SIM Setup)
     skip_setup_wizard_help: If checked, skips Google account registration and OEM setup wizard steps to expedite provisioning.
     leave_system_apps: Leave All System Apps Enabled
-    leave_system_apps_help: Recommended. Keeps OEM dialer, settings, and carrier configuration apps enabled so SIM cards function correctly.
+    leave_system_apps_help: Recommended. Keeps OEM dialer, settings, and carrier configuration apps enabled so SIM cards function
+      correctly.
     default_wifi_heading: Default Wi-Fi Network (Optional)
     wifi_ssid_label: WIFI SSID (NETWORK NAME)
     wifi_ssid_placeholder: e.g. MyHomeWiFi
@@ -580,7 +599,8 @@ pages:
     wifi_password_help: Password is only required when changing security settings.
     replace_android_apk: REPLACE ANDROID APK
     upload_android_apk: UPLOAD ANDROID APK
-    apk_upload_help_before_version: Upload a signed release APK for dev/testing, or leave empty to use the GitHub release for server version
+    apk_upload_help_before_version: Upload a signed release APK for dev/testing, or leave empty to use the GitHub release
+      for server version
     apk_upload_help_after_version: when available. Uploaded APKs are hosted at
     apk_upload_help_suffix: with an automatic signature checksum.
     save_mdm_config: Save MDM Provisioning Config
@@ -590,17 +610,18 @@ pages:
     mdm_dev_version_help_suffix: ) and upload it above.
     mdm_publish_help_prefix: Upload an Android APK above, or publish release assets for
     provisioning_qr_alt: Android MDM provisioning QR code
-    apk_url_heading: "APK URL ({source})"
-    signature_checksum_heading: "Signature Checksum ({source})"
+    apk_url_heading: APK URL ({source})
+    signature_checksum_heading: Signature Checksum ({source})
     provisioning_payload_heading: Provisioning Payload
     download_provisioning_qr: Download Provisioning QR PNG
     nintendo_heading: Nintendo Switch Account
-    nintendo_intro: Link your Nintendo Account once to manage Switch consoles through Nintendo's parental controls cloud API. Enrolled consoles stay in Guardian even if you unlink the account, but cloud sync will stop until you link again.
+    nintendo_intro: Link your Nintendo Account once to manage Switch consoles through Nintendo's parental controls cloud API.
+      Enrolled consoles stay in Guardian even if you unlink the account, but cloud sync will stop until you link again.
     account_status: ACCOUNT STATUS
     status_linked: Linked
     status_not_linked: Not linked
-    linked_since: "Linked since:"
-    enrolled_consoles: "Enrolled consoles:"
+    linked_since: 'Linked since:'
+    enrolled_consoles: 'Enrolled consoles:'
     relink_account: Re-link Account
     unlink_account: Unlink Account
     nintendo_step1: Click the button below to sign in to Nintendo.
@@ -612,7 +633,8 @@ pages:
     nintendo_redirect_placeholder: Paste npf... redirect URL here
     link_account: Link Account
     xbox_heading: Xbox Live Account
-    xbox_intro: Link your Microsoft Xbox Live Account once to track Xbox console screen time through Microsoft's Family Safety API. Enrolled consoles stay in Guardian even if you unlink the account, but cloud sync will stop until you link again.
+    xbox_intro: Link your Microsoft Xbox Live Account once to track Xbox console screen time through Microsoft's Family Safety
+      API. Enrolled consoles stay in Guardian even if you unlink the account, but cloud sync will stop until you link again.
     xbox_step1: Click the button below to sign in to Microsoft.
     xbox_step2_prefix: On the final blank redirect page, copy the full address bar URL (which starts with
     xbox_step2_suffix: ) and paste it below.
@@ -620,12 +642,12 @@ pages:
     xbox_redirect_placeholder: Paste live.com redirect URL here
     auth_heading_oidc: Authentication Settings
     auth_heading_password: Update Admin Credentials
-    oidc_active_alert_label: "Single Sign-On Active:"
+    oidc_active_alert_label: 'Single Sign-On Active:'
     oidc_active_alert_body: Auth is managed via your OIDC identity provider. Password changes must be configured there.
     session_account_info: Session Account Info
-    username_label: "Username:"
-    full_name_label: "Full Name:"
-    email_label: "Email:"
+    username_label: 'Username:'
+    full_name_label: 'Full Name:'
+    email_label: 'Email:'
     password_update_lead: Update the local parent administrator password for the Guardian web panel.
     current_password_label: CURRENT PASSWORD
     current_password_placeholder: Enter current password
@@ -649,27 +671,30 @@ pages:
     save_webhook: Save Webhook Settings
     engine_heading: General Engine Configuration
     time_sync_label: TIME SYNC TOLERANCE (SECONDS)
-    time_sync_help: "Ignores trivial client timezone drift smaller than this offset (default: 15s)."
+    time_sync_help: 'Ignores trivial client timezone drift smaller than this offset (default: 15s).'
     alert_retention_label: ALERT RETENTION DAYS
-    alert_retention_help: "Retention period for security logs and device warnings before purging (default: 30 days)."
+    alert_retention_help: 'Retention period for security logs and device warnings before purging (default: 30 days).'
     timezone_context: Timezone Context
-    env_tz_label: "Environment TZ:"
+    env_tz_label: 'Environment TZ:'
     save_engine: Save Engine Configurations
     web_video_heading: Web & Video History Monitoring
     youtube_api_key_label: YOUTUBE DATA API KEY
     youtube_api_key_placeholder: Enter Google Developer API Key
-    youtube_api_key_help: Used to fetch video categories and details in the background. Generating a key in Google Cloud Console is required.
+    youtube_api_key_help: Used to fetch video categories and details in the background. Generating a key in Google Cloud Console
+      is required.
     youtube_retention_label: YOUTUBE LOG RETENTION (DAYS)
     youtube_retention_help: Number of days to keep watched video history. Set to 0 to keep history indefinitely.
     web_retention_label: WEB HISTORY RETENTION (DAYS)
-    web_retention_help: "Number of days to keep general web browsing history. Set to 0 to keep history indefinitely (default: 7)."
+    web_retention_help: 'Number of days to keep general web browsing history. Set to 0 to keep history indefinitely (default:
+      7).'
     save_web_video: Save Web & Video Settings
     nintendo_login_url_failed: Failed to get Nintendo login URL
     nintendo_redirect_required: Please paste the redirect URL from the Nintendo login process.
     auth_failed: Authentication failed
     refresh_status_failed: Failed to refresh account status
     nintendo_linked_success: Nintendo Account linked successfully.
-    nintendo_unlink_confirm: Unlink the Nintendo Account? Enrolled consoles will remain, but cloud sync will stop until you link again.
+    nintendo_unlink_confirm: Unlink the Nintendo Account? Enrolled consoles will remain, but cloud sync will stop until you
+      link again.
     unlink_failed: Failed to unlink account
     nintendo_unlinked_success: Nintendo Account unlinked.
     xbox_login_url_failed: Failed to get Xbox login URL
@@ -677,12 +702,10 @@ pages:
     xbox_linked_success: Xbox Account linked successfully.
     xbox_unlink_confirm: Unlink the Xbox Account? Enrolled consoles will remain, but cloud sync will stop until you link again.
     xbox_unlinked_success: Xbox Account unlinked.
-
   admin_settings:
     title: System Settings - Guardian
     heading: System Settings
     lead: Technical configuration for agents, Android provisioning, webhooks, API keys, and data retention.
-
   dashboard:
     title: Family Home - Guardian
     heading: Family Home
@@ -690,12 +713,12 @@ pages:
     connecting: Connecting
     agent_online: Agent Online
     agent_offline: Agent Offline
-    pending: "Pending:"
+    pending: 'Pending:'
     requests: request(s)
     unsynced: Protected · Sync pending
     sync_updating: Protected · Updating...
     sync_offline: Protected · Offline
-    mapping_summary: "{count} device mapping(s) ({online} online)"
+    mapping_summary: '{count} device mapping(s) ({online} online)'
     routine_left: Routine Left Today
     last_checked: Last Checked
     never: Never
@@ -706,22 +729,22 @@ pages:
     activity_online_accounts: Online accounts
     usage_week: Usage This Week
     empty_title: No Child Profiles Configured
-    empty_lead: You need to create a child profile and map local device user accounts before you can monitor screen time or apply limits.
+    empty_lead: You need to create a child profile and map local device user accounts before you can monitor screen time or
+      apply limits.
     onboard_device: Onboard New Device
     create_profile_only: Create Profile Only
     adjust_time_title: Adjust Time
-    adjust_time_lead: "Select time adjustment for:"
+    adjust_time_lead: 'Select time adjustment for:'
     current_offset: Current Offset
     apply_changes: Apply Changes
-
   admin_users:
     title: Child Profiles - Guardian
     heading: Child Profiles
     lead: Each profile keeps its own routines, browsing shields, and activity story.
     search_placeholder: Search child accounts...
     link_device_accounts: Connected Devices
-    active_count: "{count} active"
-    linked_device_accounts: "{count} connected devices ({verified} connected)"
+    active_count: '{count} active'
+    linked_device_accounts: '{count} connected devices ({verified} connected)'
     edit_profile: Edit Profile
     verify: Verify
     remove: Remove
@@ -765,10 +788,10 @@ pages:
     show_details: Details
     hide_details: Hide details
     device_admin: Device admin
-    technical_uid: "Account ID: {uid}"
-    technical_uid_unknown: "Account ID: unknown"
+    technical_uid: 'Account ID: {uid}'
+    technical_uid_unknown: 'Account ID: unknown'
     nintendo_player: Nintendo Player
-    programmatic: "Programmatic: {type}"
+    programmatic: 'Programmatic: {type}'
     verified: Verified
     unverified: Unverified
     never_checked: Never checked
@@ -777,12 +800,12 @@ pages:
     empty_title: No Child Profiles Yet
     empty_lead: Tap Create Managed Profile in the header to set up a supportive safety baseline — then connect devices below.
     create_managed_profile: Create Managed Profile
-    found_count: "{count} found"
-
+    found_count: '{count} found'
   admin_user_edit:
-    title: "{username} — Profile Settings - Guardian"
-    heading: "{username} — Profile Settings"
-    lead: Fine-tune browsing shields, routine locks, and family dialogue for this child. Changes save automatically as you adjust settings.
+    title: '{username} — Profile Settings - Guardian'
+    heading: '{username} — Profile Settings'
+    lead: Fine-tune browsing shields, routine locks, and family dialogue for this child. Changes save automatically as you
+      adjust settings.
     tab_nav_label: Profile settings sections
     tab_browsing: Browsing
     tab_computer: Computer & browser
@@ -791,26 +814,27 @@ pages:
     autosave_hint: Changes save automatically
     checking_sync: Checking sync
     back_to_children: Back to Children
-    child_profile: "Child Profile: {username}"
-    linked_mappings: "Linked account mappings: {count}"
+    child_profile: 'Child Profile: {username}'
+    linked_mappings: 'Linked account mappings: {count}'
     adjust_limits: Adjust Limits & Timeline
     view_activity: View activity
     view_online_accounts: Online accounts
     safety_baseline: Safety Baseline
     recalibrate_baseline: Recalibrate Baseline
     baseline_active: A supportive baseline is active. You can still fine-tune any routine lock or browsing shield below.
-    no_baseline: No baseline applied yet — Custom configuration. Use Recalibrate Baseline to load an age-appropriate starting point.
+    no_baseline: No baseline applied yet — Custom configuration. Use Recalibrate Baseline to load an age-appropriate starting
+      point.
     browsing_shields: Browsing Shields
     browsing_shields_lead: Curated and custom browsing shields applied across this child's linked accounts.
     stat_shields_assigned: Shields assigned
     stat_sites_shielded: Sites shielded
     stat_accounts_sync: Accounts in sync
     curated_shields: Curated Browsing Shields
-    ages_badge: "Ages: {ages}"
+    ages_badge: 'Ages: {ages}'
     save_curated_shields: Save Curated Shields
     custom_shield_lists: Custom Shield Lists
-    domains_bullet: "About {count} sites covered"
-    sites_badge: "~{count} sites"
+    domains_bullet: About {count} sites covered
+    sites_badge: ~{count} sites
     no_custom_shields: No custom shields yet. Create them under Browsing Shields before assigning.
     save_custom_shields: Save custom shields
     manage_shields: Manage shields
@@ -822,16 +846,17 @@ pages:
     sync_status_pending: Updating…
     sync_show_details: Show details
     sync_hide_details: Hide details
-    uid_label: "UID: {uid}"
-    last_sync: "Last Sync: {time}"
-    remediation_title: "Fix: open laptop, ensure Guardian is running, click Verify."
-    remediation_lead: "Remediation Guide:"
-    remediation_step1: "1. Turn on the device and connect to the internet."
-    remediation_step2: "2. Ensure the Guardian agent service is running."
-    remediation_step3: "3. If setup is finishing, make sure you log in to the child's OS account."
-    technical_details_label: "Technical Error Details (for troubleshooting):"
+    uid_label: 'UID: {uid}'
+    last_sync: 'Last Sync: {time}'
+    remediation_title: 'Fix: open laptop, ensure Guardian is running, click Verify.'
+    remediation_lead: 'Remediation Guide:'
+    remediation_step1: 1. Turn on the device and connect to the internet.
+    remediation_step2: 2. Ensure the Guardian agent service is running.
+    remediation_step3: 3. If setup is finishing, make sure you log in to the child's OS account.
+    technical_details_label: 'Technical Error Details (for troubleshooting):'
     computer_browser: Computer & browser boundaries
-    computer_browser_lead: Limits what your child can change on linked computers and how their browser behaves. Changes save automatically.
+    computer_browser_lead: Limits what your child can change on linked computers and how their browser behaves. Changes save
+      automatically.
     computer_changes: Computer changes
     browser_boundaries_sub: Browser boundaries
     device_routine_locks: Device Routine Locks
@@ -839,8 +864,10 @@ pages:
     synced: Synced
     sync_pending: Sync pending
     linux_how_it_works_title: How this works on Linux
-    linux_how_it_works: Requires the Guardian agent on the device. Routine locks apply through standard Linux security hooks; command-line tools can be blocked separately.
-    polkit_info: Requires the Guardian agent running as root. Polkit rules apply on common systemd distros; terminal blocking covers common shells and terminal emulators.
+    linux_how_it_works: Requires the Guardian agent on the device. Routine locks apply through standard Linux security hooks;
+      command-line tools can be blocked separately.
+    polkit_info: Requires the Guardian agent running as root. Polkit rules apply on common systemd distros; terminal blocking
+      covers common shells and terminal emulators.
     system_privileges: What they can change on the computer
     block_extra_app_stores: Block extra app stores
     block_extra_app_stores_hint: Includes Flatpak and Snap installers on Linux.
@@ -866,7 +893,7 @@ pages:
     disable_incognito: Disable Incognito Mode
     enforce_safesearch: Enforce Google SafeSearch
     youtube_restricted: YouTube Restricted Mode
-    youtube_off: "Off"
+    youtube_off: 'Off'
     youtube_moderate: Moderate
     youtube_strict: Strict (Recommended)
     block_extensions: Block all other extensions (only allow Guardian monitor)
@@ -889,9 +916,11 @@ pages:
     enforce_signup: Enforce Sign-up Approvals
     signup_hint: Require approval before signing up on any website.
     signup_prerequisite_title: Browser monitor required
-    signup_prerequisite_body: Sign-up blocking and online account tracking need the Guardian browser monitor on Chrome, Brave, or Edge. Enable "Block all other extensions" in Browser Boundaries so only the monitor can run.
+    signup_prerequisite_body: Sign-up blocking and online account tracking need the Guardian browser monitor on Chrome, Brave,
+      or Edge. Enable "Block all other extensions" in Browser Boundaries so only the monitor can run.
     signup_prerequisite_link: Open Computer & browser tab
-    signup_outcome_note: When blocked, your child sees the Guardian Space overlay and can request approval — requests appear in Family Dialogue.
+    signup_outcome_note: When blocked, your child sees the Guardian Space overlay and can request approval — requests appear
+      in Family Dialogue.
     signup_outcome_link: Open Family Dialogue
     save_approval_settings: Save Approval Settings
     link_device_for_approval: Link a device mapping before configuring approval policies.
@@ -904,18 +933,19 @@ pages:
     age_teen: Teen — Direct, respectful language
     age_tier_hint: Controls the tone and wording displayed on the Guardian Space blocked page.
     parent_note: Parent Note
-    parent_note_placeholder: 'e.g. "Hey! Bedtime rules are on. Sleep well — limits refresh in the morning!"'
+    parent_note_placeholder: e.g. "Hey! Bedtime rules are on. Sleep well — limits refresh in the morning!"
     parent_note_hint: Optional message shown on the overlay card. Leave blank for the built-in default.
     save_overlay: Save Overlay Settings
     app_routine_locks: App Routine Locks
     app_routine_lead: Assign platform-specific application lock policies to this child.
     linux_policies: Linux / Desktop Policies
     no_linux_device: No Linux/desktop device linked yet. Assign a Linux agent device to enforce these policies.
-    rules_configured: "{count} apps in this lock set"
+    rules_configured: '{count} apps in this lock set'
     app_details: App details
     revoke_confirm: Revoke approval for this app?
     baseline_apply_confirm_title: Apply this safety baseline?
-    baseline_apply_confirm_body: "This will refresh browsing shields, routine locks, device and browser boundaries, family dialogue settings, and Guardian Space overlay tone. You can still adjust individual settings afterward."
+    baseline_apply_confirm_body: This will refresh browsing shields, routine locks, device and browser boundaries, family
+      dialogue settings, and Guardian Space overlay tone. You can still adjust individual settings afterward.
     android_policies: Android Policies
     no_android_device: No Android device linked yet. Pair an Android agent to enforce these policies.
     define_app_policies: Please define app policies in App Locks before assigning them here.
@@ -938,19 +968,19 @@ pages:
     balanced_watch: Balanced Watch
     assisted_steps: Assisted Steps
     baseline_summary: Baseline Summary
-    accountability_guarantee: "Accountability guarantee: Backed by the Bypass Credit Programme — see our public ledger for patch transparency."
+    accountability_guarantee: 'Accountability guarantee: Backed by the Bypass Credit Programme — see our public ledger for
+      patch transparency.'
     cancel: Cancel
     apply_baseline: Apply Baseline
-
   admin_devices:
     title: Devices - Guardian
     heading: Devices
     lead: Approve new hardware and keep an eye on the computers, phones, and consoles in your home.
     add_device: Add Device
     connected_trusted: Connected & trusted
-    active_count: "{count} Active"
+    active_count: '{count} Active'
     waiting_approval: Waiting for approval
-    pending_count: "{count} Pending"
+    pending_count: '{count} Pending'
     waiting_to_connect: Devices waiting to connect
     col_device_label: Device Label / Hostname
     col_ip: Current IP Address
@@ -965,19 +995,19 @@ pages:
     no_pending: No new connection or registration requests pending.
     connected_devices: Connected devices
     col_active_mappings: Active Mappings
-    linked_accounts: "{count} linked accounts"
+    linked_accounts: '{count} linked accounts'
     refresh_inventory: Refresh Inventory
     unenroll: Unenroll
     factory_reset: Factory Reset
     no_approved: No approved devices connected yet. Use the Onboarding Wizard to enroll devices.
     cloud: Cloud
-
   approvals:
     title: Family Dialogue - Guardian
     heading: Family Dialogue
-    lead: When your child asks to open an app, visit a site, or sign up for a new account, their request lands here for a calm yes-or-no.
+    lead: When your child asks to open an app, visit a site, or sign up for a new account, their request lands here for a
+      calm yes-or-no.
     awaiting_reply: Awaiting Your Reply
-    open_count: "{count} open"
+    open_count: '{count} open'
     open_requests: Open requests
     col_child: Child Profile
     col_device_account: Device / Account
@@ -993,12 +1023,11 @@ pages:
     deny: Deny
     no_pending: No pending access requests.
     family_dialogue:
-      flag_title: "Conversation Alert"
-      flag_lead: "Guardian noticed some highly negative interactions on {platform}."
-      flag_prompt: "This might be a good moment for a supportive, face-to-face family check-in."
-      flag_slang: "Matched intent / words"
-      acknowledge: "Acknowledge"
-
+      flag_title: Conversation Alert
+      flag_lead: Guardian noticed some highly negative interactions on {platform}.
+      flag_prompt: This might be a good moment for a supportive, face-to-face family check-in.
+      flag_slang: Matched intent / words
+      acknowledge: Acknowledge
   restrictions:
     title: Internet Restrictions - Guardian
     heading: Browsing Shields
@@ -1017,32 +1046,31 @@ pages:
     initial_domains: Initial Domain List (One host record per line)
     create_shield: Create shield
     your_shields: Your shields
-    active_count: "{count} active"
+    active_count: '{count} active'
     active: Active
     inactive: Inactive
-    blocked_domains: "{count} blocked domain(s)"
+    blocked_domains: '{count} blocked domain(s)'
     assigned_profiles: Assigned to {count} child profile(s)
-    source_url_label: "Source URL:"
-    last_sync_label: "Last Sync:"
-    status_label: "Status:"
+    source_url_label: 'Source URL:'
+    last_sync_label: 'Last Sync:'
+    status_label: 'Status:'
     enforce: Enforce
     force_sync: Force sync
     delete: Delete
     delete_confirm: Remove shield {name}?
     add_domain: Add New Blocked Domain
     add_domain_btn: Add Domain
-    showing_domains: "* Showing first 25 domains. All {count} domains are actively restricted."
+    showing_domains: '* Showing first 25 domains. All {count} domains are actively restricted.'
     no_domains_yet: No blocked domains defined yet. Type a domain above to immediately restrict access.
     empty_title: No shields yet
     empty_lead: Create a hand-picked list or subscribe to a remote shield URL to start guiding browsing.
-    ages_badge: "Ages: {ages}"
+    ages_badge: 'Ages: {ages}'
     apply_to_profiles: Apply to Child Profiles
     no_profiles: No child profiles created yet.
     update_subscriptions: Update Subscriptions
     marketplace_empty_title: Marketplace catalog is empty
     marketplace_empty_lead: Static catalog file was not loaded correctly.
-    found_count: "{count} found"
-
+    found_count: '{count} found'
   restrictions_app:
     title: App Routine Locks - Guardian
     heading: App Routine Locks
@@ -1056,17 +1084,17 @@ pages:
     platform_android: Android
     create_policy: Create Policy
     active_policies: Active Policies
-    profiles_count: "{count} profiles"
-    rules_badge: "{count} rules configured"
-    assigned_to: "Assigned to:"
+    profiles_count: '{count} profiles'
+    rules_badge: '{count} rules configured'
+    assigned_to: 'Assigned to:'
     no_children_assigned: No children currently assigned
     delete_policy: Delete Policy
     delete_confirm: Delete app policy profile {name}? This will remove all its rules and unassign it from all children.
     add_lock_rule: Add App Lock Rule
     select_curated: Select Curated App
-    custom_executable: "-- Custom executable / path --"
+    custom_executable: -- Custom executable / path --
     discovered_apps: Discovered Apps
-    select_discovered: "-- Select discovered app --"
+    select_discovered: -- Select discovered app --
     no_android_apps: No Android apps reported yet. Pair an Android device and wait for the agent sync session.
     no_desktop_apps: No desktop apps reported yet. Connect a Linux agent and wait for inventory sync.
     app_label: App Label Name
@@ -1089,14 +1117,14 @@ pages:
     no_rules: No application locks configured for this policy. Define one above to get started.
     empty_title: No App Policies Configured
     empty_lead: Create App Lock policies and define block/restrict rules for applications to protect your children.
-    found_count: "{count} found"
-
+    found_count: '{count} found'
   weekly_schedule:
     title: Routine Locks & Time - Guardian
     heading: Routine Locks & Time
-    lead: Choose a child profile to open their weekly routine blueprint — screen-time limits and allowed windows in one calm view.
-    linked_accounts: "{count} linked device account"
-    linked_accounts_plural: "{count} linked device accounts"
+    lead: Choose a child profile to open their weekly routine blueprint — screen-time limits and allowed windows in one calm
+      view.
+    linked_accounts: '{count} linked device account'
+    linked_accounts_plural: '{count} linked device accounts'
     sync_pending: Protected · Sync pending
     synced: Protected
     not_configured: Not configured
@@ -1110,22 +1138,21 @@ pages:
     empty_title: No child profiles yet
     empty_lead: Create child profiles first, then return here to shape each week's routine.
     go_to_profiles: Go to child profiles
-
   weekly_schedule_single:
-    title: "{username} — Weekly Routine - Guardian"
+    title: '{username} — Weekly Routine - Guardian'
     checking_sync: Checking sync
     reset: Reset
     save: Save
     reset_baseline: Reset to saved baseline
-    heading: "{username} — Weekly routine settings"
+    heading: '{username} — Weekly routine settings'
     lead: Shape when they can log in and how much screen time fits each day of the week.
     all_profiles: All profiles
     weekly_summary: Weekly summary metrics
     metric_week_total: Total for week
     metric_weekdays: Weekdays (Mon–Fri)
     metric_weekends: Weekends (Sat–Sun)
-    hours_allowed: "{hours} Hours allowed"
-    hours_per_day: "{hours} Hours / day"
+    hours_allowed: '{hours} Hours allowed'
+    hours_per_day: '{hours} Hours / day'
     routine_wizard: Routine wizard strip
     wizard_lead: Batch screen-time limits and allowed windows — then fine-tune individual days below.
     bulk_screen_time: Bulk screen time limits
@@ -1149,25 +1176,24 @@ pages:
     sunday: Sunday
     guided_default: 2.0h guided default
     no_limit: No limit
-
   online_accounts:
     title: Online Accounts - {username} - Guardian
-    heading: "{username} — Signed-in services"
+    heading: '{username} — Signed-in services'
     lead: A login audit of websites and services this child has signed into — separate from the Family Dialogue approval queue.
     back_to_stats: Back to Stats
     card_title: Online Services & Credentials
-    accounts_count: "{count} accounts"
+    accounts_count: '{count} accounts'
     search_placeholder: Search service domain or username...
     loading: Loading online accounts...
     empty_title: No online accounts reported
     empty_lead: Accounts will appear here when the child logs in or registers on websites using monitored browsers.
-    empty_setup_lead: This list fills in when your child signs in on a website using the Guardian browser monitor on a linked Linux or Windows device.
+    empty_setup_lead: This list fills in when your child signs in on a website using the Guardian browser monitor on a linked
+      Linux or Windows device.
     empty_setup_cta: Check browser setup
     col_domain: Service Domain
     col_username: Username / Email
     col_first_detected: First Detected
     col_last_active: Last Active
-
   stats:
     title: Usage History - {username} - Guardian
     select_date_range: Select date range
@@ -1181,9 +1207,9 @@ pages:
     start_date: Start Date
     end_date: End Date
     apply_custom: Apply Custom Range
-    heading: "{username} — Activity story"
-    lead: "{count} linked device • Usage patterns and gentle alerts"
-    lead_plural: "{count} linked devices • Usage patterns and gentle alerts"
+    heading: '{username} — Activity story'
+    lead: '{count} linked device • Usage patterns and gentle alerts'
+    lead_plural: '{count} linked devices • Usage patterns and gentle alerts'
     web_video_history: Web & Video History
     activity_nav_label: Activity views
     activity_tab_overview: Usage overview
@@ -1220,7 +1246,6 @@ pages:
     loading_feed: Loading activity feed...
     loading_older: Loading older activities...
     no_activities: No activities found matching the current criteria.
-
   web_video_history:
     title: Web & Video History - {username} - Guardian
     select_date_range: Select date range
@@ -1234,7 +1259,7 @@ pages:
     start_date: Start Date
     end_date: End Date
     apply_custom: Apply Custom Range
-    heading: "{username} — Browsing & video story"
+    heading: '{username} — Browsing & video story'
     lead: One calm timeline of websites visited and videos watched
     back_to_stats: Back to Stats
     web_pages: Web Pages Visited
@@ -1249,7 +1274,7 @@ pages:
     loading_channels: Loading channels...
     no_channels: No channel data available for this period.
     combined_timeline: Combined Activity Timeline
-    entries_found: "{count} entries found"
+    entries_found: '{count} entries found'
     search_placeholder: Search page titles, domains or videos...
     filter_all: All Activities
     filter_web: Web Pages Only
@@ -1260,8 +1285,7 @@ pages:
     empty_lead: Logs will appear here once the child browses the web or watches videos on monitored devices.
     previous: Previous
     next: Next
-    page_indicator: "Page {page} of {total}"
-
+    page_indicator: Page {page} of {total}
   youtube_history:
     title: YouTube History - {username} - Guardian
     select_date_range: Select date range
@@ -1275,7 +1299,7 @@ pages:
     start_date: Start Date
     end_date: End Date
     apply_custom: Apply Custom Range
-    heading: "{username} — YouTube story"
+    heading: '{username} — YouTube story'
     lead: See what they've watched and which channels keep drawing them back
     back_to_stats: Back to Stats
     total_watch_time: Total Watch Time
@@ -1291,7 +1315,7 @@ pages:
     loading_channels: Loading channels...
     no_channels: No channel data available for this period.
     watch_history: Watch History Feed
-    videos_found: "{count} videos found"
+    videos_found: '{count} videos found'
     search_placeholder: Search titles or channels...
     all_categories: All Categories
     loading_logs: Loading watch logs...
@@ -1299,10 +1323,9 @@ pages:
     empty_lead: Logs will appear here once the child plays YouTube videos on monitored devices.
     previous: Previous
     next: Next
-    page_indicator: "Page {page} of {total}"
-
+    page_indicator: Page {page} of {total}
   device_detail:
-    title: "{label} - Device Details - Guardian"
+    title: '{label} - Device Details - Guardian'
     tab_nav_label: Device views
     tab_at_a_glance: At a glance
     tab_glance_short: Glance
@@ -1322,9 +1345,9 @@ pages:
     protection_needs_attention: Needs attention
     needs_attention_title: Things to look at
     attention_offline: Device is not connected to Guardian right now
-    attention_pending_commands: "{count} update(s) waiting to apply when this device reconnects"
-    attention_unverified_mappings: "{count} account link(s) need a check"
-    attention_connection_notes: "{count} connection note(s) in history"
+    attention_pending_commands: '{count} update(s) waiting to apply when this device reconnects'
+    attention_unverified_mappings: '{count} account link(s) need a check'
+    attention_connection_notes: '{count} connection note(s) in history'
     attention_filter_sync: Website filters still syncing for {count} account(s)
     attention_android_policy: Android routine locks still syncing
     attention_screen_history: Screen history settings still syncing
@@ -1332,7 +1355,7 @@ pages:
     attention_hardware_non_compliant: Hardware lockdown settings need attention
     hardware_lockdown_title: Hardware lockdown
     hardware_lockdown_heading: BIOS baseline
-    hardware_oem_label: "Detected vendor: {oem}"
+    hardware_oem_label: 'Detected vendor: {oem}'
     hardware_oem_unknown: Hardware vendor not detected yet
     hardware_status_compliant: Compliant
     hardware_status_non_compliant: Non-compliant
@@ -1346,11 +1369,13 @@ pages:
     hardware_audit_btn: Audit settings
     hardware_apply_btn: Apply hardware baseline
     hardware_reveal_password_btn: Reveal supervisor password
-    hardware_apply_warning: Applying a hardware baseline may set a BIOS supervisor password and change boot security settings. Guardian stores the password securely on your server.
+    hardware_apply_warning: Applying a hardware baseline may set a BIOS supervisor password and change boot security settings.
+      Guardian stores the password securely on your server.
     windows_laps_title: Local administrator
     windows_laps_heading: Windows administrator password
-    windows_laps_description: Guardian rotates the built-in local Administrator account when it is enabled with a weak password, and stores the new password securely on your server.
-    windows_laps_rotated_label: "Last rotated: {rotated_at}"
+    windows_laps_description: Guardian rotates the built-in local Administrator account when it is enabled with a weak password,
+      and stores the new password securely on your server.
+    windows_laps_rotated_label: 'Last rotated: {rotated_at}'
     windows_laps_reveal_password_btn: Reveal local Administrator password
     windows_laps_clear_lockdown_btn: Release Safe Mode lockdown
     manage_routines: Manage routines
@@ -1369,11 +1394,13 @@ pages:
     no_daily_limit: No daily limit set
     no_play_time: No play time reported
     device_owner_setup: Set up device owner
-    device_owner_body: Enforcing hardware limitations, preventing uninstall, and automatically provisioning child user accounts requires the Guardian agent to be set as Device Owner.
+    device_owner_body: Enforcing hardware limitations, preventing uninstall, and automatically provisioning child user accounts
+      requires the Guardian agent to be set as Device Owner.
     adb_step_dev_options: Enable Developer Options and USB Debugging on the child's device.
     adb_step_remove_accounts: Remove all existing user accounts from the device under Settings → Passwords & Accounts.
     adb_step_run_command: Connect the device to a computer and execute the terminal command below.
-    adb_restart_note: Once successfully executed, restart the Guardian agent. Device Owner status will refresh and unlock these routine locks.
+    adb_restart_note: Once successfully executed, restart the Guardian agent. Device Owner status will refresh and unlock
+      these routine locks.
     custom_installs_advanced: Custom app installs (advanced)
     prune_alerts: Clear old notes
     recovery_commands: Recovery commands
@@ -1384,12 +1411,12 @@ pages:
     cloud_managed: Cloud Managed
     last_ip: Last IP Address
     host_logs: Host Logs
-    alerts_count: "{count} alerts"
+    alerts_count: '{count} alerts'
     linked_accounts: Linked Managed Accounts
     application_policies: Application Policies
     nintendo_player_id: Nintendo Player ID
     xbox_user_id: Xbox User ID
-    linux_uid: "Linux UID: {uid}"
+    linux_uid: 'Linux UID: {uid}'
     unassigned: Unassigned
     verified: Verified
     pending_check: Pending Check
@@ -1401,7 +1428,8 @@ pages:
     no_contributors_desc: There are no active content filtering source profiles mapped to accounts on this machine.
     parental_access_code: Parental Access Code
     access_code_hint: Use offline to reset lock screen PIN
-    access_code_help: Enter this 6-digit code on the device lock screen. It rotates every 30 minutes. If the current code fails, try the codes from the previous one or two windows as well.
+    access_code_help: Enter this 6-digit code on the device lock screen. It rotates every 30 minutes. If the current code
+      fails, try the codes from the previous one or two windows as well.
     device_management: Device Management
     device_management_lead: Remove this device from family management
     console_active: Console Active
@@ -1411,10 +1439,13 @@ pages:
     agent_offline: Agent offline
     fcm_available: FCM available
     no_fcm: No FCM token
-    unenroll_nintendo: Unenroll removes this Switch console from Guardian. Playtime logs and account associations will be kept as read-only history.
-    unenroll_default: Unenroll revokes server trust and asks the agent to stop enforcement and clear local credentials. You can re-pair the device later.
+    unenroll_nintendo: Unenroll removes this Switch console from Guardian. Playtime logs and account associations will be
+      kept as read-only history.
+    unenroll_default: Unenroll revokes server trust and asks the agent to stop enforcement and clear local credentials. You
+      can re-pair the device later.
     unenroll_device: Unenroll Device
-    factory_reset_help: Factory reset erases this Android device and removes Guardian management. All personal data on the device will be deleted. This cannot be undone. Requires device-owner provisioning.
+    factory_reset_help: Factory reset erases this Android device and removes Guardian management. All personal data on the
+      device will be deleted. This cannot be undone. Requires device-owner provisioning.
     factory_reset_device: Factory Reset Device
     android_policy: Android Device Policy
     android_policy_lead: Manage hardware access, system settings, and restrictions.
@@ -1453,7 +1484,7 @@ pages:
     save_restrictions: Save Restrictions
     unlocking_restrictions: Unlocking Advanced Restrictions
     unlocking_lead: Guardian needs Device Owner permission for these controls.
-    provision_via_adb: "To provision via ADB:"
+    provision_via_adb: 'To provision via ADB:'
     screen_history_settings: Screen History Settings
     enable_screen_history: Enable Screen History
     capture_interval: Capture Interval
@@ -1468,12 +1499,13 @@ pages:
     captured_screen_history: Captured Screen History
     screen_history_lead: Review periodic desktop screenshot logs from this device.
     no_screenshots_title: No Screenshots Logged
-    no_screenshots_desc: Periodic desktop screens will show up here once a monitoring session is running and capturing is enabled.
+    no_screenshots_desc: Periodic desktop screens will show up here once a monitoring session is running and capturing is
+      enabled.
     capture_now_btn: Capture Now
     play: Play
-    speed: "Speed:"
+    speed: 'Speed:'
     installed_applications: Installed Applications
-    last_inventory: "Last inventory: {time} ({count} apps)"
+    last_inventory: 'Last inventory: {time} ({count} apps)'
     no_inventory: No inventory reported yet.
     refresh_inventory: Refresh Inventory
     no_apps_account: No applications reported for this account yet.
@@ -1488,10 +1520,181 @@ pages:
     analytics_unassigned_desc: No mapped accounts are available to track on this device.
     locked_recovery: Locked Device Recovery
     locked_recovery_lead: Use when the phone cannot unlock after reboot
-    locked_recovery_body: >-
-      Copy the device token and recovery commands below onto a trusted computer with ADB access.
-      This restores agent connectivity after a locked boot without wiping the device.
+    locked_recovery_body: Copy the device token and recovery commands below onto a trusted computer with ADB access. This
+      restores agent connectivity after a locked boot without wiping the device.
     device_token: Device token
     diagnostic_alerts: Diagnostic Alert History
     no_audit_title: No Audit Records Found
     no_audit_desc: No diagnostic alerts have been recorded for this device yet.
+tpl:
+  create_profile_wizard:
+    previous_step: Previous step
+    not_yet: Not yet
+    recommended_ages: 'Recommended ages:'
+    accountability_guarantee: 'Accountability guarantee:'
+    here_is_what_guardian_will: Here is what Guardian will apply when you save — every setting stays editable afterward.
+    review_your_baseline: Review your baseline
+    step_4_of_4: Step 4 of 4
+    enforcement_supports_education_slide_toward: Enforcement supports education — slide toward more hands-on help when your
+      child is comfortable finding workarounds.
+    step_3_of_4: Step 3 of 4
+    pick_the_stage_that_best: Pick the stage that best matches your child today — you can recalibrate anytime.
+    step_2_of_4: Step 2 of 4
+    profile_flexibility_choice: 'Profile flexibility choice:'
+    please_enter_a_profile_name: Please enter a profile name to continue.
+    eg_sam: e.g. Sam
+    child_profile_name: Child profile name
+    give_this_profile_a_name: Give this profile a name your family will recognise on the dashboard.
+    who_are_we_protecting: Who are we protecting?
+    step_1_of_4: Step 1 of 4
+    a_calm_step_by_step: A calm, step-by-step setup — enforcement supports education.
+  admin_settings:
+    add_custom_bad_words_or: Add custom bad words or slang modifiers, separated by commas. These will be synchronized to the
+      browser extension to watch for targeted cyberbullying or toxicity.
+    eg_slang1_slang2_slang3: e.g. slang1, slang2, slang3
+    slang_bad_word_lexicon: Slang & Bad Word Lexicon
+  admin_user_edit:
+    link_will_expire_in_48: Link will expire in 48 hours.
+    copy_invite_link: Copy Invite Link
+    manage_policies_blocklists_apps: Manage Policies (Blocklists, Apps)
+    view_monitoring_history_stats: View Monitoring (History, Stats)
+    manage_screen_time_adjust_limits: Manage Screen Time (Adjust Limits, Pause)
+    view_screen_time: View Screen Time
+    granular_permissions: Granular Permissions
+    role_preset: Role Preset
+    invite_a_co_parent_or: Invite a co-parent or guardian to manage or view this profile.
+    generate_share_invite: Generate Share Invite
+    this_profile_is_not_currently: This profile is not currently shared with anyone.
+    other_parents_or_guardians_who: Other parents or guardians who currently have granular access to  's profile.
+    active_profile_shares: Active Profile Shares
+    daily_ai_limit_minutes: Daily AI Limit (Minutes)
+    full_text_logs_prompts: Full Text (Logs Prompts)
+    metadata_only_length_service: Metadata Only (Length & Service)
+    prompt_logging: Prompt Logging
+    require_approval: Require Approval
+    monitor_log_prompts: Monitor & Log Prompts
+    block_ai_services: Block AI Services
+    off_allow: Off / Allow
+    ai_policy_mode: AI Policy Mode
+    active_protection_guarded: Active Protection Guarded
+    share_profile: Share Profile
+    other_parents_or_guardians: Other parents or guardians who currently have granular access to {username}'s profile.
+  base:
+    link_console_amp_continue: Link Console &amp; Continue
+    approve_amp_continue: Approve &amp; Continue
+    link_account_amp_continue: Link Account &amp; Continue
+    log_in_and_on_the: Log in, and on the final
+    screen_right_click_or_tap: screen, right-click (or tap and hold) the button, copy its link address, and paste it below.
+    alternatively_you_can_download_the: 'Alternatively, you can download the MSI installer package directly and run it:'
+    powershell_executionpolicy_bypass_command: powershell -ExecutionPolicy Bypass -Command "..."
+    curl_ssl_httpyourserverscriptsinstall_agentsh_sudo: curl -sSL http://yourserver/scripts/install-agent.sh | sudo bash -s
+      -- --url ws://yourserver/ws
+    pick_the_platform_your_child: Pick the platform your child uses — we'll walk you through connecting it safely.
+    choose_a_device: Choose a device
+    view_live_ledger_amp_billing: View live ledger &amp; billing stack
+    view_authentication_settings_change_administrative: View authentication settings Change administrative password
+    workspace_family_home: 'Workspace: Family Home'
+    routine_locks_amp_time: Routine Locks &amp; Time
+  device_detail:
+    activity:
+      version_v: 'Version: v'
+      next_frame_right_arrow: Next Frame (Right Arrow)
+      play_pause_autoplay_spacebar: Play / Pause Autoplay (Spacebar)
+      previous_frame_left_arrow: Previous Frame (Left Arrow)
+      open_image_in_new_tab: Open Image in New Tab
+      no_active_window: No active window
+      active_screenshot_frame: Active Screenshot Frame
+      loading_screenshots: Loading screenshots...
+    advanced:
+      this_client_is_connection_healthy: This client is connection-healthy. No connection diagnostic alerts match your filters.
+      diagnostic_details: Diagnostic Details
+      delivery_status: Delivery Status
+      event_type: Event Type
+      date_amp_time: Date &amp; Time
+      loading_alert_history: Loading alert history...
+      sort_by_type: Sort by Type
+      sort_by_date: Sort by Date
+      all_event_types: All Event Types
+      search_events_details: Search events, details...
+      adb_shell_dpm_set_device: adb shell dpm set-device-owner com.timekpr.agent/.admin.TimeKprDeviceAdminReceiver
+      factory_reset: Factory reset
+    android_wizard_modal:
+      an_error_occurred: An error occurred
+      source_url: Source URL
+      sha_256_checksum: SHA-256 Checksum
+      apk_successfully_validated_and_verified: APK successfully validated and verified!
+      downloading_apk_verifying_structural_integrity: Downloading APK, verifying structural integrity, and extracting binary
+        metadata. This may take a few seconds...
+      validating_application: Validating Application
+      please_enter_a_valid_https: Please enter a valid HTTPS URL.
+      provide_the_https_url_to: Provide the HTTPS URL to the application's APK file. The server will download and inspect
+        the file to verify the package name and calculate its checksum.
+    settings:
+      console_name: Console Name
+      last_sync: Last sync
+      cloud_managed_parental_controls: Cloud-managed parental controls
+      bedtime_alarm: Bedtime alarm
+      timer_mode: Timer mode
+      play_time_data_unavailable: Play time data unavailable.
+      no_daily_limit_configured_on: No daily limit configured on this console.
+      30_days: 30 days
+      7_days: 7 days
+      24_hours: 24 hours
+      every_30_minutes: Every 30 minutes
+      every_15_minutes: Every 15 minutes
+      every_5_minutes: Every 5 minutes
+      every_1_minute: Every 1 minute
+      when_enabled_the_agent_captures: When enabled, the agent captures the desktop on a schedule while a user session is
+        active.
+      sha_256_hash: SHA-256 Hash
+      shown_in_the_device_administrator: Shown in the Device Administrator details screen. Max 4096 chars.
+      shown_when_a_restricted_setting: Shown when a restricted setting is blocked (e.g., in Settings). Max 200 chars.
+      unspecified_default: Unspecified (Default)
+      disallow_usb_data_transfer_completely: Disallow USB Data Transfer Completely
+      disallow_usb_file_transfer_charge: Disallow USB File Transfer (Charge Only)
+      allow_usb_data_transfer: Allow USB Data Transfer
+      user_choice: User Choice
+  expired_invite:
+    what_should_i_do: What should I do?
+    this_child_profile_invitation_code: This child profile invitation code is invalid, has expired, or has already been fully
+      redeemed.
+    error_410_gone: Error 410 Gone
+    invitation_expired: Invitation Expired
+    invitation_expired_guardian: Invitation Expired - Guardian
+  onboarding:
+    welcome_to_guardian_setup_your: Welcome to Guardian - Setup Your Account
+  restrictions:
+    remove_domain_restriction: Remove domain restriction
+    eg_redditcom_instagramcom: e.g. reddit.com, instagram.com
+    youtubecom10tiktokcom10facebookcom: youtube.com&#10;tiktok.com&#10;facebook.com
+  restrictions_app:
+    remove_this_rule: Remove this rule
+  spa_shell:
+    apply_block: Apply Block
+    eg_blocked_social_sites: e.g. Blocked Social Sites
+    create_and_add_to_a: Create and Add to a New Shield List
+    _choose_an_existing_list: -- Choose an existing list --
+    add_to_existing_shield_list: Add to Existing Shield List
+    to_apply_this_restriction_assign: '. To apply this restriction, assign it to a custom rule list:'
+    you_are_blocking: You are blocking
+    confirm_blocking_rule: Confirm Blocking Rule
+    channel_blocking_is_currently_disabled: Channel blocking is currently disabled in this version.
+    current_restrictions: Current Restrictions
+    device_distribution: Device Distribution
+    first_seen: First Seen
+    total_visits: Total Visits
+    activity_overview: Activity Overview
+    retrieving_activity_details: Retrieving activity details...
+    activity_inspector: Activity Inspector
+    select_target_household: Select Target Household
+  weekly_schedule_single:
+    allowed_window_end: Allowed window end
+    allowed_window_start: Allowed window start
+    bulk_daily_hours: Bulk daily hours
+  welcome:
+    go_to_family_home: Go to Family Home
+    from_here_you_can_review: From here you can review routines, respond to dialogue requests, and tune browsing shields for
+      each child profile.
+    youre_signed_in_to_your: You're signed in to your family's safety console.
+    welcome_back: Welcome back
+    welcome_guardian: Welcome - Guardian

@@ -18,7 +18,7 @@
                     <div class="card-body">
                         <div id="screen-history-loading" class="text-center py-4" style="display: none;">
                             <div class="spinner-border text-primary" role="status">
-                                <span class="visually-hidden">Loading screenshots...</span>
+                                <span class="visually-hidden">{{ t('tpl.device_detail.activity.loading_screenshots') }}</span>
                             </div>
                         </div>
                         
@@ -40,18 +40,18 @@
                         <div id="screen-history-timeline-container" class="d-none">
                             <!-- Large Viewport Display Frame (Sharp geometry) -->
                             <div class="position-relative bg-dark border rounded overflow-hidden mb-3" style="aspect-ratio: 16/10; min-height: 250px;">
-                                <img id="timeline-preview-img" src="" alt="Active Screenshot Frame" class="w-100 h-100" style="object-fit: contain; background: #181818;">
+                                <img id="timeline-preview-img" src="" alt="{{ t('tpl.device_detail.activity.active_screenshot_frame') }}" class="w-100 h-100" style="object-fit: contain; background: #181818;">
                                 
                                 <!-- Top Overlay Bar: Status, Timestamp and Active Application Window Title -->
                                 <div class="position-absolute top-0 start-0 end-0 p-2 d-flex justify-content-between align-items-center bg-black bg-opacity-75 text-white small" style="font-family: monospace; z-index: 5;">
                                     <span id="timeline-overlay-time" class="fw-bold"><i class="fas fa-clock me-1 text-warning"></i>--:--:--</span>
-                                    <span id="timeline-overlay-window" class="text-truncate px-2 text-warning" style="max-width: 60%;" title="">No active window</span>
+                                    <span id="timeline-overlay-window" class="text-truncate px-2 text-warning" style="max-width: 60%;" title="">{{ t('tpl.device_detail.activity.no_active_window') }}</span>
                                 </div>
 
                                 <!-- Bottom Overlay Bar: Linux User, Fullscreen Link -->
                                 <div class="position-absolute bottom-0 start-0 end-0 p-2 d-flex justify-content-between align-items-center bg-black bg-opacity-75 text-white small" style="z-index: 5;">
                                     <span id="timeline-overlay-user" class="badge bg-secondary">user</span>
-                                    <a id="timeline-download-link" href="#" target="_blank" class="btn btn-sm btn-outline-light py-0.5 px-2 fs-7 border-0" title="Open Image in New Tab">
+                                    <a id="timeline-download-link" href="#" target="_blank" class="btn btn-sm btn-outline-light py-0.5 px-2 fs-7 border-0" title="{{ t('tpl.device_detail.activity.open_image_in_new_tab') }}">
                                         <i class="fas fa-expand-arrows-alt"></i>
                                     </a>
                                 </div>
@@ -78,17 +78,17 @@
                             <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 p-2 border-top bg-body-tertiary">
                                 <div class="d-flex align-items-center gap-2">
                                     <!-- Step Back Button -->
-                                    <button type="button" id="timeline-prev-btn" class="btn btn-sm btn-outline-secondary" title="Previous Frame (Left Arrow)">
+                                    <button type="button" id="timeline-prev-btn" class="btn btn-sm btn-outline-secondary" title="{{ t('tpl.device_detail.activity.previous_frame_left_arrow') }}">
                                         <i class="fas fa-chevron-left"></i>
                                     </button>
                                     
                                     <!-- Play/Pause Autoplay Button -->
-                                    <button type="button" id="timeline-play-btn" class="btn btn-sm btn-warning fw-bold" title="Play / Pause Autoplay (Spacebar)">
+                                    <button type="button" id="timeline-play-btn" class="btn btn-sm btn-warning fw-bold" title="{{ t('tpl.device_detail.activity.play_pause_autoplay_spacebar') }}">
                                         <i class="fas fa-play me-1"></i> <span id="timeline-play-label">Play</span>
                                     </button>
 
                                     <!-- Step Forward Button -->
-                                    <button type="button" id="timeline-next-btn" class="btn btn-sm btn-outline-secondary" title="Next Frame (Right Arrow)">
+                                    <button type="button" id="timeline-next-btn" class="btn btn-sm btn-outline-secondary" title="{{ t('tpl.device_detail.activity.next_frame_right_arrow') }}">
                                         <i class="fas fa-chevron-right"></i>
                                     </button>
                                 </div>
@@ -96,7 +96,7 @@
                                 <div class="d-flex align-items-center gap-3">
                                     <!-- Playback Speed Control -->
                                     <div class="d-flex align-items-center gap-2">
-                                        <span class="small text-secondary fw-semibold">Speed:</span>
+                                        <span class="small text-secondary fw-semibold">{{ t('pages.device_detail.speed') }}</span>
                                         <select id="timeline-speed-select" class="form-select form-select-sm py-0.5 px-2" style="width: auto; font-size: 0.8rem;">
                                             <option value="1000" selected>1s</option>
                                             <option value="500">0.5s</option>
@@ -146,7 +146,7 @@
                             </button>
                         </form>
                         {% elif mapped_accounts %}
-                        <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle px-3 py-1.5 fw-bold">Agent Offline</span>
+                        <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle px-3 py-1.5 fw-bold">{{ t('pages.dashboard.agent_offline') }}</span>
                         {% endif %}
                     </div>
                     <div class="card-body">
@@ -191,7 +191,7 @@
                                                                     title="{{ app.identifier }}">{{ app.identifier }}</code>
                                                             </div>
                                                         {% if app.version_name %}
-                                                        <span class="text-secondary d-block" style="font-size: 0.65rem;">Version: v{{ app.version_name }}</span>
+                                                        <span class="text-secondary d-block" style="font-size: 0.65rem;">{{ t('tpl.device_detail.activity.version_v') }}{{ app.version_name }}</span>
                                                         {% endif %}
                                                     </div>
                                                 </div>
@@ -199,7 +199,7 @@
                                             {% endfor %}
                                         </div>
                                         {% else %}
-                                        <p class="small text-secondary fst-italic mb-0 py-2"><i class="fas fa-info-circle me-1"></i>No applications reported for this account yet.</p>
+                                        <p class="small text-secondary fst-italic mb-0 py-2"><i class="fas fa-info-circle me-1"></i>{{ t('pages.device_detail.no_apps_account') }}</p>
                                         {% endif %}
                                     </div>
                                 {% endfor %}

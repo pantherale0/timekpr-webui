@@ -1,6 +1,10 @@
 (function () {
     'use strict';
 
+    function i18n(key, params) {
+        return typeof window.guardianI18n === 'function' ? window.guardianI18n(key, params) : key;
+    }
+
     let blocklistModal = null;
     let activeInspectType = null;
     let activeInspectValue = null;
@@ -360,7 +364,7 @@
         const newSourceName = document.getElementById('blocklist-new-name')?.value.trim() || '';
 
         if (activeInspectType === 'domain' && !blockSourceId && !newSourceName) {
-            alert('Please select an existing shield list or enter a name for a new one.');
+            alert(i18n('guardian-inspector.please_select_an_existing_shield'));
             return;
         }
 

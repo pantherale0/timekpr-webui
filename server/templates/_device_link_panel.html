@@ -35,7 +35,7 @@
                 </select>
             </div>
             <div class="col-12 {% if mode == 'inline' %}col-md-2{% endif %} device-link-action-col{% if not show_connect_button %} d-none{% endif %}">
-                <label class="form-label device-link-action-spacer small mb-1" aria-hidden="true">&nbsp;</label>
+                <label class="form-label device-link-action-spacer small mb-1" aria-hidden="true">&nbsp;</label> {# noqa: i18n #}
                 <button type="button" class="btn btn-primary w-100 fw-bold device-link-connect-btn">
                     <i class="fas fa-link me-1"></i> {{ t('pages.admin_users.connect') }}
                 </button>

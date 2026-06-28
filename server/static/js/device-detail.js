@@ -4,6 +4,10 @@
 (function () {
     'use strict';
 
+    function i18n(key, params) {
+        return typeof window.guardianI18n === 'function' ? window.guardianI18n(key, params) : key;
+    }
+
     const TAB_ALIASES = {
         overview: '#overview-tab',
         activity: '#activity-tab',
@@ -139,7 +143,7 @@
         const applyBtn = document.getElementById('hardware-baseline-apply-btn');
         if (applyBtn) {
             applyBtn.addEventListener('click', async () => {
-                if (!window.confirm('Apply hardware lockdown settings? This may change BIOS passwords and boot options.')) {
+                if (!window.confirm(i18n('device-detail.apply_hardware_lockdown_settings_this'))) {
                     return;
                 }
                 applyBtn.disabled = true;
@@ -157,7 +161,7 @@
         const revealBtn = document.getElementById('hardware-baseline-reveal-btn');
         if (revealBtn) {
             revealBtn.addEventListener('click', async () => {
-                if (!window.confirm('Reveal the escrowed supervisor password? This action is logged.')) {
+                if (!window.confirm(i18n('device-detail.reveal_the_escrowed_supervisor_password'))) {
                     return;
                 }
                 try {
@@ -201,7 +205,7 @@
         const revealBtn = document.getElementById('windows-laps-reveal-btn');
         if (revealBtn) {
             revealBtn.addEventListener('click', async () => {
-                if (!window.confirm('Reveal the escrowed local Administrator password? This action is logged.')) {
+                if (!window.confirm(i18n('device-detail.reveal_the_escrowed_local_administrator'))) {
                     return;
                 }
                 try {
@@ -216,7 +220,7 @@
         const clearBtn = document.getElementById('windows-laps-clear-lockdown-btn');
         if (clearBtn) {
             clearBtn.addEventListener('click', async () => {
-                if (!window.confirm('Release Safe Mode lockdown on this device?')) {
+                if (!window.confirm(i18n('device-detail.release_safe_mode_lockdown_on'))) {
                     return;
                 }
                 clearBtn.disabled = true;
@@ -567,7 +571,7 @@ const alertConfig = {
 
             const daysInt = parseInt(days);
             if (isNaN(daysInt) || daysInt < 0) {
-                alert('Please enter a valid number of days.');
+                alert(i18n('device-detail.please_enter_a_valid_number'));
                 return;
             }
 
@@ -591,7 +595,7 @@ const alertConfig = {
                     fetchAlerts();
                 }
             } catch (error) {
-                alert('Failed to prune alerts.');
+                alert(i18n('device-detail.failed_to_prune_alerts'));
             }
         });
 

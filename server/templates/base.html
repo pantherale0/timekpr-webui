@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>{% block title %}Guardian Family Safety{% endblock %}</title>
+    <title>{% block title %}{{ t('shell.title') }}{% endblock %}</title>
     <meta name="description"
         content="Guardian Family Safety console. Calm routines, browsing shields, and family dialogue for your household.">
 
@@ -144,20 +144,20 @@
 <body class="layout-fixed sidebar-expand-lg sidebar-mini bg-body-tertiary">
     <div class="app-wrapper">
         <!-- Top Navbar Header -->
-        <nav class="app-header navbar navbar-expand bg-body shadow-sm" aria-label="Main navigation">
+        <nav class="app-header navbar navbar-expand bg-body shadow-sm" aria-label="{{ t('nav.main_navigation') }}">
             <div class="container-fluid guardian-nav-shell">
                 <!-- Brand context (left) -->
                 <div class="guardian-nav-brand">
                     <ul class="navbar-nav flex-row align-items-center">
                         <li class="nav-item">
                             <a class="nav-link guardian-nav-toggle" data-lte-toggle="sidebar" href="#" role="button"
-                                aria-label="Toggle sidebar">
+                                aria-label="{{ t('nav.toggle_sidebar') }}">
                                 <i class="fas fa-bars"></i>
                             </a>
                         </li>
                         {% block top_nav_left %}
                         <li class="nav-item d-none d-md-inline-block">
-                            <span class="navbar-text guardian-nav-workspace-label">Family Home</span>
+                            <span class="navbar-text guardian-nav-workspace-label">{{ t('nav.family_home') }}</span>
                         </li>
                         {% endblock %}
                         {% block top_nav_brand_status %}{% endblock %}
@@ -177,7 +177,7 @@
                         id="navbar-task-badge" style="display: none; cursor: pointer;"
                         onclick="location.href='{{ url_for('settings') }}'">
                         <span class="task-status-indicator-dot danger"></span>
-                        <span class="guardian-nav-alert-text">Tasks Offline</span>
+                        <span class="guardian-nav-alert-text">{{ t('nav.tasks_offline') }}</span>
                     </span>
                 </div>
 
@@ -189,14 +189,14 @@
                                 id="navbar-approvals-badge-mobile" style="display: none; cursor: pointer;"
                                 aria-live="polite"
                                 onclick="location.href='{{ url_for('ui_dashboard.admin_approvals') }}'"
-                                title="Pending dialogue">
+                                title="{{ t('nav.pending_dialogue') }}">
                                 <i class="fas fa-clipboard-check"></i>
                             </span>
                         </li>
                         <li class="nav-item d-lg-none">
                             <span class="guardian-nav-alert-badge badge rounded-pill bg-danger text-white"
                                 id="navbar-task-badge-mobile" style="display: none; cursor: pointer;"
-                                onclick="location.href='{{ url_for('settings') }}'" title="Tasks offline">
+                                onclick="location.href='{{ url_for('settings') }}'" title="{{ t('nav.tasks_offline_title') }}">
                                 <span class="task-status-indicator-dot danger"></span>
                             </span>
                         </li>
@@ -204,7 +204,7 @@
                             <button type="button" class="btn btn-sm guardian-btn-sage guardian-nav-action-btn"
                                 onclick="openOnboardingWizard()">
                                 <i class="fas fa-plus"></i>
-                                <span>Add Device</span>
+                                <span>{{ t('nav.add_device') }}</span>
                             </button>
                         </li>
                         {% block top_nav_secondary %}
@@ -214,7 +214,7 @@
                             <button type="button" class="btn btn-sm guardian-btn-sage guardian-nav-action-btn"
                                 data-bs-toggle="modal" data-bs-target="#createProfileModal">
                                 <i class="fas fa-user-plus"></i>
-                                <span>Create Managed Profile</span>
+                                <span>{{ t('nav.create_managed_profile') }}</span>
                             </button>
                         </li>
                         {% endif %}
@@ -225,7 +225,7 @@
                         <li class="nav-item dropdown guardian-nav-actions-menu d-lg-none">
                             <button type="button"
                                 class="btn btn-sm btn-outline-secondary guardian-nav-action-btn guardian-nav-actions-trigger"
-                                data-bs-toggle="dropdown" aria-expanded="false" aria-label="Open actions menu">
+                                data-bs-toggle="dropdown" aria-expanded="false" aria-label="{{ t('nav.open_actions_menu') }}">
                                 <i class="fas fa-ellipsis-v"></i>
                                 <span class="guardian-nav-actions-trigger-label">Actions</span>
                             </button>
@@ -258,7 +258,7 @@
                     <i class="fas fa-shield-alt brand-icon-shield flex-shrink-0" aria-hidden="true"></i>
                     <span class="brand-text">
                         <span class="d-block fw-bold lh-1">Guardian</span>
-                        <span class="d-block guardian-brand-subtitle">Family Safety</span>
+                        <span class="d-block guardian-brand-subtitle">{{ t('nav.brand_subtitle') }}</span>
                     </span>
                 </a>
             </div>
@@ -282,21 +282,21 @@
                             <a href="{{ url_for('weekly_schedule') }}"
                                 class="nav-link {% if request.path.startswith('/weekly-schedule') %}active{% endif %}">
                                 <i class="nav-icon fas fa-clock"></i>
-                                <p>Routine Locks &amp; Time</p>
+                                <p>{{ t('tpl.base.routine_locks_amp_time') }}</p>
                             </a>
                         </li>
                         <li class="nav-item">
                             <a href="{{ url_for('ui_dashboard.admin_restrictions') }}"
                                 class="nav-link {% if request.path.startswith('/admin/restrictions') %}active{% endif %}">
                                 <i class="nav-icon fas fa-globe"></i>
-                                <p>Browsing Shields</p>
+                                <p>{{ t('nav.browsing_shields') }}</p>
                             </a>
                         </li>
                         <li class="nav-item">
                             <a href="{{ url_for('ui_apparmor.admin_app_policies') }}"
                                 class="nav-link {% if request.path.startswith('/admin/app-policies') %}active{% endif %}">
                                 <i class="nav-icon fas fa-lock"></i>
-                                <p>App Routine Locks</p>
+                                <p>{{ t('nav.app_routine_locks') }}</p>
                             </a>
                         </li>
                         <li class="nav-item">
@@ -304,14 +304,14 @@
                                 class="nav-link {% if request.path.startswith('/admin/approvals') %}active{% endif %}">
                                 <i class="nav-icon fas fa-clipboard-check"></i>
                                 <p class="d-flex align-items-center justify-content-between w-100 mb-0">
-                                    <span>Family Dialogue</span>
+                                    <span>{{ t('nav.family_dialogue') }}</span>
                                     <span class="badge bg-warning text-dark ms-2" id="sidebar-approvals-badge"
                                         style="display: none;">0</span>
                                 </p>
                             </a>
                         </li>
 
-                        <li class="nav-header guardian-nav-section-header mt-2">YOUR FAMILY</li>
+                        <li class="nav-header guardian-nav-section-header mt-2">{{ t('nav.your_family') }}</li>
                         <li class="nav-item">
                             <a href="{{ url_for('ui_dashboard.admin_devices') }}"
                                 class="nav-link {% if request.path.startswith('/admin/devices') %}active{% endif %}">
@@ -323,7 +323,7 @@
                             <a href="{{ url_for('ui_dashboard.admin_users') }}"
                                 class="nav-link {% if request.path.startswith('/admin/users') or request.path == url_for('ui_dashboard.admin') %}active{% endif %}">
                                 <i class="nav-icon fas fa-users"></i>
-                                <p>Child Profiles</p>
+                                <p>{{ t('nav.child_profiles') }}</p>
                             </a>
                         </li>
 
@@ -355,37 +355,37 @@
                     </button>
 
                     <div class="guardian-profile-popout" id="guardian-profile-popout" role="menu"
-                        aria-label="Account and session controls" hidden>
+                        aria-label="{{ t('shell.profile_hub_aria') }}" hidden>
                         <div class="guardian-profile-popout-header">
-                            <p class="guardian-profile-popout-kicker">User settings overlay</p>
+                            <p class="guardian-profile-popout-kicker">{{ t('shell.profile_overlay_kicker') }}</p>
                             <p class="guardian-profile-popout-title">
                                 <i class="fas fa-user-circle me-1" aria-hidden="true"></i>Admin account profile
                             </p>
                             <p class="guardian-profile-popout-meta">{{ profile_email }}</p>
-                            <p class="guardian-profile-popout-meta">Workspace: Family Home</p>
+                            <p class="guardian-profile-popout-meta">{{ t('tpl.base.workspace_family_home') }}</p>
                         </div>
                         <div class="guardian-profile-popout-actions">
                             <a href="{{ url_for('settings') }}" class="guardian-profile-popout-link" role="menuitem">
                                 <i class="fas fa-cog" aria-hidden="true"></i>
-                                <span>Manage account preferences</span>
+                                <span>{{ t('shell.profile_manage_prefs') }}</span>
                             </a>
                             <a href="{{ url_for('settings') }}#admin-credentials" class="guardian-profile-popout-link"
                                 role="menuitem">
                                 <i class="fas fa-key" aria-hidden="true"></i>
-                                <span>{% if oidc_enabled %}View authentication settings{% else %}Change administrative password{% endif %}</span>
+                                <span>{% if oidc_enabled %}{{ t('shell.profile_view_auth') }}{% else %}{{ t('shell.profile_change_password') }}{% endif %}</span>
                             </a>
                             <a href="https://github.com/pantherale0/timekpr-webui/issues"
                                 class="guardian-profile-popout-link" role="menuitem" target="_blank"
                                 rel="noopener noreferrer">
                                 <i class="fas fa-receipt" aria-hidden="true"></i>
-                                <span>View live ledger &amp; billing stack</span>
+                                <span>{{ t('tpl.base.view_live_ledger_amp_billing') }}</span>
                             </a>
                         </div>
                         <div class="guardian-profile-popout-divider" role="separator"></div>
                         <a href="{{ url_for('logout') }}"
                             class="guardian-profile-popout-link guardian-profile-popout-link--logout" role="menuitem">
                             <i class="fas fa-sign-out-alt" aria-hidden="true"></i>
-                            <span>Terminate session (Logout)</span>
+                            <span>{{ t('shell.profile_logout') }}</span>
                         </a>
                     </div>
                 </div>
@@ -435,7 +435,7 @@
             <div class="modal-content shadow-lg">
                 <div class="modal-header guardian-modal-header">
                     <h5 class="modal-title" id="onboardingWizardModalLabel"><i
-                            class="fas fa-laptop me-2"></i>Add a Family Device</h5>
+                            class="fas fa-laptop me-2"></i>{{ t('shell.wizard_title') }}</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"
                         onclick="closeWizard()"></button>
                 </div>
@@ -450,8 +450,8 @@
                     </div>
 
                     <div class="text-center mb-3">
-                        <h4 class="fw-bold" id="step-title">Choose a device</h4>
-                        <p class="text-muted small" id="step-subtitle">Pick the platform your child uses — we'll walk you through connecting it safely.</p>
+                        <h4 class="fw-bold" id="step-title">{{ t('tpl.base.choose_a_device') }}</h4>
+                        <p class="text-muted small" id="step-subtitle">{{ t('tpl.base.pick_the_platform_your_child') }}</p>
                     </div>
 
                     <!-- STEP 1: Select Platform -->
@@ -460,36 +460,36 @@
                             <div class="col-sm-6 col-md-4">
                                 <div class="platform-card p-3 text-center h-100" onclick="selectPlatform('linux')">
                                     <div class="platform-icon text-primary"><i class="fab fa-linux"></i></div>
-                                    <h5 class="fw-bold mb-1">Linux PC</h5>
-                                    <span class="small text-muted">Ubuntu, Debian, Fedora, Arch</span>
+                                    <h5 class="fw-bold mb-1">{{ t('shell.platform_linux') }}</h5>
+                                    <span class="small text-muted">{{ t('shell.platform_linux_hint') }}</span>
                                 </div>
                             </div>
                             <div class="col-sm-6 col-md-4">
                                 <div class="platform-card p-3 text-center h-100" onclick="selectPlatform('android')">
                                     <div class="platform-icon text-success"><i class="fab fa-android"></i></div>
                                     <h5 class="fw-bold mb-1">Android</h5>
-                                    <span class="small text-muted">Phone, Tablet, Chromebook</span>
+                                    <span class="small text-muted">{{ t('shell.platform_android_hint') }}</span>
                                 </div>
                             </div>
                             <div class="col-sm-6 col-md-4">
                                 <div class="platform-card p-3 text-center h-100" onclick="selectPlatform('windows')">
                                     <div class="platform-icon text-info"><i class="fab fa-windows"></i></div>
-                                    <h5 class="fw-bold mb-1">Windows PC</h5>
-                                    <span class="small text-muted">Windows 10, 11 (64-bit)</span>
+                                    <h5 class="fw-bold mb-1">{{ t('shell.platform_windows') }}</h5>
+                                    <span class="small text-muted">{{ t('shell.platform_windows_hint') }}</span>
                                 </div>
                             </div>
                             <div class="col-sm-6 col-md-4">
                                  <div class="platform-card p-3 text-center h-100" onclick="selectPlatform('nintendo')">
                                      <div class="platform-icon text-warning"><i class="fas fa-gamepad"></i></div>
-                                     <h5 class="fw-bold mb-1">Nintendo Switch</h5>
-                                     <span class="small text-muted">Cloud Parental Controls</span>
+                                     <h5 class="fw-bold mb-1">{{ t('shell.platform_nintendo') }}</h5>
+                                     <span class="small text-muted">{{ t('shell.platform_nintendo_hint') }}</span>
                                  </div>
                             </div>
                             <div class="col-sm-6 col-md-4">
                                  <div class="platform-card p-3 text-center h-100" onclick="selectPlatform('xbox')">
                                      <div class="platform-icon text-danger"><i class="fab fa-xbox"></i></div>
-                                     <h5 class="fw-bold mb-1">Xbox Console</h5>
-                                     <span class="small text-muted">Cloud Parental Controls</span>
+                                     <h5 class="fw-bold mb-1">{{ t('shell.platform_xbox') }}</h5>
+                                     <span class="small text-muted">{{ t('shell.platform_nintendo_hint') }}</span>
                                  </div>
                             </div>
                         </div>
@@ -499,15 +499,15 @@
                     <div class="wizard-step-panel d-none" id="step-panel-2">
                         <!-- Linux Instructions -->
                         <div id="setup-instruction-linux" class="d-none">
-                            <p class="mb-3">On the Linux computer, open a terminal and run this one-line installer to connect Guardian:</p>
+                            <p class="mb-3">{{ t('shell.linux_setup_lead') }}</p>
                             <div class="position-relative mb-3">
                                 <pre class="guardian-code-block p-3 text-wrap font-monospace"
                                     style="font-size: 0.85rem;"
-                                    id="linux-install-cmd">curl -sSL http://yourserver/scripts/install-agent.sh | sudo bash -s -- --url ws://yourserver/ws</pre>
+                                    id="linux-install-cmd">{{ t('tpl.base.curl_ssl_httpyourserverscriptsinstall_agentsh_sudo') }}</pre>
                                 <button class="btn btn-sm btn-outline-light position-absolute top-0 end-0 m-2"
                                     onclick="copyLinuxCommand()">Copy</button>
                             </div>
-                            <p class="text-muted small"><i class="fas fa-info-circle me-1"></i>Guardian installs quietly in the background and starts a secure pairing handshake with this console.</p>
+                            <p class="text-muted small"><i class="fas fa-info-circle me-1"></i>{{ t('shell.linux_setup_hint') }}</p>
                         </div>
 
                         <!-- Android Instructions -->
@@ -516,12 +516,12 @@
                                 <li class="nav-item" role="presentation">
                                     <button class="nav-link active" id="qr-tab" data-bs-toggle="tab"
                                         data-bs-target="#qr-pane" type="button" role="tab" aria-controls="qr-pane"
-                                        aria-selected="true">Standard Pairing QR</button>
+                                        aria-selected="true">{{ t('shell.android_tab_standard') }}</button>
                                 </li>
                                 <li class="nav-item" role="presentation">
                                     <button class="nav-link" id="mdm-tab" data-bs-toggle="tab"
                                         data-bs-target="#mdm-pane" type="button" role="tab" aria-controls="mdm-pane"
-                                        aria-selected="false">MDM Provisioning QR</button>
+                                        aria-selected="false">{{ t('shell.android_tab_mdm') }}</button>
                                 </li>
                             </ul>
                             <div class="tab-content" id="androidTabContent">
@@ -529,7 +529,7 @@
                                     aria-labelledby="qr-tab">
                                     <p class="mb-2">Download the Guardian APK, open it on the child's Android device,
                                         and scan the QR code to connect:</p>
-                                    <img id="android-qr-img" src="" alt="Pairing QR"
+                                    <img id="android-qr-img" src="" alt="{{ t('shell.android_qr_alt') }}"
                                         class="img-fluid border rounded p-2 bg-white mb-2" style="max-height: 200px;">
                                     <div class="small"><code id="android-ws-url"></code></div>
                                 </div>
@@ -538,7 +538,7 @@
                                     <p class="mb-2">For a fresh setup, tap the welcome screen 6 times, scan the QR code
                                         below to enroll as Device Owner:</p>
                                     <div id="mdm-qr-container">
-                                        <img id="android-mdm-qr-img" src="" alt="MDM QR"
+                                        <img id="android-mdm-qr-img" src="" alt="{{ t('shell.android_mdm_alt') }}"
                                             class="img-fluid border rounded p-2 bg-white mb-2"
                                             style="max-height: 200px;">
                                     </div>
@@ -552,16 +552,16 @@
 
                         <!-- Windows Instructions -->
                         <div id="setup-instruction-windows" class="d-none">
-                            <p class="mb-3">On the Windows computer, open PowerShell as Administrator and paste this command to install Guardian:</p>
+                            <p class="mb-3">{{ t('shell.windows_setup_lead') }}</p>
                             <div class="position-relative mb-3">
-                                <pre class="guardian-code-block p-3 text-wrap font-monospace" id="windows-install-cmd">powershell -ExecutionPolicy Bypass -Command "..."</pre>
+                                <pre class="guardian-code-block p-3 text-wrap font-monospace" id="windows-install-cmd">{{ t('tpl.base.powershell_executionpolicy_bypass_command') }}</pre>
                                 <button class="btn btn-sm btn-outline-light position-absolute top-0 end-0 m-2" onclick="copyWindowsCommand()">Copy</button>
                             </div>
-                            <p class="mb-3">Alternatively, you can download the MSI installer package directly and run it:</p>
+                            <p class="mb-3">{{ t('tpl.base.alternatively_you_can_download_the') }}</p>
                             <div class="text-center mb-3">
-                                <a id="windows-download-link" href="#" class="btn btn-outline-primary fw-bold" download><i class="fas fa-download me-2"></i>Download MSI Installer</a>
+                                <a id="windows-download-link" href="#" class="btn btn-outline-primary fw-bold" download><i class="fas fa-download me-2"></i>{{ t('shell.windows_download_btn') }}</a>
                             </div>
-                            <p class="text-muted small"><i class="fas fa-info-circle me-1"></i>The installer registers the background monitoring service and configures autostart components for user sessions.</p>
+                            <p class="text-muted small"><i class="fas fa-info-circle me-1"></i>{{ t('shell.windows_setup_hint') }}</p>
                         </div>
 
                         <!-- Nintendo Instructions -->
@@ -569,21 +569,21 @@
                             <div id="nintendo-link-expired-alert" class="alert alert-warning py-2 small d-none mb-3 mx-auto" style="max-width: 500px;">
                                 Your Nintendo Account session has expired. Link again to continue adding consoles.
                             </div>
-                            <p class="mb-3">Link your Nintendo Account to enable console monitoring:</p>
+                            <p class="mb-3">{{ t('shell.nintendo_link_lead') }}</p>
                             <ol class="text-start mb-3 mx-auto" style="max-width: 500px;">
-                                <li>Click the button below to sign in to Nintendo.</li>
-                                <li>Log in, and on the final <b>"Select this person"</b> screen, right-click (or tap and hold) the button, copy its link address, and paste it below.</li>
+                                <li>{{ t('shell.nintendo_step1') }}</li>
+                                <li>{{ t('tpl.base.log_in_and_on_the') }} <b>{{ t('pages.settings.nintendo_step2_highlight') }}</b> {{ t('tpl.base.screen_right_click_or_tap') }}</li>
                             </ol>
                             <div class="text-center mb-3">
-                                <a href="#" id="nintendo-login-btn" target="_blank" class="btn btn-outline-primary fw-bold"><i class="fas fa-external-link-alt me-2"></i>Sign In to Nintendo Account</a>
+                                <a href="#" id="nintendo-login-btn" target="_blank" class="btn btn-outline-primary fw-bold"><i class="fas fa-external-link-alt me-2"></i>{{ t('shell.nintendo_sign_in') }}</a>
                             </div>
                             <div class="form-group text-start mx-auto mb-3" style="max-width: 500px;">
-                                <label for="nintendo-redirect-url" class="form-label fw-bold small text-muted">REDIRECT LINK ADDRESS</label>
-                                <input type="text" id="nintendo-redirect-url" class="form-control" placeholder="Paste npf... redirect URL here">
+                                <label for="nintendo-redirect-url" class="form-label fw-bold small text-muted">{{ t('shell.nintendo_redirect_label') }}</label>
+                                <input type="text" id="nintendo-redirect-url" class="form-control" placeholder="{{ t('shell.nintendo_redirect_placeholder') }}">
                             </div>
                             <div class="text-center mt-4">
                                 <button class="btn btn-secondary me-2" onclick="setWizardStep(1)">Back</button>
-                                <button class="btn btn-success" onclick="submitNintendoAuth()">Link Account &amp; Continue</button>
+                                <button class="btn btn-success" onclick="submitNintendoAuth()">{{ t('tpl.base.link_account_amp_continue') }}</button>
                             </div>
                         </div>
 
@@ -592,27 +592,27 @@
                             <div id="xbox-link-expired-alert" class="alert alert-warning py-2 small d-none mb-3 mx-auto" style="max-width: 500px;">
                                 Your Xbox Live/Microsoft session has expired. Link again to continue adding consoles.
                             </div>
-                            <p class="mb-3">Link your Microsoft Xbox Live Account to enable console monitoring:</p>
+                            <p class="mb-3">{{ t('shell.xbox_link_lead') }}</p>
                             <ol class="text-start mb-3 mx-auto" style="max-width: 500px;">
-                                <li>Click the button below to sign in to Microsoft Live.</li>
-                                <li>Log in, and on the final blank screen (after clicking Yes/Accept), copy the complete address/URL of the page, and paste it below.</li>
+                                <li>{{ t('shell.xbox_step1') }}</li>
+                                <li>{{ t('shell.xbox_step2') }}</li>
                             </ol>
                             <div class="text-center mb-3">
-                                <a href="#" id="xbox-login-btn" target="_blank" class="btn btn-outline-primary fw-bold"><i class="fas fa-external-link-alt me-2"></i>Sign In to Microsoft Account</a>
+                                <a href="#" id="xbox-login-btn" target="_blank" class="btn btn-outline-primary fw-bold"><i class="fas fa-external-link-alt me-2"></i>{{ t('shell.xbox_sign_in') }}</a>
                             </div>
                             <div class="form-group text-start mx-auto mb-3" style="max-width: 500px;">
-                                <label for="xbox-redirect-url" class="form-label fw-bold small text-muted">REDIRECT LINK ADDRESS</label>
-                                <input type="text" id="xbox-redirect-url" class="form-control" placeholder="Paste Microsoft redirect URL here">
+                                <label for="xbox-redirect-url" class="form-label fw-bold small text-muted">{{ t('shell.nintendo_redirect_label') }}</label>
+                                <input type="text" id="xbox-redirect-url" class="form-control" placeholder="{{ t('shell.xbox_redirect_placeholder') }}">
                             </div>
                             <div class="text-center mt-4">
                                 <button class="btn btn-secondary me-2" onclick="setWizardStep(1)">Back</button>
-                                <button class="btn btn-success" onclick="submitXboxAuth()">Link Account &amp; Continue</button>
+                                <button class="btn btn-success" onclick="submitXboxAuth()">{{ t('tpl.base.link_account_amp_continue') }}</button>
                             </div>
                         </div>
 
                         <div class="text-center mt-4" id="setup-standard-footer-btns">
                             <button class="btn btn-secondary me-2" onclick="setWizardStep(1)">Back</button>
-                            <button class="btn btn-primary" onclick="goToStep3()">I have run/scanned it</button>
+                            <button class="btn btn-primary" onclick="goToStep3()">{{ t('shell.wizard_ran_scanned') }}</button>
                         </div>
                     </div>
 
@@ -623,68 +623,68 @@
                                 role="status">
                                 <span class="visually-hidden">Loading...</span>
                             </div>
-                            <p class="lead">Scanning for new agent connections...</p>
+                            <p class="lead">{{ t('shell.wizard_scanning') }}</p>
                             <p class="text-muted small">Guardian is waiting for the device client to connect to the
                                 WebSocket hub. This usually takes a few seconds.</p>
                         </div>
 
                         <div id="detect-success" class="d-none">
                             <div class="text-success fs-1 mb-2"><i class="fas fa-check-circle"></i></div>
-                            <h5 class="fw-bold mb-3" id="detected-device-text">Device Connected!</h5>
+                            <h5 class="fw-bold mb-3" id="detected-device-text">{{ t('shell.wizard_device_connected') }}</h5>
 
                             <div class="form-group text-start mx-auto" style="max-width: 400px;">
                                 <label for="wizard-device-label" class="form-label fw-bold small text-muted">ASSIGN A
                                     DEVICE LABEL</label>
                                 <input type="text" id="wizard-device-label" class="form-control"
-                                    placeholder="e.g. Jordan's Laptop">
+                                    placeholder="{{ t('shell.wizard_new_profile_placeholder') }}'s Laptop">
                             </div>
 
                             <div class="text-center mt-4">
-                                <button class="btn btn-primary" onclick="goToStep4()">Approve &amp; Continue</button>
+                                <button class="btn btn-primary" onclick="goToStep4()">{{ t('tpl.base.approve_amp_continue') }}</button>
                             </div>
                         </div>
 
                         <!-- Nintendo Device Select Panel -->
                         <div id="nintendo-device-select-panel" class="d-none text-start mx-auto" style="max-width: 500px;">
                             <div class="text-success fs-1 mb-2 text-center"><i class="fas fa-gamepad"></i></div>
-                            <h5 class="fw-bold mb-3 text-center">Nintendo Console Found</h5>
+                            <h5 class="fw-bold mb-3 text-center">{{ t('shell.wizard_nintendo_found') }}</h5>
                             
                             <div class="form-group mb-3">
-                                <label for="wizard-nintendo-device-select" class="form-label fw-bold small text-muted">SELECT SWITCH CONSOLE</label>
+                                <label for="wizard-nintendo-device-select" class="form-label fw-bold small text-muted">{{ t('shell.wizard_nintendo_select') }}</label>
                                 <select id="wizard-nintendo-device-select" class="form-select" onchange="onNintendoConsoleChange()">
                                     <!-- Will populate with Switch devices -->
                                 </select>
                             </div>
 
                             <div class="form-group mb-3">
-                                <label for="wizard-nintendo-device-label" class="form-label fw-bold small text-muted">ASSIGN A DEVICE LABEL</label>
-                                <input type="text" id="wizard-nintendo-device-label" class="form-control" placeholder="e.g. Living Room Switch">
+                                <label for="wizard-nintendo-device-label" class="form-label fw-bold small text-muted">{{ t('shell.wizard_nintendo_label') }}</label>
+                                <input type="text" id="wizard-nintendo-device-label" class="form-control" placeholder="{{ t('shell.wizard_nintendo_placeholder') }}">
                             </div>
 
                             <div class="text-center mt-4">
-                                <button class="btn btn-primary" onclick="importNintendoDevice()">Link Console &amp; Continue</button>
+                                <button class="btn btn-primary" onclick="importNintendoDevice()">{{ t('tpl.base.link_console_amp_continue') }}</button>
                             </div>
                         </div>
 
                         <!-- Xbox Device Select Panel -->
                         <div id="xbox-device-select-panel" class="d-none text-start mx-auto" style="max-width: 500px;">
                             <div class="text-danger fs-1 mb-2 text-center"><i class="fab fa-xbox"></i></div>
-                            <h5 class="fw-bold mb-3 text-center">Xbox Console Found</h5>
+                            <h5 class="fw-bold mb-3 text-center">{{ t('shell.wizard_xbox_found') }}</h5>
                             
                             <div class="form-group mb-3">
-                                <label for="wizard-xbox-device-select" class="form-label fw-bold small text-muted">SELECT XBOX CONSOLE</label>
+                                <label for="wizard-xbox-device-select" class="form-label fw-bold small text-muted">{{ t('shell.wizard_xbox_select') }}</label>
                                 <select id="wizard-xbox-device-select" class="form-select" onchange="onXboxConsoleChange()">
                                     <!-- Will populate with Xbox devices -->
                                 </select>
                             </div>
 
                             <div class="form-group mb-3">
-                                <label for="wizard-xbox-device-label" class="form-label fw-bold small text-muted">ASSIGN A DEVICE LABEL</label>
-                                <input type="text" id="wizard-xbox-device-label" class="form-control" placeholder="e.g. Family Room Xbox">
+                                <label for="wizard-xbox-device-label" class="form-label fw-bold small text-muted">{{ t('shell.wizard_nintendo_label') }}</label>
+                                <input type="text" id="wizard-xbox-device-label" class="form-control" placeholder="{{ t('shell.wizard_xbox_placeholder') }}">
                             </div>
 
                             <div class="text-center mt-4">
-                                <button class="btn btn-primary" onclick="importXboxDevice()">Link Console &amp; Continue</button>
+                                <button class="btn btn-primary" onclick="importXboxDevice()">{{ t('tpl.base.link_console_amp_continue') }}</button>
                             </div>
                         </div>
                     </div>
@@ -705,7 +705,7 @@
                                 <label for="wizard-user-select" class="form-label fw-bold small text-muted">SELECT CHILD
                                     PROFILE</label>
                                 <select id="wizard-user-select" class="form-select">
-                                    <option value="" disabled selected>Select child account</option>
+                                    <option value="" disabled selected>{{ t('shell.wizard_select_child') }}</option>
                                 </select>
                             </div>
 
@@ -714,7 +714,7 @@
                                 <label for="wizard-user-input" class="form-label fw-bold small text-muted">NEW CHILD
                                     PROFILE NAME</label>
                                 <input type="text" id="wizard-user-input" class="form-control"
-                                    placeholder="e.g. Jordan">
+                                    placeholder="{{ t('shell.wizard_new_profile_placeholder') }}">
                             </div>
 
                             <div class="text-center mt-4">
@@ -735,14 +735,14 @@
                                     locked under this profile:</p>
                                 <div class="form-group mb-3">
                                     <label for="wizard-linux-user-select" class="form-label fw-bold small text-muted"
-                                        id="wizard-user-select-label">LOCAL OS USERNAME</label>
+                                        id="wizard-user-select-label">{{ t('shell.wizard_local_username') }}</label>
                                     <select id="wizard-linux-user-select" class="form-select">
                                         <!-- Will populate dynamically -->
                                     </select>
                                 </div>
                                 <div class="form-group mb-3">
                                     <label for="wizard-linux-uid" class="form-label fw-bold small text-muted"
-                                        id="wizard-uid-label">LINUX UID (OPTIONAL)</label>
+                                        id="wizard-uid-label">{{ t('shell.wizard_linux_uid') }}</label>
                                     <input type="text" id="wizard-linux-uid" class="form-control"
                                         placeholder="e.g. 1000">
                                 </div>
@@ -767,7 +767,7 @@
                 <path
                     d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zm-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.061L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z" />
             </svg>
-            <span class="toast-message">Changes saved successfully!</span>
+            <span class="toast-message">{{ t('shell.toast_saved') }}</span>
         </div>
     </div>
 

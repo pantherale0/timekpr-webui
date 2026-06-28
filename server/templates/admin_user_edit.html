@@ -10,7 +10,7 @@
     <button type="button" class="segmented-tab-btn" data-tab-target="#computer-tab">{{ t('pages.admin_user_edit.tab_computer') }}</button>
     <button type="button" class="segmented-tab-btn" data-tab-target="#family-tab">{{ t('pages.admin_user_edit.tab_family') }}</button>
     <button type="button" class="segmented-tab-btn" data-tab-target="#apps-tab">{{ t('pages.admin_user_edit.tab_apps') }}</button>
-    <button type="button" class="segmented-tab-btn" data-tab-target="#share-tab">Share Profile</button>
+    <button type="button" class="segmented-tab-btn" data-tab-target="#share-tab">{{ t('tpl.admin_user_edit.share_profile') }}</button>
 </div>
 {% endmacro %}
 
@@ -244,7 +244,7 @@
                                              <div class="p-3 bg-light-subtle rounded border border-warning-subtle small">
                                                  <div class="d-flex align-items-center gap-2 mb-2">
                                                      <i class="fas fa-shield-alt text-success"></i>
-                                                     <span class="fw-bold text-success-emphasis">Active Protection Guarded</span>
+                                                     <span class="fw-bold text-success-emphasis">{{ t('tpl.admin_user_edit.active_protection_guarded') }}</span>
                                                  </div>
                                                  <p class="text-secondary mb-2" style="font-size: 0.8rem;">
                                                      Your child is still fully protected on this device. The existing browsing shields and limits remain active in the background.
@@ -476,23 +476,23 @@
                                         {% endif %}
                                         <hr class="my-2">
                                         <div class="mb-2">
-                                            <label class="form-label fw-bold small text-muted text-uppercase mb-1" style="font-size: 0.7rem;">AI Policy Mode</label>
+                                            <label class="form-label fw-bold small text-muted text-uppercase mb-1" style="font-size: 0.7rem;">{{ t('tpl.admin_user_edit.ai_policy_mode') }}</label>
                                             <select class="form-select form-select-sm approval-ai-mode" data-mapping-id="{{ mapping.id }}">
-                                                <option value="off" {% if settings.ai_policy_mode == 'off' or not settings.ai_policy_mode %}selected{% endif %}>Off / Allow</option>
-                                                <option value="block" {% if settings.ai_policy_mode == 'block' %}selected{% endif %}>Block AI Services</option>
-                                                <option value="monitor" {% if settings.ai_policy_mode == 'monitor' %}selected{% endif %}>Monitor & Log Prompts</option>
-                                                <option value="approve" {% if settings.ai_policy_mode == 'approve' %}selected{% endif %}>Require Approval</option>
+                                                <option value="off" {% if settings.ai_policy_mode == 'off' or not settings.ai_policy_mode %}selected{% endif %}>{{ t('tpl.admin_user_edit.off_allow') }}</option>
+                                                <option value="block" {% if settings.ai_policy_mode == 'block' %}selected{% endif %}>{{ t('tpl.admin_user_edit.block_ai_services') }}</option>
+                                                <option value="monitor" {% if settings.ai_policy_mode == 'monitor' %}selected{% endif %}>{{ t('tpl.admin_user_edit.monitor_log_prompts') }}</option>
+                                                <option value="approve" {% if settings.ai_policy_mode == 'approve' %}selected{% endif %}>{{ t('tpl.admin_user_edit.require_approval') }}</option>
                                             </select>
                                         </div>
                                         <div class="mb-2 approval-ai-logging-section {% if settings.ai_policy_mode == 'off' or settings.ai_policy_mode == 'block' or not settings.ai_policy_mode %}d-none{% endif %}" id="ai-logging-section-{{ mapping.id }}">
-                                            <label class="form-label fw-bold small text-muted text-uppercase mb-1" style="font-size: 0.7rem;">Prompt Logging</label>
+                                            <label class="form-label fw-bold small text-muted text-uppercase mb-1" style="font-size: 0.7rem;">{{ t('tpl.admin_user_edit.prompt_logging') }}</label>
                                             <select class="form-select form-select-sm approval-ai-logging" data-mapping-id="{{ mapping.id }}">
-                                                <option value="metadata_only" {% if settings.ai_prompt_logging == 'metadata_only' or not settings.ai_prompt_logging %}selected{% endif %}>Metadata Only (Length & Service)</option>
-                                                <option value="full_text" {% if settings.ai_prompt_logging == 'full_text' %}selected{% endif %}>Full Text (Logs Prompts)</option>
+                                                <option value="metadata_only" {% if settings.ai_prompt_logging == 'metadata_only' or not settings.ai_prompt_logging %}selected{% endif %}>{{ t('tpl.admin_user_edit.metadata_only_length_service') }}</option>
+                                                <option value="full_text" {% if settings.ai_prompt_logging == 'full_text' %}selected{% endif %}>{{ t('tpl.admin_user_edit.full_text_logs_prompts') }}</option>
                                             </select>
                                         </div>
                                         <div class="mb-0 approval-ai-limit-section {% if settings.ai_policy_mode == 'block' %}d-none{% endif %}" id="ai-limit-section-{{ mapping.id }}">
-                                            <label class="form-label fw-bold small text-muted text-uppercase mb-1" style="font-size: 0.7rem;">Daily AI Limit (Minutes)</label>
+                                            <label class="form-label fw-bold small text-muted text-uppercase mb-1" style="font-size: 0.7rem;">{{ t('tpl.admin_user_edit.daily_ai_limit_minutes') }}</label>
                                             <input type="number" min="0" placeholder="Unlimited" class="form-control form-control-sm approval-ai-limit" data-mapping-id="{{ mapping.id }}" value="{{ settings.ai_daily_time_limit or '' }}">
                                         </div>
                                     </div>
@@ -665,10 +665,10 @@
             <div class="col-12 col-lg-7">
                 <div class="card border shadow-sm">
                     <div class="card-header guardian-card-header py-3">
-                        <h5 class="mb-0 fw-bold"><i class="fas fa-users me-2 guardian-section-icon"></i>Active Profile Shares</h5>
+                        <h5 class="mb-0 fw-bold"><i class="fas fa-users me-2 guardian-section-icon"></i>{{ t('tpl.admin_user_edit.active_profile_shares') }}</h5>
                     </div>
                     <div class="card-body p-4">
-                        <p class="text-secondary small fw-medium mb-3">Other parents or guardians who currently have granular access to {{ user.username }}'s profile.</p>
+                        <p class="text-secondary small fw-medium mb-3">{{ t('tpl.admin_user_edit.other_parents_or_guardians', username=user.username) }}</p>
                         {% if shares %}
                             <div class="d-flex flex-column gap-3">
                                 {% for share in shares %}
@@ -695,7 +695,7 @@
                                 {% endfor %}
                             </div>
                         {% else %}
-                            <p class="text-secondary mb-0 small fw-medium text-center py-4"><i class="fas fa-info-circle me-1"></i>This profile is not currently shared with anyone.</p>
+                            <p class="text-secondary mb-0 small fw-medium text-center py-4"><i class="fas fa-info-circle me-1"></i>{{ t('tpl.admin_user_edit.this_profile_is_not_currently') }}</p>
                         {% endif %}
                     </div>
                 </div>
@@ -705,14 +705,14 @@
             <div class="col-12 col-lg-5">
                 <div class="card border shadow-sm">
                     <div class="card-header guardian-card-header py-3">
-                        <h5 class="mb-0 fw-bold"><i class="fas fa-user-plus me-2 guardian-section-icon"></i>Generate Share Invite</h5>
+                        <h5 class="mb-0 fw-bold"><i class="fas fa-user-plus me-2 guardian-section-icon"></i>{{ t('tpl.admin_user_edit.generate_share_invite') }}</h5>
                     </div>
                     <div class="card-body p-4">
-                        <p class="text-secondary small fw-medium mb-3">Invite a co-parent or guardian to manage or view this profile.</p>
+                        <p class="text-secondary small fw-medium mb-3">{{ t('tpl.admin_user_edit.invite_a_co_parent_or') }}</p>
                         
                         <!-- Role Presets -->
                         <div class="mb-3">
-                            <label class="form-label fw-bold small text-muted text-uppercase mb-2" style="font-size: 0.7rem;">Role Preset</label>
+                            <label class="form-label fw-bold small text-muted text-uppercase mb-2" style="font-size: 0.7rem;">{{ t('tpl.admin_user_edit.role_preset') }}</label>
                             <div class="d-flex gap-2">
                                 <button type="button" class="btn btn-outline-secondary btn-sm flex-grow-1" onclick="applyPresetRole('viewer')">Viewer</button>
                                 <button type="button" class="btn btn-outline-secondary btn-sm flex-grow-1" onclick="applyPresetRole('manager')">Manager</button>
@@ -722,23 +722,23 @@
 
                         <!-- Scopes -->
                         <div class="mb-4">
-                            <label class="form-label fw-bold small text-muted text-uppercase mb-2" style="font-size: 0.7rem;">Granular Permissions</label>
+                            <label class="form-label fw-bold small text-muted text-uppercase mb-2" style="font-size: 0.7rem;">{{ t('tpl.admin_user_edit.granular_permissions') }}</label>
                             <div class="d-flex flex-column gap-2">
                                 <div class="form-check">
                                     <input class="form-check-input" type="checkbox" id="share-can-view-screentime" checked disabled>
-                                    <label class="form-check-label small" for="share-can-view-screentime">View Screen Time</label>
+                                    <label class="form-check-label small" for="share-can-view-screentime">{{ t('tpl.admin_user_edit.view_screen_time') }}</label>
                                 </div>
                                 <div class="form-check">
                                     <input class="form-check-input" type="checkbox" id="share-can-manage-screentime">
-                                    <label class="form-check-label small" for="share-can-manage-screentime">Manage Screen Time (Adjust Limits, Pause)</label>
+                                    <label class="form-check-label small" for="share-can-manage-screentime">{{ t('tpl.admin_user_edit.manage_screen_time_adjust_limits') }}</label>
                                 </div>
                                 <div class="form-check">
                                     <input class="form-check-input" type="checkbox" id="share-can-view-monitoring">
-                                    <label class="form-check-label small" for="share-can-view-monitoring">View Monitoring (History, Stats)</label>
+                                    <label class="form-check-label small" for="share-can-view-monitoring">{{ t('tpl.admin_user_edit.view_monitoring_history_stats') }}</label>
                                 </div>
                                 <div class="form-check">
                                     <input class="form-check-input" type="checkbox" id="share-can-manage-policies">
-                                    <label class="form-check-label small" for="share-can-manage-policies">Manage Policies (Blocklists, Apps)</label>
+                                    <label class="form-check-label small" for="share-can-manage-policies">{{ t('tpl.admin_user_edit.manage_policies_blocklists_apps') }}</label>
                                 </div>
                             </div>
                         </div>
@@ -752,14 +752,14 @@
 
                         <!-- Result Input -->
                         <div class="d-none" id="share-result-container">
-                            <label class="form-label fw-bold small text-muted text-uppercase mb-1" style="font-size: 0.7rem;">Copy Invite Link</label>
+                            <label class="form-label fw-bold small text-muted text-uppercase mb-1" style="font-size: 0.7rem;">{{ t('tpl.admin_user_edit.copy_invite_link') }}</label>
                             <div class="input-group">
                                 <input type="text" id="share-invite-link" class="form-control form-control-sm font-mono text-center" readonly style="font-size: 0.75rem;">
                                 <button class="btn btn-sm btn-outline-secondary" type="button" onclick="copyInviteLinkToClipboard()">
                                     <i class="fas fa-copy"></i>
                                 </button>
                             </div>
-                            <div class="form-text small text-emerald-600 mt-1"><i class="fas fa-clock me-1"></i>Link will expire in 48 hours.</div>
+                            <div class="form-text small text-emerald-600 mt-1"><i class="fas fa-clock me-1"></i>{{ t('tpl.admin_user_edit.link_will_expire_in_48') }}</div>
                         </div>
                     </div>
                 </div>

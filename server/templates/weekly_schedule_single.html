@@ -72,7 +72,7 @@
     </div>
 
     {% if schedule %}
-    <section class="mb-4" aria-label="Weekly summary metrics">
+    <section class="mb-4" aria-label="{{ t('pages.weekly_schedule_single.weekly_summary') }}">
         <h2 class="guardian-wizard-section-title mb-3">{{ t('pages.weekly_schedule_single.weekly_summary') }}</h2>
         <div class="row g-3">
             <div class="col-12 col-md-4">
@@ -98,7 +98,7 @@
     {% endif %}
 
     <!-- 2. Intent-Based Quick Batch Actions -->
-    <section class="card guardian-routine-wizard shadow-sm mb-4" aria-label="Routine wizard strip">
+    <section class="card guardian-routine-wizard shadow-sm mb-4" aria-label="{{ t('pages.weekly_schedule_single.routine_wizard') }}">
         <div class="card-header py-3">
             <h2 class="h5 fw-bold mb-0"><i class="fas fa-magic me-2 text-primary"></i>{{ t('pages.weekly_schedule_single.routine_wizard') }}</h2>
             <p class="small text-secondary mb-0 mt-1">{{ t('pages.weekly_schedule_single.wizard_lead') }}</p>
@@ -111,7 +111,7 @@
                         <span class="small fw-bold text-muted">0.0h</span>
                         <input type="range" id="bulk-hours-slider" min="0" max="48" step="1"
                             value="{% if schedule %}{{ (schedule['monday'] * 2) | int }}{% else %}4{% endif %}"
-                            aria-label="Bulk daily hours">
+                            aria-label="{{ t('tpl.weekly_schedule_single.bulk_daily_hours') }}">
                         <span class="small fw-bold text-muted">24h</span>
                         <span class="guardian-hours-display" id="bulk-hours-display">2.0h</span>
                     </div>
@@ -128,8 +128,8 @@
                     <div class="guardian-dual-range-wrap">
                         <div class="guardian-dual-range-track" id="bulk-window-track">
                             <div class="guardian-dual-range-fill" id="bulk-window-fill"></div>
-                            <button type="button" class="guardian-dual-handle" id="bulk-window-handle-start" aria-label="Allowed window start"></button>
-                            <button type="button" class="guardian-dual-handle" id="bulk-window-handle-end" aria-label="Allowed window end"></button>
+                            <button type="button" class="guardian-dual-handle" id="bulk-window-handle-start" aria-label="{{ t('tpl.weekly_schedule_single.allowed_window_start') }}"></button>
+                            <button type="button" class="guardian-dual-handle" id="bulk-window-handle-end" aria-label="{{ t('tpl.weekly_schedule_single.allowed_window_end') }}"></button>
                         </div>
                     </div>
                     <p class="guardian-window-hint mb-3" id="bulk-window-hint"></p>

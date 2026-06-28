@@ -195,7 +195,7 @@
                             <div>
                                 <div class="fw-bold fs-5 text-body">
                                     {{ mapping.managed_user.username }}
-                                    <span class="text-secondary fw-semibold">&rarr;</span>
+                                    <span class="text-secondary fw-semibold">&rarr;</span> {# noqa: i18n #}
                                     {% if device.platform == 'nintendo' or device.platform == 'xbox' %}
                                     {{ mapped_player.nickname if mapped_player else mapping.linux_username }}
                                     {% else %}

@@ -11,13 +11,13 @@
 
     function friendlyPackName(id, presetNameById) {
         const names = {
-            malware_phishing: 'Malware & phishing shields',
-            adult_explicit: 'Adult & explicit content',
-            gambling: 'Gambling sites',
-            social_media: 'Social networks',
-            fake_news: 'Misleading news sources',
-            vpn_proxy_bypass: 'Anti-Bypass Watching (VPN & proxy)',
-            ai_chat: 'AI chat assistants',
+            malware_phishing: i18n('guardian-wizard.malware_phishing_shields'),
+            adult_explicit: i18n('guardian-wizard.adult_explicit_content'),
+            gambling: i18n('guardian-wizard.gambling_sites'),
+            social_media: i18n('guardian-wizard.social_networks'),
+            fake_news: i18n('guardian-wizard.misleading_news_sources'),
+            vpn_proxy_bypass: i18n('guardian-wizard.anti_bypass_watching_vpn_proxy'),
+            ai_chat: i18n('guardian-wizard.ai_chat_assistants'),
         };
         return names[id] || presetNameById[id] || id;
     }

@@ -17,21 +17,21 @@
                         <div class="d-flex flex-wrap gap-2 mb-3">
                             {% if device.platform == 'nintendo' %}
                                 {% if agent_online %}
-                                <span class="badge bg-success-subtle text-success border border-success-subtle">Console Active</span>
+                                <span class="badge bg-success-subtle text-success border border-success-subtle">{{ t('pages.device_detail.console_active') }}</span>
                                 {% else %}
-                                <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle">Console Inactive</span>
+                                <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle">{{ t('pages.device_detail.console_inactive') }}</span>
                                 {% endif %}
-                                <span class="badge bg-warning-subtle text-warning border border-warning-subtle">Cloud Sync</span>
+                                <span class="badge bg-warning-subtle text-warning border border-warning-subtle">{{ t('pages.device_detail.cloud_sync') }}</span>
                             {% else %}
                                 {% if agent_online %}
-                                <span class="badge bg-success-subtle text-success border border-success-subtle">Agent online</span>
+                                <span class="badge bg-success-subtle text-success border border-success-subtle">{{ t('pages.device_detail.agent_online') }}</span>
                                 {% else %}
-                                <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle">Agent offline</span>
+                                <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle">{{ t('pages.device_detail.agent_offline') }}</span>
                                 {% endif %}
                                 {% if fcm_available %}
-                                <span class="badge bg-primary-subtle text-primary border border-primary-subtle">FCM available</span>
+                                <span class="badge bg-primary-subtle text-primary border border-primary-subtle">{{ t('pages.device_detail.fcm_available') }}</span>
                                 {% else %}
-                                <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle">No FCM token</span>
+                                <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle">{{ t('pages.device_detail.no_fcm') }}</span>
                                 {% endif %}
                             {% endif %}
                         </div>
@@ -50,7 +50,7 @@
                         {% if device.platform == 'android' %}
                         <hr>
                         <p class="small text-secondary mb-3">
-                            <strong>Factory reset</strong> erases this Android device and removes Guardian management.
+                            <strong>{{ t('tpl.device_detail.advanced.factory_reset') }}</strong> erases this Android device and removes Guardian management.
                             All personal data on the device will be deleted. This cannot be undone.
                             Requires device-owner provisioning.
                         </p>
@@ -130,7 +130,7 @@
                                 <li>{{ t('pages.device_detail.adb_step_run_command') }}</li>
                             </ol>
                             <div class="p-3 border rounded bg-body-secondary mb-3">
-                                <code class="d-block text-break font-monospace small" style="user-select: all;">adb shell dpm set-device-owner com.timekpr.agent/.admin.TimeKprDeviceAdminReceiver</code>
+                                <code class="d-block text-break font-monospace small" style="user-select: all;">{{ t('tpl.device_detail.advanced.adb_shell_dpm_set_device') }}</code>
                             </div>
                             <p class="small text-secondary mb-0">
                                 <i class="fas fa-info-circle me-1 text-primary"></i> {{ t('pages.device_detail.adb_restart_note') }}
@@ -196,13 +196,13 @@ adb reboot</pre>
                         <div class="d-flex gap-2 mb-3 flex-wrap align-items-center justify-content-between">
                             <div class="d-flex gap-2 flex-wrap flex-grow-1">
                                 <input type="text" id="alert-search-input" class="form-control form-control-sm"
-                                    placeholder="Search events, details..." style="max-width: 250px;">
+                                    placeholder="{{ t('tpl.device_detail.advanced.search_events_details') }}" style="max-width: 250px;">
                                 <select id="alert-type-filter" class="form-select form-select-sm" style="max-width: 180px;">
-                                    <option value="">All Event Types</option>
+                                    <option value="">{{ t('tpl.device_detail.advanced.all_event_types') }}</option>
                                 </select>
                                 <select id="alert-sort-by" class="form-select form-select-sm" style="max-width: 140px;">
-                                    <option value="date">Sort by Date</option>
-                                    <option value="type">Sort by Type</option>
+                                    <option value="date">{{ t('tpl.device_detail.advanced.sort_by_date') }}</option>
+                                    <option value="type">{{ t('tpl.device_detail.advanced.sort_by_type') }}</option>
                                 </select>
                                 <select id="alert-sort-dir" class="form-select form-select-sm" style="max-width: 100px;">
                                     <option value="desc">Desc</option>
@@ -217,9 +217,9 @@ adb reboot</pre>
 
                         <div id="alerts-loading" class="text-center py-5" style="display: none;">
                             <div class="spinner-border text-primary" role="status">
-                                <span class="visually-hidden">Loading alert history...</span>
+                                <span class="visually-hidden">{{ t('tpl.device_detail.advanced.loading_alert_history') }}</span>
                             </div>
-                            <p class="text-muted mt-2 mb-0">Loading alert history...</p>
+                            <p class="text-muted mt-2 mb-0">{{ t('tpl.device_detail.advanced.loading_alert_history') }}</p>
                         </div>
 
                         <div id="alerts-table-container" class="table-responsive" style="display: none;">
@@ -227,15 +227,15 @@ adb reboot</pre>
                                 <thead>
                                     <tr class="table-light">
                                         <th class="ps-3 text-secondary fw-bold"
-                                            style="font-size: 0.75rem; text-transform: uppercase;">Date &amp; Time</th>
+                                            style="font-size: 0.75rem; text-transform: uppercase;">{{ t('tpl.device_detail.advanced.date_amp_time') }}</th>
                                         <th class="text-secondary fw-bold"
-                                            style="font-size: 0.75rem; text-transform: uppercase;">Event Type</th>
+                                            style="font-size: 0.75rem; text-transform: uppercase;">{{ t('tpl.device_detail.advanced.event_type') }}</th>
                                         <th class="text-secondary fw-bold"
                                             style="font-size: 0.75rem; text-transform: uppercase;">Scope</th>
                                         <th class="text-secondary fw-bold"
-                                            style="font-size: 0.75rem; text-transform: uppercase;">Delivery Status</th>
+                                            style="font-size: 0.75rem; text-transform: uppercase;">{{ t('tpl.device_detail.advanced.delivery_status') }}</th>
                                         <th class="pe-3 text-secondary fw-bold"
-                                            style="font-size: 0.75rem; text-transform: uppercase;">Diagnostic Details</th>
+                                            style="font-size: 0.75rem; text-transform: uppercase;">{{ t('tpl.device_detail.advanced.diagnostic_details') }}</th>
                                     </tr>
                                 </thead>
                                 <tbody id="alerts-tbody">
@@ -250,7 +250,7 @@ adb reboot</pre>
                             </svg>
                             <h6 class="empty-state-title">{{ t('pages.device_detail.no_audit_title') }}</h6>
                             <p class="empty-state-desc">{{ t('pages.device_detail.no_audit_desc') }}</p>
-                            <p class="empty-state-desc">This client is connection-healthy. No connection diagnostic alerts match your filters.</p>
+                            <p class="empty-state-desc">{{ t('tpl.device_detail.advanced.this_client_is_connection_healthy') }}</p>
                         </div>
 
                         <div id="alerts-pagination"
