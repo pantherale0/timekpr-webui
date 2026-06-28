@@ -255,6 +255,114 @@ jobs:
             dist/guardian-agent-${{ matrix.target }}.tar.gz
             dist/guardian-agent-${{ matrix.target }}.tar.gz.sha256
 
+  # Build the CEF overlay helper for x86_64 Linux.
+  #
+  # CEF (Chromium Embedded Framework) prebuilt binaries are only available for
+  # x86_64 at version 149; there are no aarch64 Linux prebuilts.  The cef-rs
+  # build.rs downloads the prebuilt CEF archive automatically during the build.
+  # `bundle-cef-app` then collects the compiled binary and all required CEF
+  # runtime files (libcef.so, locales/, Resources/, etc.) into a single
+  # directory that can be archived and distributed.
+  linux-cef-release-build:
+    needs: i18n
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Bundle agent i18n artifacts
+        run: |
+          python -m pip install --disable-pip-version-check PyYAML
+          python scripts/i18n/manage.py bundle --target agent
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          # CEF requires these X11/graphics libraries to link against at build time.
+          sudo apt-get install -y \
+            libdbus-1-dev pkg-config \
+            libx11-dev libxcomposite-dev libxcursor-dev libxdamage-dev \
+            libxext-dev libxfixes-dev libxi-dev libxrandr-dev libxrender-dev \
+            libxss-dev libxtst-dev \
+            libatk1.0-dev libatk-bridge2.0-dev libcups2-dev libdrm-dev \
+            libgbm-dev libnss3-dev
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "agent -> target"
+          # Key the cache on the cef-overlay feature so it stays independent
+          # of the standard agent build cache.
+          key: cef-overlay
+
+      - name: Cache CEF prebuilt download
+        uses: actions/cache@v4
+        with:
+          # cef-dll-sys downloads and extracts the CEF prebuilt archive into
+          # CEF_PATH when it is not already populated. Caching this directory
+          # avoids the ~200 MB re-download on every run.
+          path: ~/.local/share/cef
+          key: cef-prebuilt-v149-${{ runner.os }}
+
+      - name: Build guardian-overlay-helper
+        working-directory: agent
+        run: |
+          export GUARDIAN_AGENT_VERSION="${{ github.ref_name }}"
+          # CEF_PATH tells cef-dll-sys where to find (or download) the prebuilt
+          # CEF archive.  If the actions/cache step restored a warm cache this
+          # step completes without any network access.
+          export CEF_PATH="$HOME/.local/share/cef"
+          cargo build --release \
+            --bin guardian-overlay-helper \
+            --features cef-overlay
+
+      - name: Bundle CEF runtime
+        working-directory: agent
+        run: |
+          mkdir -p target/bundle
+          export CEF_PATH="$HOME/.local/share/cef"
+          # Copy the compiled overlay helper binary.
+          cp target/release/guardian-overlay-helper target/bundle/
+          # Copy all CEF runtime files from the cached/downloaded CEF directory.
+          # This includes libcef.so, libEGL.so, libGLESv2.so, chrome-sandbox,
+          # locales/, Resources/, and swiftshader/ (if present).
+          if [[ -d "$CEF_PATH" ]]; then
+            cp -r "$CEF_PATH/." target/bundle/
+          else
+            # Fall back to the cef OUT_DIR populated during the build step.
+            CEF_OUT_DIR="$(cargo metadata --no-deps --format-version 1 \
+              | python3 -c "import sys,json; m=json.load(sys.stdin); print(m['target_directory'])")/release/build"
+            CEF_DIR="$(find "$CEF_OUT_DIR" -maxdepth 3 -name 'libcef.so' -printf '%h\n' | head -1)"
+            [[ -n "$CEF_DIR" ]] || { echo "Error: could not locate libcef.so in build output"; exit 1; }
+            cp -r "${CEF_DIR}/." target/bundle/
+          fi
+
+      - name: Package overlay asset
+        run: |
+          mkdir -p dist
+          # The bundle directory contains the binary + all CEF runtime files.
+          tar -czf "dist/guardian-overlay-x86_64-unknown-linux-gnu.tar.gz" \
+            -C agent/target/bundle \
+            .
+
+      - name: Generate SHA-256 checksum
+        run: |
+          sha256sum "dist/guardian-overlay-x86_64-unknown-linux-gnu.tar.gz" \
+            | awk '{print $1}' \
+            > "dist/guardian-overlay-x86_64-unknown-linux-gnu.tar.gz.sha256"
+
+      - name: Upload packaged asset
+        uses: actions/upload-artifact@v4
+        with:
+          name: guardian-linux-overlay-x86_64
+          path: |
+            dist/guardian-overlay-x86_64-unknown-linux-gnu.tar.gz
+            dist/guardian-overlay-x86_64-unknown-linux-gnu.tar.gz.sha256
+
   windows-release-build:
     needs: i18n
     if: startsWith(github.ref, 'refs/tags/v')
@@ -513,7 +621,7 @@ jobs:
             dist/guardian-android-agent-${{ github.ref_name }}.signature-checksum
 
   publish-release:
-    needs: [linux-release-build, android-release-build, windows-release-build]
+    needs: [linux-release-build, linux-cef-release-build, android-release-build, windows-release-build]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
@@ -525,6 +633,12 @@ jobs:
           pattern: "*-agent-*"
           path: dist
           merge-multiple: true
+
+      - name: Download overlay asset
+        uses: actions/download-artifact@v4
+        with:
+          name: guardian-linux-overlay-x86_64
+          path: dist
 
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v2

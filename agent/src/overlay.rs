@@ -7,8 +7,43 @@
 ///
 /// The helper binary uses CEF (Chromium Embedded Framework) for a kiosk overlay.
 /// Build with: `cargo build --bin guardian-overlay-helper --features cef-overlay`
+use std::path::PathBuf;
 use std::process::{Child, Command};
 use std::sync::Mutex;
+
+const HELPER_NAME: &str = "guardian-overlay-helper";
+
+/// Locate the `guardian-overlay-helper` binary.
+///
+/// Preference order:
+/// 1. Same directory as the running `guardian-agent` executable (the standard
+///    install layout where both binaries sit in `/usr/local/bin`).
+/// 2. Bare name — resolved via `$PATH` as a fallback for non-standard setups.
+///
+/// Returns `None` when the companion binary is definitely not present so the
+/// caller can emit a clear "not installed" message instead of an OS error.
+fn find_helper() -> Option<PathBuf> {
+    // Try sibling of the running executable first.
+    if let Ok(mut exe) = std::env::current_exe() {
+        exe.pop();
+        exe.push(HELPER_NAME);
+        if exe.is_file() {
+            return Some(exe);
+        }
+    }
+
+    // Fall back to PATH lookup.
+    if let Ok(path_var) = std::env::var("PATH") {
+        for dir in std::env::split_paths(&path_var) {
+            let candidate = dir.join(HELPER_NAME);
+            if candidate.is_file() {
+                return Some(candidate);
+            }
+        }
+    }
+
+    None
+}
 
 static OVERLAY_CHILD: Mutex<Option<Child>> = Mutex::new(None);
 
@@ -69,11 +104,20 @@ pub fn show(args: &serde_json::Value, username: &str) -> Result<String, String> 
     // Kill any existing overlay before launching a new one
     dismiss();
 
-    let child = Command::new("guardian-overlay-helper")
+    let helper_path = find_helper().ok_or_else(|| {
+        format!(
+            "{HELPER_NAME} is not installed. \
+             Install the CEF overlay helper alongside the guardian-agent binary \
+             (e.g. /usr/local/bin/{HELPER_NAME}) or build it with: \
+             cargo build --release --bin {HELPER_NAME} --features cef-overlay"
+        )
+    })?;
+
+    let child = Command::new(&helper_path)
         .arg(&url)
         .arg(username)
         .spawn()
-        .map_err(|e| format!("Failed to spawn guardian-overlay-helper: {}", e))?;
+        .map_err(|e| format!("Failed to spawn {}: {}", helper_path.display(), e))?;
 
     let mut guard = OVERLAY_CHILD.lock().unwrap();
     *guard = Some(child);

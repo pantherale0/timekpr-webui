@@ -22,6 +22,7 @@ NO_START=0
 REPLACE_AGENT_TOKEN=0
 SECURITY_STACK_REBOOT_REQUIRED=0
 SECURITY_STACK_KERNEL_BUG_DETECTED=0
+WITH_OVERLAY=0
 
 usage() {
     cat <<'EOF'
@@ -44,6 +45,11 @@ Options:
   --replace-agent-token           Overwrite an existing config token
   --download-only                 Download and install the binary, but do not write config or service files
   --no-start                      Install and enable the service, but do not start/restart it
+  --with-overlay                  Also download and install the CEF overlay helper (x86_64 only).
+                                  Requires the guardian-overlay-x86_64-unknown-linux-gnu.tar.gz asset
+                                  to be present in the release. The CEF runtime is installed to
+                                  ${INSTALL_DIR}/guardian-overlay-cef/ and a launcher wrapper is
+                                  written to ${INSTALL_DIR}/guardian-overlay-helper.
   --help                          Show this help message
 
 Environment:
@@ -60,6 +66,7 @@ Notes:
   - The script expects release assets named:
       guardian-agent-x86_64-unknown-linux-gnu.tar.gz
       guardian-agent-aarch64-unknown-linux-gnu.tar.gz
+      guardian-overlay-x86_64-unknown-linux-gnu.tar.gz  (CEF overlay, optional)
 EOF
 }
 
@@ -380,6 +387,10 @@ while [[ $# -gt 0 ]]; do
             NO_START=1
             shift
             ;;
+        --with-overlay)
+            WITH_OVERLAY=1
+            shift
+            ;;
         --help|-h)
             usage
             exit 0
@@ -499,6 +510,78 @@ tar -xzf "$ARCHIVE_PATH" -C "$EXTRACT_DIR"
 install -d -m 0755 "$INSTALL_DIR"
 install -m 0755 "${EXTRACT_DIR}/guardian-agent" "${INSTALL_DIR}/guardian-agent"
 log "Installed binary to ${INSTALL_DIR}/guardian-agent"
+
+# ---------------------------------------------------------------------------
+# Optional CEF overlay helper (x86_64 Linux only, requires --with-overlay)
+# ---------------------------------------------------------------------------
+if [[ "$WITH_OVERLAY" -eq 1 ]]; then
+    OVERLAY_ASSET_NAME="guardian-overlay-${TARGET}.tar.gz"
+    OVERLAY_DOWNLOAD_URL="$(python3 - "$RELEASE_JSON" "$OVERLAY_ASSET_NAME" <<'PY'
+import json
+import sys
+with open(sys.argv[1], encoding="utf-8") as handle:
+    data = json.load(handle)
+asset_name = sys.argv[2]
+for asset in data.get("assets", []):
+    if asset.get("name") == asset_name:
+        print(asset.get("browser_download_url", ""))
+        break
+PY
+    )"
+
+    if [[ -z "$OVERLAY_DOWNLOAD_URL" ]]; then
+        warn "--with-overlay requested but release ${RELEASE_TAG_RESOLVED} does not contain ${OVERLAY_ASSET_NAME}."
+        warn "Overlay helper will not be installed. Build the CEF overlay on x86_64 first."
+    else
+        OVERLAY_ARCHIVE="${TMP_DIR}/${OVERLAY_ASSET_NAME}"
+        OVERLAY_EXTRACT_DIR="${TMP_DIR}/overlay-extract"
+        mkdir -p "$OVERLAY_EXTRACT_DIR"
+
+        log "Downloading ${OVERLAY_ASSET_NAME} from release ${RELEASE_TAG_RESOLVED}"
+        curl -fsSL "$OVERLAY_DOWNLOAD_URL" -o "$OVERLAY_ARCHIVE"
+
+        log "Extracting overlay archive"
+        tar -xzf "$OVERLAY_ARCHIVE" -C "$OVERLAY_EXTRACT_DIR"
+
+        [[ -f "${OVERLAY_EXTRACT_DIR}/guardian-overlay-helper" ]] || \
+            die "Overlay archive did not contain the guardian-overlay-helper binary"
+
+        # Install CEF runtime libraries into a dedicated subdirectory so they
+        # don't pollute the system library path.
+        CEF_RUNTIME_DIR="${INSTALL_DIR}/guardian-overlay-cef"
+        install -d -m 0755 "$CEF_RUNTIME_DIR"
+
+        # Copy every file from the archive except the main binary itself.
+        find "$OVERLAY_EXTRACT_DIR" -maxdepth 1 ! -name 'guardian-overlay-helper' \
+            -not -type d -exec install -m 0644 {} "$CEF_RUNTIME_DIR/" \;
+        # Preserve subdirectories (locales/, Resources/, swiftshader/) with their contents.
+        for d in "${OVERLAY_EXTRACT_DIR}"/*/; do
+            [[ -d "$d" ]] || continue
+            dir_name="$(basename "$d")"
+            install -d -m 0755 "${CEF_RUNTIME_DIR}/${dir_name}"
+            cp -r "${d}/." "${CEF_RUNTIME_DIR}/${dir_name}/"
+        done
+
+        # Write a thin launcher wrapper that sets LD_LIBRARY_PATH to the CEF
+        # runtime directory before exec-ing the real binary.  guardian-agent
+        # spawns this wrapper by name (guardian-overlay-helper) so find_helper()
+        # picks it up from the same directory.
+        install -d -m 0755 "$INSTALL_DIR"
+        cat > "${INSTALL_DIR}/guardian-overlay-helper" <<WRAPPER
+#!/usr/bin/env bash
+export LD_LIBRARY_PATH="${CEF_RUNTIME_DIR}\${LD_LIBRARY_PATH:+:\$LD_LIBRARY_PATH}"
+exec "${CEF_RUNTIME_DIR}/guardian-overlay-helper-bin" "\$@"
+WRAPPER
+        chmod 0755 "${INSTALL_DIR}/guardian-overlay-helper"
+
+        # Install the real binary under a private name inside the CEF dir.
+        install -m 0755 "${OVERLAY_EXTRACT_DIR}/guardian-overlay-helper" \
+            "${CEF_RUNTIME_DIR}/guardian-overlay-helper-bin"
+
+        log "Installed overlay helper to ${CEF_RUNTIME_DIR}/guardian-overlay-helper-bin"
+        log "Installed overlay launcher wrapper to ${INSTALL_DIR}/guardian-overlay-helper"
+    fi
+fi
 
 if [[ "$DOWNLOAD_ONLY" -eq 1 ]]; then
     log "Download-only mode requested; skipping config and systemd service setup"
