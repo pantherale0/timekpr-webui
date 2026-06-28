@@ -459,7 +459,7 @@ mod linux_impl {
                     // 1b. Linux device policy terminal blocking
                     if let Some(ref username) = username {
                         if !exe_path.is_empty()
-                            && linux_device_policy::check_terminal_exec_block(username, &exe_path).await
+                            && linux_device_policy::check_terminal_exec_block(username, &exe_path, &argv).await
                         {
                             println!("netlink: blocking terminal execution: user='{}', pid={}, comm='{}', exe='{}'", username, pid, comm, exe_path);
                             let _ = alert_tx.send(AppAlert {

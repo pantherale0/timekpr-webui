@@ -19,6 +19,10 @@ const SYSTEM_BINARY_PREFIXES: &[&str] = &[
     "/usr/sbin/",
     "/sbin/",
     "/usr/libexec/",
+    "/usr/lib/",
+    "/lib/",
+    "/usr/lib64/",
+    "/lib64/",
 ];
 
 #[cfg(target_os = "linux")]

@@ -127,7 +127,7 @@ pub async fn clear_on_unenroll() -> Result<(), String> {
     guard.reconcile_enforcement()
 }
 
-pub async fn check_terminal_exec_block(username: &str, exe_path: &str) -> bool {
+pub async fn check_terminal_exec_block(username: &str, exe_path: &str, argv: &[String]) -> bool {
     let runtime = get_runtime();
     let guard = runtime.lock().await;
     terminal_exec_block_applies(
@@ -135,6 +135,7 @@ pub async fn check_terminal_exec_block(username: &str, exe_path: &str) -> bool {
         username,
         guard.current_state.users.get(username),
         exe_path,
+        argv,
     )
 }
 
@@ -151,6 +152,7 @@ fn terminal_exec_block_applies(
     username: &str,
     policy: Option<&DevicePolicyPayload>,
     exe_path: &str,
+    argv: &[String],
 ) -> bool {
     if enforced_username != Some(username) {
         return false;
@@ -161,7 +163,7 @@ fn terminal_exec_block_applies(
     if !policy.exec.terminal_access_disabled {
         return false;
     }
-    exec::is_terminal_executable(exe_path)
+    exec::is_terminal_blocked(exe_path, argv)
 }
 
 fn get_runtime() -> Arc<Mutex<LinuxDevicePolicyRuntime>> {
@@ -299,12 +301,21 @@ mod tests {
             "child",
             Some(&policy),
             "/usr/bin/bash",
+            &[],
         ));
         assert!(!terminal_exec_block_applies(
             Some("child"),
             "parent",
             Some(&policy),
             "/usr/bin/bash",
+            &[],
+        ));
+        assert!(!terminal_exec_block_applies(
+            Some("child"),
+            "child",
+            Some(&policy),
+            "/usr/bin/bash",
+            &["bash".to_string(), "-c".to_string(), "echo".to_string()],
         ));
     }
 
