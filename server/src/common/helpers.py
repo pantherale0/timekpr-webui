@@ -202,9 +202,34 @@ def parent_has_access_to_child(parent_id: int, child_id: int, required_perm: str
         perms = share.permissions_json or {}
         if not required_perm:
             return True
-        return perms.get(required_perm, False)
+        default_val = True if required_perm == 'can_view_screentime' else False
+        return bool(perms.get(required_perm, default_val))
         
     return False
+
+
+def get_accessible_child_ids(parent_id: int) -> set:
+    """Return a set of child profile IDs that the parent has permission to access."""
+    from src.models import ManagedUser, HouseholdParentMembership, ManagedUserShare
+    if parent_id is None:
+        return {u.id for u in ManagedUser.query.all()}
+
+    accessible_ids = set()
+
+    # 1. Children from parent's households
+    memberships = HouseholdParentMembership.query.filter_by(parent_account_id=parent_id).all()
+    hh_ids = [m.household_id for m in memberships]
+    if hh_ids:
+        households_children = ManagedUser.query.filter(ManagedUser.household_id.in_(hh_ids)).all()
+        for child in households_children:
+            accessible_ids.add(child.id)
+
+    # 2. Children shared individually
+    shares = ManagedUserShare.query.filter_by(parent_account_id=parent_id).all()
+    for share in shares:
+        accessible_ids.add(share.managed_user_id)
+
+    return accessible_ids
 
 
 def parent_has_access_to_device(parent_id: int, system_id: str) -> bool:

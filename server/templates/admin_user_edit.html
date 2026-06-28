@@ -10,6 +10,7 @@
     <button type="button" class="segmented-tab-btn" data-tab-target="#computer-tab">{{ t('pages.admin_user_edit.tab_computer') }}</button>
     <button type="button" class="segmented-tab-btn" data-tab-target="#family-tab">{{ t('pages.admin_user_edit.tab_family') }}</button>
     <button type="button" class="segmented-tab-btn" data-tab-target="#apps-tab">{{ t('pages.admin_user_edit.tab_apps') }}</button>
+    <button type="button" class="segmented-tab-btn" data-tab-target="#share-tab">Share Profile</button>
 </div>
 {% endmacro %}
 
@@ -656,6 +657,179 @@
             </div>
         </div>
     </div>
+
+    <!-- Share tab -->
+    <div id="share-tab" class="tab-pane-custom d-none">
+        <div class="row g-4">
+            <!-- Active Shares List -->
+            <div class="col-12 col-lg-7">
+                <div class="card border shadow-sm">
+                    <div class="card-header guardian-card-header py-3">
+                        <h5 class="mb-0 fw-bold"><i class="fas fa-users me-2 guardian-section-icon"></i>Active Profile Shares</h5>
+                    </div>
+                    <div class="card-body p-4">
+                        <p class="text-secondary small fw-medium mb-3">Other parents or guardians who currently have granular access to {{ user.username }}'s profile.</p>
+                        {% if shares %}
+                            <div class="d-flex flex-column gap-3">
+                                {% for share in shares %}
+                                    <div class="border rounded p-3 bg-body-tertiary">
+                                        <div class="d-flex justify-content-between align-items-center mb-2">
+                                            <strong class="text-dark">{{ share.parent.email if share.parent else 'Unknown Parent' }}</strong>
+                                            <span class="text-secondary small">Shared {{ share.shared_at.strftime('%Y-%m-%d') if share.shared_at else '' }}</span>
+                                        </div>
+                                        <div class="d-flex flex-wrap gap-1 mt-2">
+                                            {% for scope in ['can_view_screentime', 'can_manage_screentime', 'can_view_monitoring', 'can_manage_policies'] %}
+                                                {% set scope_active = share.permissions_json.get(scope, True if scope == 'can_view_screentime' else False) %}
+                                                {% if scope_active %}
+                                                    <span class="badge text-emerald-400 bg-emerald-950/20 border border-emerald-500/30 px-2 py-1" style="font-size: 0.7rem;">
+                                                        {{ scope.replace('can_', '').replace('_', ' ') | title }}
+                                                    </span>
+                                                {% else %}
+                                                    <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle px-2 py-1" style="font-size: 0.7rem;">
+                                                        {{ scope.replace('can_', '').replace('_', ' ') | title }}
+                                                    </span>
+                                                {% endif %}
+                                            {% endfor %}
+                                        </div>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            <p class="text-secondary mb-0 small fw-medium text-center py-4"><i class="fas fa-info-circle me-1"></i>This profile is not currently shared with anyone.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Share Profile Invite Generator -->
+            <div class="col-12 col-lg-5">
+                <div class="card border shadow-sm">
+                    <div class="card-header guardian-card-header py-3">
+                        <h5 class="mb-0 fw-bold"><i class="fas fa-user-plus me-2 guardian-section-icon"></i>Generate Share Invite</h5>
+                    </div>
+                    <div class="card-body p-4">
+                        <p class="text-secondary small fw-medium mb-3">Invite a co-parent or guardian to manage or view this profile.</p>
+                        
+                        <!-- Role Presets -->
+                        <div class="mb-3">
+                            <label class="form-label fw-bold small text-muted text-uppercase mb-2" style="font-size: 0.7rem;">Role Preset</label>
+                            <div class="d-flex gap-2">
+                                <button type="button" class="btn btn-outline-secondary btn-sm flex-grow-1" onclick="applyPresetRole('viewer')">Viewer</button>
+                                <button type="button" class="btn btn-outline-secondary btn-sm flex-grow-1" onclick="applyPresetRole('manager')">Manager</button>
+                                <button type="button" class="btn btn-outline-secondary btn-sm flex-grow-1" onclick="applyPresetRole('co-parent')">Co-Parent</button>
+                            </div>
+                        </div>
+
+                        <!-- Scopes -->
+                        <div class="mb-4">
+                            <label class="form-label fw-bold small text-muted text-uppercase mb-2" style="font-size: 0.7rem;">Granular Permissions</label>
+                            <div class="d-flex flex-column gap-2">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="share-can-view-screentime" checked disabled>
+                                    <label class="form-check-label small" for="share-can-view-screentime">View Screen Time</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="share-can-manage-screentime">
+                                    <label class="form-check-label small" for="share-can-manage-screentime">Manage Screen Time (Adjust Limits, Pause)</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="share-can-view-monitoring">
+                                    <label class="form-check-label small" for="share-can-view-monitoring">View Monitoring (History, Stats)</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="share-can-manage-policies">
+                                    <label class="form-check-label small" for="share-can-manage-policies">Manage Policies (Blocklists, Apps)</label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Invite Generation Actions -->
+                        <div class="mb-3">
+                            <button type="button" class="btn guardian-btn-sage w-100 fw-bold py-2 shadow-sm" onclick="generateShareInvite()">
+                                <i class="fas fa-link me-1"></i> Generate Invitation Link
+                            </button>
+                        </div>
+
+                        <!-- Result Input -->
+                        <div class="d-none" id="share-result-container">
+                            <label class="form-label fw-bold small text-muted text-uppercase mb-1" style="font-size: 0.7rem;">Copy Invite Link</label>
+                            <div class="input-group">
+                                <input type="text" id="share-invite-link" class="form-control form-control-sm font-mono text-center" readonly style="font-size: 0.75rem;">
+                                <button class="btn btn-sm btn-outline-secondary" type="button" onclick="copyInviteLinkToClipboard()">
+                                    <i class="fas fa-copy"></i>
+                                </button>
+                            </div>
+                            <div class="form-text small text-emerald-600 mt-1"><i class="fas fa-clock me-1"></i>Link will expire in 48 hours.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function applyPresetRole(role) {
+            const viewCheck = document.getElementById('share-can-view-screentime');
+            const manageCheck = document.getElementById('share-can-manage-screentime');
+            const monitorCheck = document.getElementById('share-can-view-monitoring');
+            const policyCheck = document.getElementById('share-can-manage-policies');
+
+            viewCheck.checked = true; // always enabled
+            if (role === 'viewer') {
+                manageCheck.checked = false;
+                monitorCheck.checked = false;
+                policyCheck.checked = false;
+            } else if (role === 'manager') {
+                manageCheck.checked = true;
+                monitorCheck.checked = false;
+                policyCheck.checked = false;
+            } else if (role === 'co-parent') {
+                manageCheck.checked = true;
+                monitorCheck.checked = true;
+                policyCheck.checked = true;
+            }
+        }
+
+        function generateShareInvite() {
+            const childId = "{{ user.id }}";
+            const payload = {
+                can_view_screentime: document.getElementById('share-can-view-screentime').checked,
+                can_manage_screentime: document.getElementById('share-can-manage-screentime').checked,
+                can_view_monitoring: document.getElementById('share-can-view-monitoring').checked,
+                can_manage_policies: document.getElementById('share-can-manage-policies').checked
+            };
+
+            fetch(`/api/profiles/${childId}/generate-invite`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    const fullUrl = window.location.origin + data.redeem_url;
+                    document.getElementById('share-invite-link').value = fullUrl;
+                    document.getElementById('share-result-container').classList.remove('d-none');
+                } else {
+                    alert(data.message || 'Failed to generate invite');
+                }
+            })
+            .catch(() => alert('Failed to generate invite'));
+        }
+
+        function copyInviteLinkToClipboard() {
+            const linkInput = document.getElementById('share-invite-link');
+            linkInput.select();
+            linkInput.setSelectionRange(0, 99999);
+            navigator.clipboard.writeText(linkInput.value)
+                .then(() => {
+                    alert('Invitation link copied to clipboard!');
+                })
+                .catch(() => {
+                    alert('Failed to copy link. Please manually copy it.');
+                });
+        }
+    </script>
 </div>
 
 <!-- Policy Preset Modal -->

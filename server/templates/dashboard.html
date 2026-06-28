@@ -61,140 +61,164 @@
 </div>
 {% endif %}
 
-<div class="row g-4">
-    {% if users %}
-        {% for user in users %}
-            <div class="col-12 col-md-6 col-lg-4" id="user-container-{{ user.id }}">
-                <div class="card card-outline card-primary shadow-sm h-100" id="user-card-{{ user.id }}">
-                    <div class="card-header d-flex justify-content-between align-items-center py-3">
-                        <div class="d-flex align-items-center gap-2">
-                            <span id="status-dot-{{ user.id }}" class="status-dot rounded-circle" style="display: inline-block; width: 10px; height: 10px; background-color: {{ 'var(--guardian-status-connected)' if user.is_online else 'var(--guardian-text-secondary)' }};" title="{{ t('pages.dashboard.agent_online') if user.is_online else t('pages.dashboard.agent_offline') }}"></span>
-                            <h5 class="mb-0 fw-bold text-truncate" style="max-width: 180px;" title="{{ user.username }}{% if user.has_multiple_households and user.household_name %} ({{ user.household_name }}){% endif %}">
-                                {{ user.username }}{% if user.has_multiple_households and user.household_name %} <small class="text-muted" style="font-size: 0.75rem;">({{ user.household_name }})</small>{% endif %}
-                            </h5>
-                            {% if user.is_shared %}
-                                <span class="badge" style="font-size: 0.65rem; color: #4A6B5D; border: 1px solid #4A6B5D !important; background-color: #EBF1EE;">{{ t('common.shared') }}</span>
+{% macro render_user_card(user) %}
+    <div class="col-12 col-md-6 col-lg-4" id="user-container-{{ user.id }}">
+        <div class="card card-outline card-primary shadow-sm h-100" id="user-card-{{ user.id }}">
+            <div class="card-header d-flex justify-content-between align-items-center py-3">
+                <div class="d-flex align-items-center gap-2">
+                    <span id="status-dot-{{ user.id }}" class="status-dot rounded-circle" style="display: inline-block; width: 10px; height: 10px; background-color: {{ 'var(--guardian-status-connected)' if user.is_online else 'var(--guardian-text-secondary)' }};" title="{{ t('pages.dashboard.agent_online') if user.is_online else t('pages.dashboard.agent_offline') }}"></span>
+                    <h5 class="mb-0 fw-bold text-truncate" style="max-width: 180px;" title="{{ user.username }}{% if user.has_multiple_households and user.household_name %} ({{ user.household_name }}){% endif %}">
+                        {{ user.username }}{% if user.has_multiple_households and user.household_name %} <small class="text-muted" style="font-size: 0.75rem;">({{ user.household_name }})</small>{% endif %}
+                    </h5>
+                    {% if user.is_shared %}
+                        <span class="badge" style="font-size: 0.65rem; color: #4A6B5D; border: 1px solid #4A6B5D !important; background-color: #EBF1EE;">{{ t('common.shared') }}</span>
+                    {% endif %}
+                </div>
+                <div class="d-flex flex-column gap-1 align-items-end">
+                    <span id="pending-badge-{{ user.id }}" class="badge bg-warning text-dark" style="font-size: 0.7rem;{% if user.id|string not in pending_adjustments %} display: none;{% endif %}">
+                        {{ t('pages.dashboard.pending') }} <span id="pending-badge-text-{{ user.id }}">{{ pending_adjustments[user.id|string] if user.id|string in pending_adjustments else '' }}</span>
+                    </span>
+                    <span id="approval-badge-{{ user.id }}" class="badge bg-info text-dark" style="font-size: 0.7rem; display: none;">
+                        <span id="approval-badge-text-{{ user.id }}">0</span> {{ t('pages.dashboard.requests') }}
+                    </span>
+                    <span id="sync-status-{{ user.id }}" class="badge {% if user.is_online %}bg-success{% else %}bg-secondary{% endif %} text-white align-items-center gap-1" style="{% if user.schedule_is_synced %}display: none;{% else %}display: inline-flex;{% endif %}">
+                        <i class="{% if user.is_online %}fas fa-sync fa-spin{% else %}fas fa-shield-alt{% endif %}" style="font-size: 0.75rem;"></i>
+                        <span id="sync-text-{{ user.id }}">
+                            {% if user.is_online %}
+                                {{ t('pages.dashboard.sync_updating') }}
+                            {% else %}
+                                {{ t('pages.dashboard.sync_offline') }}
+                            {% endif %}
+                        </span>
+                    </span>
+                </div>
+            </div>
+
+            <div class="card-body p-3 d-flex flex-column justify-content-between">
+                <div>
+                    <!-- Mappings Info -->
+                    <p id="mapping-summary-{{ user.id }}" class="text-secondary small fw-semibold mb-2">
+                        {{ t('pages.dashboard.mapping_summary', count=user.mapping_count, online=user.online_mapping_count) }}
+                    </p>
+
+                    <!-- Safety Preset Status / Warning -->
+                    {% if user.policy_age_bracket and user.policy_maturity_level %}
+                        {% set age_meta = policy_preset_matrix.age_brackets.get(user.policy_age_bracket, {}) %}
+                        {% set mat_meta = policy_preset_matrix.maturity_levels.get(user.policy_maturity_level, {}) %}
+                        <div class="badge bg-light text-slate border p-2 mb-3 w-100 text-start d-flex align-items-center justify-content-between" style="font-weight: normal; color: #1E293B; white-space: normal;">
+                            <span>
+                                <i class="fas fa-shield-alt me-1" style="color: #4A6B5D;"></i>
+                                <strong>{{ age_meta.profile_title or age_meta.label }}</strong> · {{ mat_meta.label }}
+                            </span>
+                            <span class="small text-muted" style="font-size: 0.65rem;">Active Preset</span>
+                        </div>
+                    {% else %}
+                        <div class="alert alert-warning p-2 mb-3 small d-flex align-items-center justify-content-between" style="border-left: 3px solid #ffc107; background-color: #fffaf0;">
+                            <span>
+                                <i class="fas fa-exclamation-triangle me-1 text-warning"></i>
+                                No safety baseline active.
+                            </span>
+                            {% if user.can_manage_policies %}
+                            <a href="{{ url_for('ui_dashboard.edit_user_profile', user_id=user.id) }}" class="btn btn-xs btn-warning text-dark fw-bold px-2 py-0" style="font-size: 0.7rem;">Protect</a>
                             {% endif %}
                         </div>
-                        <div class="d-flex flex-column gap-1 align-items-end">
-                            <span id="pending-badge-{{ user.id }}" class="badge bg-warning text-dark" style="font-size: 0.7rem;{% if user.id|string not in pending_adjustments %} display: none;{% endif %}">
-                                {{ t('pages.dashboard.pending') }} <span id="pending-badge-text-{{ user.id }}">{{ pending_adjustments[user.id|string] if user.id|string in pending_adjustments else '' }}</span>
-                            </span>
-                            <span id="approval-badge-{{ user.id }}" class="badge bg-info text-dark" style="font-size: 0.7rem; display: none;">
-                                <span id="approval-badge-text-{{ user.id }}">0</span> {{ t('pages.dashboard.requests') }}
-                            </span>
-                            <span id="sync-status-{{ user.id }}" class="badge {% if user.is_online %}bg-success{% else %}bg-secondary{% endif %} text-white align-items-center gap-1" style="{% if user.schedule_is_synced %}display: none;{% else %}display: inline-flex;{% endif %}">
-                                <i class="{% if user.is_online %}fas fa-sync fa-spin{% else %}fas fa-shield-alt{% endif %}" style="font-size: 0.75rem;"></i>
-                                <span id="sync-text-{{ user.id }}">
-                                    {% if user.is_online %}
-                                        {{ t('pages.dashboard.sync_updating') }}
-                                    {% else %}
-                                        {{ t('pages.dashboard.sync_offline') }}
-                                    {% endif %}
-                                </span>
-                            </span>
+                    {% endif %}
+                    
+                    <!-- Quick Stats Row -->
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <div class="bg-body-secondary p-2 rounded text-center border">
+                                <span class="text-secondary small fw-bold text-uppercase d-block mb-1" style="font-size: 0.65rem; letter-spacing: 0.05em;">{{ t('pages.dashboard.routine_left') }}</span>
+                                <strong id="time-left-{{ user.id }}" class="fs-5 text-primary d-block lh-1">{{ user.time_left }}</strong>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="bg-body-secondary p-2 rounded text-center border">
+                                <span class="text-secondary small fw-bold text-uppercase d-block mb-1" style="font-size: 0.65rem; letter-spacing: 0.05em;">{{ t('pages.dashboard.last_checked') }}</span>
+                                <strong id="last-updated-{{ user.id }}" class="small text-truncate d-block" style="font-size: 0.8rem; line-height: 1.5;">
+                                    {{ user.last_checked_display or t('pages.dashboard.never') }}
+                                </strong>
+                            </div>
                         </div>
                     </div>
+                    
+                    <!-- Actions Row -->
+                    <div class="d-flex gap-2 mb-2">
+                        {% if user.can_manage_screentime %}
+                        <button class="btn btn-sm btn-primary flex-fill py-1 fw-bold" onclick="openTimeAdjustModal({{ user.id }}, '{{ user.username }}')">
+                            <i class="fas fa-clock me-1"></i> {{ t('pages.dashboard.adjust') }}
+                        </button>
+                        <a href="{{ url_for('weekly_schedule_user', user_id=user.id) }}" class="btn btn-sm btn-outline-secondary flex-fill py-1 fw-bold">
+                            <i class="fas fa-sliders-h me-1"></i> {{ t('pages.dashboard.limits') }}
+                        </a>
+                        {% endif %}
+                        <a href="{{ url_for('user_stats', user_id=user.id) }}" class="btn btn-sm btn-outline-secondary flex-fill py-1 fw-bold">
+                            <i class="fas fa-chart-line me-1"></i> {{ t('pages.dashboard.activity') }}
+                        </a>
+                    </div>
+                    <div class="d-flex flex-wrap gap-2 mb-3 small">
+                        <a href="{{ url_for('ui_dashboard.user_combined_history', user_id=user.id) }}" class="text-secondary text-decoration-none">
+                            {{ t('pages.dashboard.activity_web_history') }}
+                        </a>
+                        <span class="text-secondary" aria-hidden="true">·</span>
+                        <a href="{{ url_for('ui_dashboard.user_online_accounts', user_id=user.id) }}" class="text-secondary text-decoration-none">
+                            {{ t('pages.dashboard.activity_online_accounts') }}
+                        </a>
+                    </div>
+                </div>
 
-                    <div class="card-body p-3 d-flex flex-column justify-content-between">
-                        <div>
-                            <!-- Mappings Info -->
-                            <p id="mapping-summary-{{ user.id }}" class="text-secondary small fw-semibold mb-2">
-                                {{ t('pages.dashboard.mapping_summary', count=user.mapping_count, online=user.online_mapping_count) }}
-                            </p>
-
-                            <!-- Safety Preset Status / Warning -->
-                            {% if user.policy_age_bracket and user.policy_maturity_level %}
-                                {% set age_meta = policy_preset_matrix.age_brackets.get(user.policy_age_bracket, {}) %}
-                                {% set mat_meta = policy_preset_matrix.maturity_levels.get(user.policy_maturity_level, {}) %}
-                                <div class="badge bg-light text-slate border p-2 mb-3 w-100 text-start d-flex align-items-center justify-content-between" style="font-weight: normal; color: #1E293B; white-space: normal;">
-                                    <span>
-                                        <i class="fas fa-shield-alt me-1" style="color: #4A6B5D;"></i>
-                                        <strong>{{ age_meta.profile_title or age_meta.label }}</strong> · {{ mat_meta.label }}
-                                    </span>
-                                    <span class="small text-muted" style="font-size: 0.65rem;">Active Preset</span>
-                                </div>
-                            {% else %}
-                                <div class="alert alert-warning p-2 mb-3 small d-flex align-items-center justify-content-between" style="border-left: 3px solid #ffc107; background-color: #fffaf0;">
-                                    <span>
-                                        <i class="fas fa-exclamation-triangle me-1 text-warning"></i>
-                                        No safety baseline active.
-                                    </span>
-                                    <a href="{{ url_for('ui_dashboard.edit_user_profile', user_id=user.id) }}" class="btn btn-xs btn-warning text-dark fw-bold px-2 py-0" style="font-size: 0.7rem;">Protect</a>
-                                </div>
-                            {% endif %}
-                            
-                            <!-- Quick Stats Row -->
-                            <div class="row g-2 mb-3">
-                                <div class="col-6">
-                                    <div class="bg-body-secondary p-2 rounded text-center border">
-                                        <span class="text-secondary small fw-bold text-uppercase d-block mb-1" style="font-size: 0.65rem; letter-spacing: 0.05em;">{{ t('pages.dashboard.routine_left') }}</span>
-                                        <strong id="time-left-{{ user.id }}" class="fs-5 text-primary d-block lh-1">{{ user.time_left }}</strong>
-                                    </div>
-                                </div>
-                                <div class="col-6">
-                                    <div class="bg-body-secondary p-2 rounded text-center border">
-                                        <span class="text-secondary small fw-bold text-uppercase d-block mb-1" style="font-size: 0.65rem; letter-spacing: 0.05em;">{{ t('pages.dashboard.last_checked') }}</span>
-                                        <strong id="last-updated-{{ user.id }}" class="small text-truncate d-block" style="font-size: 0.8rem; line-height: 1.5;">
-                                            {{ user.last_checked_display or t('pages.dashboard.never') }}
-                                        </strong>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <!-- Actions Row -->
-                            <div class="d-flex gap-2 mb-2">
-                                <button class="btn btn-sm btn-primary flex-fill py-1 fw-bold" onclick="openTimeAdjustModal({{ user.id }}, '{{ user.username }}')">
-                                    <i class="fas fa-clock me-1"></i> {{ t('pages.dashboard.adjust') }}
-                                </button>
-                                <a href="{{ url_for('weekly_schedule_user', user_id=user.id) }}" class="btn btn-sm btn-outline-secondary flex-fill py-1 fw-bold">
-                                    <i class="fas fa-sliders-h me-1"></i> {{ t('pages.dashboard.limits') }}
-                                </a>
-                                <a href="{{ url_for('user_stats', user_id=user.id) }}" class="btn btn-sm btn-outline-secondary flex-fill py-1 fw-bold">
-                                    <i class="fas fa-chart-line me-1"></i> {{ t('pages.dashboard.activity') }}
-                                </a>
-                            </div>
-                            <div class="d-flex flex-wrap gap-2 mb-3 small">
-                                <a href="{{ url_for('ui_dashboard.user_combined_history', user_id=user.id) }}" class="text-secondary text-decoration-none">
-                                    {{ t('pages.dashboard.activity_web_history') }}
-                                </a>
-                                <span class="text-secondary" aria-hidden="true">·</span>
-                                <a href="{{ url_for('ui_dashboard.user_online_accounts', user_id=user.id) }}" class="text-secondary text-decoration-none">
-                                    {{ t('pages.dashboard.activity_online_accounts') }}
-                                </a>
-                            </div>
-                        </div>
-
-                        <!-- Weekly Usage Chart -->
-                        <div class="border-top pt-3 mt-2">
-                            <h6 class="text-secondary small fw-bold text-uppercase mb-2" style="font-size: 0.7rem; letter-spacing: 0.05em;">{{ t('pages.dashboard.usage_week') }}</h6>
-                            <div class="chart-container" style="height: 140px; position: relative;">
-                                <canvas id="chart-{{ user.id }}"></canvas>
-                            </div>
-                        </div>
+                <!-- Weekly Usage Chart -->
+                <div class="border-top pt-3 mt-2">
+                    <h6 class="text-secondary small fw-bold text-uppercase mb-2" style="font-size: 0.7rem; letter-spacing: 0.05em;">{{ t('pages.dashboard.usage_week') }}</h6>
+                    <div class="chart-container" style="height: 140px; position: relative;">
+                        <canvas id="chart-{{ user.id }}"></canvas>
                     </div>
                 </div>
             </div>
-            
-            <script>
-                (function() {
-                    window._chartData = window._chartData || {};
-                    const i18n = JSON.parse(document.getElementById('i18n-data')?.textContent || '{}');
-                    const shortWeekdays = [
-                        i18n.dashboard_weekday_sun, i18n.dashboard_weekday_mon, i18n.dashboard_weekday_tue,
-                        i18n.dashboard_weekday_wed, i18n.dashboard_weekday_thu, i18n.dashboard_weekday_fri,
-                        i18n.dashboard_weekday_sat
-                    ];
-                    const dates = [], labels = [], values = [];
-                    {% for date, time_spent in user.usage_data.items() %}
-                        dates.push('{{ date }}');
-                        labels.push(shortWeekdays[new Date('{{ date }}T00:00:00').getDay()]);
-                        values.push({{ time_spent / 3600 }});
-                    {% endfor %}
-                    window._chartData[{{ user.id }}] = { dates, labels, values };
-                })();
-            </script>
+        </div>
+    </div>
+    
+    <script>
+        (function() {
+            window._chartData = window._chartData || {};
+            const i18n = JSON.parse(document.getElementById('i18n-data')?.textContent || '{}');
+            const shortWeekdays = [
+                i18n.dashboard_weekday_sun, i18n.dashboard_weekday_mon, i18n.dashboard_weekday_tue,
+                i18n.dashboard_weekday_wed, i18n.dashboard_weekday_thu, i18n.dashboard_weekday_fri,
+                i18n.dashboard_weekday_sat
+            ];
+            const dates = [], labels = [], values = [];
+            {% for date, time_spent in user.usage_data.items() %}
+                dates.push('{{ date }}');
+                labels.push(shortWeekdays[new Date('{{ date }}T00:00:00').getDay()]);
+                values.push({{ time_spent / 3600 }});
+            {% endfor %}
+            window._chartData[{{ user.id }}] = { dates, labels, values };
+        })();
+    </script>
+{% endmacro %}
+
+{% if users %}
+    {% if has_multiple_households %}
+        {% for household_group in users|groupby('household_name') %}
+            <div class="col-12 mt-4 mb-2">
+                <h5 class="fw-bold text-uppercase tracking-wider text-secondary border-bottom pb-2 mb-3" style="font-size: 0.85rem; letter-spacing: 0.05em;">
+                    <i class="fas fa-home me-1"></i> {{ household_group.grouper or 'Shared Profiles' }}
+                </h5>
+            </div>
+            <div class="row g-4 mb-4">
+                {% for user in household_group.list %}
+                    {{ render_user_card(user) }}
+                {% endfor %}
+            </div>
         {% endfor %}
+    {% else %}
+        <div class="row g-4">
+            {% for user in users %}
+                {{ render_user_card(user) }}
+            {% endfor %}
+        </div>
+    {% endif %}
     {% else %}
         <div class="col-12">
             <div class="card shadow-sm border p-5 text-center bg-body-tertiary">

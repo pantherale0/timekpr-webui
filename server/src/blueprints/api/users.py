@@ -583,16 +583,11 @@ def get_all_users():
         if p:
             parent_id = p.id
 
-    hh_ids = []
-    if parent_id:
-        from src.models import ParentAccount
-        p = ParentAccount.query.get(parent_id)
-        if p:
-            hh_ids = [m.household_id for m in p.memberships if m.household_id]
-
     query = ManagedUser.query
-    if hh_ids:
-        query = query.filter(ManagedUser.household_id.in_(hh_ids))
+    if parent_id:
+        from src.common.helpers import get_accessible_child_ids
+        allowed_ids = get_accessible_child_ids(parent_id)
+        query = query.filter(ManagedUser.id.in_(allowed_ids))
 
     users = query.order_by(ManagedUser.username.asc()).all()
     return jsonify({

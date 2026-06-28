@@ -26,6 +26,7 @@ from src.blueprints.api import (
     api_hardware_baseline_bp,
     api_windows_laps_bp,
     api_ai_bp,
+    sharing_api_bp,
 )
 from src.blueprints.api_access_requests import bp as api_access_requests_bp
 from src.blueprints.websocket import websocket_bp
@@ -58,4 +59,5 @@ __all__ = [
     'api_access_requests_bp',
     'websocket_bp',
     'api_ai_bp',
+    'sharing_api_bp',
 ]

@@ -295,11 +295,12 @@ from src.blueprints import (
     api_access_requests_bp,
     websocket_bp,
     api_ai_bp,
+    sharing_api_bp,
 )
 
 @app.before_request
 def enforce_household_isolation():
-    """Enforce tenant/household boundaries for logged-in multi-tenant parents.
+    """Enforce tenant/household boundaries and granular scopes for logged-in multi-tenant parents.
 
     Only activates when parent_account_id is present in the session (OIDC flow).
     Local admin mode and test environments without a parent account pass through
@@ -308,25 +309,56 @@ def enforce_household_isolation():
     from flask import request, session, abort
     parent_id = session.get('parent_account_id')
     # Only enforce when we have an explicit parent account identity in the session.
-    # Local admin (no parent_account_id) is implicitly trusted — its sessions
-    # cannot span multiple tenants by definition.
-    if not session.get('logged_in') or not parent_id or not request.view_args:
+    # Local admin (no parent_account_id) is implicitly trusted.
+    if not session.get('logged_in') or not parent_id:
         return
 
     from src.common.helpers import parent_has_access_to_child, parent_has_access_to_device
-    from src.models import ManagedUserDeviceMap
+    from src.models import ManagedUserDeviceMap, ApprovalRequest
 
-    # 1. user_id path param → verify child access
-    if 'user_id' in request.view_args:
+    user_id = None
+    if request.view_args and 'user_id' in request.view_args:
         try:
             user_id = int(request.view_args['user_id'])
-            if not parent_has_access_to_child(parent_id, user_id):
+        except (ValueError, TypeError):
+            pass
+
+    if user_id is None:
+        try:
+            if request.form and 'user_id' in request.form:
+                user_id = int(request.form['user_id'])
+            elif request.is_json and request.json and 'user_id' in request.json:
+                user_id = int(request.json['user_id'])
+        except Exception:
+            pass
+
+    if request.view_args and 'request_id' in request.view_args:
+        try:
+            request_id = int(request.view_args['request_id'])
+            request_row = ApprovalRequest.query.get(request_id)
+            if request_row and request_row.device_map:
+                user_id = request_row.device_map.managed_user_id
+        except (ValueError, TypeError):
+            pass
+
+    if user_id is not None:
+        try:
+            required_perm = 'can_view_screentime'
+            path = request.path
+            if any(p in path for p in ['/whitelist', '/block', '/policy', '/presets', '/apparmor', '/installed-apps']):
+                required_perm = 'can_manage_policies'
+            elif any(p in path for p in ['/schedule', '/limits', '/screentime', '/pause', '/add-time', '/intervals', '/tamper']):
+                required_perm = 'can_manage_screentime'
+            elif any(p in path for p in ['/inspect', '/stats', '/history', '/logs']):
+                required_perm = 'can_view_monitoring'
+
+            if not parent_has_access_to_child(parent_id, user_id, required_perm):
                 abort(403)
         except (ValueError, TypeError):
             pass
 
     # 2. system_id path param → verify device access
-    if 'system_id' in request.view_args:
+    if request.view_args and 'system_id' in request.view_args:
         try:
             system_id = str(request.view_args['system_id'])
             if not parent_has_access_to_device(parent_id, system_id):
@@ -335,13 +367,13 @@ def enforce_household_isolation():
             pass
 
     # 3. mapping_id path param → verify via the mapping's child + device
-    if 'mapping_id' in request.view_args:
+    if request.view_args and 'mapping_id' in request.view_args:
         try:
             mapping_id = int(request.view_args['mapping_id'])
             mapping = ManagedUserDeviceMap.query.get(mapping_id)
             if not mapping:
                 abort(404)
-            if not parent_has_access_to_child(parent_id, mapping.managed_user_id):
+            if not parent_has_access_to_child(parent_id, mapping.managed_user_id, 'can_view_screentime'):
                 abort(403)
             if not parent_has_access_to_device(parent_id, mapping.system_id):
                 abort(403)
@@ -378,9 +410,12 @@ csrf.exempt(api_windows_laps_bp)
 csrf.exempt(api_youtube_bp)
 app.register_blueprint(api_access_requests_bp)
 csrf.exempt(api_access_requests_bp)
+app.register_blueprint(sharing_api_bp)
+csrf.exempt(sharing_api_bp)
 app.register_blueprint(api_ai_bp)
 csrf.exempt(api_ai_bp)
 app.register_blueprint(websocket_bp)
+
 
 # Register WebSocket endpoint via Flask-Sock
 sock.route('/ws')(ws_agent_handler)

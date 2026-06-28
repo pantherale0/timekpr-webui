@@ -210,6 +210,9 @@ flash:
     child_share_failed: Could not redeem the share code. Please try again.
     unauthorized_household: You do not have access to that home.
     household_switched: Active home switched successfully.
+  sharing:
+    redeem_success: Profile invitation redeemed successfully.
+    redeem_error: "Failed to redeem invitation: {reason}"
   common:
     fields_required: All fields are required
     invalid_values: Invalid setting values provided

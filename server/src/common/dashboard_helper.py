@@ -18,7 +18,7 @@ def _schedule_is_synced(user):
     return bool(user.weekly_schedule.is_synced)
 
 
-def _build_user_entry(user, active_household_id=None, has_multiple_households=False):
+def _build_user_entry(user, active_household_id=None, has_multiple_households=False, parent_id=None):
     usage_data = user.get_recent_usage(days=7)
     mapping_count = len(user.device_mappings)
     online_mapping_count = sum(
@@ -39,6 +39,10 @@ def _build_user_entry(user, active_household_id=None, has_multiple_households=Fa
         else:
             is_shared = user.household_id != active_household_id
 
+    from src.common.helpers import parent_has_access_to_child
+    can_manage_screentime = parent_has_access_to_child(parent_id, user.id, 'can_manage_screentime') if parent_id is not None else True
+    can_manage_policies = parent_has_access_to_child(parent_id, user.id, 'can_manage_policies') if parent_id is not None else True
+
     return {
         'id': user.id,
         'username': user.username,
@@ -57,6 +61,8 @@ def _build_user_entry(user, active_household_id=None, has_multiple_households=Fa
         'is_shared': is_shared,
         'household_name': user.household.name if user.household else None,
         'has_multiple_households': has_multiple_households,
+        'can_manage_screentime': can_manage_screentime,
+        'can_manage_policies': can_manage_policies,
     }
 
 
@@ -97,7 +103,7 @@ def build_dashboard_snapshot(active_household_id=None, parent_account_id=None):
     user_data = []
 
     for user in users:
-        entry = _build_user_entry(user, active_household_id=active_household_id, has_multiple_households=has_multiple_households)
+        entry = _build_user_entry(user, active_household_id=active_household_id, has_multiple_households=has_multiple_households, parent_id=parent_account_id)
         if entry['pending_adjustment']:
             pending_adjustments[str(user.id)] = entry['pending_adjustment']
         user_data.append(entry)

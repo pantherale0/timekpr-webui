@@ -189,13 +189,16 @@ def build_dashboard_context():
     if hh_ids:
         households = Household.query.filter(Household.id.in_(hh_ids)).all()
 
+    distinct_households = {u['household_name'] for u in snapshot['users'] if u.get('household_name')}
+    has_multiple_households = len(distinct_households) > 1
+
     return {
         'template': 'dashboard.html',
         'users': snapshot['users'],
         'pending_adjustments': snapshot['pending_adjustments'],
         'policy_preset_matrix': get_matrix_metadata_for_ui(),
         'parent_households': households,
-        'has_multiple_households': len(hh_ids) > 1,
+        'has_multiple_households': has_multiple_households,
     }
 
 
@@ -233,7 +236,7 @@ def build_edit_user_profile_context(user_id):
     from src.policy.presets import get_matrix_metadata_for_ui
     from src.common.helpers import check_parent_child_access
 
-    check_parent_child_access(user_id)
+    check_parent_child_access(user_id, 'can_manage_policies')
 
     user = ManagedUser.query.get_or_404(user_id)
     blocklist_sync_status = _build_user_blocklist_sync_status(user)
@@ -320,6 +323,9 @@ def build_edit_user_profile_context(user_id):
         key=lambda item: (item['application_name'].lower(), item['identifier']),
     )
 
+    from src.models import ManagedUserShare
+    shares = ManagedUserShare.query.filter_by(managed_user_id=user.id).all()
+
     return {
         'template': 'admin_user_edit.html',
         'user': user,
@@ -337,6 +343,7 @@ def build_edit_user_profile_context(user_id):
         'linux_device_policy_by_mapping': linux_device_policy_by_mapping,
         'device_labels': device_labels,
         'policy_preset_matrix': policy_preset_matrix,
+        'shares': shares,
     }
 
 

@@ -68,6 +68,16 @@ def login():
                 memberships = [m.household_id for m in parent.memberships]
                 if memberships:
                     session['active_household_id'] = memberships[0]
+                
+                # Redeem pending invite token
+                pending_token = session.pop('pending_invite_token', None)
+                if pending_token:
+                    from src.user.sharing import process_pending_invite_redemption
+                    success, msg = process_pending_invite_redemption(parent.id, pending_token)
+                    if success:
+                        flash_t('flash.sharing.redeem_success', 'success')
+                    else:
+                        flash_t('flash.sharing.redeem_error', 'danger', reason=msg)
             flash_t('flash.auth.login_success', 'success')
             return redirect(url_for('ui_dashboard.dashboard'))
         error = t('flash.auth.invalid_credentials')
@@ -170,6 +180,20 @@ def oidc_callback():
             'success',
             username=session['user']['username'],
         )
+
+        # Redeem pending invite token
+        pending_token = session.pop('pending_invite_token', None)
+        redeemed = False
+        if pending_token:
+            from src.user.sharing import process_pending_invite_redemption
+            success, msg = process_pending_invite_redemption(parent.id, pending_token)
+            if success:
+                flash_t('flash.sharing.redeem_success', 'success')
+                redeemed = True
+            else:
+                flash_t('flash.sharing.redeem_error', 'danger', reason=msg)
+
+        has_shares = ManagedUserShare.query.filter_by(parent_account_id=parent.id).first() is not None
 
         if not memberships and not has_shares:
             _LOGGER.info("OIDC user %s has no households/shares, redirecting to onboarding", email)
@@ -355,3 +379,39 @@ def switch_household(household_id):
     session['active_household_id'] = household_id
     flash_t('flash.auth.household_switched', 'success')
     return redirect(url_for('ui_dashboard.dashboard'))
+
+
+@ui_auth_bp.route('/invite/redeem/<token>')
+def redeem_invite_link(token):
+    # Retrieve invite from database
+    invite = ManagedUserShareInvite.query.filter_by(invite_code=token).first()
+    if not invite:
+        return render_template('expired_invite.html'), 410
+        
+    if invite.expires_at:
+        expires_at = invite.expires_at.replace(tzinfo=timezone.utc) if invite.expires_at.tzinfo is None else invite.expires_at
+        if expires_at < datetime.now(timezone.utc):
+            return render_template('expired_invite.html'), 410
+
+    if invite.used_count >= invite.max_uses:
+        return render_template('expired_invite.html'), 410
+
+    # Cache token in session
+    session['pending_invite_token'] = token
+
+    parent_id = session.get('parent_account_id')
+    if parent_id:
+        # Already logged in, redeem immediately!
+        from src.user.sharing import process_pending_invite_redemption
+        success, msg = process_pending_invite_redemption(parent_id, token)
+        session.pop('pending_invite_token', None)
+        if success:
+            flash_t('flash.sharing.redeem_success', 'success')
+            return redirect(url_for('ui_dashboard.dashboard'))
+        else:
+            flash_t('flash.sharing.redeem_error', 'danger', reason=msg)
+            return redirect(url_for('ui_dashboard.dashboard'))
+
+    # Redirect to login/OIDC pathway
+    return redirect(url_for('ui_auth.login'))
+

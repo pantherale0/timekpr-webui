@@ -115,13 +115,19 @@ def list_access_requests():
     query = AgentAlert.query.filter_by(event_type="access_requested")
     if system_id:
         query = query.filter_by(system_id=system_id)
-    elif hh_ids:
-        query = query.join(AgentDevice, AgentDevice.system_id == AgentAlert.system_id).filter(
-            AgentDevice.household_id.in_(hh_ids)
-        )
-    else:
-        # If no households, return empty list to prevent leakage
-        return jsonify([])
+    elif parent_id:
+        from src.common.helpers import get_accessible_child_ids
+        allowed_child_ids = get_accessible_child_ids(parent_id)
+        if allowed_child_ids:
+            from src.models import ManagedUserDeviceMap
+            allowed_system_ids = [
+                m.system_id for m in ManagedUserDeviceMap.query.filter(
+                    ManagedUserDeviceMap.managed_user_id.in_(allowed_child_ids)
+                ).all()
+            ]
+            query = query.filter(AgentAlert.system_id.in_(allowed_system_ids))
+        else:
+            return jsonify([])
 
     alerts = query.order_by(AgentAlert.occurred_at.desc()).limit(limit).all()
 

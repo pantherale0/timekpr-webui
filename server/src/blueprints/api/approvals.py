@@ -64,15 +64,28 @@ def list_approvals():
     managed_user_id = request.args.get('managed_user_id')
     limit = request.args.get('limit', 50)
 
+    parent_id = session.get('parent_account_id')
+    hh_ids = []
+    if parent_id:
+        from src.models import ParentAccount
+        p = ParentAccount.query.get(parent_id)
+        if p:
+            hh_ids = [m.household_id for m in p.memberships if m.household_id]
+
     parsed_user_id = None
     if managed_user_id is not None and str(managed_user_id).strip().isdigit():
         parsed_user_id = int(managed_user_id)
+        from src.common.helpers import parent_has_access_to_child
+        if parent_id and not parent_has_access_to_child(parent_id, parsed_user_id):
+            return jsonify({'success': False, 'message': 'Permission denied.'}), 403
 
     rows = list_pending_requests(
         status=status,
         request_type=request_type,
         managed_user_id=parsed_user_id,
         limit=limit,
+        active_household_id=hh_ids or None,
+        parent_account_id=parent_id,
     )
     return jsonify({
         'success': True,
