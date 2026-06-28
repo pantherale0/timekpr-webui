@@ -98,7 +98,7 @@ def test_is_dev_server_version():
 
 def test_default_android_apk_url():
     url = default_android_apk_url('v1.2.3')
-    assert url.endswith('/timekpr-android-agent-v1.2.3.apk')
+    assert url.endswith('/guardian-android-agent-v1.2.3.apk')
     assert 'pantherale0/timekpr-webui' in url
 
 
@@ -110,7 +110,7 @@ def test_resolve_android_apk_url_dev_without_upload(app):
 def test_resolve_android_apk_url_release_default(app):
     with app.test_request_context('/'):
         url = resolve_android_apk_url('v0.10')
-        assert 'timekpr-android-agent-v0.10.apk' in url
+        assert 'guardian-android-agent-v0.10.apk' in url
 
 
 @patch('src.agent.pairing.has_uploaded_android_apk', return_value=True)

@@ -202,7 +202,7 @@ def provisioning_apk():
 @api_pairing_bp.route('/api/pairing/windows/msi', methods=['GET'])
 def windows_msi():
     """Serve the local Windows agent MSI installer or redirect to GitHub Releases."""
-    msi_filename = 'timekpr-agent-x86_64-pc-windows-msvc.msi'
+    msi_filename = 'guardian-agent-x86_64-pc-windows-msvc.msi'
     local_path = os.path.join(get_android_apk_storage_dir(), msi_filename)
     if os.path.isfile(local_path) and os.path.getsize(local_path) > 0:
         return send_file(

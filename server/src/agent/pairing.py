@@ -147,7 +147,7 @@ def default_android_apk_url(version: str) -> str:
     tag = (version or '').strip() or 'v0.0.0-dev'
     return (
         f'https://github.com/{GITHUB_RELEASE_REPO}/releases/download/'
-        f'{tag}/timekpr-android-agent-{tag}.apk'
+        f'{tag}/guardian-android-agent-{tag}.apk'
     )
 
 
@@ -156,7 +156,7 @@ def default_android_checksum_url(version: str) -> str:
     tag = (version or '').strip() or 'v0.0.0-dev'
     return (
         f'https://github.com/{GITHUB_RELEASE_REPO}/releases/download/'
-        f'{tag}/timekpr-android-agent-{tag}.signature-checksum'
+        f'{tag}/guardian-android-agent-{tag}.signature-checksum'
     )
 
 
