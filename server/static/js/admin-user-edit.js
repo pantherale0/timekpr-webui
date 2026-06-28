@@ -17,6 +17,7 @@
         computer: '#computer-tab',
         family: '#family-tab',
         apps: '#apps-tab',
+        share: '#share-tab',
     };
     const TAB_HASH_PREFIX = 'profile-';
     let tabHashListener = null;
@@ -589,4 +590,65 @@
     } else {
         boot();
     }
+    window.applyPresetRole = function (role) {
+        const viewCheck = document.getElementById('share-can-view-screentime');
+        const manageCheck = document.getElementById('share-can-manage-screentime');
+        const monitorCheck = document.getElementById('share-can-view-monitoring');
+        const policyCheck = document.getElementById('share-can-manage-policies');
+
+        if (viewCheck) viewCheck.checked = true; // always enabled
+        if (role === 'viewer') {
+            if (manageCheck) manageCheck.checked = false;
+            if (monitorCheck) monitorCheck.checked = false;
+            if (policyCheck) policyCheck.checked = false;
+        } else if (role === 'manager') {
+            if (manageCheck) manageCheck.checked = true;
+            if (monitorCheck) monitorCheck.checked = false;
+            if (policyCheck) policyCheck.checked = false;
+        } else if (role === 'co-parent') {
+            if (manageCheck) manageCheck.checked = true;
+            if (monitorCheck) monitorCheck.checked = true;
+            if (policyCheck) policyCheck.checked = true;
+        }
+    };
+
+    window.generateShareInvite = function (childId) {
+        const payload = {
+            can_view_screentime: document.getElementById('share-can-view-screentime').checked,
+            can_manage_screentime: document.getElementById('share-can-manage-screentime').checked,
+            can_view_monitoring: document.getElementById('share-can-view-monitoring').checked,
+            can_manage_policies: document.getElementById('share-can-manage-policies').checked
+        };
+
+        fetch(`/api/profiles/${childId}/generate-invite`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                const fullUrl = window.location.origin + data.redeem_url;
+                document.getElementById('share-invite-link').value = fullUrl;
+                document.getElementById('share-result-container').classList.remove('d-none');
+            } else {
+                alert(data.message || 'Failed to generate invite');
+            }
+        })
+        .catch(() => alert('Failed to generate invite'));
+    };
+
+    window.copyInviteLinkToClipboard = function () {
+        const linkInput = document.getElementById('share-invite-link');
+        if (!linkInput) return;
+        linkInput.select();
+        linkInput.setSelectionRange(0, 99999);
+        navigator.clipboard.writeText(linkInput.value)
+            .then(() => {
+                alert('Invitation link copied to clipboard!');
+            })
+            .catch(() => {
+                alert('Failed to copy link. Please manually copy it.');
+            });
+    };
 })();
