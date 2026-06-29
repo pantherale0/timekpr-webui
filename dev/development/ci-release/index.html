@@ -2513,8 +2513,8 @@
 <h2 id="documentation-github-pages">Documentation (GitHub Pages)<a class="headerlink" href="#documentation-github-pages" title="Permanent link">&para;</a></h2>
 <ol>
 <li><strong>Settings → Pages → Source:</strong> branch <code>gh-pages</code>, folder <code>/ (root)</code></li>
-<li>Push to <code>master</code> → mike deploys version <strong><code>dev</code></strong> (rolling docs from <code>master</code>)</li>
-<li>Push tag <code>v*</code> → mike deploys that tag and updates the <strong><code>latest</code></strong> alias</li>
+<li>Push to <code>master</code> (when docs files change) → mike deploys version <strong><code>dev</code></strong> (rolling docs from <code>master</code>)</li>
+<li>Push tag <code>v*</code> → mike deploys that tag, updates the <strong><code>latest</code></strong> alias, and refreshes the root redirect via <code>mike set-default</code></li>
 </ol>
 <p>Site URL configured in <code>mkdocs.yml</code> as <code>site_url</code>.</p>
 <p>First deploy creates the <code>gh-pages</code> branch automatically.</p>
