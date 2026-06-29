@@ -98,6 +98,18 @@ app.config['SQLALCHEMY_DATABASE_URI'] = (
     or _default_db_uri
 )
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+_db_uri_for_pool = (
+    os.environ.get('DATABASE_URL')
+    or os.environ.get('SQLALCHEMY_DATABASE_URI')
+    or _default_db_uri
+)
+if _db_uri_for_pool.startswith('postgresql') and not os.environ.get('TESTING'):
+    app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+        'pool_pre_ping': True,
+        'pool_recycle': 300,
+        'pool_size': int(os.environ.get('SQLALCHEMY_POOL_SIZE', '10')),
+        'max_overflow': int(os.environ.get('SQLALCHEMY_MAX_OVERFLOW', '20')),
+    }
 
 # Initialize extensions
 db.init_app(app)

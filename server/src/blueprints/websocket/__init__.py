@@ -63,6 +63,14 @@ def _close_websocket_connection(ws, system_id, connection_label):
         )
 
 
+def _release_db_session():
+    """Return the scoped SQLAlchemy connection to the pool during long websocket waits."""
+    try:
+        db.session.remove()
+    except (RuntimeError, TypeError, ValueError, SQLAlchemyError):
+        _LOGGER.debug("Could not release websocket database session", exc_info=True)
+
+
 def ws_agent_handler(ws):
     """
     WebSocket endpoint for client agents.
@@ -132,6 +140,7 @@ def ws_agent_handler(ws):
                 return
     
             expected_reg_token = AgentConnectionManager.registration_token
+            pending_approval = False
             
             with app.app_context():
                 device = AgentDevice.query.get(system_id)
@@ -220,21 +229,30 @@ def ws_agent_handler(ws):
                             system_id,
                             exc_info=True,
                         )
-    
-                if device.status == 'pending':
+
+                pending_approval = device.status == 'pending'
+                if pending_approval:
                     _LOGGER.info("Device %s is PENDING approval. Waiting...", system_id)
                     AgentConnectionManager.register_pending(system_id, ws)
                     ws.send(json.dumps({"type": "pairing_status", "status": "pending"}))
-                    
-                    try:
-                        while True:
-                            msg = ws.receive()
-                            if not msg:
-                                break
-                    except (OSError, RuntimeError, ValueError):
-                        _LOGGER.debug("Pending websocket closed for %s", system_id)
+
+            if pending_approval:
+                try:
+                    while True:
+                        _release_db_session()
+                        msg = ws.receive()
+                        if not msg:
+                            break
+                except (OSError, RuntimeError, ValueError):
+                    _LOGGER.debug("Pending websocket closed for %s", system_id)
+                return
+
+            with app.app_context():
+                device = AgentDevice.query.get(system_id)
+                if device is None:
+                    _LOGGER.warning("Device %s disappeared before handshake could continue", system_id)
                     return
-    
+
                 pending_factory_reset = bool(getattr(device, 'pending_factory_reset', False))
                 is_android = (device.platform or '').strip().lower() == 'android'
                 allow_pending_reset_auth = (
@@ -319,6 +337,11 @@ def ws_agent_handler(ws):
                         )
                         ws.send(json.dumps({"type": "auth_result", "success": False, "message": "Invalid authentication signature"}))
                         return
+
+                    device = AgentDevice.query.get(system_id)
+                    if device is None:
+                        _LOGGER.warning("Device %s disappeared during authentication handshake", system_id)
+                        return
                         
                     AgentConnectionManager.register(system_id, ws, remote_ip)
                     auth_result = {
@@ -384,22 +407,23 @@ def ws_agent_handler(ws):
                 elif msg_type == "alert_event":
                     try:
                         normalized_alert = normalize_agent_alert_payload(system_id, msg)
-                        alert = _store_agent_alert(system_id, normalized_alert)
+                        alert, alert_row_id = _store_agent_alert(system_id, normalized_alert)
+                        alert_event_type = normalized_alert['event_type']
                         _LOGGER.info(
                             "Stored alert %s from agent %s as row %s",
-                            alert.event_type,
+                            alert_event_type,
                             system_id,
-                            alert.id,
+                            alert_row_id,
                         )
-                        if alert.event_type == 'app_usage':
+                        if alert_event_type == 'app_usage':
                             _store_app_usage_from_alert(system_id, normalized_alert)
-                        elif alert.event_type in {'access_requested', 'app_blocked'}:
+                        elif alert_event_type in {'access_requested', 'app_blocked'}:
                             try:
                                 from src.user.approvals import ingest_access_request
                                 ingest_access_request(
                                     system_id,
                                     normalized_alert,
-                                    source_alert_id=alert.id,
+                                    source_alert_id=alert_row_id,
                                 )
                             except ValueError as exc:
                                 _LOGGER.warning(
@@ -413,13 +437,13 @@ def ws_agent_handler(ws):
                                     system_id,
                                     exc,
                                 )
-                        elif alert.event_type in {'dialogue_flag', 'sentiment_breach'}:
+                        elif alert_event_type in {'dialogue_flag', 'sentiment_breach'}:
                             try:
                                 from src.user.approvals import ingest_dialogue_flag_alert
                                 ingest_dialogue_flag_alert(
                                     system_id,
                                     normalized_alert,
-                                    source_alert_id=alert.id,
+                                    source_alert_id=alert_row_id,
                                 )
                             except ValueError as exc:
                                 _LOGGER.warning(
@@ -433,7 +457,7 @@ def ws_agent_handler(ws):
                                     system_id,
                                     exc,
                                 )
-                        elif alert.event_type == 'clock_tamper':
+                        elif alert_event_type == 'clock_tamper':
                             try:
                                 from src.common.dashboard_events import notify_dashboard_changed
                                 notify_dashboard_changed('clock_tamper')
@@ -443,7 +467,7 @@ def ws_agent_handler(ws):
                                     system_id,
                                     exc,
                                 )
-                        elif alert.event_type == 'boot_config_tamper':
+                        elif alert_event_type == 'boot_config_tamper':
                             try:
                                 from src.common.dashboard_events import notify_dashboard_changed
                                 notify_dashboard_changed('boot_config_tamper')

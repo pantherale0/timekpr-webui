@@ -189,5 +189,7 @@ def _store_agent_alert(system_id, payload):
     if device:
         device.last_seen = datetime.now(timezone.utc)
 
+    db.session.flush()
+    alert_id = alert.id
     db.session.commit()
-    return alert
+    return alert, alert_id

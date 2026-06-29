@@ -1342,6 +1342,7 @@ class BackgroundTaskManager:
                             reason,
                             message,
                         )
+                    db.session.remove()
                     android_success, android_message = self._sync_android_device_policy_system(
                         system_id,
                     )
@@ -1359,6 +1360,7 @@ class BackgroundTaskManager:
                             reason,
                             android_message,
                         )
+                    db.session.remove()
                     linux_success, linux_message = self._sync_linux_device_policy_system(
                         system_id,
                     )
