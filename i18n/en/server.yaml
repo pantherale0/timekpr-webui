@@ -1616,7 +1616,7 @@ tpl:
       sort_by_date: Sort by Date
       all_event_types: All Event Types
       search_events_details: Search events, details...
-      adb_shell_dpm_set_device: adb shell dpm set-device-owner com.timekpr.agent/.admin.TimeKprDeviceAdminReceiver
+      adb_shell_dpm_set_device: adb shell dpm set-device-owner com.guardian.agent/.admin.GuardianDeviceAdminReceiver
       factory_reset: Factory reset
     android_wizard_modal:
       an_error_occurred: An error occurred

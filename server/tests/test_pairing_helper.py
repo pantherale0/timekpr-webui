@@ -136,6 +136,14 @@ def test_resolve_android_signature_checksum_fetches_release(mock_fetch):
     mock_fetch.assert_called_once_with('v0.10')
 
 
+def test_android_dpc_component_matches_guardian_apk():
+    assert ANDROID_DPC_COMPONENT == (
+        'com.guardian.agent/.admin.GuardianDeviceAdminReceiver'
+    )
+    assert ANDROID_EXTRA_SERVER_URL == 'com.guardian.agent.EXTRA_SERVER_URL'
+    assert ANDROID_EXTRA_REGISTRATION_TOKEN == 'com.guardian.agent.EXTRA_REGISTRATION_TOKEN'
+
+
 def test_build_android_provisioning_payload_shape():
     payload = build_android_provisioning_payload(
         'wss://example.com/ws',

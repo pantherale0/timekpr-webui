@@ -163,8 +163,8 @@
                         <label class="form-label small fw-bold text-secondary mb-1">{{ t('pages.device_detail.recovery_commands') }}</label>
                         <pre class="small bg-body-secondary border rounded p-2 mb-0 user-select-all" style="white-space: pre-wrap;">adb install -r app-debug.apk
 adb shell am broadcast --user 0 \
-  -a com.timekpr.agent.LOCKED_BOOT_SEED_CONFIG \
-  -n com.timekpr.agent/.boot.LockedBootRecoveryReceiver \
+  -a com.guardian.agent.LOCKED_BOOT_SEED_CONFIG \
+  -n com.guardian.agent/.boot.LockedBootRecoveryReceiver \
   --es agent_token "{{ device.secure_token }}" \
   --es server_url "{{ android_recovery_ws_url }}"
 adb reboot</pre>

@@ -27,9 +27,9 @@ _LOGGER = logging.getLogger(__name__)
 
 PAIRING_PAYLOAD_TYPE = 'timekpr_pairing'
 
-ANDROID_DPC_COMPONENT = 'com.timekpr.agent/.admin.TimeKprDeviceAdminReceiver'
-ANDROID_EXTRA_SERVER_URL = 'com.timekpr.agent.EXTRA_SERVER_URL'
-ANDROID_EXTRA_REGISTRATION_TOKEN = 'com.timekpr.agent.EXTRA_REGISTRATION_TOKEN'
+ANDROID_DPC_COMPONENT = 'com.guardian.agent/.admin.GuardianDeviceAdminReceiver'
+ANDROID_EXTRA_SERVER_URL = 'com.guardian.agent.EXTRA_SERVER_URL'
+ANDROID_EXTRA_REGISTRATION_TOKEN = 'com.guardian.agent.EXTRA_REGISTRATION_TOKEN'
 GITHUB_RELEASE_REPO = 'pantherale0/timekpr-webui'
 
 PROVISIONING_KEY_COMPONENT = 'android.app.extra.PROVISIONING_DEVICE_ADMIN_COMPONENT_NAME'

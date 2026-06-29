@@ -91,20 +91,20 @@ Use for zero-touch device-owner rollout on a factory-reset device. The QR follow
 
 1. Open **Settings → Agent pairing → Android MDM provisioning QR** in the WebUI.
 2. On a factory-reset device, tap the welcome screen six times and scan the MDM QR.
-3. Android downloads the APK, sets `com.timekpr.agent` as device owner, and applies the server URL from admin extras.
+3. Android downloads the APK, sets `com.guardian.agent` as device owner, and applies the server URL from admin extras.
 4. Approve the pending device in **Admin → Devices** (same as in-app pairing).
 
 The server emits standard `android.app.extra.PROVISIONING_*` keys. Admin extras use:
 
-- `com.timekpr.agent.EXTRA_SERVER_URL`
-- `com.timekpr.agent.EXTRA_REGISTRATION_TOKEN` (optional)
+- `com.guardian.agent.EXTRA_SERVER_URL`
+- `com.guardian.agent.EXTRA_REGISTRATION_TOKEN` (optional)
 
 #### Release servers
 
 When `TIMEKPR_SERVER_VERSION` matches a GitHub release tag (e.g. `v1.2.3`), the WebUI defaults to:
 
-- APK: `https://github.com/pantherale0/timekpr-webui/releases/download/{tag}/timekpr-android-agent-{tag}.apk`
-- Checksum: companion `timekpr-android-agent-{tag}.signature-checksum` asset
+- APK: `https://github.com/pantherale0/timekpr-webui/releases/download/{tag}/guardian-android-agent-{tag}.apk`
+- Checksum: companion `guardian-android-agent-{tag}.signature-checksum` asset
 
 #### Development servers
 
@@ -157,7 +157,7 @@ Local release signing uses the same variables via `ANDROID_KEYSTORE_PATH` or `an
 | Capability | Permission / API |
 |------------|------------------|
 | Background connection | Foreground service (`AgentWebSocketService`) |
-| Screen time enforcement | Device Admin (`TimeKprDeviceAdminReceiver`) |
+| Screen time enforcement | Device Admin (`GuardianDeviceAdminReceiver`) |
 | App usage monitoring | `PACKAGE_USAGE_STATS` (Usage Access) |
 | Installed app inventory | `PackageManager` (launcher-visible apps; no extra permission beyond normal install visibility) |
 | Web/domain policies | `VpnService` consent |
@@ -199,7 +199,7 @@ If the device is already set up and you do not want to perform a factory reset, 
 1. Enable **Developer Options** and **USB Debugging** on the target device.
 2. Connect the device to your computer and run the following command:
    ```bash
-   adb shell dpm set-device-owner com.timekpr.agent/.admin.TimeKprDeviceAdminReceiver
+   adb shell dpm set-device-owner com.guardian.agent/.admin.GuardianDeviceAdminReceiver
    ```
 
 !!! warning "ADB Device Owner blockers"
@@ -413,7 +413,7 @@ The Android agent handles this automatically:
 3. Installs via `PackageInstaller` (silent when device owner; may prompt on sideload-only installs per Android platform rules)
 4. Reconnects after install via `PACKAGE_REPLACED` / install callback
 
-**Release servers:** APK from `https://github.com/pantherale0/timekpr-webui/releases/download/{tag}/timekpr-android-agent-{tag}.apk` with companion `.signature-checksum` asset.
+**Release servers:** APK from `https://github.com/pantherale0/timekpr-webui/releases/download/{tag}/guardian-android-agent-{tag}.apk` with companion `.signature-checksum` asset.
 
 **Development servers:** Upload a signed release APK in **Settings → Android MDM provisioning QR**; the server serves it at `/api/pairing/provisioning/apk` and includes that URL in the update response.
 

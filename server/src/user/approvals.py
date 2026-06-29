@@ -27,7 +27,7 @@ from src.device.installed_apps import ANDROID_PACKAGE_PREFIX
 _LOGGER = logging.getLogger(__name__)
 
 INTERNAL_ANDROID_PACKAGES = {
-    f'{ANDROID_PACKAGE_PREFIX}com.timekpr.agent',
+    f'{ANDROID_PACKAGE_PREFIX}com.guardian.agent',
 }
 
 

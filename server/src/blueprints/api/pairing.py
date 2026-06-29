@@ -177,7 +177,7 @@ def provisioning_qr_png():
     return send_file(
         BytesIO(png_bytes),
         mimetype='image/png',
-        download_name='timekpr-android-provisioning.png',
+        download_name='guardian-android-provisioning.png',
         max_age=0,
     )
 
@@ -192,7 +192,7 @@ def provisioning_apk():
     return send_file(
         apk_path,
         mimetype='application/vnd.android.package-archive',
-        download_name='timekpr-android-agent.apk',
+        download_name='guardian-android-agent.apk',
         max_age=3600,
         conditional=True,
         etag=True,
