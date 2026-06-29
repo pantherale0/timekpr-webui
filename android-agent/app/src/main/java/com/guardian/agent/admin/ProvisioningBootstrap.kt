@@ -33,7 +33,11 @@ object ProvisioningBootstrap {
     }
 
     fun stageFromAdminExtras(context: Context, extras: PersistableBundle?): Boolean {
-        val serverUrl = extras?.getString(ProvisioningExtras.SERVER_URL)?.trim().orEmpty()
+        if (extras == null) {
+            return false
+        }
+
+        val serverUrl = extras.getString(ProvisioningExtras.SERVER_URL)?.trim().orEmpty()
         if (serverUrl.isEmpty()) {
             return false
         }
