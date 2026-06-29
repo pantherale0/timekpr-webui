@@ -57,6 +57,16 @@ strings:
   owner_lockdown_title: Parent access required
   owner_lockdown_body: This owner profile is locked. Enter the parental access code from the dashboard to unlock it.
   youtube_accessibility_description: Monitors watched YouTube videos for parental controls.
+  provisioning_google_account_title: Add a Google account?
+  provisioning_google_account_body: Would you like to sign in to add a Google account to this profile? This can help protect the device if someone tries to reset it from recovery mode.
+  provisioning_google_account_sign_in: Sign in
+  provisioning_google_account_skip: Skip
+  provisioning_google_account_added: "Google account added: %1$s"
+  provisioning_approval_title: One last step on your dashboard
+  provisioning_approval_body: Open Guardian on your computer or tablet, find this device in Pending Approvals, and tap approve. This screen will finish automatically.
+  provisioning_approval_connecting: Connecting to your home…
+  provisioning_approval_waiting: Waiting for your approval…
+  provisioning_approval_retrying: Having trouble reaching the server. Still trying…
 
 overlay:
   under8:

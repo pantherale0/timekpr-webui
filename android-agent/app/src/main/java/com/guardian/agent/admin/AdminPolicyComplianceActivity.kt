@@ -9,8 +9,35 @@ import androidx.appcompat.app.AppCompatActivity
  * Must be a real activity class (not an activity-alias); some OEM setup wizards reject aliases.
  */
 class AdminPolicyComplianceActivity : AppCompatActivity() {
+    private lateinit var setupController: ManagementModeSetupController
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        ManagementModeSetupDelegate.bind(this, complianceFlow = true)
+        setupController = ManagementModeSetupDelegate.bind(
+            activity = this,
+            complianceFlow = true,
+            savedInstanceState = savedInstanceState,
+        )
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (::setupController.isInitialized) {
+            setupController.onResume()
+        }
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        if (::setupController.isInitialized) {
+            setupController.onSaveInstanceState(outState)
+        }
+    }
+
+    override fun onDestroy() {
+        if (::setupController.isInitialized) {
+            setupController.onDestroy()
+        }
+        super.onDestroy()
     }
 }
