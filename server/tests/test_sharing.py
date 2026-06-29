@@ -38,6 +38,7 @@ def test_generate_and_redeem_sharing_invite(app, client):
     assert data['success'] is True
     redeem_url = data['redeem_url']
     token = redeem_url.split('/')[-1]
+    assert len(token) == 32
 
     # Verify database state
     invite = ManagedUserShareInvite.query.filter_by(invite_code=token).first()

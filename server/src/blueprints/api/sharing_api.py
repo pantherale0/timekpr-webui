@@ -31,8 +31,8 @@ def generate_invite(child_id):
         'can_manage_policies': bool(payload.get('can_manage_policies', False)),
     }
 
-    # Generate cryptographic token (32 bytes = 64 hex characters)
-    token = secrets.token_hex(32)
+    # 16 bytes → 32 hex chars, matching invite_code VARCHAR(32)
+    token = secrets.token_hex(16)
     expires_at = datetime.now(timezone.utc) + timedelta(hours=48)
 
     invite = ManagedUserShareInvite(
