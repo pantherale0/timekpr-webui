@@ -166,10 +166,10 @@ Local release signing uses the same variables via `ANDROID_KEYSTORE_PATH` or `an
 For full MDM-style control, provision the app as **Device Owner** using the MDM provisioning QR above, your EMM, or:
 
 ```bash
-adb dpm set-device-owner com.guardian.agent/.admin.GuardianDeviceAdminReceiver
+adb dpm set-device-owner com.guardian.agent/com.guardian.agent.admin.GuardianDeviceAdminReceiver
 ```
 
-The agent implements Android 12+ provisioning handlers (`GET_PROVISIONING_MODE`, `ADMIN_POLICY_COMPLIANCE`) so QR-based device-owner enrollment applies server config automatically.
+The agent implements Android 12+ provisioning handlers (`GET_PROVISIONING_MODE`, `ADMIN_POLICY_COMPLIANCE`) for QR-based device-owner enrollment. During provisioning the app prompts for **Single-User** vs **Multi-User** management mode, stages the server URL from the QR, and returns control to the setup wizard so the user can still add a Google account and complete OEM setup steps. On Android 11 and below, the same management-mode screen appears on first app launch after QR provisioning.
 
 When device owner, the app auto-grants itself Usage Access, overlay (`SYSTEM_ALERT_WINDOW`), and notification permission (Android 13+) via `DevicePolicyManager` — no manual Settings taps required. Always-on VPN is enabled only when domain block policies are active. Device Admin alone still needs the user to approve Usage Access and VPN in system settings.
 
@@ -199,7 +199,7 @@ If the device is already set up and you do not want to perform a factory reset, 
 1. Enable **Developer Options** and **USB Debugging** on the target device.
 2. Connect the device to your computer and run the following command:
    ```bash
-   adb shell dpm set-device-owner com.guardian.agent/.admin.GuardianDeviceAdminReceiver
+   adb shell dpm set-device-owner com.guardian.agent/com.guardian.agent.admin.GuardianDeviceAdminReceiver
    ```
 
 !!! warning "ADB Device Owner blockers"
@@ -211,7 +211,7 @@ If the device is already set up and you do not want to perform a factory reset, 
     To use ADB provisioning you must temporarily remove all accounts on User 0 **and** remove secondary users, then run:
 
     ```bash
-    adb shell dpm set-device-owner com.guardian.agent/.admin.GuardianDeviceAdminReceiver
+    adb shell dpm set-device-owner com.guardian.agent/com.guardian.agent.admin.GuardianDeviceAdminReceiver
     ```
 
     Re-add accounts and recreate child profiles **after** Device Owner is set. See [Troubleshooting](../troubleshooting/index.md#android-multi-user-and-device-owner).

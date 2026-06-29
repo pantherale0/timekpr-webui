@@ -112,13 +112,6 @@ def _get_android_agent_signature_checksum():
     return (_safe_get_setting_value('android_agent_signature_checksum', '') or '').strip()
 
 
-def _get_android_provisioning_skip_user_setup() -> bool:
-    """Get whether to skip Setup Wizard in Android MDM provisioning (default: True)."""
-    raw_value = _safe_get_setting_value('android_provisioning_skip_user_setup', None)
-    if raw_value is None:
-        return True
-    return str(raw_value).strip().lower() in {'1', 'true', 'yes', 'on'}
-
 
 def _get_android_provisioning_leave_all_system_apps_enabled() -> bool:
     """Get whether to leave all system apps enabled in Android MDM provisioning (default: True)."""

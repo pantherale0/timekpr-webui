@@ -8,7 +8,6 @@ from src.models import Settings
 from src.common.settings import (
     encrypt_setting,
     decrypt_setting,
-    _get_android_provisioning_skip_user_setup,
     _get_android_provisioning_leave_all_system_apps_enabled,
     _get_android_provisioning_wifi_ssid,
     _get_android_provisioning_wifi_security_type,
@@ -17,12 +16,13 @@ from src.common.settings import (
 from src.agent.pairing import (
     build_android_provisioning_payload,
     resolve_android_provisioning,
-    PROVISIONING_KEY_SKIP_USER_SETUP,
     PROVISIONING_KEY_LEAVE_ALL_SYSTEM_APPS_ENABLED,
     PROVISIONING_KEY_WIFI_SSID,
     PROVISIONING_KEY_WIFI_SECURITY_TYPE,
     PROVISIONING_KEY_WIFI_PASSWORD,
 )
+
+SKIP_USER_SETUP_KEY = 'android.app.extra.PROVISIONING_SKIP_USER_SETUP'
 
 
 @pytest.fixture
@@ -51,8 +51,6 @@ def test_encryption_decryption_empty_inputs(app):
 
 
 def test_provisioning_settings_defaults(db_session):
-    # Before any values are set
-    assert _get_android_provisioning_skip_user_setup() is True
     assert _get_android_provisioning_leave_all_system_apps_enabled() is True
     assert _get_android_provisioning_wifi_ssid() == ""
     assert _get_android_provisioning_wifi_security_type() == "WPA"
@@ -61,30 +59,27 @@ def test_provisioning_settings_defaults(db_session):
 
 def test_provisioning_settings_persistence(db_session, app):
     with app.app_context():
-        Settings.set_value('android_provisioning_skip_user_setup', '0')
         Settings.set_value('android_provisioning_leave_all_system_apps_enabled', '0')
         Settings.set_value('android_provisioning_wifi_ssid', 'HomeNet')
         Settings.set_value('android_provisioning_wifi_security_type', 'NONE')
         Settings.set_value('android_provisioning_wifi_password', encrypt_setting('secret123'))
         
-        assert _get_android_provisioning_skip_user_setup() is False
         assert _get_android_provisioning_leave_all_system_apps_enabled() is False
         assert _get_android_provisioning_wifi_ssid() == 'HomeNet'
         assert _get_android_provisioning_wifi_security_type() == 'NONE'
         assert _get_android_provisioning_wifi_password() == 'secret123'
 
 
-def test_build_android_provisioning_payload_wifi_omitted():
+def test_build_android_provisioning_payload_omits_skip_user_setup():
     payload = build_android_provisioning_payload(
         server_url='ws://localhost/ws',
         apk_url='http://localhost/apk',
         signature_checksum='checksum',
         registration_token='reg-token',
-        skip_user_setup=True,
         leave_all_system_apps_enabled=True,
         wifi_ssid='',
     )
-    assert payload[PROVISIONING_KEY_SKIP_USER_SETUP] is True
+    assert SKIP_USER_SETUP_KEY not in payload
     assert payload[PROVISIONING_KEY_LEAVE_ALL_SYSTEM_APPS_ENABLED] is True
     assert PROVISIONING_KEY_WIFI_SSID not in payload
     assert PROVISIONING_KEY_WIFI_PASSWORD not in payload
@@ -96,13 +91,12 @@ def test_build_android_provisioning_payload_wifi_included():
         apk_url='http://localhost/apk',
         signature_checksum='checksum',
         registration_token='reg-token',
-        skip_user_setup=False,
         leave_all_system_apps_enabled=False,
         wifi_ssid='HomeNet',
         wifi_security_type='WPA',
         wifi_password='password123',
     )
-    assert payload[PROVISIONING_KEY_SKIP_USER_SETUP] is False
+    assert SKIP_USER_SETUP_KEY not in payload
     assert payload[PROVISIONING_KEY_LEAVE_ALL_SYSTEM_APPS_ENABLED] is False
     assert payload[PROVISIONING_KEY_WIFI_SSID] == 'HomeNet'
     assert payload[PROVISIONING_KEY_WIFI_SECURITY_TYPE] == 'WPA'
@@ -112,7 +106,6 @@ def test_build_android_provisioning_payload_wifi_included():
 @patch('src.agent.pairing.has_uploaded_android_apk', return_value=True)
 def test_resolve_android_provisioning_includes_new_options(mock_uploaded, db_session, app):
     with app.app_context():
-        Settings.set_value('android_provisioning_skip_user_setup', '0')
         Settings.set_value('android_provisioning_leave_all_system_apps_enabled', '1')
         Settings.set_value('android_provisioning_wifi_ssid', 'MyWiFi')
         Settings.set_value('android_provisioning_wifi_security_type', 'WPA')
@@ -124,14 +117,14 @@ def test_resolve_android_provisioning_includes_new_options(mock_uploaded, db_ses
             version='v0.0.0-dev',
             checksum_override='checksum1',
         )
-        assert context['skip_user_setup'] is False
         assert context['leave_all_system_apps_enabled'] is True
         assert context['wifi_ssid'] == 'MyWiFi'
         assert context['wifi_security_type'] == 'WPA'
         assert context['has_wifi_password'] is True
+        assert 'skip_user_setup' not in context
         
         payload = context['payload']
-        assert payload[PROVISIONING_KEY_SKIP_USER_SETUP] is False
+        assert SKIP_USER_SETUP_KEY not in payload
         assert payload[PROVISIONING_KEY_LEAVE_ALL_SYSTEM_APPS_ENABLED] is True
         assert payload[PROVISIONING_KEY_WIFI_SSID] == 'MyWiFi'
         assert payload[PROVISIONING_KEY_WIFI_PASSWORD] == 'pass123'
@@ -143,7 +136,6 @@ def test_post_android_provisioning_settings(auth_client, db_session, app):
             '/admin/settings',
             data={
                 'form_name': 'android_provisioning',
-                'android_provisioning_skip_user_setup': 'on',
                 # leave_all_system_apps_enabled is omitted (unchecked)
                 'android_provisioning_wifi_ssid': 'NewSSID',
                 'android_provisioning_wifi_security_type': 'WEP',
@@ -153,7 +145,6 @@ def test_post_android_provisioning_settings(auth_client, db_session, app):
         )
         assert response.status_code == 200
         
-        assert _get_android_provisioning_skip_user_setup() is True
         assert _get_android_provisioning_leave_all_system_apps_enabled() is False
         assert _get_android_provisioning_wifi_ssid() == 'NewSSID'
         assert _get_android_provisioning_wifi_security_type() == 'WEP'

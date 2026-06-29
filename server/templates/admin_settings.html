@@ -91,16 +91,7 @@
                     <input type="hidden" name="form_name" value="android_provisioning">
 
                     <div class="row g-3 mb-3">
-                        <div class="col-12 col-md-6">
-                            <div class="form-check form-switch mb-1">
-                                <input class="form-check-input" type="checkbox" id="android_provisioning_skip_user_setup" name="android_provisioning_skip_user_setup" {% if provisioning.skip_user_setup %}checked{% endif %}>
-                                <label class="form-check-label fw-bold small text-body" for="android_provisioning_skip_user_setup">
-                                    {{ t('pages.settings.skip_setup_wizard') }}
-                                </label>
-                            </div>
-                            <div class="form-text text-secondary small ms-5">{{ t('pages.settings.skip_setup_wizard_help') }}</div>
-                        </div>
-                        <div class="col-12 col-md-6">
+                        <div class="col-12">
                             <div class="form-check form-switch mb-1">
                                 <input class="form-check-input" type="checkbox" id="android_provisioning_leave_all_system_apps_enabled" name="android_provisioning_leave_all_system_apps_enabled" {% if provisioning.leave_all_system_apps_enabled %}checked{% endif %}>
                                 <label class="form-check-label fw-bold small text-body" for="android_provisioning_leave_all_system_apps_enabled">

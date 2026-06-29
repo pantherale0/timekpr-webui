@@ -39,8 +39,6 @@ class AgentConfigStore(context: Context) {
         migrateToDeviceProtectedStorageIfNeeded()
         val systemId = prefs.getString(KEY_SYSTEM_ID, null)?.takeIf { it.isNotBlank() }
             ?: UUID.randomUUID().toString().also { saveSystemId(it) }
-        val managementMode = prefs.getString(KEY_MANAGEMENT_MODE, null)
-            ?: MANAGEMENT_MODE_EXCLUSIVE_DO
         return AgentConfig(
             serverUrl = prefs.getString(KEY_SERVER_URL, "") ?: "",
             systemId = systemId,
@@ -49,8 +47,52 @@ class AgentConfigStore(context: Context) {
             agentVersion = prefs.getString(KEY_AGENT_VERSION, null)?.takeIf { it.isNotBlank() }
                 ?: BuildConfig.DEFAULT_AGENT_VERSION,
             pairingComplete = prefs.getBoolean(KEY_PAIRING_COMPLETE, false),
-            managementMode = managementMode,
+            managementMode = readManagementMode(),
         )
+    }
+
+    fun isManagementModeChosen(): Boolean {
+        return when (prefs.getString(KEY_MANAGEMENT_MODE, null)) {
+            MANAGEMENT_MODE_EXCLUSIVE_DO, MANAGEMENT_MODE_SECONDARY_USERS -> true
+            null -> (prefs.getString(KEY_SERVER_URL, "") ?: "").isNotBlank()
+            else -> false
+        }
+    }
+
+    fun hasPendingProvisioningPayload(): Boolean {
+        return prefs.getString(KEY_PENDING_SERVER_URL, null)?.isNotBlank() == true
+    }
+
+    fun savePendingProvisioningPayload(serverUrl: String, registrationToken: String?) {
+        writeBoth {
+            putString(KEY_PENDING_SERVER_URL, serverUrl.trim())
+            if (registrationToken.isNullOrBlank()) {
+                remove(KEY_PENDING_REGISTRATION_TOKEN)
+            } else {
+                putString(KEY_PENDING_REGISTRATION_TOKEN, registrationToken.trim())
+            }
+            if (!isManagementModeChosen()) {
+                putString(KEY_MANAGEMENT_MODE, MANAGEMENT_MODE_UNSET)
+            }
+        }
+    }
+
+    fun completeManagementModeSetup(mode: String) {
+        val pendingServerUrl = prefs.getString(KEY_PENDING_SERVER_URL, null)?.trim().orEmpty()
+        val pendingRegistrationToken = prefs.getString(KEY_PENDING_REGISTRATION_TOKEN, null)
+        writeBoth {
+            putString(KEY_MANAGEMENT_MODE, mode)
+            if (pendingServerUrl.isNotEmpty()) {
+                putString(KEY_SERVER_URL, pendingServerUrl)
+                if (pendingRegistrationToken.isNullOrBlank()) {
+                    remove(KEY_REGISTRATION_TOKEN)
+                } else {
+                    putString(KEY_REGISTRATION_TOKEN, pendingRegistrationToken.trim())
+                }
+                remove(KEY_PENDING_SERVER_URL)
+                remove(KEY_PENDING_REGISTRATION_TOKEN)
+            }
+        }
     }
 
     fun saveServerUrl(url: String) {
@@ -95,6 +137,9 @@ class AgentConfigStore(context: Context) {
             } else {
                 putString(KEY_REGISTRATION_TOKEN, registrationToken.trim())
             }
+            if (!isManagementModeChosen()) {
+                putString(KEY_MANAGEMENT_MODE, MANAGEMENT_MODE_EXCLUSIVE_DO)
+            }
         }
     }
 
@@ -103,6 +148,19 @@ class AgentConfigStore(context: Context) {
             remove(KEY_AGENT_TOKEN)
             putBoolean(KEY_PAIRING_COMPLETE, false)
             remove(KEY_FCM_TOKEN)
+        }
+    }
+
+    private fun readManagementMode(): String {
+        return when (val raw = prefs.getString(KEY_MANAGEMENT_MODE, null)) {
+            MANAGEMENT_MODE_EXCLUSIVE_DO, MANAGEMENT_MODE_SECONDARY_USERS -> raw
+            MANAGEMENT_MODE_UNSET -> MANAGEMENT_MODE_UNSET
+            null -> if ((prefs.getString(KEY_SERVER_URL, "") ?: "").isNotBlank()) {
+                MANAGEMENT_MODE_EXCLUSIVE_DO
+            } else {
+                MANAGEMENT_MODE_UNSET
+            }
+            else -> MANAGEMENT_MODE_UNSET
         }
     }
 
@@ -144,6 +202,8 @@ class AgentConfigStore(context: Context) {
     companion object {
         private const val PREFS_NAME = "guardian_agent_config"
         private const val KEY_SERVER_URL = "server_url"
+        private const val KEY_PENDING_SERVER_URL = "pending_provisioning_server_url"
+        private const val KEY_PENDING_REGISTRATION_TOKEN = "pending_provisioning_registration_token"
         private const val KEY_SYSTEM_ID = "system_id"
         private const val KEY_REGISTRATION_TOKEN = "registration_token"
         private const val KEY_AGENT_TOKEN = "agent_token"
@@ -151,6 +211,7 @@ class AgentConfigStore(context: Context) {
         private const val KEY_PAIRING_COMPLETE = "pairing_complete"
         private const val KEY_FCM_TOKEN = "fcm_token"
         private const val KEY_MANAGEMENT_MODE = "management_mode"
+        const val MANAGEMENT_MODE_UNSET = "unset"
         const val MANAGEMENT_MODE_EXCLUSIVE_DO = "exclusive_do"
         const val MANAGEMENT_MODE_SECONDARY_USERS = "secondary_users"
     }

@@ -15,6 +15,8 @@ import com.guardian.agent.R
 import com.guardian.agent.GuardianApplication
 import com.guardian.agent.admin.DeviceAdminActivationActivity
 import com.guardian.agent.admin.DeviceOwnerProvisioner
+import com.guardian.agent.admin.ManagementModeSetupActivity
+import com.guardian.agent.admin.ProvisioningBootstrap
 import com.guardian.agent.admin.SecondaryUserProvisioner
 import com.guardian.agent.service.AgentConnectionState
 import com.guardian.agent.service.AgentConnectionStatus
@@ -37,6 +39,12 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         if (SecondaryUserProvisioner.blockManagementActivity(this)) {
+            finish()
+            return
+        }
+
+        if (ProvisioningBootstrap.needsManagementModeSetup(this)) {
+            startActivity(Intent(this, ManagementModeSetupActivity::class.java))
             finish()
             return
         }

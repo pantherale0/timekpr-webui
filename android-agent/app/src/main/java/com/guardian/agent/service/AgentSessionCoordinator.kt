@@ -33,6 +33,11 @@ object AgentSessionCoordinator {
             return
         }
 
+        val configStore = GuardianApplication.from(appContext).configStore
+        if (DeviceOwnerProvisioner.isDeviceOwner(appContext) && !configStore.isManagementModeChosen()) {
+            return
+        }
+
         DeviceOwnerProvisioner.applyIfDeviceOwner(appContext)
         val app = GuardianApplication.from(appContext)
         app.appPolicyStore.restore()

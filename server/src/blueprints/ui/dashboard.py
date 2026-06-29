@@ -134,12 +134,10 @@ def admin_settings():
                 flash_t('flash.settings.apk_removed', 'success')
                 return redirect(url_for('ui_dashboard.admin_settings'))
 
-            skip_user_setup = '1' if request.form.get('android_provisioning_skip_user_setup') == 'on' else '0'
             leave_all_system_apps_enabled = '1' if request.form.get('android_provisioning_leave_all_system_apps_enabled') == 'on' else '0'
             wifi_ssid = (request.form.get('android_provisioning_wifi_ssid') or '').strip()
             wifi_security_type = (request.form.get('android_provisioning_wifi_security_type') or 'WPA').strip()
 
-            Settings.set_value('android_provisioning_skip_user_setup', skip_user_setup)
             Settings.set_value('android_provisioning_leave_all_system_apps_enabled', leave_all_system_apps_enabled)
             Settings.set_value('android_provisioning_wifi_ssid', wifi_ssid)
             Settings.set_value('android_provisioning_wifi_security_type', wifi_security_type)

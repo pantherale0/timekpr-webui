@@ -9,7 +9,7 @@ Kotlin/Android port of the Guardian Rust Linux client. See the [Android agent do
 3. Build: `./gradlew assembleDebug`
 4. Install the APK, scan the server Settings QR, approve in Admin → Devices.
 5. Provision as **Device Owner** so capabilities are granted automatically:
-   `adb dpm set-device-owner com.guardian.agent/.admin.GuardianDeviceAdminReceiver`
+   `adb dpm set-device-owner com.guardian.agent/com.guardian.agent.admin.GuardianDeviceAdminReceiver`
    (device must have no accounts; factory reset or new user profile). Without device owner, enable Device Admin, Usage Access, and VPN manually on the phone.
 
 Connectivity uses **FCM + short WebSocket sessions**, not a 24/7 socket. See the [Android agent docs](https://pantherale0.github.io/timekpr-webui/platforms/android-agent/).

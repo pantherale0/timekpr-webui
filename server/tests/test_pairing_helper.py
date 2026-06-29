@@ -138,7 +138,7 @@ def test_resolve_android_signature_checksum_fetches_release(mock_fetch):
 
 def test_android_dpc_component_matches_guardian_apk():
     assert ANDROID_DPC_COMPONENT == (
-        'com.guardian.agent/.admin.GuardianDeviceAdminReceiver'
+        'com.guardian.agent/com.guardian.agent.admin.GuardianDeviceAdminReceiver'
     )
     assert ANDROID_EXTRA_SERVER_URL == 'com.guardian.agent.EXTRA_SERVER_URL'
     assert ANDROID_EXTRA_REGISTRATION_TOKEN == 'com.guardian.agent.EXTRA_REGISTRATION_TOKEN'

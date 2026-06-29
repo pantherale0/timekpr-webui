@@ -82,6 +82,7 @@
 
         <activity
             android:name=".admin.ProvisioningModeActivity"
+            android:enabled="@bool/provision_mode_compliance_enabled"
             android:exported="true"
             android:permission="android.permission.BIND_DEVICE_ADMIN"
             android:theme="@android:style/Theme.Translucent.NoTitleBar">
@@ -92,15 +93,21 @@
         </activity>
 
         <activity
+            android:name=".admin.ManagementModeSetupActivity"
+            android:exported="false"
+            android:theme="@style/Theme.GuardianAgent" />
+
+        <activity-alias
             android:name=".admin.AdminPolicyComplianceActivity"
+            android:enabled="@bool/provision_mode_compliance_enabled"
             android:exported="true"
             android:permission="android.permission.BIND_DEVICE_ADMIN"
-            android:theme="@style/Theme.GuardianAgent">
+            android:targetActivity=".admin.ManagementModeSetupActivity">
             <intent-filter>
                 <action android:name="android.app.action.ADMIN_POLICY_COMPLIANCE" />
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
-        </activity>
+        </activity-alias>
 
         <receiver
             android:name=".admin.GuardianDeviceAdminReceiver"
