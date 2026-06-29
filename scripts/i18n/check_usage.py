@@ -18,6 +18,7 @@ from lib import (  # noqa: E402
     DEFAULT_LOCALE,
     I18N_ROOT,
     REPO_ROOT,
+    android_string_name,
     discover_locales,
     iter_leaf_strings,
     load_catalog,
@@ -47,6 +48,25 @@ JS_I18N_KEY_OBJECT_RE = re.compile(
 EXT_I18N_RE = re.compile(
     r"""guardianExtI18n\(\s*['"]([^'"]+)['"]""",
 )
+
+# Android agent (Kotlin + layout XML)
+ANDROID_R_STRING_RE = re.compile(r'\bR\.string\.([A-Za-z0-9_]+)')
+ANDROID_XML_STRING_RE = re.compile(r'@string/([A-Za-z0-9_]+)')
+ANDROID_XML_TEXT_ATTR_RE = re.compile(
+    r'android:(?:text|hint|contentDescription|title|summary)\s*=\s*"([^"@][^"]*)"',
+    re.IGNORECASE,
+)
+KOTLIN_HARDCODED_UI_RE = re.compile(
+    r'(?:\.text|setText\(|setContentTitle\(|setContentText\(|Snackbar\.make\([^,]+,\s*)\s*"([^"]{4,})"',
+)
+
+ANDROID_SKIP_PATH_RE = re.compile(
+    r'(?:^|/)values(?:-[\w-]+)?/strings\.xml$|/uniffi/|/build/|/src/test/',
+)
+
+
+def _android_root() -> Path:
+    return REPO_ROOT / 'android-agent' / 'app' / 'src' / 'main'
 
 # ── Hardcoded string patterns ─────────────────────────────────────────────────
 
@@ -180,6 +200,30 @@ def _load_extension_keys() -> set[str]:
     return leaves
 
 
+def _load_agent_string_keys() -> set[str]:
+    catalog = load_catalog(DEFAULT_LOCALE, 'agent')
+    strings = catalog.get('strings')
+    if not isinstance(strings, dict):
+        return set()
+    return {key for key, value in strings.items() if isinstance(value, str)}
+
+
+def _agent_catalog_key(resource_name: str) -> str:
+    """Map an Android @string / R.string resource name to agent.yaml strings: key."""
+    keys = _load_agent_string_keys()
+    if resource_name in keys:
+        return resource_name
+    for key in keys:
+        if android_string_name(key) == resource_name:
+            return key
+    return resource_name
+
+
+def _should_skip_android_path(path: Path) -> bool:
+    rel = _rel(path)
+    return bool(ANDROID_SKIP_PATH_RE.search(rel))
+
+
 def _is_user_visible(text: str) -> bool:
     cleaned = ' '.join(text.split())
     if len(cleaned) < 4:
@@ -268,6 +312,58 @@ def _scan_js_keys(path: Path, content: str, refs: list[KeyReference], seen: set,
                 service='server',
                 catalog_key=_normalize_js_key(candidate),
             )
+
+
+def _scan_android_kotlin_keys(path: Path, content: str, refs: list[KeyReference], seen: set) -> None:
+    for match in ANDROID_R_STRING_RE.finditer(content):
+        resource = match.group(1)
+        _add_key_ref(
+            refs, seen,
+            key=resource,
+            path=path,
+            line=_line_number(content, match.start()),
+            service='agent',
+            catalog_key=_agent_catalog_key(resource),
+        )
+
+
+def _scan_android_xml_keys(path: Path, content: str, refs: list[KeyReference], seen: set) -> None:
+    for match in ANDROID_XML_STRING_RE.finditer(content):
+        resource = match.group(1)
+        _add_key_ref(
+            refs, seen,
+            key=resource,
+            path=path,
+            line=_line_number(content, match.start()),
+            service='agent',
+            catalog_key=_agent_catalog_key(resource),
+        )
+
+
+def _scan_hardcoded_android_xml(path: Path, content: str, findings: list[HardcodedString]) -> None:
+    lines = content.splitlines()
+    for line_no, line in enumerate(lines, start=1):
+        if SKIP_LINE_RE.search(line):
+            continue
+        for match in ANDROID_XML_TEXT_ATTR_RE.finditer(line):
+            if '@string/' in match.group(0):
+                continue
+            text = match.group(1).strip()
+            if _is_user_visible(text):
+                findings.append(HardcodedString(_rel(path), line_no, text, 'android-xml'))
+
+
+def _scan_hardcoded_android_kotlin(path: Path, content: str, findings: list[HardcodedString]) -> None:
+    lines = content.splitlines()
+    for line_no, line in enumerate(lines, start=1):
+        if SKIP_LINE_RE.search(line):
+            continue
+        if 'R.string.' in line:
+            continue
+        for match in KOTLIN_HARDCODED_UI_RE.finditer(line):
+            text = match.group(1).strip()
+            if _is_user_visible(text):
+                findings.append(HardcodedString(_rel(path), line_no, text, 'android-kotlin'))
 
 
 def _scan_hardcoded_template(path: Path, content: str, findings: list[HardcodedString]) -> None:
@@ -369,6 +465,25 @@ def collect_key_references(changed_only: set[str] | None = None) -> list[KeyRefe
         content = path.read_text(encoding='utf-8')
         _scan_js_keys(path, content, refs, seen, service='extension')
 
+    if _android_root().is_dir():
+        kotlin_paths = _filter_paths(
+            _iter_files(('*.kt',), (_android_root() / 'java',)),
+            changed_only,
+        )
+        for path in kotlin_paths:
+            if _should_skip_android_path(path):
+                continue
+            _scan_android_kotlin_keys(path, path.read_text(encoding='utf-8'), refs, seen)
+
+        xml_paths = _filter_paths(
+            _iter_files(('*.xml',), (_android_root() / 'res',)),
+            changed_only,
+        )
+        for path in xml_paths:
+            if _should_skip_android_path(path):
+                continue
+            _scan_android_xml_keys(path, path.read_text(encoding='utf-8'), refs, seen)
+
     return refs
 
 
@@ -391,6 +506,25 @@ def collect_hardcoded_strings(changed_only: set[str] | None = None) -> list[Hard
             continue
         _scan_hardcoded_js(path, path.read_text(encoding='utf-8'), findings)
 
+    if _android_root().is_dir():
+        kotlin_paths = _filter_paths(
+            _iter_files(('*.kt',), (_android_root() / 'java',)),
+            changed_only,
+        )
+        for path in kotlin_paths:
+            if _should_skip_android_path(path):
+                continue
+            _scan_hardcoded_android_kotlin(path, path.read_text(encoding='utf-8'), findings)
+
+        xml_paths = _filter_paths(
+            _iter_files(('*.xml',), (_android_root() / 'res',)),
+            changed_only,
+        )
+        for path in xml_paths:
+            if _should_skip_android_path(path):
+                continue
+            _scan_hardcoded_android_xml(path, path.read_text(encoding='utf-8'), findings)
+
     deduped: list[HardcodedString] = []
     seen: set[tuple[str, int, str]] = set()
     for item in findings:
@@ -405,6 +539,7 @@ def collect_hardcoded_strings(changed_only: set[str] | None = None) -> list[Hard
 def validate_references(refs: list[KeyReference]) -> list[KeyReference]:
     server_keys = _load_server_keys()
     extension_keys = _load_extension_keys()
+    agent_keys = _load_agent_string_keys()
     missing: list[KeyReference] = []
 
     for ref in refs:
@@ -412,6 +547,8 @@ def validate_references(refs: list[KeyReference]) -> list[KeyReference]:
             exists = ref.catalog_key in server_keys
         elif ref.service == 'extension':
             exists = ref.key in extension_keys or f'messages.{ref.key}.message' in extension_keys
+        elif ref.service == 'agent':
+            exists = ref.catalog_key in agent_keys
         else:
             exists = False
         if not exists:
@@ -480,8 +617,9 @@ def format_markdown(report: CheckReport, *, changed_files: set[str] | None = Non
         lines.append(f'### ⚠️ Hardcoded user-visible strings ({len(report.hardcoded)} in {scope})')
         lines.append('')
         lines.append(
-            'Consider moving these to `i18n/en/server.yaml` (or the relevant service catalog) '
-            'and referencing them with `t()` / `i18n()`.'
+            'Consider moving these to `i18n/en/server.yaml`, `i18n/en/agent.yaml` '
+            '(under `strings:`), or the relevant service catalog, and referencing them '
+            'with `t()` / `i18n()` / `@string` / `R.string`.'
         )
         lines.append('')
         lines.append('| Location | Kind | Text |')

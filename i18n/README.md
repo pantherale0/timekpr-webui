@@ -104,6 +104,8 @@ python scripts/i18n/manage.py bundle --target all        # server + agent bundle
 | `agent.yaml` | Flat `strings:` → Android `strings.xml`; `overlay:` + `overlay_ui:` → `overlay-i18n.{locale}.js`; `desktop:` → Rust JSON |
 | `extension.yaml` | `messages:` map → Chrome `_locales/<lang>/messages.json` |
 
+`check-usage` scans `android-agent/` Kotlin (`R.string.*`) and layout XML (`@string/*`), validating keys against `agent.yaml` `strings:` and flagging hardcoded `android:text` / Kotlin UI literals.
+
 Use `{parameter}` placeholders in server strings. Android uses `%1$s` style in `agent.yaml` where required.
 
 ### CI integration

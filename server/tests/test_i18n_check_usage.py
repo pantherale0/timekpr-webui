@@ -116,6 +116,72 @@ def test_dynamic_template_key_suffix_is_ignored(tmp_path, monkeypatch):
     assert report.missing_keys == []
 
 
+def test_android_missing_string_key(tmp_path, monkeypatch):
+    repo = tmp_path / 'repo'
+    kotlin = repo / 'android-agent' / 'app' / 'src' / 'main' / 'java' / 'com' / 'example'
+    kotlin.mkdir(parents=True)
+    (kotlin / 'MainActivity.kt').write_text(
+        'val title = getString(R.string.missing_android_copy)\n',
+        encoding='utf-8',
+    )
+
+    i18n_root = repo / 'i18n' / 'en'
+    i18n_root.mkdir(parents=True)
+    (i18n_root / 'agent.yaml').write_text(
+        'meta:\n  locale: en\n  label: English\nstrings:\n  app_name: Guardian Agent\n',
+        encoding='utf-8',
+    )
+    (i18n_root / 'server.yaml').write_text(
+        'meta:\n  locale: en\n  label: English\n',
+        encoding='utf-8',
+    )
+    (i18n_root / 'extension.yaml').write_text(
+        'meta:\n  locale: en\n  label: English\nmessages: {}\n',
+        encoding='utf-8',
+    )
+
+    monkeypatch.setattr(check_usage, 'REPO_ROOT', repo)
+    monkeypatch.setattr(lib, 'I18N_ROOT', repo / 'i18n')
+    monkeypatch.setattr(lib, 'REPO_ROOT', repo)
+
+    report = check_usage.run_check()
+    assert any(ref.catalog_key == 'missing_android_copy' for ref in report.missing_keys)
+
+
+def test_android_hardcoded_layout_warning(tmp_path, monkeypatch):
+    repo = tmp_path / 'repo'
+    layout = repo / 'android-agent' / 'app' / 'src' / 'main' / 'res' / 'layout'
+    layout.mkdir(parents=True)
+    (layout / 'activity_example.xml').write_text(
+        '<TextView android:text="Hardcoded Android Heading" />\n',
+        encoding='utf-8',
+    )
+
+    i18n_root = repo / 'i18n' / 'en'
+    i18n_root.mkdir(parents=True)
+    (i18n_root / 'agent.yaml').write_text(
+        'meta:\n  locale: en\n  label: English\nstrings:\n  app_name: Guardian Agent\n',
+        encoding='utf-8',
+    )
+    (i18n_root / 'server.yaml').write_text(
+        'meta:\n  locale: en\n  label: English\n',
+        encoding='utf-8',
+    )
+    (i18n_root / 'extension.yaml').write_text(
+        'meta:\n  locale: en\n  label: English\nmessages: {}\n',
+        encoding='utf-8',
+    )
+
+    monkeypatch.setattr(check_usage, 'REPO_ROOT', repo)
+    monkeypatch.setattr(lib, 'I18N_ROOT', repo / 'i18n')
+    monkeypatch.setattr(lib, 'REPO_ROOT', repo)
+
+    report = check_usage.run_check(
+        changed_files={'android-agent/app/src/main/res/layout/activity_example.xml'},
+    )
+    assert any(item.text == 'Hardcoded Android Heading' for item in report.hardcoded)
+
+
 def test_diff_mode_ignores_unchanged_files(tmp_path, monkeypatch):
     repo = tmp_path / 'repo'
     server = repo / 'server' / 'src'
