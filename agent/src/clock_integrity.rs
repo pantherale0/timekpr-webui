@@ -136,6 +136,13 @@ impl ClockIntegrityState {
             };
         }
 
+        // elapsedRealtime / CLOCK_BOOTTIME reset on reboot; a lower reading means
+        // the persisted baseline is from a previous boot and must not be treated
+        // as clock tampering.
+        if boottime_ms < self.inner.baseline_boottime_ms {
+            return self.handle_reboot(wall_ms, boottime_ms, ntp_ms);
+        }
+
         let expected_wall_ms = self.trusted_wall_ms(boottime_ms);
         let boottime_skew_ms = (wall_ms - expected_wall_ms).abs();
         let boottime_breach = boottime_skew_ms > self.threshold_ms();
@@ -207,6 +214,45 @@ impl ClockIntegrityState {
             skew_seconds: 0,
             detection_source: None,
             tamper_active: false,
+            expected_wall_ms: wall_ms,
+        }
+    }
+
+    fn handle_reboot(
+        &mut self,
+        wall_ms: i64,
+        boottime_ms: i64,
+        ntp_ms: Option<i64>,
+    ) -> TickOutcome {
+        let was_tamper = self.inner.tamper_active;
+        self.inner.tamper_active = false;
+        self.inner.consecutive_passing_checks = 0;
+        self.rebaseline(wall_ms, boottime_ms, ntp_ms);
+
+        if let Some(ntp) = ntp_ms {
+            let ntp_skew_ms = (wall_ms - ntp).abs();
+            if ntp_skew_ms > self.threshold_ms() {
+                self.inner.tamper_active = true;
+                let skew_seconds = ntp_skew_ms.saturating_add(999) / 1000;
+                return TickOutcome {
+                    status: TickStatus::TamperDetected,
+                    skew_seconds,
+                    detection_source: Some(DetectionSource::Ntp),
+                    tamper_active: true,
+                    expected_wall_ms: wall_ms,
+                };
+            }
+        }
+
+        TickOutcome {
+            status: if was_tamper {
+                TickStatus::TamperCleared
+            } else {
+                TickStatus::Ok
+            },
+            skew_seconds: 0,
+            detection_source: None,
+            tamper_active: self.tamper_active(),
             expected_wall_ms: wall_ms,
         }
     }
@@ -490,6 +536,36 @@ mod tests {
         let second = state.tick(1_001_000, 11_000, Some(1_001_000));
         assert_eq!(second.status, TickStatus::TamperCleared);
         assert!(!state.tamper_active());
+    }
+
+    #[test]
+    fn reboot_rebaselines_without_tamper() {
+        let mut state = state_with_baseline(1_000_000, 3_610_000);
+        let outcome = state.tick(1_003_700_000, 60_000, None);
+        assert_eq!(outcome.status, TickStatus::Ok);
+        assert!(!state.tamper_active());
+    }
+
+    #[test]
+    fn reboot_clears_false_positive_tamper() {
+        let mut inner = PersistedClockIntegrity::default();
+        inner.baseline_wall_ms = 1_000_000;
+        inner.baseline_boottime_ms = 3_610_000;
+        inner.tamper_active = true;
+        let mut state = ClockIntegrityState::new(inner);
+
+        let outcome = state.tick(1_003_700_000, 60_000, None);
+        assert_eq!(outcome.status, TickStatus::TamperCleared);
+        assert!(!state.tamper_active());
+    }
+
+    #[test]
+    fn reboot_still_flags_ntp_mismatch() {
+        let mut state = state_with_baseline(1_000_000, 3_610_000);
+        let outcome = state.tick(1_003_700_000, 60_000, Some(1_004_100_000));
+        assert_eq!(outcome.status, TickStatus::TamperDetected);
+        assert_eq!(outcome.detection_source, Some(DetectionSource::Ntp));
+        assert!(state.tamper_active());
     }
 
     #[test]

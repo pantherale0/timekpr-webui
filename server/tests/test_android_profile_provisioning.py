@@ -167,6 +167,12 @@ def test_agent_device_has_managed_profiles_property(db_session, android_device):
     assert android_device.has_managed_profiles is True
 
 
+def test_device_detail_parental_access_code_shown_without_managed_profiles(auth_client, android_device):
+    res = auth_client.get(f'/devices/{android_device.system_id}')
+    assert res.status_code == 200
+    assert b"Parental Access Code" in res.data
+
+
 def test_device_detail_locked_device_recovery_conditional_rendering(auth_client, android_device, db_session):
     # Log in first
     Settings.set_admin_password("admin")
