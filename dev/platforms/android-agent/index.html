@@ -3163,19 +3163,19 @@
 <ol>
 <li>Open <strong>Settings → Agent pairing → Android MDM provisioning QR</strong> in the WebUI.</li>
 <li>On a factory-reset device, tap the welcome screen six times and scan the MDM QR.</li>
-<li>Android downloads the APK, sets <code>com.timekpr.agent</code> as device owner, and applies the server URL from admin extras.</li>
+<li>Android downloads the APK, sets <code>com.guardian.agent</code> as device owner, and applies the server URL from admin extras.</li>
 <li>Approve the pending device in <strong>Admin → Devices</strong> (same as in-app pairing).</li>
 </ol>
 <p>The server emits standard <code>android.app.extra.PROVISIONING_*</code> keys. Admin extras use:</p>
 <ul>
-<li><code>com.timekpr.agent.EXTRA_SERVER_URL</code></li>
-<li><code>com.timekpr.agent.EXTRA_REGISTRATION_TOKEN</code> (optional)</li>
+<li><code>com.guardian.agent.EXTRA_SERVER_URL</code></li>
+<li><code>com.guardian.agent.EXTRA_REGISTRATION_TOKEN</code> (optional)</li>
 </ul>
 <h4 id="release-servers">Release servers<a class="headerlink" href="#release-servers" title="Permanent link">&para;</a></h4>
 <p>When <code>TIMEKPR_SERVER_VERSION</code> matches a GitHub release tag (e.g. <code>v1.2.3</code>), the WebUI defaults to:</p>
 <ul>
-<li>APK: <code>https://github.com/pantherale0/timekpr-webui/releases/download/{tag}/timekpr-android-agent-{tag}.apk</code></li>
-<li>Checksum: companion <code>timekpr-android-agent-{tag}.signature-checksum</code> asset</li>
+<li>APK: <code>https://github.com/pantherale0/timekpr-webui/releases/download/{tag}/guardian-android-agent-{tag}.apk</code></li>
+<li>Checksum: companion <code>guardian-android-agent-{tag}.signature-checksum</code> asset</li>
 </ul>
 <h4 id="development-servers">Development servers<a class="headerlink" href="#development-servers" title="Permanent link">&para;</a></h4>
 <p>When the server runs as <code>v0.0.0-dev</code>, no release assets exist. Build a <strong>release</strong> APK locally and upload it in <strong>Settings → Android MDM provisioning QR</strong>. The server stores the file, serves it at <code>/api/pairing/provisioning/apk</code>, and computes the signature checksum automatically (requires <code>apksigner</code> in <code>ANDROID_HOME</code> or <code>~/Android/Sdk/build-tools</code> on the server host).</p>
@@ -3234,7 +3234,7 @@
 </tr>
 <tr>
 <td>Screen time enforcement</td>
-<td>Device Admin (<code>TimeKprDeviceAdminReceiver</code>)</td>
+<td>Device Admin (<code>GuardianDeviceAdminReceiver</code>)</td>
 </tr>
 <tr>
 <td>App usage monitoring</td>
@@ -3279,7 +3279,7 @@
 <ol>
 <li>Enable <strong>Developer Options</strong> and <strong>USB Debugging</strong> on the target device.</li>
 <li>Connect the device to your computer and run the following command:
-   <div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>adb<span class="w"> </span>shell<span class="w"> </span>dpm<span class="w"> </span>set-device-owner<span class="w"> </span>com.timekpr.agent/.admin.TimeKprDeviceAdminReceiver
+   <div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>adb<span class="w"> </span>shell<span class="w"> </span>dpm<span class="w"> </span>set-device-owner<span class="w"> </span>com.guardian.agent/.admin.GuardianDeviceAdminReceiver
 </code></pre></div></li>
 </ol>
 <div class="admonition warning">
@@ -3469,7 +3469,7 @@
 <li>Installs via <code>PackageInstaller</code> (silent when device owner; may prompt on sideload-only installs per Android platform rules)</li>
 <li>Reconnects after install via <code>PACKAGE_REPLACED</code> / install callback</li>
 </ol>
-<p><strong>Release servers:</strong> APK from <code>https://github.com/pantherale0/timekpr-webui/releases/download/{tag}/timekpr-android-agent-{tag}.apk</code> with companion <code>.signature-checksum</code> asset.</p>
+<p><strong>Release servers:</strong> APK from <code>https://github.com/pantherale0/timekpr-webui/releases/download/{tag}/guardian-android-agent-{tag}.apk</code> with companion <code>.signature-checksum</code> asset.</p>
 <p><strong>Development servers:</strong> Upload a signed release APK in <strong>Settings → Android MDM provisioning QR</strong>; the server serves it at <code>/api/pairing/provisioning/apk</code> and includes that URL in the update response.</p>
 <p>If <code>update_available</code> is false (dev server without uploaded APK), the agent shows the server error message and retries on the next sync cycle.</p>
 
