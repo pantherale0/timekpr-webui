@@ -572,6 +572,7 @@ jobs:
         working-directory: android-agent
         env:
           GUARDIAN_AGENT_VERSION: ${{ github.ref_name }}
+          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
           ANDROID_KEYSTORE_PATH: ${{ github.workspace }}/android-agent/release.keystore
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}

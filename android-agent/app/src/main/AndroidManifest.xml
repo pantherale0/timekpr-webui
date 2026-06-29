@@ -35,6 +35,19 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.GuardianAgent">
 
+        <!--
+          Sentry auto-init (SentryInitProvider) reads io.sentry.dsn from the manifest, NOT
+          BuildConfig.SENTRY_DSN. CI sets SENTRY_DSN for manual init in GuardianApplication.
+          Disable auto-init so an empty/missing manifest DSN cannot crash app startup.
+        -->
+        <meta-data
+            android:name="io.sentry.auto-init"
+            android:value="false" />
+        <meta-data
+            android:name="io.sentry.dsn"
+            android:value="${sentryDsn}"
+            tools:replace="android:value" />
+
         <activity
             android:name=".ui.MainActivity"
             android:exported="true"
@@ -97,17 +110,17 @@
             android:exported="false"
             android:theme="@style/Theme.GuardianAgent" />
 
-        <activity-alias
+        <activity
             android:name=".admin.AdminPolicyComplianceActivity"
             android:enabled="@bool/provision_mode_compliance_enabled"
             android:exported="true"
             android:permission="android.permission.BIND_DEVICE_ADMIN"
-            android:targetActivity=".admin.ManagementModeSetupActivity">
+            android:theme="@style/Theme.GuardianAgent">
             <intent-filter>
                 <action android:name="android.app.action.ADMIN_POLICY_COMPLIANCE" />
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
-        </activity-alias>
+        </activity>
 
         <receiver
             android:name=".admin.GuardianDeviceAdminReceiver"

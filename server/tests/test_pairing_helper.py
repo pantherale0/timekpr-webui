@@ -17,6 +17,7 @@ from src.agent.pairing import (
     PROVISIONING_KEY_DOWNLOAD,
     PROVISIONING_KEY_EXTRAS,
     PROVISIONING_KEY_SIGNATURE,
+    PROVISIONING_KEY_SKIP_ENCRYPTION,
     build_android_provisioning_payload,
     build_pairing_payload,
     default_android_apk_url,
@@ -126,7 +127,16 @@ def test_build_uploaded_android_apk_url_uses_wss_origin():
     assert url == 'https://timekpr.example/api/pairing/provisioning/apk'
 
 
-def test_resolve_android_signature_checksum_prefers_override():
+@patch('src.agent.pairing.has_uploaded_android_apk', return_value=True)
+@patch('src.agent.pairing.compute_apk_signature_checksum', return_value='computed-checksum')
+def test_resolve_android_signature_checksum_computes_from_upload(mock_compute, mock_uploaded):
+    assert resolve_android_signature_checksum('v0.10', 'stale-override') == 'computed-checksum'
+    mock_compute.assert_called_once()
+
+
+@patch('src.agent.pairing.has_uploaded_android_apk', return_value=True)
+@patch('src.agent.pairing.compute_apk_signature_checksum', side_effect=RuntimeError('fail'))
+def test_resolve_android_signature_checksum_falls_back_to_stored_override(mock_compute, mock_uploaded):
     assert resolve_android_signature_checksum('v0.10', 'checksum-override') == 'checksum-override'
 
 
@@ -157,6 +167,15 @@ def test_build_android_provisioning_payload_shape():
     extras = payload[PROVISIONING_KEY_EXTRAS]
     assert extras[ANDROID_EXTRA_SERVER_URL] == 'wss://example.com/ws'
     assert extras[ANDROID_EXTRA_REGISTRATION_TOKEN] == 'reg-token'
+    assert payload[PROVISIONING_KEY_SKIP_ENCRYPTION] is True
+
+
+def test_provisioning_download_warnings_for_http_apk():
+    from src.agent.pairing import provisioning_download_warnings
+
+    warnings = provisioning_download_warnings('http://10.0.0.5:5000/api/pairing/provisioning/apk')
+    assert warnings
+    assert provisioning_download_warnings('https://example.com/app.apk') == []
 
 
 def test_provisioning_payload_json_roundtrip():

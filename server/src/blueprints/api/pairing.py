@@ -153,6 +153,8 @@ def provisioning_config():
         'signature_checksum': context['signature_checksum'],
         'checksum_source': context['checksum_source'],
         'provisioning_ready': context['provisioning_ready'],
+        'provisioning_warnings': context.get('provisioning_warnings') or [],
+        'apk_download_https': context.get('apk_download_https', False),
         'is_dev_version': context['is_dev_version'],
     })
 

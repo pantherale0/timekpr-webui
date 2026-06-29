@@ -152,6 +152,13 @@
                     {% endif %}
                 </div>
                 {% else %}
+                {% if provisioning.provisioning_warnings %}
+                <div class="alert alert-warning small py-2 mt-4 mb-0 rounded-0">
+                    {% for warning in provisioning.provisioning_warnings %}
+                    <div><i class="fas fa-exclamation-triangle me-1"></i>{{ warning }}</div>
+                    {% endfor %}
+                </div>
+                {% endif %}
                 <div class="row g-4 align-items-start mt-4">
                     <div class="col-12 col-md-auto text-center">
                         <img

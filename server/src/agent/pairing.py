@@ -38,6 +38,7 @@ PROVISIONING_KEY_SIGNATURE = 'android.app.extra.PROVISIONING_DEVICE_ADMIN_SIGNAT
 PROVISIONING_KEY_DOWNLOAD = 'android.app.extra.PROVISIONING_DEVICE_ADMIN_PACKAGE_DOWNLOAD_LOCATION'
 PROVISIONING_KEY_EXTRAS = 'android.app.extra.PROVISIONING_ADMIN_EXTRAS_BUNDLE'
 PROVISIONING_KEY_LEAVE_ALL_SYSTEM_APPS_ENABLED = 'android.app.extra.PROVISIONING_LEAVE_ALL_SYSTEM_APPS_ENABLED'
+PROVISIONING_KEY_SKIP_ENCRYPTION = 'android.app.extra.PROVISIONING_SKIP_ENCRYPTION'
 PROVISIONING_KEY_WIFI_SSID = 'android.app.extra.PROVISIONING_WIFI_SSID'
 PROVISIONING_KEY_WIFI_SECURITY_TYPE = 'android.app.extra.PROVISIONING_WIFI_SECURITY_TYPE'
 PROVISIONING_KEY_WIFI_PASSWORD = 'android.app.extra.PROVISIONING_WIFI_PASSWORD'
@@ -353,6 +354,9 @@ def remove_uploaded_android_apk() -> None:
 
 def resolve_android_apk_url(version: str, server_url: str = '') -> str:
     """Resolve the APK URL used in Android MDM provisioning QR codes."""
+    explicit = (os.environ.get('TIMEKPR_ANDROID_PROVISIONING_APK_URL') or '').strip()
+    if explicit:
+        return explicit
     if has_uploaded_android_apk() and (server_url or '').strip():
         return build_uploaded_android_apk_url(server_url)
     if is_dev_server_version(version):
@@ -391,15 +395,38 @@ def resolve_android_signature_checksum(
     override: str | None = None,
 ) -> str | None:
     """Resolve the APK signing certificate checksum for MDM provisioning."""
-    candidate = (override or '').strip()
-    if candidate:
-        return candidate
+    if has_uploaded_android_apk():
+        try:
+            return compute_apk_signature_checksum(get_android_apk_storage_path())
+        except RuntimeError as exc:
+            _LOGGER.warning('Failed to compute checksum from uploaded APK: %s', exc)
+            stored = (override or '').strip()
+            if stored:
+                return stored
+            return None
 
     env_checksum = (os.environ.get('TIMEKPR_ANDROID_SIGNATURE_CHECKSUM') or '').strip()
     if env_checksum:
         return env_checksum
 
     return _fetch_release_signature_checksum(version)
+
+
+def is_https_download_url(url: str) -> bool:
+    parsed = urlparse((url or '').strip())
+    return parsed.scheme == 'https' and bool(parsed.netloc)
+
+
+def provisioning_download_warnings(apk_url: str) -> list[str]:
+    warnings: list[str] = []
+    if not apk_url:
+        return warnings
+    if not is_https_download_url(apk_url):
+        warnings.append(
+            'APK download URL is not HTTPS. Many devices (including Samsung) refuse to '
+            'download the DPC during setup wizard provisioning over plain HTTP.'
+        )
+    return warnings
 
 
 def build_android_provisioning_payload(
@@ -425,6 +452,7 @@ def build_android_provisioning_payload(
         PROVISIONING_KEY_DOWNLOAD: apk_url.strip(),
         PROVISIONING_KEY_EXTRAS: extras,
         PROVISIONING_KEY_LEAVE_ALL_SYSTEM_APPS_ENABLED: leave_all_system_apps_enabled,
+        PROVISIONING_KEY_SKIP_ENCRYPTION: True,
     }
 
     if wifi_ssid and wifi_ssid.strip():
@@ -470,12 +498,13 @@ def resolve_android_provisioning(
     """Resolve APK URL, checksum, and readiness for Android MDM provisioning."""
     apk_url = resolve_android_apk_url(version, server_url=server_url)
     signature_checksum = resolve_android_signature_checksum(version, checksum_override)
+    download_warnings = provisioning_download_warnings(apk_url or '')
     provisioning_ready = bool(apk_url and signature_checksum)
 
     checksum_source = 'missing'
-    if (checksum_override or '').strip():
-        checksum_source = 'upload' if has_uploaded_android_apk() else 'override'
-    elif (os.environ.get('TIMEKPR_ANDROID_SIGNATURE_CHECKSUM') or '').strip():
+    if has_uploaded_android_apk() and signature_checksum:
+        checksum_source = 'upload'
+    elif (os.environ.get('TIMEKPR_ANDROID_SIGNATURE_CHECKSUM') or '').strip() and signature_checksum:
         checksum_source = 'environment'
     elif signature_checksum:
         checksum_source = 'release'
@@ -519,9 +548,11 @@ def resolve_android_provisioning(
     return {
         'apk_url': apk_url,
         'apk_source': apk_source,
+        'apk_download_https': is_https_download_url(apk_url or ''),
         'signature_checksum': signature_checksum,
         'checksum_source': checksum_source,
         'provisioning_ready': provisioning_ready,
+        'provisioning_warnings': download_warnings,
         'payload': payload,
         'payload_json': payload_json,
         'is_dev_version': is_dev_server_version(version),

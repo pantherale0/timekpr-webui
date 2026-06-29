@@ -25,6 +25,12 @@ fun versionCodeFromTag(tag: String): Int {
 
 val releaseAgentVersion = normalizedAgentVersion(System.getenv("GUARDIAN_AGENT_VERSION"))
 
+fun gradleStringLiteral(value: String): String {
+    return "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
+}
+
+val sentryDsn = System.getenv("SENTRY_DSN").orEmpty().trim()
+
 android {
     namespace = "com.guardian.agent"
     compileSdk = 35
@@ -36,7 +42,9 @@ android {
         versionCode = versionCodeFromTag(releaseAgentVersion)
         versionName = versionNameFromTag(releaseAgentVersion)
         buildConfigField("String", "DEFAULT_AGENT_VERSION", "\"$releaseAgentVersion\"")
-        buildConfigField("String", "SENTRY_DSN", "\"${System.getenv("SENTRY_DSN").orEmpty()}\"")
+        buildConfigField("String", "SENTRY_DSN", gradleStringLiteral(sentryDsn))
+        // SentryInitProvider reads manifest meta-data, not BuildConfig; kept for tooling/docs.
+        manifestPlaceholders["sentryDsn"] = sentryDsn
     }
 
     signingConfigs {
