@@ -30,6 +30,7 @@ class AgentSyncWorker(
             result.success -> Result.success()
             result.reason == "update_scheduled" -> Result.success()
             result.reason == "persistent_handoff" -> Result.success()
+            result.reason == "session_busy" -> Result.success()
             else -> Result.retry()
         }
     }

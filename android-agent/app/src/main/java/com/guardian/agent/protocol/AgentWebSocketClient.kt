@@ -11,6 +11,7 @@ import com.guardian.agent.enforcement.EnforcementController
 import com.guardian.agent.monitor.AlertEventBus
 import com.guardian.agent.policy.AppPolicyStore
 import com.guardian.agent.push.PushTokenProvider
+import com.guardian.agent.service.AgentConnectionGate
 import com.guardian.agent.service.AgentConnectionState
 import com.guardian.agent.service.AgentConnectionStatus
 import com.guardian.agent.service.AgentPersistentConnectionService
@@ -52,6 +53,12 @@ class AgentWebSocketClient(
             return SessionResult(success = false, reason = "missing_server_url")
         }
 
+        return AgentConnectionGate.run(mode) {
+            runSessionLocked(config, mode)
+        } ?: SessionResult(success = false, reason = "session_busy")
+    }
+
+    private suspend fun runSessionLocked(config: AgentConfig, mode: SessionMode): SessionResult {
         val fcmToken = PushTokenProvider.getToken(context)
         if (!fcmToken.isNullOrBlank()) {
             GuardianApplication.from(context).configStore.saveFcmToken(fcmToken)

@@ -194,7 +194,6 @@ class ManagementModeSetupController(
         }
 
         AgentSessionCoordinator.startMobileAgent(activity)
-        AgentSessionCoordinator.scheduleSync(activity, reason = "provisioning_setup")
         startApprovalWait()
     }
 
@@ -205,7 +204,6 @@ class ManagementModeSetupController(
             completeAndExit()
             return
         }
-        AgentSessionCoordinator.scheduleSync(activity, reason = "provisioning_setup_resume")
         startApprovalWait()
     }
 
@@ -222,7 +220,7 @@ class ManagementModeSetupController(
                     completeAndExit()
                     break
                 }
-                AgentSessionCoordinator.runSyncSession(
+                val result = AgentSessionCoordinator.runSyncSession(
                     activity.applicationContext,
                     AgentWebSocketClient.SessionMode.PAIRING_ONLY,
                 )
@@ -230,7 +228,13 @@ class ManagementModeSetupController(
                     completeAndExit()
                     break
                 }
-                delay(APPROVAL_POLL_INTERVAL_MS)
+                delay(
+                    if (result.reason == "session_busy") {
+                        SESSION_BUSY_RETRY_MS
+                    } else {
+                        APPROVAL_POLL_INTERVAL_MS
+                    },
+                )
             }
         }
     }
@@ -294,5 +298,6 @@ class ManagementModeSetupController(
         private const val STATE_SHOWING_APPROVAL = "showing_approval_wait"
         private const val STATE_ENROLLMENT_STARTED = "enrollment_started"
         private const val APPROVAL_POLL_INTERVAL_MS = 5_000L
+        private const val SESSION_BUSY_RETRY_MS = 1_000L
     }
 }
