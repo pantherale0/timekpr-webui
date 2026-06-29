@@ -40,7 +40,7 @@ jobs:
   build:
     needs: changes
     runs-on: ubuntu-latest
-    if: needs.changes.outputs.docs_changed == 'true'
+    if: github.event_name == 'pull_request' && needs.changes.outputs.docs_changed == 'true'
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -59,8 +59,12 @@ jobs:
         run: mkdocs build --strict
 
   deploy:
-    needs: build
-    if: github.event_name == 'push'
+    needs: changes
+    if: |
+      github.event_name == 'push' && (
+        startsWith(github.ref, 'refs/tags/v') ||
+        (github.ref == 'refs/heads/master' && needs.changes.outputs.docs_changed == 'true')
+      )
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
@@ -91,4 +95,6 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         env:
           DISABLE_MKDOCS_2_WARNING: "true"
-        run: mike deploy "${GITHUB_REF_NAME}" --push --update-aliases latest
+        run: |
+          mike deploy "${GITHUB_REF_NAME}" --push --update-aliases latest
+          mike set-default --push latest
