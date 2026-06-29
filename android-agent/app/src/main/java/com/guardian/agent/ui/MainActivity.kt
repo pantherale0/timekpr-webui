@@ -78,6 +78,9 @@ class MainActivity : AppCompatActivity() {
     private fun needsSetupWizard(serverUrlBlank: Boolean): Boolean {
         if (serverUrlBlank) return true
         DeviceOwnerProvisioner.applyIfDeviceOwner(this)
+        if (DeviceOwnerProvisioner.skipsManualPermissionSetup(this)) {
+            return false
+        }
         val state = PermissionState(
             deviceAdmin = DeviceAdminActivationActivity.isActive(this) ||
                 DeviceOwnerProvisioner.isDeviceOrProfileOwner(this),

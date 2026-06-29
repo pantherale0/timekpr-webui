@@ -177,6 +177,9 @@ class SetupWizardActivity : AppCompatActivity(), WizardHost {
         val config = GuardianApplication.from(this).configStore.load()
         if (config.serverUrl.isBlank()) return STEP_LINK
         DeviceOwnerProvisioner.applyIfDeviceOwner(this)
+        if (DeviceOwnerProvisioner.skipsManualPermissionSetup(this)) {
+            return STEP_COMPLETE
+        }
         val state = PermissionState(
             deviceAdmin = DeviceAdminActivationActivity.isActive(this) ||
                 DeviceOwnerProvisioner.isDeviceOrProfileOwner(this),

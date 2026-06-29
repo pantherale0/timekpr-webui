@@ -3,8 +3,6 @@ package com.guardian.agent.vpn
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
-import android.app.admin.DevicePolicyManager
-import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.net.Network
@@ -18,7 +16,6 @@ import androidx.core.app.NotificationCompat
 import com.guardian.agent.R
 import com.guardian.agent.GuardianApplication
 import com.guardian.agent.admin.DeviceOwnerProvisioner
-import com.guardian.agent.admin.GuardianDeviceAdminReceiver
 import com.guardian.agent.policy.BlockedDomainMatcher
 import com.guardian.agent.boot.SecondaryUserInitService
 import com.guardian.agent.policy.DomainPolicyResolver
@@ -343,22 +340,27 @@ class DomainBlockVpnService : VpnService() {
 
             if (policy.blockedDomains.isEmpty()) {
                 lastPolicySignatureByUser.remove(userId)
-                clearAlwaysOnVpnIfDeviceOwner(context)
                 context.stopService(
                     Intent(context, DomainBlockVpnService::class.java).setAction(ACTION_STOP),
                 )
                 return
             }
 
-            if (!DeviceOwnerProvisioner.hasUsageAccess(context)) {
-                DeviceOwnerProvisioner.applyManagedCapabilities(context)
-            }
-            setAlwaysOnVpnIfDeviceOwner(context)
+            DeviceOwnerProvisioner.applyManagedCapabilities(context)
+            DeviceOwnerProvisioner.grantVpnAuthorization(context)
 
             val prepare = VpnService.prepare(context)
             if (prepare != null) {
-                prepare.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                context.startActivity(prepare)
+                if (!DeviceOwnerProvisioner.isDeviceOrProfileOwner(context)) {
+                    prepare.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    context.startActivity(prepare)
+                } else {
+                    AgentLog.wOnce(
+                        TAG,
+                        "vpn_grant_failed_$userId",
+                        "VPN consent not granted; always-on VPN setup failed for user $userId",
+                    )
+                }
                 return
             }
 
@@ -426,26 +428,6 @@ class DomainBlockVpnService : VpnService() {
                 try {
                     socket.close()
                 } catch (_: Exception) {}
-            }
-        }
-
-        private fun setAlwaysOnVpnIfDeviceOwner(context: Context) {
-            if (!DeviceOwnerProvisioner.isDeviceOrProfileOwner(context)) return
-            val dpm = context.getSystemService(DevicePolicyManager::class.java) ?: return
-            val admin = ComponentName(context, GuardianDeviceAdminReceiver::class.java)
-            try {
-                dpm.setAlwaysOnVpnPackage(admin, context.packageName, false)
-            } catch (_: Exception) {
-            }
-        }
-
-        private fun clearAlwaysOnVpnIfDeviceOwner(context: Context) {
-            if (!DeviceOwnerProvisioner.isDeviceOrProfileOwner(context)) return
-            val dpm = context.getSystemService(DevicePolicyManager::class.java) ?: return
-            val admin = ComponentName(context, GuardianDeviceAdminReceiver::class.java)
-            try {
-                dpm.setAlwaysOnVpnPackage(admin, null, false)
-            } catch (_: Exception) {
             }
         }
     }

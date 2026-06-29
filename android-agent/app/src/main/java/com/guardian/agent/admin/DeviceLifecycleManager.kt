@@ -31,6 +31,7 @@ class DeviceLifecycleManager(private val context: Context) {
         app.appPolicyStore.syncPolicies(username, JSONArray(), null)
         app.deviceRestrictionStore.syncPolicy(username, null)
 
+        DeviceOwnerProvisioner.clearVpnAuthorization(context)
         EnforcementController(context, app.appPolicyStore).applyAppPolicies(username)
         context.stopService(Intent(context, UsageMonitorService::class.java))
         DomainBlockVpnService.reconcile(context)

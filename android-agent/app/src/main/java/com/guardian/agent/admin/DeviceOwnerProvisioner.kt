@@ -56,6 +56,7 @@ object DeviceOwnerProvisioner {
             grantPermission(dpm, admin, packageName, Manifest.permission.POST_NOTIFICATIONS)
         }
         grantOverlayPermission(context)
+        grantVpnAuthorization(context)
         grantCrossUserPermissionsIfDeviceOwner(context)
         configureCrossProfileCommunication(context)
         SecondaryUserProvisioner.configureRelayActivityForUser(context)
@@ -167,54 +168,129 @@ object DeviceOwnerProvisioner {
 
     fun hasVpnConsent(context: Context): Boolean = VpnService.prepare(context) == null
 
+    /**
+     * Device/profile owners can pre-authorize the app's VPN via always-on VPN configuration.
+     * This avoids the system VPN consent dialog during provisioning.
+     */
+    fun grantVpnAuthorization(context: Context): Boolean {
+        if (!isDeviceOrProfileOwner(context)) {
+            return false
+        }
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) {
+            return hasVpnConsent(context)
+        }
+        val dpm = context.getSystemService(DevicePolicyManager::class.java) ?: return false
+        val admin = ComponentName(context, GuardianDeviceAdminReceiver::class.java)
+        if (!dpm.isAdminActive(admin)) {
+            return false
+        }
+        return try {
+            dpm.setAlwaysOnVpnPackage(admin, context.packageName, false)
+            hasVpnConsent(context)
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to set always-on VPN package", e)
+            false
+        }
+    }
+
+    fun clearVpnAuthorization(context: Context) {
+        if (!isDeviceOrProfileOwner(context)) {
+            return
+        }
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) {
+            return
+        }
+        val dpm = context.getSystemService(DevicePolicyManager::class.java) ?: return
+        val admin = ComponentName(context, GuardianDeviceAdminReceiver::class.java)
+        try {
+            dpm.setAlwaysOnVpnPackage(admin, null, false)
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to clear always-on VPN package", e)
+        }
+    }
+
     fun hasRequiredCapabilities(context: Context): Boolean {
+        if (isDeviceOrProfileOwner(context)) {
+            return hasUsageAccess(context) && hasVpnConsent(context)
+        }
         return DeviceAdminActivationActivity.isActive(context)
             && hasUsageAccess(context)
             && hasVpnConsent(context)
     }
 
+    /** Device/profile owner installs manage these silently; skip manual setup wizards. */
+    fun skipsManualPermissionSetup(context: Context): Boolean {
+        return isDeviceOrProfileOwner(context)
+    }
+
     private fun grantUsageStatsAppOp(context: Context) {
         val appOps = context.getSystemService(AppOpsManager::class.java) ?: return
-        try {
-            val method = AppOpsManager::class.java.getMethod(
-                "setMode",
-                String::class.java,
-                Int::class.javaPrimitiveType,
-                String::class.java,
-                Int::class.javaPrimitiveType,
-            )
-            method.invoke(
-                appOps,
-                AppOpsManager.OPSTR_GET_USAGE_STATS,
-                android.os.Process.myUid(),
-                context.packageName,
-                AppOpsManager.MODE_ALLOWED,
-            )
-        } catch (e: Exception) {
-            Log.w(TAG, "Failed to grant GET_USAGE_STATS app op", e)
+        val uid = Process.myUid()
+        val packageName = context.packageName
+        if (setAppOpMode(appOps, AppOpsManager.OPSTR_GET_USAGE_STATS, uid, packageName)) {
+            return
         }
+        Log.w(TAG, "Usage access app-op grant did not stick")
     }
 
     private fun grantOverlayPermission(context: Context) {
         val appOps = context.getSystemService(AppOpsManager::class.java) ?: return
+        val uid = Process.myUid()
+        val packageName = context.packageName
+        if (setAppOpMode(appOps, AppOpsManager.OPSTR_SYSTEM_ALERT_WINDOW, uid, packageName)) {
+            return
+        }
+        Log.w(TAG, "Overlay app-op grant did not stick")
+    }
+
+    private fun setAppOpMode(
+        appOps: AppOpsManager,
+        op: String,
+        uid: Int,
+        packageName: String,
+    ): Boolean {
         try {
-            val method = AppOpsManager::class.java.getMethod(
+            val setMode = AppOpsManager::class.java.getMethod(
                 "setMode",
                 String::class.java,
                 Int::class.javaPrimitiveType,
                 String::class.java,
                 Int::class.javaPrimitiveType,
             )
-            method.invoke(
-                appOps,
-                AppOpsManager.OPSTR_SYSTEM_ALERT_WINDOW,
-                android.os.Process.myUid(),
-                context.packageName,
-                AppOpsManager.MODE_ALLOWED,
-            )
+            setMode.invoke(appOps, op, uid, packageName, AppOpsManager.MODE_ALLOWED)
+            if (checkAppOpAllowed(appOps, op, uid, packageName)) {
+                return true
+            }
         } catch (e: Exception) {
-            Log.w(TAG, "Failed to grant SYSTEM_ALERT_WINDOW", e)
+            Log.w(TAG, "setMode failed for $op", e)
         }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            try {
+                val setUidMode = AppOpsManager::class.java.getMethod(
+                    "setUidMode",
+                    String::class.java,
+                    Int::class.javaPrimitiveType,
+                    Int::class.javaPrimitiveType,
+                )
+                setUidMode.invoke(appOps, op, uid, AppOpsManager.MODE_ALLOWED)
+                if (checkAppOpAllowed(appOps, op, uid, packageName)) {
+                    return true
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "setUidMode failed for $op", e)
+            }
+        }
+        return false
+    }
+
+    private fun checkAppOpAllowed(
+        appOps: AppOpsManager,
+        op: String,
+        uid: Int,
+        packageName: String,
+    ): Boolean {
+        return appOps.checkOpNoThrow(op, uid, packageName) == AppOpsManager.MODE_ALLOWED
     }
 
     private fun grantPermission(

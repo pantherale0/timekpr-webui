@@ -96,8 +96,15 @@ class PermissionManager(
     }
 
     private fun requestVpn() {
+        if (DeviceOwnerProvisioner.isDeviceOrProfileOwner(activity)) {
+            DeviceOwnerProvisioner.grantVpnAuthorization(activity)
+        }
         if (DeviceOwnerProvisioner.hasVpnConsent(activity)) {
             continueSequentialGrant()
+            return
+        }
+        if (DeviceOwnerProvisioner.isDeviceOrProfileOwner(activity)) {
+            grantInProgress = false
             return
         }
         val prepare = VpnService.prepare(activity)
@@ -109,8 +116,15 @@ class PermissionManager(
     }
 
     private fun requestUsageAccess() {
+        if (DeviceOwnerProvisioner.isDeviceOrProfileOwner(activity)) {
+            DeviceOwnerProvisioner.applyManagedCapabilities(activity)
+        }
         if (DeviceOwnerProvisioner.hasUsageAccess(activity)) {
             continueSequentialGrant()
+            return
+        }
+        if (DeviceOwnerProvisioner.isDeviceOrProfileOwner(activity)) {
+            grantInProgress = false
             return
         }
         activity.startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
