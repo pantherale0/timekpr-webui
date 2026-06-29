@@ -3255,9 +3255,9 @@
 </tbody>
 </table>
 <p>For full MDM-style control, provision the app as <strong>Device Owner</strong> using the MDM provisioning QR above, your EMM, or:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>adb<span class="w"> </span>dpm<span class="w"> </span>set-device-owner<span class="w"> </span>com.guardian.agent/.admin.GuardianDeviceAdminReceiver
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>adb<span class="w"> </span>dpm<span class="w"> </span>set-device-owner<span class="w"> </span>com.guardian.agent/com.guardian.agent.admin.GuardianDeviceAdminReceiver
 </code></pre></div>
-<p>The agent implements Android 12+ provisioning handlers (<code>GET_PROVISIONING_MODE</code>, <code>ADMIN_POLICY_COMPLIANCE</code>) so QR-based device-owner enrollment applies server config automatically.</p>
+<p>The agent implements Android 12+ provisioning handlers (<code>GET_PROVISIONING_MODE</code>, <code>ADMIN_POLICY_COMPLIANCE</code>) for QR-based device-owner enrollment. During provisioning the app prompts for <strong>Single-User</strong> vs <strong>Multi-User</strong> management mode, stages the server URL from the QR, and returns control to the setup wizard so the user can still add a Google account and complete OEM setup steps. On Android 11 and below, the same management-mode screen appears on first app launch after QR provisioning.</p>
 <p>When device owner, the app auto-grants itself Usage Access, overlay (<code>SYSTEM_ALERT_WINDOW</code>), and notification permission (Android 13+) via <code>DevicePolicyManager</code> — no manual Settings taps required. Always-on VPN is enabled only when domain block policies are active. Device Admin alone still needs the user to approve Usage Access and VPN in system settings.</p>
 <h2 id="multi-user-support">Multi-user support<a class="headerlink" href="#multi-user-support" title="Permanent link">&para;</a></h2>
 <p>Android allows multiple user profiles (e.g. secondary users, guests, restricted profiles) to run on a single device. TimeKpr Android Agent supports managing these secondary profiles from a single installation running under the primary user account (User 0).</p>
@@ -3279,7 +3279,7 @@
 <ol>
 <li>Enable <strong>Developer Options</strong> and <strong>USB Debugging</strong> on the target device.</li>
 <li>Connect the device to your computer and run the following command:
-   <div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>adb<span class="w"> </span>shell<span class="w"> </span>dpm<span class="w"> </span>set-device-owner<span class="w"> </span>com.guardian.agent/.admin.GuardianDeviceAdminReceiver
+   <div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>adb<span class="w"> </span>shell<span class="w"> </span>dpm<span class="w"> </span>set-device-owner<span class="w"> </span>com.guardian.agent/com.guardian.agent.admin.GuardianDeviceAdminReceiver
 </code></pre></div></li>
 </ol>
 <div class="admonition warning">
@@ -3290,7 +3290,7 @@
 <li><code>Not allowed to set the device owner because there are already several users on the device</code></li>
 </ul>
 <p>To use ADB provisioning you must temporarily remove all accounts on User 0 <strong>and</strong> remove secondary users, then run:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>adb<span class="w"> </span>shell<span class="w"> </span>dpm<span class="w"> </span>set-device-owner<span class="w"> </span>com.guardian.agent/.admin.GuardianDeviceAdminReceiver
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>adb<span class="w"> </span>shell<span class="w"> </span>dpm<span class="w"> </span>set-device-owner<span class="w"> </span>com.guardian.agent/com.guardian.agent.admin.GuardianDeviceAdminReceiver
 </code></pre></div>
 <p>Re-add accounts and recreate child profiles <strong>after</strong> Device Owner is set. See <a href="../../troubleshooting/#android-multi-user-and-device-owner">Troubleshooting</a>.</p>
 </div>
