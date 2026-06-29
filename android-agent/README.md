@@ -6,7 +6,7 @@ Kotlin/Android port of the Guardian Rust Linux client. See the [Android agent do
 
 1. Copy `app/google-services.json.example` → `app/google-services.json` (Firebase console).
 2. Set server `FCM_SERVER_KEY` or `FIREBASE_CREDENTIALS_JSON`.
-3. Build: `./gradlew assembleDebug`
+3. Build: `python scripts/i18n/manage.py bundle --target android && ./gradlew assembleDebug`
 4. Install the APK, scan the server Settings QR, approve in Admin → Devices.
 5. Provision as **Device Owner** so capabilities are granted automatically:
    `adb dpm set-device-owner com.guardian.agent/com.guardian.agent.admin.GuardianDeviceAdminReceiver`

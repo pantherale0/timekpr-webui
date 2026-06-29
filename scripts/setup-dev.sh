@@ -470,6 +470,9 @@ build_android_agent() {
     configure_java_17
     ensure_gradle_wrapper
 
+    log "Bundling Android strings from i18n catalogs"
+    python "${REPO_ROOT}/scripts/i18n/manage.py" bundle --target android
+
     log "Building Android debug APK"
     (
         cd "$ANDROID_DIR"

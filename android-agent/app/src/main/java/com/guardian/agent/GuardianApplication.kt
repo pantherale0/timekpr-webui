@@ -34,7 +34,6 @@ class GuardianApplication : Application() {
                 android.util.Log.e("GuardianApplication", "Failed to initialize native Sentry", e)
             }
         }
-        com.google.android.material.color.DynamicColors.applyToActivitiesIfAvailable(this)
         configStore = AgentConfigStore(this)
 
         if (DirectBootHelper.isCredentialStorageUnlocked(this)) {

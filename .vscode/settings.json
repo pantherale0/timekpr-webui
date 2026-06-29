@@ -13,5 +13,13 @@
     "pylint.cwd": "${workspaceFolder}/server",
     "rust-analyzer.testExplorer": true,
     "debug.allowBreakpointsEverywhere": true,
-    "kotlin.java.home": "/usr/lib/jvm/java-17-openjdk"
+    "kotlin.java.home": "/usr/lib/jvm/java-17-openjdk",
+    "java.import.gradle.enabled": true,
+    "java.import.gradle.wrapper.enabled": true,
+    "java.configuration.updateBuildConfiguration": "automatic",
+    "java.import.exclusions": [
+        "**/agent/**",
+        "**/server/**",
+        "**/node_modules/**"
+    ]
 }

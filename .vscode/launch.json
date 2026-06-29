@@ -54,6 +54,39 @@
                 "--agent-version",
                 "v0.0.0-dev"
             ]
+        },
+        {
+            "name": "Android Agent: Debug",
+            "type": "android",
+            "request": "launch",
+            "preLaunchTask": "Android Agent: Rebuild and Install Debug",
+            "appSrcRoot": "${workspaceFolder}/android-agent/app/src/main",
+            "apkFile": "${workspaceFolder}/android-agent/app/build/outputs/apk/debug/app-debug.apk",
+            "adbPort": 5037,
+            "pmInstallArgs": [
+                "-r",
+                "-t"
+            ],
+            "amStartArgs": [
+                "-D",
+                "-a",
+                "android.intent.action.MAIN",
+                "-c",
+                "android.intent.category.LAUNCHER",
+                "-n",
+                "com.guardian.agent/.ui.MainActivity"
+            ],
+            "postLaunchPause": 1500,
+            "trace": false
+        },
+        {
+            "name": "Android Agent: Attach (Java/Kotlin)",
+            "type": "java",
+            "request": "attach",
+            "hostName": "localhost",
+            "port": 5035,
+            "preLaunchTask": "Android Agent: Install and Wait for Debugger",
+            "projectName": "app"
         }
     ],
     "compounds": [

@@ -18,8 +18,7 @@ import com.guardian.agent.vpn.DomainBlockVpnService
 import com.guardian.agent.policy.PolicyStorePayloadPush
 import com.guardian.agent.policy.ProfileProvisioningStore
 import com.guardian.agent.ui.MainActivity
-import com.guardian.agent.ui.PairingSetupActivity
-import com.guardian.agent.ui.QrScanActivity
+import com.guardian.agent.ui.wizard.SetupWizardActivity
 import com.guardian.agent.util.AndroidUsers
 import com.guardian.agent.config.AgentConfigStore
 import java.io.File
@@ -250,7 +249,6 @@ object SecondaryUserProvisioner {
 
     private val MANAGEMENT_ACTIVITIES = listOf(
         MainActivity::class.java,
-        PairingSetupActivity::class.java,
-        QrScanActivity::class.java,
+        SetupWizardActivity::class.java,
     )
 }

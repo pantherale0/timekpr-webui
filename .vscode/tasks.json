@@ -73,6 +73,121 @@
                 "panel": "shared"
             },
             "problemMatcher": []
+        },
+        {
+            "label": "Bundle i18n for Android Agent",
+            "type": "shell",
+            "command": "python scripts/i18n/manage.py bundle --target android",
+            "presentation": {
+                "reveal": "silent",
+                "panel": "shared"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Android Agent: Build Native",
+            "type": "shell",
+            "command": "${workspaceFolder}/scripts/android-native-build.sh",
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared",
+                "focus": false
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Android Agent: Assemble Debug",
+            "type": "shell",
+            "command": "./gradlew assembleDebug",
+            "options": {
+                "cwd": "${workspaceFolder}/android-agent"
+            },
+            "group": {
+                "kind": "build",
+                "isDefault": false
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared",
+                "focus": false
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Android Agent: Install Debug",
+            "type": "shell",
+            "command": "./gradlew installDebug",
+            "options": {
+                "cwd": "${workspaceFolder}/android-agent"
+            },
+            "group": "build",
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared",
+                "focus": false
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Android Agent: Rebuild and Install Debug",
+            "dependsOn": [
+                "Android Agent: Build Native",
+                "Bundle i18n for Android Agent",
+                "Android Agent: Install Debug"
+            ],
+            "dependsOrder": "sequence",
+            "problemMatcher": []
+        },
+        {
+            "label": "Android Agent: Launch",
+            "type": "shell",
+            "command": "adb shell am start -a android.intent.action.MAIN -c android.intent.category.LAUNCHER -n com.guardian.agent/.ui.MainActivity",
+            "presentation": {
+                "reveal": "silent",
+                "panel": "shared"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Android Agent: Uninstall",
+            "type": "shell",
+            "command": "adb uninstall com.guardian.agent",
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Android Agent: Logcat",
+            "type": "shell",
+            "command": "${workspaceFolder}/scripts/android-logcat.sh",
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "focus": true
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Android Agent: Install and Wait for Debugger",
+            "dependsOn": [
+                "Android Agent: Build Native",
+                "Android Agent: Install and Wait for Debugger (run)"
+            ],
+            "dependsOrder": "sequence",
+            "problemMatcher": []
+        },
+        {
+            "label": "Android Agent: Install and Wait for Debugger (run)",
+            "type": "shell",
+            "command": "${workspaceFolder}/scripts/android-debug-prepare.sh",
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared",
+                "focus": true
+            },
+            "problemMatcher": []
         }
     ]
 }

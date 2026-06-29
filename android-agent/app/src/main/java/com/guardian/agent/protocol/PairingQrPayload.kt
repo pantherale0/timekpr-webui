@@ -11,6 +11,7 @@ data class PairingQrPayload(
 ) {
     companion object {
         const val TYPE = "guardian_pairing"
+        const val LEGACY_TYPE = "timekpr_pairing"
 
         fun parse(raw: String): PairingQrPayload? {
             val trimmed = raw.trim()
@@ -18,7 +19,8 @@ data class PairingQrPayload(
 
             return try {
                 val json = JSONObject(trimmed)
-                if (json.optString("type") != TYPE) {
+                val type = json.optString("type")
+                if (type != TYPE && type != LEGACY_TYPE) {
                     return null
                 }
                 val serverUrl = json.optString("server_url").trim()

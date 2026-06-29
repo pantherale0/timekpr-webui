@@ -25,16 +25,28 @@ strings:
   time_exhausted_call: Make a call
   time_exhausted_notification_channel: Screen time lockout
   time_exhausted_notification_channel_desc: Persistent alert when screen time is exhausted
-  pairing_scan_qr: Scan server QR code
-  pairing_manual_server: Server WebSocket URL
-  pairing_save: Save and connect
-  enable_device_admin: Enable device management
-  grant_usage_access: Grant usage access
-  grant_vpn: Enable web filtering VPN
   status_connected: Connected
   status_pending: Awaiting admin approval
   status_disconnected: Disconnected
-  agent_version_label: "Agent version: %1$s"
+  status_reconnect: Reconnect
+  wizard_step1_title: Link this device to your Guardian dashboard.
+  wizard_step1_hint: Point your camera at the pairing QR code from your parent dashboard.
+  wizard_step2_title: Activate Protection Tools
+  wizard_perm_admin_title: Device Administrator
+  wizard_perm_admin_desc: Prevents the protection app from being cleared or uninstalled without authorization.
+  wizard_perm_vpn_title: Web Filtering VPN
+  wizard_perm_vpn_desc: Safeguards network traffic and filters inappropriate web endpoints automatically.
+  wizard_perm_usage_title: Usage & Screen Access
+  wizard_perm_usage_desc: Monitors app activity timers and applies remote schedule updates.
+  wizard_grant_requirements: Grant Requirements
+  wizard_continue: Continue
+  wizard_finish: Done
+  wizard_step3_connected: Connected to Guardian Server
+  wizard_step3_tip: Setup complete. You can now close this app. All filtering profiles, usage rules, and configuration changes are managed directly from your parent web interface.
+  wizard_error_server: Unable to locate your server. Please confirm your local network path is accurate.
+  wizard_error_pairing: Could not read that QR code. Please try again with the code from your Guardian dashboard.
+  wizard_error_connection: Having trouble connecting. Check your network and try again.
+  wizard_camera_permission: Camera access is needed to scan your pairing code.
   managed_secondary_profile_status: This profile is managed by Guardian
   managed_secondary_profile_waiting: Waiting for the main profile to finish setup. Open Guardian on the primary account first.
   time_exhausted_parent_access: Parental Access
