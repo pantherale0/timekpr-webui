@@ -2240,6 +2240,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Agent release assets (tags v*)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#partial-patch-releases" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Partial (patch) releases
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -2349,6 +2366,23 @@
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="Agent release assets (tags v*)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#partial-patch-releases" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Partial (patch) releases
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -2474,6 +2508,35 @@
 </tbody>
 </table>
 <p>Set <code>GUARDIAN_AGENT_VERSION</code> / tag name at build time. Server reads <code>TIMEKPR_SERVER_VERSION</code> for handshake matching.</p>
+<h3 id="partial-patch-releases">Partial (patch) releases<a class="headerlink" href="#partial-patch-releases" title="Permanent link">&para;</a></h3>
+<p>On tags that stay on the same <code>major.minor</code> line as the previous tag (for example <code>v0.68.4</code> → <code>v0.68.5</code>), the Agent CI workflow runs <code>scripts/ci/release_plan.py</code> to diff against the previous tag and only builds platforms whose paths changed:</p>
+<table>
+<thead>
+<tr>
+<th>Changed paths</th>
+<th>Builds</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>agent/**</code></td>
+<td>Linux, Windows, and Android (JNI rebuild)</td>
+</tr>
+<tr>
+<td><code>android-agent/**</code>, <code>i18n/**</code>, <code>scripts/i18n/**</code></td>
+<td>Android</td>
+</tr>
+<tr>
+<td><code>agent/src/overlay_cef/**</code>, <code>agent/overlay_resources/**</code>, <code>agent/Cargo.toml</code></td>
+<td>CEF overlay bundle</td>
+</tr>
+<tr>
+<td><code>server/**</code>, <code>docs/**</code>, or other non-agent paths</td>
+<td>No agent assets (publish step skipped)</td>
+</tr>
+</tbody>
+</table>
+<p>A new <code>major.minor</code> line (for example <code>v0.68.x</code> → <code>v0.69.0</code>) always builds every agent asset. The server only offers <code>update_available</code> for platforms that have assets on the GitHub release, so unchanged agents can keep running on the previous patch until a new binary is published.</p>
 <h2 id="android-signing-secrets">Android signing secrets<a class="headerlink" href="#android-signing-secrets" title="Permanent link">&para;</a></h2>
 <p>Configure in GitHub repository secrets:</p>
 <table>
