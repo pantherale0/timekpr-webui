@@ -632,10 +632,10 @@
                 document.getElementById('share-invite-link').value = fullUrl;
                 document.getElementById('share-result-container').classList.remove('d-none');
             } else {
-                alert(data.message || 'Failed to generate invite');
+                alert(data.message || i18n('profile_invite_generate_failed'));
             }
         })
-        .catch(() => alert('Failed to generate invite'));
+        .catch(() => alert(i18n('profile_invite_generate_failed')));
     };
 
     window.copyInviteLinkToClipboard = function () {
@@ -645,10 +645,10 @@
         linkInput.setSelectionRange(0, 99999);
         navigator.clipboard.writeText(linkInput.value)
             .then(() => {
-                alert('Invitation link copied to clipboard!');
+                alert(i18n('profile_invite_copied'));
             })
             .catch(() => {
-                alert('Failed to copy link. Please manually copy it.');
+                alert(i18n('profile_invite_copy_failed'));
             });
     };
 })();

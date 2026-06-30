@@ -21,7 +21,7 @@
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Device Setup"
+                android:text="@string/provisioning_device_setup_title"
                 android:textAppearance="?attr/textAppearanceTitleLarge"
                 android:textColor="?attr/colorPrimary" />
 
@@ -29,7 +29,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
-                android:text="Select Device Management Mode"
+                android:text="@string/provisioning_mode_selection_title"
                 android:textAppearance="?attr/textAppearanceHeadlineMedium"
                 android:textColor="?android:attr/textColorPrimary" />
 
@@ -37,7 +37,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
-                android:text="Choose how Guardian will partition and restrict parental controls on this device. This setting cannot be changed later without factory resetting or re-provisioning."
+                android:text="@string/provisioning_mode_selection_body"
                 android:textAppearance="?attr/textAppearanceBodyMedium"
                 android:textColor="?android:attr/textColorSecondary" />
 
@@ -66,7 +66,7 @@
                     <TextView
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:text="Single-User Mode"
+                        android:text="@string/provisioning_single_user_mode_title"
                         android:textAppearance="?attr/textAppearanceTitleMedium"
                         android:textColor="?android:attr/textColorPrimary" />
 
@@ -74,7 +74,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="6dp"
-                        android:text="Exclusively manage the primary user profile (User 0). Choose this if the device belongs to a single child. Time limits and app blocking apply directly to this profile."
+                        android:text="@string/provisioning_single_user_mode_body"
                         android:textAppearance="?attr/textAppearanceBodyMedium"
                         android:textColor="?android:attr/textColorSecondary" />
                 </LinearLayout>
@@ -105,7 +105,7 @@
                     <TextView
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:text="Multi-User Mode"
+                        android:text="@string/provisioning_multi_user_mode_title"
                         android:textAppearance="?attr/textAppearanceTitleMedium"
                         android:textColor="?android:attr/textColorPrimary" />
 
@@ -113,7 +113,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="6dp"
-                        android:text="Create separate restricted profiles for children. The primary user profile (User 0) remains unrestricted and acts as the parent's admin panel."
+                        android:text="@string/provisioning_multi_user_mode_body"
                         android:textAppearance="?attr/textAppearanceBodyMedium"
                         android:textColor="?android:attr/textColorSecondary" />
                 </LinearLayout>
@@ -124,7 +124,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="56dp"
                 android:layout_marginTop="24dp"
-                android:text="Confirm Setup"
+                android:text="@string/provisioning_confirm_setup"
                 android:textAppearance="?attr/textAppearanceButton"
                 app:cornerRadius="16dp" />
         </LinearLayout>

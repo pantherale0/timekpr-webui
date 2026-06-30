@@ -422,7 +422,7 @@ class UsageMonitorService : Service() {
     private fun buildNotification(): Notification {
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle(getString(R.string.agent_notification_title))
-            .setContentText("Monitoring app usage")
+            .setContentText(getString(R.string.usage_monitor_notification_body))
             .setSmallIcon(R.drawable.ic_launcher_foreground)
             .setOngoing(true)
             .build()

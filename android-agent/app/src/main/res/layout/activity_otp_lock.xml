@@ -22,7 +22,7 @@
             android:id="@+id/titleText"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="System Locked"
+            android:text="@string/otp_lock_title"
             android:textColor="?attr/colorOnBackground"
             android:textSize="28sp"
             android:textStyle="bold" />
@@ -33,7 +33,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
             android:gravity="center"
-            android:text="Switching to child profile automatically..."
+            android:text="@string/otp_lock_switching_profile"
             android:textColor="?attr/colorOnSurfaceVariant"
             android:textSize="14sp" />
 
@@ -95,7 +95,7 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Enter Parental OTP"
+                android:text="@string/otp_lock_enter_parental_otp"
                 android:textColor="?attr/colorOnSurface"
                 android:textSize="18sp"
                 android:textStyle="bold" />
@@ -259,7 +259,7 @@
             style="@style/Widget.Material3.Button"
             android:layout_width="match_parent"
             android:layout_height="56dp"
-            android:text="Cancel &amp; Unlock Admin"
+            android:text="@string/otp_lock_cancel_unlock_admin"
             app:cornerRadius="16dp"
             app:backgroundTint="?attr/colorPrimary"
             android:textColor="?attr/colorOnPrimary" />
@@ -270,7 +270,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
-            android:text="Switch User"
+            android:text="@string/otp_lock_switch_user"
             android:textColor="?attr/colorSecondary" />
     </LinearLayout>
 

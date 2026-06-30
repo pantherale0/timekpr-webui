@@ -528,6 +528,9 @@ js:
   profile_sync_status_awaiting_uid: Finishing setup
   profile_sync_status_not_configured: Shields not applied yet
   profile_sync_status_pending: Updating...
+  profile_invite_generate_failed: Failed to generate invite
+  profile_invite_copied: Invitation link copied to clipboard!
+  profile_invite_copy_failed: Failed to copy link. Please manually copy it.
   dashboard_sync_updating: Protected · Updating...
   dashboard_sync_offline: Protected · Offline
   never: Never

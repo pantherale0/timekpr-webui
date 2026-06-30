@@ -63,4 +63,18 @@
     <string name="provisioning_approval_connecting">Connecting to your home…</string>
     <string name="provisioning_approval_waiting">Waiting for your approval…</string>
     <string name="provisioning_approval_retrying">Having trouble reaching the server. Still trying…</string>
+    <string name="provisioning_device_setup_title">Device Setup</string>
+    <string name="provisioning_mode_selection_title">Select Device Management Mode</string>
+    <string name="provisioning_mode_selection_body">Choose how Guardian will partition and restrict parental controls on this device. This setting cannot be changed later without factory resetting or re-provisioning.</string>
+    <string name="provisioning_single_user_mode_title">Single-User Mode</string>
+    <string name="provisioning_single_user_mode_body">Exclusively manage the primary user profile (User 0). Choose this if the device belongs to a single child. Time limits and app blocking apply directly to this profile.</string>
+    <string name="provisioning_multi_user_mode_title">Multi-User Mode</string>
+    <string name="provisioning_multi_user_mode_body">Create separate restricted profiles for children. The primary user profile (User 0) remains unrestricted and acts as the parent\'s admin panel.</string>
+    <string name="provisioning_confirm_setup">Confirm Setup</string>
+    <string name="otp_lock_title">System Locked</string>
+    <string name="otp_lock_switching_profile">Switching to child profile automatically...</string>
+    <string name="otp_lock_enter_parental_otp">Enter Parental OTP</string>
+    <string name="otp_lock_cancel_unlock_admin">Cancel &amp; Unlock Admin</string>
+    <string name="otp_lock_switch_user">Switch User</string>
+    <string name="usage_monitor_notification_body">Monitoring app usage</string>
 </resources>
