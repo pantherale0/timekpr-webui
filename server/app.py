@@ -239,6 +239,10 @@ def _refresh_oidc_tokens():
     # If the user is logged in via OIDC and has a refresh token
     if session.get('logged_in') and session.get('oidc_refresh_token'):
         expires_at = session.get('oidc_token_expires_at')
+        refresh_retry_after = session.get('oidc_refresh_retry_after')
+        if refresh_retry_after and refresh_retry_after > time.time():
+            return
+
         # Check if token is expired or about to expire in the next 60 seconds
         if expires_at is None or expires_at < time.time() + 60:
             try:
@@ -251,18 +255,24 @@ def _refresh_oidc_tokens():
                 if new_tokens.get('refresh_token'):
                     session['oidc_refresh_token'] = new_tokens.get('refresh_token')
                 session['oidc_token_expires_at'] = time.time() + new_tokens.get('expires_in', 3600)
+                session.pop('oidc_refresh_retry_after', None)
                 _LOGGER.info("Successfully refreshed OIDC access token.")
             except OIDCRefreshError as exc:
                 if exc.is_transient:
-                    # Graceful degradation (Option A): Log warning and allow request to proceed
+                    # Graceful degradation: back off refresh attempts to avoid blocking every request.
+                    backoff_seconds = int(os.environ.get('OIDC_REFRESH_BACKOFF_SECONDS', '300'))
+                    session['oidc_refresh_retry_after'] = time.time() + backoff_seconds
                     _LOGGER.warning(
                         "OIDC token refresh failed with a transient error: %s. "
-                        "Allowing user to remain authenticated temporarily.",
-                        exc
+                        "Allowing user to remain authenticated temporarily; "
+                        "next refresh attempt in %s seconds.",
+                        exc,
+                        backoff_seconds,
                     )
                 else:
                     # Definitive authentication failure: Log out the user
                     _LOGGER.error("OIDC token refresh failed with a definitive error. Logging out user: %s", exc)
+                    session.pop('oidc_refresh_retry_after', None)
                     session.pop('logged_in', None)
                     session.pop('user', None)
                     session.pop('oidc_access_token', None)
@@ -275,7 +285,14 @@ def _refresh_oidc_tokens():
                     return redirect(url_for('ui_auth.login'))
             except Exception as exc:
                 # Fallback for unexpected failures: treat as transient to avoid locking out users
-                _LOGGER.error("Unexpected error during OIDC token refresh: %s. Treating as transient.", exc)
+                backoff_seconds = int(os.environ.get('OIDC_REFRESH_BACKOFF_SECONDS', '300'))
+                session['oidc_refresh_retry_after'] = time.time() + backoff_seconds
+                _LOGGER.warning(
+                    "Unexpected error during OIDC token refresh: %s. "
+                    "Treating as transient; next refresh attempt in %s seconds.",
+                    exc,
+                    backoff_seconds,
+                )
 
 
 # Import and register blueprints

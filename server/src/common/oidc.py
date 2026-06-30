@@ -4,6 +4,7 @@ import json
 import logging
 import os
 import secrets
+import time
 
 import requests
 
@@ -47,6 +48,24 @@ class OIDCHelper:
 
         self._endpoints = None
 
+    @staticmethod
+    def _http_timeout():
+        """Return (connect, read) timeouts for outbound OIDC HTTP calls."""
+        raw = os.environ.get('OIDC_HTTP_TIMEOUT_SECONDS', '30').strip()
+        try:
+            read_timeout = max(5.0, float(raw))
+        except ValueError:
+            read_timeout = 30.0
+        return (5.0, read_timeout)
+
+    @staticmethod
+    def _refresh_max_attempts():
+        raw = os.environ.get('OIDC_REFRESH_MAX_ATTEMPTS', '3').strip()
+        try:
+            return max(1, int(raw))
+        except ValueError:
+            return 3
+
     @property
     def is_enabled(self):
         """Returns True if OIDC is configured with all required parameters."""
@@ -63,7 +82,11 @@ class OIDCHelper:
         discovery_url = f"{self.issuer_url.rstrip('/')}/.well-known/openid-configuration"
         try:
             logger.info("Fetching OIDC configuration from: %s", discovery_url)
-            response = requests.get(discovery_url, verify=self.verify_ssl, timeout=10)
+            response = requests.get(
+                discovery_url,
+                verify=self.verify_ssl,
+                timeout=self._http_timeout(),
+            )
             response.raise_for_status()
             self._endpoints = response.json()
             return self._endpoints
@@ -125,7 +148,7 @@ class OIDCHelper:
                 token_endpoint,
                 data=data,
                 verify=self.verify_ssl,
-                timeout=10,
+                timeout=self._http_timeout(),
             )
             response.raise_for_status()
             return response.json()
@@ -147,39 +170,73 @@ class OIDCHelper:
             'client_secret': self.client_secret,
         }
 
-        try:
-            logger.info("Refreshing OIDC tokens at token endpoint: %s", token_endpoint)
-            response = requests.post(
-                token_endpoint,
-                data=data,
-                verify=self.verify_ssl,
-                timeout=10,
-            )
-            response.raise_for_status()
-            return response.json()
-        except requests.HTTPError as exc:
-            status_code = exc.response.status_code if exc.response is not None else None
-            # Standard OAuth2 revocation/auth errors return 400 Bad Request (invalid_grant)
-            # or 401/403. Treat 5xx and others as transient.
-            is_transient = status_code is not None and status_code >= 500
-            logger.error("HTTP error during OIDC token refresh (status %s): %s", status_code, exc)
-            raise OIDCRefreshError(
-                f"OIDC token refresh failed with HTTP status {status_code}: {exc}",
-                is_transient=is_transient,
-                status_code=status_code
-            ) from exc
-        except requests.RequestException as exc:
-            logger.error("Network error during OIDC token refresh: %s", exc)
-            raise OIDCRefreshError(
-                f"OIDC token refresh failed due to network error: {exc}",
-                is_transient=True
-            ) from exc
-        except ValueError as exc:
-            logger.error("Failed to parse OIDC token response: %s", exc)
-            raise OIDCRefreshError(
-                f"OIDC token refresh returned invalid response: {exc}",
-                is_transient=True
-            ) from exc
+        max_attempts = self._refresh_max_attempts()
+        logger.info("Refreshing OIDC tokens at token endpoint: %s", token_endpoint)
+
+        for attempt in range(1, max_attempts + 1):
+            try:
+                response = requests.post(
+                    token_endpoint,
+                    data=data,
+                    verify=self.verify_ssl,
+                    timeout=self._http_timeout(),
+                )
+                response.raise_for_status()
+                return response.json()
+            except requests.HTTPError as exc:
+                status_code = exc.response.status_code if exc.response is not None else None
+                # Standard OAuth2 revocation/auth errors return 400 Bad Request (invalid_grant)
+                # or 401/403. Treat 5xx and others as transient.
+                is_transient = status_code is not None and status_code >= 500
+                if is_transient and attempt < max_attempts:
+                    logger.warning(
+                        "OIDC token refresh attempt %s/%s failed with HTTP %s; retrying.",
+                        attempt,
+                        max_attempts,
+                        status_code,
+                    )
+                    time.sleep(1)
+                    continue
+                log = logger.warning if is_transient else logger.error
+                log("HTTP error during OIDC token refresh (status %s): %s", status_code, exc)
+                raise OIDCRefreshError(
+                    f"OIDC token refresh failed with HTTP status {status_code}: {exc}",
+                    is_transient=is_transient,
+                    status_code=status_code,
+                ) from exc
+            except requests.RequestException as exc:
+                if attempt < max_attempts:
+                    logger.warning(
+                        "OIDC token refresh attempt %s/%s failed with network error; retrying: %s",
+                        attempt,
+                        max_attempts,
+                        exc,
+                    )
+                    time.sleep(1)
+                    continue
+                logger.warning(
+                    "Network error during OIDC token refresh after %s attempts: %s",
+                    max_attempts,
+                    exc,
+                )
+                raise OIDCRefreshError(
+                    f"OIDC token refresh failed due to network error: {exc}",
+                    is_transient=True,
+                ) from exc
+            except ValueError as exc:
+                if attempt < max_attempts:
+                    logger.warning(
+                        "OIDC token refresh attempt %s/%s returned invalid JSON; retrying.",
+                        attempt,
+                        max_attempts,
+                    )
+                    time.sleep(1)
+                    continue
+                logger.warning("Failed to parse OIDC token response after %s attempts: %s", max_attempts, exc)
+                raise OIDCRefreshError(
+                    f"OIDC token refresh returned invalid response: {exc}",
+                    is_transient=True,
+                ) from exc
 
     def get_user_info(self, access_token):
         """Retrieves user profile using access token."""
@@ -198,7 +255,7 @@ class OIDCHelper:
                 userinfo_endpoint,
                 headers=headers,
                 verify=self.verify_ssl,
-                timeout=10,
+                timeout=self._http_timeout(),
             )
             response.raise_for_status()
             return response.json()

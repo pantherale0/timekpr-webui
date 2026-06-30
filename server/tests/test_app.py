@@ -221,6 +221,13 @@ def test_oidc_session_token_refresh(client, db_session):
             with client.session_transaction() as sess:
                 assert sess.get('logged_in')
                 assert sess['oidc_access_token'] == 'old-access-token'
+                assert sess.get('oidc_refresh_retry_after', 0) > time.time()
+
+        # 5. Transient failure within backoff window skips another refresh attempt
+        with patch('src.common.oidc.OIDCHelper.refresh_access_token') as mock_refresh:
+            res = client.get('/dashboard')
+            assert res.status_code == 200
+            mock_refresh.assert_not_called()
 
 
 def test_dashboard_routes(client, db_session):

@@ -49,7 +49,11 @@ def test_fetch_discovery_success(mock_get):
     
     endpoints = helper._fetch_discovery()
     assert endpoints['authorization_endpoint'] == 'https://auth.com/login'
-    mock_get.assert_called_once_with("https://auth.com/.well-known/openid-configuration", verify=True, timeout=10)
+    mock_get.assert_called_once_with(
+        "https://auth.com/.well-known/openid-configuration",
+        verify=True,
+        timeout=(5.0, 30.0),
+    )
 
 @patch('requests.get')
 def test_fetch_discovery_failure(mock_get):
@@ -125,7 +129,12 @@ def test_get_user_info(mock_get):
 
     info = helper.get_user_info("access-token-xyz")
     assert info['name'] == 'John Doe'
-    mock_get.assert_called_once_with('https://auth.com/userinfo', headers={'Authorization': 'Bearer access-token-xyz'}, verify=True, timeout=10)
+    mock_get.assert_called_once_with(
+        'https://auth.com/userinfo',
+        headers={'Authorization': 'Bearer access-token-xyz'},
+        verify=True,
+        timeout=(5.0, 30.0),
+    )
 
     # Missing userinfo endpoint
     helper._endpoints = {}
@@ -257,10 +266,36 @@ def test_refresh_access_token_network_errors(mock_post):
     helper.client_id = "test-client"
     helper.client_secret = "test-secret"
 
-    # Test connection network error
+    # Test connection network error retries then fails
     mock_post.side_effect = requests.RequestException("Connection timed out")
 
     with pytest.raises(OIDCRefreshError) as exc_info:
         helper.refresh_access_token("any-token")
     assert exc_info.value.is_transient
+    assert mock_post.call_count == 3
+
+
+@patch('time.sleep')
+@patch('requests.post')
+def test_refresh_access_token_retries_transient_http_error(mock_post, _mock_sleep):
+    from src.common.oidc import OIDCRefreshError
+
+    helper = OIDCHelper()
+    helper.issuer_url = "https://auth.com"
+    helper._endpoints = {'token_endpoint': 'https://auth.com/token'}
+    helper.client_id = "test-client"
+    helper.client_secret = "test-secret"
+
+    mock_response_503 = MagicMock()
+    mock_response_503.status_code = 503
+    http_error_503 = requests.HTTPError("Service Unavailable", response=mock_response_503)
+
+    success_response = MagicMock()
+    success_response.raise_for_status.return_value = None
+    success_response.json.return_value = {'access_token': 'new-token', 'expires_in': 3600}
+    mock_post.side_effect = [http_error_503, success_response]
+
+    tokens = helper.refresh_access_token("any-token")
+    assert tokens['access_token'] == 'new-token'
+    assert mock_post.call_count == 2
 
