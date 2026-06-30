@@ -146,12 +146,21 @@
         });
     }
 
+    function decodeHtmlEntities(text) {
+        if (!text || !text.includes('&')) {
+            return text;
+        }
+        const el = document.createElement('textarea');
+        el.innerHTML = text;
+        return el.value;
+    }
+
     function extractFragment(html) {
         const regions = {};
         let content = html;
 
         const titleMatch = content.match(/<!--\s*spa-title:([\s\S]*?)-->/);
-        const title = titleMatch ? titleMatch[1].trim() : null;
+        const title = titleMatch ? decodeHtmlEntities(titleMatch[1].trim()) : null;
         content = content.replace(/<!--\s*spa-title:[\s\S]*?-->\n?/, '');
 
         REGION_NAMES.forEach((name) => {
@@ -386,7 +395,14 @@
     history.replaceState({ spaPath: currentPath }, document.title, window.location.pathname + window.location.search);
     updateSidebarActive(currentPath);
 
-    if (mainEl.querySelector('#spa-loading')) {
+    const initialFragmentTemplate = document.getElementById('spa-initial-fragment');
+    if (initialFragmentTemplate) {
+        renderFragment(initialFragmentTemplate.innerHTML, currentPath, {
+            pushState: false,
+            search: window.location.search,
+        });
+        initialFragmentTemplate.remove();
+    } else if (mainEl.querySelector('#spa-loading')) {
         navigateTo(currentPath, { pushState: false, force: true });
     } else if (mainEl.innerHTML.trim()) {
         renderFragment(mainEl.innerHTML, currentPath, { pushState: false, search: window.location.search });

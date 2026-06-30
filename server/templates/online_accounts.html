@@ -26,7 +26,8 @@
 
 {% block top_nav_center %}
 {% set active_tab = 'online_accounts' %}
-{% include '_child_activity_nav.html' %}
+{% set include_date_filter = false %}
+{% include '_child_activity_toolbar.html' %}
 {% endblock %}
 
 {% block content %}

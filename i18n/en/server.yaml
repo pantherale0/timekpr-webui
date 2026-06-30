@@ -25,7 +25,8 @@ common:
   minutes_short: m
   hours_short: h
 nav:
-  toggle_sidebar: Toggle sidebar
+  toggle_sidebar: Menu
+  menu_label: Menu
   family_home: Family Home
   active_household: Active Home
   dialogue: Dialogue
@@ -36,6 +37,7 @@ nav:
   add_device: Add Device
   create_managed_profile: Create Managed Profile
   actions: Actions
+  status_alerts: Status alerts
   main: MAIN
   dashboard: Dashboard
   safety_routines: SAFETY & ROUTINES
@@ -165,33 +167,35 @@ login:
   title: Login - Guardian
   meta_description: Sign in to Guardian Family Safety — calm routines, browsing shields, and family dialogue.
   og_title: Login - Guardian
-  og_description: Secure administrative login console for Guardian parental controls. Log in to manage screen time, user limits,
-    schedules, and application locks.
-  brand_subtitle: Parental Control Console
+  og_description: Sign in to Guardian to manage screen time, routines, browsing shields, and family dialogue for your home.
+  brand_subtitle: Your Home's Control Centre
   sign_in_lead: Sign in to start your parent session
-  local_fallback: 'Local Fallback Mode:'
-  local_fallback_detail: Outbound OIDC is unconfigured. Login using local parent credentials.
-  username_placeholder: Parent username
-  password_placeholder: Password
+  local_fallback: 'Signing in another way:'
+  local_fallback_detail: Single sign-on isn't available right now. Use your parent username and password below.
+  username_label: Parent username
+  password_label: Password
+  username_placeholder: e.g. admin
+  password_placeholder: Your password
   sign_in_btn: Sign in
   default_keys: 'Default fallback keys:'
 flash:
   auth:
-    login_success: Login successful!
-    login_required: Please login first
-    logout: You have been logged out
-    invalid_credentials: Invalid credentials. Please try again.
-    oidc_disabled: OIDC is not enabled.
-    oidc_init_failed: 'OIDC Login failed to initialize: OIDC provider is offline or misconfigured. Falling back to local credentials.'
-    oidc_csrf: 'Authentication failed: Invalid state token (CSRF attempt prevented).'
-    oidc_no_code: 'Authentication failed: No authorization code returned from provider.'
-    oidc_success: Logged in successfully as {username}!
-    oidc_failed: 'Authentication failed: {error}'
-    oidc_denied_missing_user: Missing user information from identity provider
-    oidc_denied_not_configured: OIDC admin access is not configured. Set ALLOWED_OIDC_ADMINS, ALLOWED_OIDC_ADMIN_DOMAINS,
-      ALLOWED_OIDC_ADMIN_ROLES, or ALLOWED_OIDC_ADMIN_GROUPS.
-    oidc_denied_unauthorized: You are not authorized to access the admin console.
-    oidc_denied_generic: 'Access denied: {reason}'
+    login_success: You're signed in. Welcome back!
+    login_required: Please sign in to continue
+    logout: You've been signed out
+    session_expired: Your sign-in timed out for security. Your household settings are unchanged — please sign in again.
+    invalid_credentials: That username and password didn't match. Nothing was changed — please try again.
+    oidc_disabled: Single sign-on isn't turned on for this server.
+    oidc_init_failed: We couldn't reach the single sign-on service. You can sign in with your parent username and password below.
+    oidc_csrf: We couldn't finish signing you in — the link may have expired. Please try again. Your account is safe.
+    oidc_no_code: We couldn't finish signing you in. Please go back to the login page and try again.
+    oidc_success: Welcome back, {username}!
+    oidc_failed: We couldn't sign you in just now. Please try again in a moment.
+    oidc_denied_missing_user: We couldn't find your account details from the sign-in service. Please contact whoever manages this
+      home.
+    oidc_denied_not_configured: Sign-in isn't set up for this console yet. Ask your administrator to configure access.
+    oidc_denied_unauthorized: You don't have permission to use this console. If you think that's wrong, contact your administrator.
+    oidc_denied_generic: You can't access this console right now. {reason}
     household_name_required: Please enter a name for your home.
     household_created: Created home "{name}". Welcome!
     household_create_failed: Could not create your home. Please try again.
@@ -209,7 +213,7 @@ flash:
     household_switched: Active home switched successfully.
   sharing:
     redeem_success: Profile invitation redeemed successfully.
-    redeem_error: 'Failed to redeem invitation: {reason}'
+    redeem_error: We couldn't accept that invitation. {reason}
   common:
     fields_required: All fields are required
     invalid_values: Invalid setting values provided
@@ -321,6 +325,9 @@ api:
   invalid_json: Request body must be a JSON object
   request_body_must_be_object: Request body must be an object
   validation_error: '{error}'
+  session_extended: You're signed in for longer.
+  session_extend_failed: We couldn't extend your sign-in. Please save your work and sign in again soon.
+  session_extend_transient: We couldn't reach the sign-in service. Please try again in a moment.
   missing_params: Missing required parameters
   invalid_params: Invalid parameter format
   invalid_operation: Operation must be '+' or '-'
@@ -368,8 +375,12 @@ api:
 js:
   save_saving: Saving…
   save_saved: Changes saved
-  save_failed: Couldn't save — try again
+  save_failed: We couldn't save your changes. Nothing was lost — please try again.
   save_sync_pending: Saved — syncing to devices when they reconnect
+  session_expiring: Your sign-in will expire in {minutes} minutes. Your work on this page is saved.
+  session_extend_btn: Keep me signed in
+  session_extended: You're signed in for longer. Carry on when you're ready.
+  session_extend_failed: We couldn't extend your sign-in. Please save your work and sign in again soon.
   shell_dialogue_count: '{count} Dialogue'
   shell_toast_saved: Changes saved
   shell_wizard_step1_title: Choose Platform
@@ -1236,7 +1247,7 @@ pages:
     col_time_spent: Time Spent
     no_app_usage: No application usage records found for this period.
     activity_feed: Activity Feed
-    activity_feed_lead: Shield blocks, app pauses, and routine notices
+    activity_feed_lead: Shield blocks, app pauses, and routine notices. Scroll down to load older entries.
     search_activities: Search activities...
     filter_all: All Activities
     filter_alerts: Alerts Only
@@ -1277,6 +1288,7 @@ pages:
     loading_channels: Loading channels...
     no_channels: No channel data available for this period.
     combined_timeline: Combined Activity Timeline
+    timeline_feed_lead: Websites, videos, and AI prompts. Scroll down to load older entries.
     entries_found: '{count} entries found'
     search_placeholder: Search page titles, domains or videos...
     filter_all: All Activities
@@ -1583,9 +1595,9 @@ tpl:
     share_profile: Share Profile
     other_parents_or_guardians: Other parents or guardians who currently have granular access to {username}'s profile.
   base:
-    link_console_amp_continue: Link Console &amp; Continue
-    approve_amp_continue: Approve &amp; Continue
-    link_account_amp_continue: Link Account &amp; Continue
+    link_console_amp_continue: Link Console & Continue
+    approve_amp_continue: Approve & Continue
+    link_account_amp_continue: Link Account & Continue
     log_in_and_on_the: Log in, and on the final
     screen_right_click_or_tap: screen, right-click (or tap and hold) the button, copy its link address, and paste it below.
     alternatively_you_can_download_the: 'Alternatively, you can download the MSI installer package directly and run it:'
@@ -1594,10 +1606,10 @@ tpl:
       -- --url ws://yourserver/ws
     pick_the_platform_your_child: Pick the platform your child uses — we'll walk you through connecting it safely.
     choose_a_device: Choose a device
-    view_live_ledger_amp_billing: View live ledger &amp; billing stack
+    view_live_ledger_amp_billing: View live ledger & billing stack
     view_authentication_settings_change_administrative: View authentication settings Change administrative password
     workspace_family_home: 'Workspace: Family Home'
-    routine_locks_amp_time: Routine Locks &amp; Time
+    routine_locks_amp_time: Routine Locks & Time
   device_detail:
     activity:
       version_v: 'Version: v'
@@ -1613,7 +1625,7 @@ tpl:
       diagnostic_details: Diagnostic Details
       delivery_status: Delivery Status
       event_type: Event Type
-      date_amp_time: Date &amp; Time
+      date_amp_time: Date & Time
       loading_alert_history: Loading alert history...
       sort_by_type: Sort by Type
       sort_by_date: Sort by Date
@@ -1669,7 +1681,10 @@ tpl:
   restrictions:
     remove_domain_restriction: Remove domain restriction
     eg_redditcom_instagramcom: e.g. reddit.com, instagram.com
-    youtubecom10tiktokcom10facebookcom: youtube.com&#10;tiktok.com&#10;facebook.com
+    youtubecom10tiktokcom10facebookcom: |-
+      youtube.com
+      tiktok.com
+      facebook.com
   restrictions_app:
     remove_this_rule: Remove this rule
   spa_shell:

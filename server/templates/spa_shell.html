@@ -154,7 +154,7 @@
     {% block extra_head %}{% endblock %}
 </head>
 
-<body class="layout-fixed sidebar-expand-lg sidebar-mini bg-body-tertiary">
+<body class="layout-fixed sidebar-expand-lg sidebar-mini bg-body-tertiary"{% if session_expires_at %} data-session-expires-at="{{ session_expires_at }}" data-session-warn-seconds="{{ session_warn_seconds }}"{% endif %}>
     <div class="app-wrapper">
         <!-- Top Navbar Header -->
         <nav class="app-header navbar navbar-expand bg-body shadow-sm" aria-label="{{ t('nav.main_navigation') }}">
@@ -163,9 +163,10 @@
                 <div class="guardian-nav-brand">
                     <ul class="navbar-nav flex-row align-items-center">
                         <li class="nav-item">
-                            <a class="nav-link guardian-nav-toggle" data-lte-toggle="sidebar" href="#" role="button"
+                            <a class="nav-link guardian-nav-toggle d-flex align-items-center gap-1" data-lte-toggle="sidebar" href="#" role="button"
                                 aria-label="{{ t('nav.toggle_sidebar') }}">
-                                <i class="fas fa-bars"></i>
+                                <i class="fas fa-bars" aria-hidden="true"></i>
+                                <span class="guardian-nav-menu-label d-none d-sm-inline">{{ t('nav.menu_label') }}</span>
                             </a>
                         </li>
                         <li class="nav-item d-none d-md-inline-block" id="spa-slot-top-nav-left" data-spa-nav-slot="top_nav_left">
@@ -175,26 +176,30 @@
                     </ul>
                 </div>
 
-                <!-- System status (center) -->
-                <div class="guardian-nav-center d-flex align-items-center">
+                <!-- Page tools (tabs, filters) — only grows when a view injects content -->
+                <div class="guardian-nav-center d-flex align-items-center" id="guardian-nav-center">
                     <div id="spa-slot-top-nav-center" data-spa-nav-slot="top_nav_center"></div>
-                    <span class="guardian-nav-alert-badge badge rounded-pill bg-warning text-dark"
-                        id="navbar-approvals-badge" style="display: none; cursor: pointer;" aria-live="polite"
-                        onclick="location.href='{{ url_for('ui_dashboard.admin_approvals') }}'">
-                        <i class="fas fa-clipboard-check"></i>
-                        <span class="guardian-nav-alert-text"><span id="navbar-approvals-count">0</span> {{ t('nav.dialogue') }}</span>
-                    </span>
-                    <span class="guardian-nav-alert-badge badge rounded-pill bg-danger text-white"
-                        id="navbar-task-badge" style="display: none; cursor: pointer;"
-                        onclick="location.href='{{ url_for('settings') }}'">
-                        <span class="task-status-indicator-dot danger"></span>
-                        <span class="guardian-nav-alert-text">{{ t('nav.tasks_offline') }}</span>
-                    </span>
+                    {% block top_nav_center %}{% endblock %}
                 </div>
 
-                <!-- Form & utility actions (right) -->
-                <div class="guardian-nav-actions">
-                    <ul class="navbar-nav flex-row align-items-center">
+                <!-- Alerts + primary actions (grouped on the right) -->
+                <div class="guardian-nav-trailing">
+                    <div class="guardian-nav-alerts d-none d-lg-flex align-items-center" aria-label="{{ t('nav.status_alerts') }}">
+                        <span class="guardian-nav-alert-badge badge rounded-pill bg-warning text-dark"
+                            id="navbar-approvals-badge" style="display: none; cursor: pointer;" aria-live="polite"
+                            onclick="location.href='{{ url_for('ui_dashboard.admin_approvals') }}'">
+                            <i class="fas fa-clipboard-check" aria-hidden="true"></i>
+                            <span class="guardian-nav-alert-text"><span id="navbar-approvals-count">0</span> {{ t('nav.dialogue') }}</span>
+                        </span>
+                        <span class="guardian-nav-alert-badge badge rounded-pill bg-danger text-white"
+                            id="navbar-task-badge" style="display: none; cursor: pointer;"
+                            onclick="location.href='{{ url_for('settings') }}'">
+                            <span class="task-status-indicator-dot danger"></span>
+                            <span class="guardian-nav-alert-text">{{ t('nav.tasks_offline') }}</span>
+                        </span>
+                    </div>
+                    <div class="guardian-nav-actions">
+                        <ul class="navbar-nav flex-row align-items-center">
                         <li class="nav-item d-lg-none">
                             <span class="guardian-nav-alert-badge badge rounded-pill bg-warning text-dark"
                                 id="navbar-approvals-badge-mobile" style="display: none; cursor: pointer;"
@@ -252,6 +257,7 @@
                             </ul>
                         </li>
                     </ul>
+                    </div>
                 </div>
             </div>
         </nav>
@@ -408,10 +414,24 @@
         <!-- Main Content Area (SPA) -->
         <main class="app-main">
             <div class="container-fluid guardian-page-shell px-4 py-4">
+                <div id="session-expiry-banner" class="alert alert-info alert-dismissible shadow-sm mb-3 d-none" role="status">
+                    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+                        <span id="session-expiry-message" class="small"></span>
+                        <button type="button" class="btn btn-sm guardian-btn-sage" id="session-extend-btn">
+                            {{ t('js.session_extend_btn') }}
+                        </button>
+                    </div>
+                </div>
                 <div class="flash-messages-container" id="spa-global-flash"></div>
+                {% if initial_fragment %}
+                <template id="spa-initial-fragment">{{ initial_fragment|safe }}</template>
+                {% endif %}
                 <div id="spa-main" data-initial-path="{{ initial_path|default('/dashboard') }}">
                     {% if initial_fragment %}
-                    {{ initial_fragment|safe }}
+                    <div class="text-center py-5 text-muted" id="spa-initial-loading">
+                        <div class="spinner-border text-secondary mb-3" role="status" aria-hidden="true"></div>
+                        <p class="mb-0">{{ t('shell.loading_home') }}</p>
+                    </div>
                     {% else %}
                     <div class="text-center py-5 text-muted" id="spa-loading">
                         <div class="spinner-border text-secondary mb-3" role="status" aria-hidden="true"></div>
@@ -891,32 +911,14 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/admin-lte@4.0.0/dist/js/adminlte.min.js"></script>
 
+    <script src="{{ url_for('static', filename='js/guardian-notifications.js', v=server_version) }}"></script>
+
     <!-- Background Task Poller & Onboarding Wizard Controller -->
     <script>
         (function () {
         'use strict';
         const i18n = JSON.parse(document.getElementById('i18n-data')?.textContent || '{}');
         const fmt = (key, params) => (window.guardianI18n ? window.guardianI18n(key, params) : i18n[key] || key);
-
-        function showNotification(message, type = 'success') {
-            const toast = document.getElementById('notification-toast');
-            if (!toast) return;
-            const messageEl = toast.querySelector('.toast-message');
-            const iconEl = toast.querySelector('.toast-icon path');
-            if (!messageEl || !iconEl) return;
-
-            messageEl.textContent = message;
-            toast.className = `notification-toast ${type}`;
-
-            if (type === 'success') {
-                iconEl.setAttribute('d', 'M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zm-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.061L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z');
-            } else if (type === 'error') {
-                iconEl.setAttribute('d', 'M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zM5.354 4.646a.5.5 0 1 0-.708.708L7.293 8l-2.647 2.646a.5.5 0 0 0 .708.708L8 8.707l2.646 2.647a.5.5 0 0 0 .708-.708L8.707 8l2.647-2.646a.5.5 0 0 0-.708-.708L8 7.293 5.354 4.646z');
-            }
-
-            toast.classList.add('show');
-            setTimeout(() => toast.classList.remove('show'), 2500);
-        }
 
         function updateApprovalsBadges(pendingApprovals) {
             const total = pendingApprovals && typeof pendingApprovals.total === 'number'
@@ -1784,7 +1786,6 @@
             });
         }
 
-        window.showNotification = showNotification;
         window.updateApprovalsBadges = updateApprovalsBadges;
         window.openOnboardingWizard = openOnboardingWizard;
         window.closeWizard = closeWizard;

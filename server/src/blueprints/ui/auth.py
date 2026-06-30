@@ -55,13 +55,15 @@ def login():
 
     # Fallback: Traditional form-based local login
     error = None
+    username_value = request.form.get('username', '').strip() if request.method == 'POST' else ''
     if request.method == 'POST':
-        username = request.form.get('username')
+        username = username_value
         password = request.form.get('password')
         
         # Check admin password using hash comparison
         if username == ADMIN_USERNAME and Settings.check_admin_password(password):
             session['logged_in'] = True
+            session.permanent = True
             parent = ParentAccount.query.filter_by(email='admin@local').first()
             if parent:
                 session['parent_account_id'] = parent.id
@@ -83,7 +85,7 @@ def login():
         error = t('flash.auth.invalid_credentials')
         flash_t('flash.auth.invalid_credentials', 'danger')
     
-    return render_template('login.html', error=error)
+    return render_template('login.html', error=error, username=username_value)
 
 
 @ui_auth_bp.route('/callback')

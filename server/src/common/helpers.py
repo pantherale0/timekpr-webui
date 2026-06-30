@@ -37,9 +37,14 @@ def _env_flag_enabled(key, default=False):
 def inject_oidc_status():
     """Inject OIDC status and session user into templates"""
     from app import oidc_helper
+    from src.auth.session_lifecycle import get_oidc_expires_at, session_warn_seconds
+
+    expires_at = get_oidc_expires_at(session) if session.get('logged_in') else None
     return {
         'oidc_enabled': oidc_helper.is_enabled,
-        'session_user': session.get('user')
+        'session_user': session.get('user'),
+        'session_expires_at': int(expires_at) if expires_at is not None else None,
+        'session_warn_seconds': session_warn_seconds(),
     }
 
 

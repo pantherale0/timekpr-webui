@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import html
 import logging
 import os
 import re
@@ -174,6 +175,13 @@ def _missing_key_placeholder(key: str) -> str:
     return f'[missing:{key}]' if testing else key
 
 
+def _normalize_catalog_text(value: str) -> str:
+    """Return plain text from catalog strings (decode accidental HTML entities)."""
+    if '&' not in value:
+        return value
+    return html.unescape(value)
+
+
 def t(key: str, locale: str | None = None, **kwargs: Any) -> str:
     """Translate a dot-path key with optional format interpolation."""
     active_locale = locale
@@ -191,6 +199,7 @@ def t(key: str, locale: str | None = None, **kwargs: Any) -> str:
     if not isinstance(value, str):
         _LOGGER.warning('Translation key is not a string: %s', key)
         return _missing_key_placeholder(key)
+    value = _normalize_catalog_text(value)
     if kwargs:
         try:
             return value.format(**kwargs)

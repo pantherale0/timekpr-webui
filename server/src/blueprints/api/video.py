@@ -496,6 +496,8 @@ def get_user_combined_history(user_id):
     activity_type = request.args.get('type', 'all').strip()
     page = int(request.args.get('page', 1))
     per_page = int(request.args.get('per_page', 20))
+    include_history = request.args.get('include_history', 'true').lower() != 'false'
+    include_analytics = request.args.get('include_analytics', 'true').lower() != 'false'
 
     from sqlalchemy import literal_column, desc, or_, text
 
@@ -616,217 +618,233 @@ def get_user_combined_history(user_id):
         from sqlalchemy import union_all
         union_stmt = union_all(video_query, web_query, ai_query)
 
-    union_sub = union_stmt.subquery()
-    paginated = db.session.query(union_sub).order_by(union_sub.c.timestamp.desc()).paginate(
-        page=page, per_page=per_page, error_out=False
-    )
-
     history_list = []
-    for row in paginated.items:
-        item_dict = {
-            'id': row.id,
-            'type': row.activity_type,
-            'title': row.title or "Untitled Page",
-            'timestamp': row.timestamp.isoformat() if row.timestamp else None,
-            'status': row.status,
-        }
-        if row.activity_type in VideoHistory.SUPPORTED_PLATFORMS:
-            item_dict.update({
-                'platform': row.activity_type,
-                'video_id': row.url_or_id,
-                'channel_name': row.domain_or_channel or "Unknown Channel",
-                'category': row.category or "Unknown",
-                'duration_seconds': int(row.duration_seconds or 0),
-                'url': _video_url(row.activity_type, row.url_or_id),
-            })
-        elif row.activity_type == 'ai_prompt':
-            item_dict.update({
-                'url': row.url_or_id,
-                'domain': row.domain_or_channel or "Unknown Domain",
-                'category': row.category or "AI Service",
-                'prompt_text': row.prompt_text,
-            })
-        else:
-            item_dict.update({
-                'url': row.url_or_id,
-                'domain': row.domain_or_channel or "Unknown Domain",
-                'category': 'Web Page',
-            })
-        history_list.append(item_dict)
+    pagination_payload = {
+        'page': page,
+        'per_page': per_page,
+        'total_items': 0,
+        'total_pages': 0,
+        'has_next': False,
+        'has_prev': False,
+    }
 
-    video_category_stats = db.session.query(
-        VideoHistory.platform,
-        VideoHistory.category,
-        db.func.sum(VideoHistory.duration_seconds).label('total_duration'),
-        db.func.count(VideoHistory.id).label('video_count'),
-    ).filter(VideoHistory.managed_user_id == user.id)
-
-    if start_date:
-        video_category_stats = video_category_stats.filter(VideoHistory.watched_at >= start_date)
-    if end_date:
-        video_category_stats = video_category_stats.filter(VideoHistory.watched_at <= end_date)
-    if search:
-        video_category_stats = video_category_stats.filter(
-            or_(
-                VideoHistory.title.ilike(search_filter),
-                VideoHistory.channel_name.ilike(search_filter),
-            )
+    if include_history:
+        union_sub = union_stmt.subquery()
+        paginated = db.session.query(union_sub).order_by(union_sub.c.timestamp.desc()).paginate(
+            page=page, per_page=per_page, error_out=False
         )
 
-    video_category_results = video_category_stats.group_by(
-        VideoHistory.platform, VideoHistory.category
-    ).all()
-    video_categories_data = [
-        {
-            'platform': row.platform,
-            'category': row.category,
-            'total_seconds': int(row.total_duration or 0),
-            'count': row.video_count,
+        for row in paginated.items:
+            item_dict = {
+                'id': row.id,
+                'type': row.activity_type,
+                'title': row.title or "Untitled Page",
+                'timestamp': row.timestamp.isoformat() if row.timestamp else None,
+                'status': row.status,
+            }
+            if row.activity_type in VideoHistory.SUPPORTED_PLATFORMS:
+                item_dict.update({
+                    'platform': row.activity_type,
+                    'video_id': row.url_or_id,
+                    'channel_name': row.domain_or_channel or "Unknown Channel",
+                    'category': row.category or "Unknown",
+                    'duration_seconds': int(row.duration_seconds or 0),
+                    'url': _video_url(row.activity_type, row.url_or_id),
+                })
+            elif row.activity_type == 'ai_prompt':
+                item_dict.update({
+                    'url': row.url_or_id,
+                    'domain': row.domain_or_channel or "Unknown Domain",
+                    'category': row.category or "AI Service",
+                    'prompt_text': row.prompt_text,
+                })
+            else:
+                item_dict.update({
+                    'url': row.url_or_id,
+                    'domain': row.domain_or_channel or "Unknown Domain",
+                    'category': 'Web Page',
+                })
+            history_list.append(item_dict)
+
+        pagination_payload = {
+            'page': paginated.page,
+            'per_page': paginated.per_page,
+            'total_items': paginated.total,
+            'total_pages': paginated.pages,
+            'has_next': paginated.has_next,
+            'has_prev': paginated.has_prev,
         }
-        for row in video_category_results
-    ]
 
-    video_creator_stats = db.session.query(
-        VideoHistory.platform,
-        VideoHistory.channel_name,
-        db.func.sum(VideoHistory.duration_seconds).label('total_duration'),
-        db.func.count(VideoHistory.id).label('video_count'),
-    ).filter(VideoHistory.managed_user_id == user.id)
-
-    if start_date:
-        video_creator_stats = video_creator_stats.filter(VideoHistory.watched_at >= start_date)
-    if end_date:
-        video_creator_stats = video_creator_stats.filter(VideoHistory.watched_at <= end_date)
-    if search:
-        video_creator_stats = video_creator_stats.filter(
-            or_(
-                VideoHistory.title.ilike(search_filter),
-                VideoHistory.channel_name.ilike(search_filter),
-            )
-        )
-
-    video_creator_results = video_creator_stats.group_by(
-        VideoHistory.platform, VideoHistory.channel_name
-    ).order_by(desc('total_duration')).limit(10).all()
-    video_creators_data = [
-        {
-            'platform': row.platform,
-            'channel_name': row.channel_name or 'Unknown Channel',
-            'total_seconds': int(row.total_duration or 0),
-            'count': row.video_count,
-        }
-        for row in video_creator_results
-    ]
-
-    web_domain_stats = db.session.query(
-        WebHistory.domain,
-        db.func.count(WebHistory.id).label('visit_count'),
-    ).filter(WebHistory.managed_user_id == user.id)
-
-    if start_date:
-        web_domain_stats = web_domain_stats.filter(WebHistory.visited_at >= start_date)
-    if end_date:
-        web_domain_stats = web_domain_stats.filter(WebHistory.visited_at <= end_date)
-    if search:
-        web_domain_stats = web_domain_stats.filter(
-            or_(
-                WebHistory.title.ilike(search_filter),
-                WebHistory.url.ilike(search_filter),
-                WebHistory.domain.ilike(search_filter),
-            )
-        )
-
-    web_domain_results = web_domain_stats.group_by(WebHistory.domain).order_by(
-        desc('visit_count')
-    ).limit(10).all()
-    domains_data = [
-        {
-            'domain': row.domain or 'Unknown Domain',
-            'count': row.visit_count,
-        }
-        for row in web_domain_results
-    ]
-
-    # AI Stats and Services
-    ai_prompt_stats_results = []
-    total_ai_seconds = 0
-    if device_map_ids:
-        ai_prompt_stats_query = db.session.query(
-            AiPromptLog.service,
-            db.func.count(AiPromptLog.id).label('prompt_count'),
-        ).filter(AiPromptLog.device_map_id.in_(device_map_ids))
+    analytics_payload = None
+    if include_analytics:
+        video_category_stats = db.session.query(
+            VideoHistory.platform,
+            VideoHistory.category,
+            db.func.sum(VideoHistory.duration_seconds).label('total_duration'),
+            db.func.count(VideoHistory.id).label('video_count'),
+        ).filter(VideoHistory.managed_user_id == user.id)
 
         if start_date:
-            ai_prompt_stats_query = ai_prompt_stats_query.filter(AiPromptLog.logged_at >= start_date)
+            video_category_stats = video_category_stats.filter(VideoHistory.watched_at >= start_date)
         if end_date:
-            ai_prompt_stats_query = ai_prompt_stats_query.filter(AiPromptLog.logged_at <= end_date)
+            video_category_stats = video_category_stats.filter(VideoHistory.watched_at <= end_date)
         if search:
-            ai_prompt_stats_query = ai_prompt_stats_query.filter(
+            video_category_stats = video_category_stats.filter(
                 or_(
-                    AiPromptLog.title.ilike(search_filter),
-                    AiPromptLog.url.ilike(search_filter),
-                    AiPromptLog.domain.ilike(search_filter),
-                    AiPromptLog.prompt_text.ilike(search_filter),
+                    VideoHistory.title.ilike(search_filter),
+                    VideoHistory.channel_name.ilike(search_filter),
                 )
             )
-        ai_prompt_stats_results = ai_prompt_stats_query.group_by(AiPromptLog.service).all()
 
-        ai_time_query = db.session.query(
-            db.func.sum(AiSessionLog.duration_seconds).label('total_duration')
-        ).filter(AiSessionLog.device_map_id.in_(device_map_ids))
+        video_category_results = video_category_stats.group_by(
+            VideoHistory.platform, VideoHistory.category
+        ).all()
+        video_categories_data = [
+            {
+                'platform': row.platform,
+                'category': row.category,
+                'total_seconds': int(row.total_duration or 0),
+                'count': row.video_count,
+            }
+            for row in video_category_results
+        ]
+
+        video_creator_stats = db.session.query(
+            VideoHistory.platform,
+            VideoHistory.channel_name,
+            db.func.sum(VideoHistory.duration_seconds).label('total_duration'),
+            db.func.count(VideoHistory.id).label('video_count'),
+        ).filter(VideoHistory.managed_user_id == user.id)
 
         if start_date:
-            ai_time_query = ai_time_query.filter(AiSessionLog.logged_at >= start_date)
+            video_creator_stats = video_creator_stats.filter(VideoHistory.watched_at >= start_date)
         if end_date:
-            ai_time_query = ai_time_query.filter(AiSessionLog.logged_at <= end_date)
+            video_creator_stats = video_creator_stats.filter(VideoHistory.watched_at <= end_date)
+        if search:
+            video_creator_stats = video_creator_stats.filter(
+                or_(
+                    VideoHistory.title.ilike(search_filter),
+                    VideoHistory.channel_name.ilike(search_filter),
+                )
+            )
 
-        total_ai_seconds = ai_time_query.scalar() or 0
+        video_creator_results = video_creator_stats.group_by(
+            VideoHistory.platform, VideoHistory.channel_name
+        ).order_by(desc('total_duration')).limit(10).all()
+        video_creators_data = [
+            {
+                'platform': row.platform,
+                'channel_name': row.channel_name or 'Unknown Channel',
+                'total_seconds': int(row.total_duration or 0),
+                'count': row.video_count,
+            }
+            for row in video_creator_results
+        ]
 
-    total_video_seconds = sum(cat['total_seconds'] for cat in video_categories_data)
-    total_video_count = sum(cat['count'] for cat in video_categories_data)
-    total_web_visits = sum(dom['count'] for dom in domains_data)
+        web_domain_stats = db.session.query(
+            WebHistory.domain,
+            db.func.count(WebHistory.id).label('visit_count'),
+        ).filter(WebHistory.managed_user_id == user.id)
 
-    youtube_categories = [
-        cat for cat in video_categories_data
-        if cat['platform'] == VideoHistory.VIDEO_PLATFORM_YOUTUBE
-    ]
-    youtube_channels = [
-        creator for creator in video_creators_data
-        if creator['platform'] == VideoHistory.VIDEO_PLATFORM_YOUTUBE
-    ]
+        if start_date:
+            web_domain_stats = web_domain_stats.filter(WebHistory.visited_at >= start_date)
+        if end_date:
+            web_domain_stats = web_domain_stats.filter(WebHistory.visited_at <= end_date)
+        if search:
+            web_domain_stats = web_domain_stats.filter(
+                or_(
+                    WebHistory.title.ilike(search_filter),
+                    WebHistory.url.ilike(search_filter),
+                    WebHistory.domain.ilike(search_filter),
+                )
+            )
+
+        web_domain_results = web_domain_stats.group_by(WebHistory.domain).order_by(
+            desc('visit_count')
+        ).limit(10).all()
+        domains_data = [
+            {
+                'domain': row.domain or 'Unknown Domain',
+                'count': row.visit_count,
+            }
+            for row in web_domain_results
+        ]
+
+        # AI Stats and Services
+        ai_prompt_stats_results = []
+        total_ai_seconds = 0
+        if device_map_ids:
+            ai_prompt_stats_query = db.session.query(
+                AiPromptLog.service,
+                db.func.count(AiPromptLog.id).label('prompt_count'),
+            ).filter(AiPromptLog.device_map_id.in_(device_map_ids))
+
+            if start_date:
+                ai_prompt_stats_query = ai_prompt_stats_query.filter(AiPromptLog.logged_at >= start_date)
+            if end_date:
+                ai_prompt_stats_query = ai_prompt_stats_query.filter(AiPromptLog.logged_at <= end_date)
+            if search:
+                ai_prompt_stats_query = ai_prompt_stats_query.filter(
+                    or_(
+                        AiPromptLog.title.ilike(search_filter),
+                        AiPromptLog.url.ilike(search_filter),
+                        AiPromptLog.domain.ilike(search_filter),
+                        AiPromptLog.prompt_text.ilike(search_filter),
+                    )
+                )
+            ai_prompt_stats_results = ai_prompt_stats_query.group_by(AiPromptLog.service).all()
+
+            ai_time_query = db.session.query(
+                db.func.sum(AiSessionLog.duration_seconds).label('total_duration')
+            ).filter(AiSessionLog.device_map_id.in_(device_map_ids))
+
+            if start_date:
+                ai_time_query = ai_time_query.filter(AiSessionLog.logged_at >= start_date)
+            if end_date:
+                ai_time_query = ai_time_query.filter(AiSessionLog.logged_at <= end_date)
+
+            total_ai_seconds = ai_time_query.scalar() or 0
+
+        total_video_seconds = sum(cat['total_seconds'] for cat in video_categories_data)
+        total_video_count = sum(cat['count'] for cat in video_categories_data)
+        total_web_visits = sum(dom['count'] for dom in domains_data)
+
+        youtube_categories = [
+            cat for cat in video_categories_data
+            if cat['platform'] == VideoHistory.VIDEO_PLATFORM_YOUTUBE
+        ]
+        youtube_channels = [
+            creator for creator in video_creators_data
+            if creator['platform'] == VideoHistory.VIDEO_PLATFORM_YOUTUBE
+        ]
+
+        analytics_payload = {
+            'video_categories': video_categories_data,
+            'video_creators': video_creators_data,
+            'web_domains': domains_data,
+            'total_video_seconds': total_video_seconds,
+            'total_video_count': total_video_count,
+            'total_web_visits': total_web_visits,
+            'youtube_categories': youtube_categories,
+            'youtube_channels': youtube_channels,
+            'total_youtube_seconds': sum(cat['total_seconds'] for cat in youtube_categories),
+            'total_youtube_videos': sum(cat['count'] for cat in youtube_categories),
+            'total_ai_prompts': sum(row.prompt_count for row in ai_prompt_stats_results),
+            'total_ai_seconds': int(total_ai_seconds),
+            'ai_services': [
+                {
+                    'service': row.service,
+                    'count': row.prompt_count
+                }
+                for row in ai_prompt_stats_results
+            ]
+        }
 
     return jsonify({
         'success': True,
         'data': {
             'history': history_list,
-            'pagination': {
-                'page': paginated.page,
-                'per_page': paginated.per_page,
-                'total_items': paginated.total,
-                'total_pages': paginated.pages,
-                'has_next': paginated.has_next,
-                'has_prev': paginated.has_prev,
-            },
-            'analytics': {
-                'video_categories': video_categories_data,
-                'video_creators': video_creators_data,
-                'web_domains': domains_data,
-                'total_video_seconds': total_video_seconds,
-                'total_video_count': total_video_count,
-                'total_web_visits': total_web_visits,
-                'youtube_categories': youtube_categories,
-                'youtube_channels': youtube_channels,
-                'total_youtube_seconds': sum(cat['total_seconds'] for cat in youtube_categories),
-                'total_youtube_videos': sum(cat['count'] for cat in youtube_categories),
-                'total_ai_prompts': sum(row.prompt_count for row in ai_prompt_stats_results),
-                'total_ai_seconds': int(total_ai_seconds),
-                'ai_services': [
-                    {
-                        'service': row.service,
-                        'count': row.prompt_count
-                    }
-                    for row in ai_prompt_stats_results
-                ]
-            },
+            'pagination': pagination_payload,
+            'analytics': analytics_payload,
         },
     })

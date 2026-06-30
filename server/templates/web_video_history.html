@@ -125,12 +125,8 @@
 
 {% block top_nav_center %}
 {% set active_tab = 'web_history' %}
-{% include '_child_activity_nav.html' %}
-{% endblock %}
-
-{% block top_nav_extra %}
-{% set date_filter_i18n_prefix = 'pages.web_video_history' %}
-{% include '_child_activity_date_filter.html' %}
+{% set include_date_filter = false %}
+{% include '_child_activity_toolbar.html' %}
 {% endblock %}
 
 {% block content %}
@@ -146,6 +142,11 @@
 </div>
 
 <div class="history-main">
+    <div class="d-flex justify-content-end mb-3">
+        {% set date_filter_i18n_prefix = 'pages.web_video_history' %}
+        {% include '_period_filter_dropdown.html' %}
+    </div>
+
     <!-- Stats Strip -->
     <div class="row g-3 mb-4">
         <div class="col-12 col-md-3">
@@ -224,7 +225,10 @@
         <div class="col-12 col-lg-7">
             <div class="card shadow-sm border">
                 <div class="card-header py-3 bg-body-secondary d-flex justify-content-between align-items-center flex-wrap gap-2">
-                    <h5 class="mb-0 fw-bold">{{ t('pages.web_video_history.combined_timeline') }}</h5>
+                    <div>
+                        <h5 class="mb-0 fw-bold">{{ t('pages.web_video_history.combined_timeline') }}</h5>
+                        <span class="text-secondary small fw-medium">{{ t('pages.web_video_history.timeline_feed_lead') }}</span>
+                    </div>
                     <span class="text-secondary small fw-medium" id="history-total-label">{{ t('pages.web_video_history.entries_found', count=0) }}</span>
                 </div>
                 <div class="card-body p-0">
@@ -373,8 +377,33 @@
         }
     }
 
-    // Load data from APIs
-    async function fetchHistory(isScrollLoad = false) {
+    // Load analytics (stats strip + charts) for the selected period
+    async function fetchAnalytics() {
+        showAnalyticsLoading(true);
+
+        let url = `/api/user/${state.userId}/history?include_history=false`;
+        if (state.startDate) url += `&start_date=${state.startDate}`;
+        if (state.endDate) url += `&end_date=${state.endDate}`;
+
+        try {
+            const response = await fetch(url, { signal: historyPageAbort ? historyPageAbort.signal : null });
+            const payload = await response.json();
+            if (payload.success && payload.data) {
+                state.analytics = payload.data.analytics || {};
+                renderStatsStrip();
+                renderCharts();
+            }
+        } catch (error) {
+            if (error.name !== 'AbortError') {
+                console.error('Failed to load history analytics', error);
+            }
+        } finally {
+            showAnalyticsLoading(false);
+        }
+    }
+
+    // Load paginated activity feed (not scoped to the analytics date range)
+    async function fetchHistoryFeed(isScrollLoad = false) {
         if (state.loadingMore) return;
 
         const scrollSpinner = document.getElementById('history-scroll-spinner');
@@ -387,14 +416,12 @@
         } else {
             state.page = 1;
             state.hasNextPage = false;
-            showLoadingState(true);
+            showFeedLoading(true);
             if (scrollSpinner) scrollSpinner.style.display = 'none';
             if (endMessage) endMessage.style.display = 'none';
         }
-        
-        let url = `/api/user/${state.userId}/history?page=${state.page}&per_page=${state.perPage}`;
-        if (state.startDate) url += `&start_date=${state.startDate}`;
-        if (state.endDate) url += `&end_date=${state.endDate}`;
+
+        let url = `/api/user/${state.userId}/history?include_analytics=false&page=${state.page}&per_page=${state.perPage}`;
         if (state.search) url += `&search=${encodeURIComponent(state.search)}`;
         if (state.type !== 'all') url += `&type=${encodeURIComponent(state.type)}`;
 
@@ -404,40 +431,46 @@
             if (payload.success && payload.data) {
                 const pagination = payload.data.pagination || {};
                 state.hasNextPage = pagination.has_next || false;
-                
+
                 if (isScrollLoad) {
                     const newItems = payload.data.history || [];
                     state.history = state.history.concat(newItems);
                     renderHistoryFeedAppend(newItems, pagination);
                 } else {
                     state.history = payload.data.history || [];
-                    state.analytics = payload.data.analytics || {};
-                    
-                    // Render view
-                    renderStatsStrip();
-                    renderCharts();
                     renderHistoryFeed(pagination);
                 }
 
-                // Show end-of-list message if no more pages
                 if (!state.hasNextPage && state.history.length > 0) {
                     if (endMessage) endMessage.style.display = 'block';
                 }
             }
         } catch (error) {
             if (error.name !== 'AbortError') {
-                console.error('Failed to load history details', error);
+                console.error('Failed to load history feed', error);
             }
         } finally {
             state.loadingMore = false;
             if (scrollSpinner) scrollSpinner.style.display = 'none';
             if (!isScrollLoad) {
-                showLoadingState(false);
+                showFeedLoading(false);
             }
         }
     }
 
-    function showLoadingState(isLoading) {
+    function showAnalyticsLoading(isLoading) {
+        if (isLoading) {
+            document.getElementById('domains-chart-loading').style.display = 'block';
+            document.getElementById('domains-chart-wrapper').style.display = 'none';
+            document.getElementById('domains-chart-empty').style.display = 'none';
+
+            document.getElementById('channels-chart-loading').style.display = 'block';
+            document.getElementById('channels-chart-wrapper').style.display = 'none';
+            document.getElementById('channels-chart-empty').style.display = 'none';
+        }
+    }
+
+    function showFeedLoading(isLoading) {
         const loading = document.getElementById('history-loading');
         const empty = document.getElementById('history-empty');
         const list = document.getElementById('history-list-container');
@@ -448,14 +481,6 @@
             empty.style.display = 'none';
             list.style.display = 'none';
             if (endMessage) endMessage.style.display = 'none';
-            
-            document.getElementById('domains-chart-loading').style.display = 'block';
-            document.getElementById('domains-chart-wrapper').style.display = 'none';
-            document.getElementById('domains-chart-empty').style.display = 'none';
-            
-            document.getElementById('channels-chart-loading').style.display = 'block';
-            document.getElementById('channels-chart-wrapper').style.display = 'none';
-            document.getElementById('channels-chart-empty').style.display = 'none';
         } else {
             loading.style.display = 'none';
         }
@@ -802,7 +827,8 @@
         state.loadingMore = false;
         state.hasNextPage = false;
         updateDateBounds();
-        fetchHistory();
+        fetchAnalytics();
+        fetchHistoryFeed();
 
         document.querySelectorAll('.date-preset-btn').forEach((btn) => {
             btn.addEventListener('click', () => {
@@ -813,8 +839,7 @@
                 document.getElementById('current-date-range-label').innerText = btn.innerText;
 
                 updateDateBounds();
-                state.page = 1;
-                fetchHistory();
+                fetchAnalytics();
             }, { signal });
         });
 
@@ -832,8 +857,7 @@
                     document.getElementById('current-date-range-label').innerText = `${startVal} to ${endVal}`;
                     document.querySelectorAll('.date-preset-btn').forEach((b) => b.classList.remove('active'));
 
-                    state.page = 1;
-                    fetchHistory();
+                    fetchAnalytics();
 
                     const dropdownBtn = document.getElementById('dateFilterDropdown');
                     const dropdownInstance = bootstrap.Dropdown.getInstance(dropdownBtn);
@@ -849,7 +873,7 @@
             typeFilter.addEventListener('change', (e) => {
                 state.type = e.target.value;
                 state.page = 1;
-                fetchHistory();
+                fetchHistoryFeed();
             }, { signal });
         }
 
@@ -861,7 +885,7 @@
                 searchTimeout = setTimeout(() => {
                     state.search = e.target.value.trim();
                     state.page = 1;
-                    fetchHistory();
+                    fetchHistoryFeed();
                 }, 300);
             }, { signal });
         }
@@ -879,7 +903,7 @@
                 entries.forEach(entry => {
                     if (entry.isIntersecting && !state.loadingMore && state.hasNextPage) {
                         state.page++;
-                        fetchHistory(true);
+                        fetchHistoryFeed(true);
                     }
                 });
             };

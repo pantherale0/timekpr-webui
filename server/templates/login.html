@@ -58,7 +58,7 @@
                     {% if messages %}
                         {% for category, message in messages %}
                             <div class="alert alert-{{ 'danger' if category == 'error' or category == 'danger' else 'warning' if category == 'warning' else 'success' }} alert-dismissible fade show small" role="alert">
-                                <i class="fas {% if category == 'success' %}fa-check-circle{% elif category == 'warning' %}fa-exclamation-triangle{% else %}fa-times-circle{% endif %} me-1"></i>
+                                <i class="fas {% if category == 'success' %}fa-check-circle{% elif category == 'warning' %}fa-info-circle{% else %}fa-circle-exclamation{% endif %} me-1"></i>
                                 {{ message }}
                                 <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="{{ t('common.close') }}"></button>
                             </div>
@@ -66,20 +66,28 @@
                     {% endif %}
                 {% endwith %}
 
-                <div class="alert alert-warning border-0 small mb-4 py-2" role="alert">
-                    <i class="fas fa-exclamation-triangle me-1"></i>
+                {% if oidc_enabled %}
+                <div class="alert alert-info border-0 small mb-4 py-2" role="status">
+                    <i class="fas fa-info-circle me-1"></i>
                     <strong>{{ t('login.local_fallback') }}</strong> {{ t('login.local_fallback_detail') }}
                 </div>
+                {% endif %}
 
                 <form method="POST" action="{{ url_for('login') }}" class="m-0">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <div class="input-group mb-3 shadow-sm rounded">
-                        <input type="text" id="username" name="username" class="form-control" placeholder="{{ t('login.username_placeholder') }}" required autocomplete="username">
-                        <span class="input-group-text bg-body text-secondary"><i class="fas fa-user"></i></span>
+                    <div class="mb-3">
+                        <label for="username" class="form-label fw-medium small mb-1">{{ t('login.username_label') }}</label>
+                        <div class="input-group shadow-sm rounded">
+                            <input type="text" id="username" name="username" class="form-control" value="{{ username or '' }}" placeholder="{{ t('login.username_placeholder') }}" required autocomplete="username">
+                            <span class="input-group-text bg-body text-secondary"><i class="fas fa-user" aria-hidden="true"></i></span>
+                        </div>
                     </div>
-                    <div class="input-group mb-4 shadow-sm rounded">
-                        <input type="password" id="password" name="password" class="form-control" placeholder="{{ t('login.password_placeholder') }}" required autocomplete="current-password">
-                        <span class="input-group-text bg-body text-secondary"><i class="fas fa-lock"></i></span>
+                    <div class="mb-4">
+                        <label for="password" class="form-label fw-medium small mb-1">{{ t('login.password_label') }}</label>
+                        <div class="input-group shadow-sm rounded">
+                            <input type="password" id="password" name="password" class="form-control" placeholder="{{ t('login.password_placeholder') }}" required autocomplete="current-password">
+                            <span class="input-group-text bg-body text-secondary"><i class="fas fa-lock" aria-hidden="true"></i></span>
+                        </div>
                     </div>
 
                     <div class="row">

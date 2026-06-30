@@ -318,6 +318,22 @@ def test_get_user_combined_history_success(auth_client, yt_setup, db_session):
     assert analytics['total_video_count'] == 2
     assert analytics['total_web_visits'] == 1
 
+    analytics_only = auth_client.get(
+        f'/api/user/{user.id}/history?include_history=false'
+    )
+    assert analytics_only.status_code == 200
+    analytics_payload = analytics_only.get_json()['data']
+    assert analytics_payload['history'] == []
+    assert analytics_payload['analytics']['total_video_count'] == 2
+
+    feed_only = auth_client.get(
+        f'/api/user/{user.id}/history?include_analytics=false'
+    )
+    assert feed_only.status_code == 200
+    feed_payload = feed_only.get_json()['data']
+    assert len(feed_payload['history']) == 3
+    assert feed_payload['analytics'] is None
+
 
 def test_log_web_history_success(client, yt_setup, db_session):
     user, device, _ = yt_setup

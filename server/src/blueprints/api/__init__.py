@@ -21,6 +21,7 @@ from src.blueprints.api.hardware_baseline import api_hardware_baseline_bp
 from src.blueprints.api.windows_laps import api_windows_laps_bp
 from src.blueprints.api.ai import api_ai_bp
 from src.blueprints.api.sharing_api import sharing_api_bp
+from src.blueprints.api.session import api_session_bp
 
 __all__ = [
     'api_devices_bp',
@@ -45,4 +46,5 @@ __all__ = [
     'api_windows_laps_bp',
     'api_ai_bp',
     'sharing_api_bp',
+    'api_session_bp',
 ]

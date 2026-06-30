@@ -272,6 +272,8 @@ def _refresh_oidc_tokens():
                 else:
                     # Definitive authentication failure: Log out the user
                     _LOGGER.error("OIDC token refresh failed with a definitive error. Logging out user: %s", exc)
+                    from src.i18n.catalog import flash_t
+                    flash_t('flash.auth.session_expired', 'warning')
                     session.pop('oidc_refresh_retry_after', None)
                     session.pop('logged_in', None)
                     session.pop('user', None)
@@ -325,6 +327,7 @@ from src.blueprints import (
     websocket_bp,
     api_ai_bp,
     sharing_api_bp,
+    api_session_bp,
 )
 
 @app.before_request
@@ -440,6 +443,7 @@ csrf.exempt(api_youtube_bp)
 app.register_blueprint(api_access_requests_bp)
 csrf.exempt(api_access_requests_bp)
 app.register_blueprint(sharing_api_bp)
+app.register_blueprint(api_session_bp)
 csrf.exempt(sharing_api_bp)
 app.register_blueprint(api_ai_bp)
 csrf.exempt(api_ai_bp)

@@ -1,0 +1,7 @@
+{# Per-child activity hub toolbar — set active_tab; optional include_date_filter (default true) #}
+<div class="guardian-child-activity-toolbar">
+    {% include '_child_activity_nav.html' %}
+    {% if include_date_filter | default(true) %}
+    {% include '_child_activity_date_filter.html' %}
+    {% endif %}
+</div>

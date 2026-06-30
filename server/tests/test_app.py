@@ -60,7 +60,8 @@ def test_login_routes(client, db_session):
 
     # 2. POST login with invalid password
     res = client.post('/', data={'username': 'admin', 'password': 'wrongpassword'}, follow_redirects=True)
-    assert b"Invalid credentials" in res.data
+    assert b"Nothing was changed" in res.data
+    assert b'value="admin"' in res.data
 
     # 3. POST login with correct password
     Settings.set_admin_password("admin")
@@ -74,7 +75,7 @@ def test_login_routes(client, db_session):
 
     # 5. Logout route
     res = client.get('/logout', follow_redirects=True)
-    assert b"logged out" in res.data
+    assert b"logged out" in res.data.lower() or b"signed out" in res.data.lower()
 
 def test_oidc_login_redirect(client, db_session):
     with patch('src.common.oidc.OIDCHelper.is_enabled', new=True), \
@@ -91,11 +92,11 @@ def test_oidc_callback_route(client, db_session):
         with client.session_transaction() as sess:
             sess['oidc_state'] = 'state123'
         res = client.get('/callback?state=state123', follow_redirects=True)
-        assert b"No authorization code returned" in res.data
+        assert b"finish signing you in" in res.data
 
         # Simulate OIDC Callback with state mismatch
         res = client.get('/callback?state=wrongstate&code=code123', follow_redirects=True)
-        assert b"Invalid state token" in res.data
+        assert b"finish signing you in" in res.data
 
         # Simulate OIDC Callback success
         with client.session_transaction() as sess:
@@ -123,7 +124,7 @@ def test_oidc_callback_route(client, db_session):
             mock_userinfo.return_value = {'preferred_username': 'child', 'email': 'child@school.edu'}
 
             res = client.get('/callback?state=state456&code=code456', follow_redirects=True)
-            assert b"not authorized" in res.data.lower()
+            assert b"permission to use this console" in res.data.lower()
 
 
 def test_oidc_session_token_refresh(client, db_session):
@@ -228,6 +229,36 @@ def test_oidc_session_token_refresh(client, db_session):
             res = client.get('/dashboard')
             assert res.status_code == 200
             mock_refresh.assert_not_called()
+
+
+def test_session_extend_endpoint(client, db_session):
+    import time
+
+    with client.session_transaction() as sess:
+        sess['logged_in'] = True
+        sess['oidc_refresh_token'] = 'refresh-token-xyz'
+        sess['oidc_token_expires_at'] = time.time() + 120
+
+    with patch('src.common.oidc.OIDCHelper.refresh_access_token') as mock_refresh:
+        mock_refresh.return_value = {
+            'access_token': 'extended-access-token',
+            'expires_in': 3600,
+        }
+        res = client.post('/api/session/extend')
+        assert res.status_code == 200
+        payload = res.get_json()
+        assert payload['success'] is True
+        assert 'signed in for longer' in payload['message'].lower()
+        mock_refresh.assert_called_once_with('refresh-token-xyz')
+
+        with client.session_transaction() as sess:
+            assert sess['oidc_access_token'] == 'extended-access-token'
+            assert sess['oidc_token_expires_at'] > time.time() + 3500
+
+
+def test_session_extend_requires_auth(client):
+    res = client.post('/api/session/extend')
+    assert res.status_code == 401
 
 
 def test_dashboard_routes(client, db_session):

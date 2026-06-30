@@ -19,7 +19,7 @@
                 const msgEl = toast.querySelector('.toast-message');
                 if (msgEl) msgEl.textContent = message;
                 toast.classList.add('show');
-                setTimeout(() => toast.classList.remove('show'), 3000);
+                setTimeout(() => toast.classList.remove('show'), window.GUARDIAN_TOAST_VISIBLE_MS || 10000);
             } else {
                 alert(message);
             }

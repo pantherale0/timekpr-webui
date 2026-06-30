@@ -38,6 +38,12 @@ def test_translate_known_key():
     assert t('pages.dashboard.heading', locale='en') == 'Family Home'
 
 
+def test_translate_decodes_html_entities_in_catalog():
+    assert t('tpl.base.link_console_amp_continue', locale='en') == 'Link Console & Continue'
+    placeholder = t('tpl.restrictions.youtubecom10tiktokcom10facebookcom', locale='en')
+    assert placeholder == 'youtube.com\ntiktok.com\nfacebook.com'
+
+
 def test_translate_interpolation():
     result = t('flash.users.created', locale='en', username='jordan')
     assert 'jordan' in result

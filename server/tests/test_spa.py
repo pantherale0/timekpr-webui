@@ -138,3 +138,25 @@ def test_admin_approvals_spa_shell(auth_client):
     assert response.status_code == 200
     assert b'id="spa-main"' in response.data
     assert b'Family Dialogue' in response.data
+
+
+def test_spa_shell_child_activity_nav_in_header(auth_client, db_session):
+    """Activity tabs must hydrate into the nav slot, not spa-main, on hard refresh."""
+    from src.models import ManagedUser
+
+    user = ManagedUser(username='nav-child', system_ip='Unassigned', is_valid=True)
+    db_session.add(user)
+    db_session.commit()
+
+    response = auth_client.get(f'/dashboard/user/{user.id}/history')
+    assert response.status_code == 200
+    html = response.data.decode('utf-8')
+
+    assert 'id="spa-initial-fragment"' in html
+    assert 'guardian-child-activity-toolbar' in html
+    assert 'spa-region:top_nav_center' in html
+
+    main_start = html.index('id="spa-main"')
+    main_slice = html[main_start:main_start + 800]
+    assert 'guardian-child-activity-toolbar' not in main_slice
+    assert 'history-main' not in main_slice

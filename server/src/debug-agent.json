@@ -1,0 +1,2726 @@
+{
+  "active_session_username": null,
+  "agent_token": null,
+  "agent_version": "v0.0.0-dev",
+  "apparmor_state": {},
+  "default_time_left_day": 7200,
+  "domain_policy_state": {
+    "last_sync_id": null,
+    "policies": {},
+    "source_revisions": {},
+    "sources": {}
+  },
+  "domain_policy_syncs": {},
+  "emit_startup_alert_on_auth": false,
+  "enforced_linux_device_policy": null,
+  "installed_apps_report_sent": false,
+  "linux_device_policy_state": {},
+  "next_linux_uid": 1003,
+  "random_seed": null,
+  "reconnect_delay_seconds": 2,
+  "registration_token": null,
+  "screenshot_policy": {
+    "enabled": false,
+    "intervalSeconds": 300
+  },
+  "seed_alerts": [
+    {
+      "details": {
+        "note": "Synthetic startup event for server debugging",
+        "source": "python-debug-agent"
+      },
+      "event_type": "system_startup"
+    },
+    {
+      "details": {
+        "session_id": "debug-alice-session",
+        "source": "gdm-password"
+      },
+      "event_type": "user_signed_in",
+      "linux_username": "alice"
+    },
+    {
+      "details": {
+        "application_name": "Discord",
+        "executable_path": "/usr/bin/discord",
+        "reason": "Synthetic policy block for UI testing"
+      },
+      "event_type": "app_blocked",
+      "linux_username": "bob"
+    },
+    {
+      "details": {
+        "application_name": "Firefox",
+        "duration_seconds": 1800,
+        "executable_path": "/usr/bin/firefox"
+      },
+      "event_type": "app_usage",
+      "linux_username": "charlie"
+    }
+  ],
+  "seed_alerts_on_first_auth": true,
+  "seed_alerts_sent": false,
+  "seed_fake_users": true,
+  "send_installed_apps_on_auth": true,
+  "send_policy_sync_check_on_auth": false,
+  "server_url": "ws://127.0.0.1:5000/ws",
+  "socket_poll_interval_seconds": 1.0,
+  "strict_users": false,
+  "synthetic_activity_interval_seconds": 15.0,
+  "system_hostname": "xps9500",
+  "system_id": "86645f88-b558-4336-ad9d-d9891da7f262",
+  "users": {
+    "alice": {
+      "allowed_days": [
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7"
+      ],
+      "allowed_hours": {
+        "1": {
+          "0": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "1": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "10": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "11": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "12": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "13": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "14": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "15": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "16": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "17": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "18": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "19": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "2": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "20": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "21": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "22": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "23": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "3": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "4": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "5": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "6": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "7": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "8": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "9": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          }
+        },
+        "2": {
+          "0": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "1": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "10": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "11": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "12": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "13": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "14": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "15": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "16": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "17": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "18": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "19": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "2": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "20": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "21": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "22": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "23": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "3": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "4": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "5": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "6": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "7": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "8": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "9": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          }
+        },
+        "3": {
+          "0": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "1": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "10": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "11": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "12": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "13": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "14": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "15": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "16": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "17": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "18": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "19": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "2": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "20": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "21": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "22": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "23": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "3": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "4": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "5": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "6": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "7": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "8": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "9": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          }
+        },
+        "4": {
+          "0": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "1": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "10": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "11": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "12": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "13": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "14": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "15": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "16": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "17": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "18": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "19": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "2": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "20": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "21": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "22": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "23": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "3": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "4": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "5": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "6": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "7": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "8": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "9": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          }
+        },
+        "5": {
+          "0": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "1": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "10": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "11": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "12": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "13": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "14": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "15": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "16": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "17": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "18": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "19": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "2": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "20": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "21": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "22": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "23": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "3": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "4": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "5": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "6": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "7": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "8": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "9": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          }
+        },
+        "6": {
+          "0": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "1": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "10": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "11": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "12": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "13": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "14": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "15": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "16": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "17": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "18": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "19": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "2": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "20": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "21": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "22": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "23": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "3": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "4": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "5": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "6": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "7": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "8": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "9": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          }
+        },
+        "7": {
+          "0": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "1": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "10": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "11": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "12": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "13": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "14": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "15": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "16": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "17": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "18": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "19": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "2": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "20": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "21": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "22": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "23": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "3": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "4": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "5": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "6": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "7": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "8": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "9": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          }
+        }
+      },
+      "apparmor_policies": [],
+      "domain_policy_source_ids": [],
+      "enabled": true,
+      "limit": 21600,
+      "linux_device_policy": null,
+      "linux_uid": 1000,
+      "time_left_day": 18000,
+      "time_spent_day": 2700,
+      "weekly_schedule": {
+        "friday": 3.0,
+        "monday": 2.0,
+        "saturday": 4.0,
+        "sunday": 4.0,
+        "thursday": 2.0,
+        "tuesday": 2.0,
+        "wednesday": 1.5
+      }
+    },
+    "bob": {
+      "allowed_days": [
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7"
+      ],
+      "allowed_hours": {
+        "1": {
+          "0": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "1": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "10": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "11": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "12": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "13": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "14": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "15": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "16": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "17": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "18": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "19": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "2": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "20": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "21": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "22": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "23": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "3": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "4": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "5": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "6": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "7": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "8": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "9": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          }
+        },
+        "2": {
+          "0": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "1": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "10": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "11": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "12": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "13": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "14": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "15": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "16": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "17": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "18": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "19": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "2": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "20": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "21": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "22": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "23": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "3": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "4": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "5": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "6": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "7": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "8": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "9": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          }
+        },
+        "3": {
+          "0": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "1": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "10": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "11": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "12": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "13": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "14": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "15": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "16": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "17": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "18": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "19": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "2": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "20": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "21": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "22": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "23": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "3": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "4": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "5": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "6": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "7": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "8": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "9": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          }
+        },
+        "4": {
+          "0": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "1": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "10": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "11": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "12": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "13": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "14": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "15": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "16": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "17": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "18": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "19": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "2": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "20": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "21": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "22": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "23": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "3": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "4": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "5": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "6": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "7": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "8": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "9": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          }
+        },
+        "5": {
+          "0": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "1": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "10": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "11": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "12": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "13": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "14": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "15": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "16": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "17": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "18": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "19": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "2": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "20": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "21": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "22": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "23": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "3": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "4": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "5": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "6": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "7": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "8": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "9": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          }
+        },
+        "6": {
+          "0": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "1": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "10": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "11": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "12": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "13": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "14": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "15": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "16": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "17": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "18": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "19": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "2": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "20": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "21": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "22": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "23": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "3": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "4": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "5": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "6": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "7": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "8": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "9": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          }
+        },
+        "7": {
+          "0": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "1": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "10": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "11": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "12": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "13": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "14": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "15": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "16": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "17": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "18": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "19": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "2": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "20": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "21": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "22": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "23": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "3": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "4": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "5": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "6": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "7": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "8": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "9": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          }
+        }
+      },
+      "apparmor_policies": [],
+      "domain_policy_source_ids": [],
+      "enabled": true,
+      "limit": 7200,
+      "linux_device_policy": null,
+      "linux_uid": 1001,
+      "time_left_day": 5400,
+      "time_spent_day": 1800,
+      "weekly_schedule": {
+        "friday": 1.5,
+        "monday": 1.0,
+        "saturday": 2.0,
+        "sunday": 2.0,
+        "thursday": 1.0,
+        "tuesday": 1.0,
+        "wednesday": 1.0
+      }
+    },
+    "charlie": {
+      "allowed_days": [
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7"
+      ],
+      "allowed_hours": {
+        "1": {
+          "0": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "1": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "10": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "11": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "12": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "13": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "14": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "15": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "16": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "17": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "18": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "19": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "2": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "20": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "21": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "22": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "23": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "3": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "4": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "5": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "6": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "7": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "8": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "9": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          }
+        },
+        "2": {
+          "0": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "1": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "10": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "11": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "12": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "13": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "14": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "15": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "16": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "17": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "18": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "19": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "2": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "20": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "21": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "22": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "23": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "3": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "4": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "5": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "6": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "7": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "8": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "9": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          }
+        },
+        "3": {
+          "0": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "1": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "10": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "11": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "12": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "13": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "14": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "15": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "16": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "17": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "18": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "19": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "2": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "20": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "21": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "22": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "23": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "3": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "4": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "5": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "6": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "7": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "8": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "9": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          }
+        },
+        "4": {
+          "0": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "1": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "10": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "11": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "12": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "13": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "14": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "15": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "16": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "17": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "18": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "19": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "2": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "20": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "21": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "22": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "23": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "3": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "4": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "5": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "6": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "7": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "8": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "9": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          }
+        },
+        "5": {
+          "0": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "1": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "10": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "11": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "12": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "13": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "14": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "15": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "16": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "17": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "18": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "19": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "2": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "20": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "21": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "22": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "23": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "3": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "4": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "5": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "6": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "7": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "8": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "9": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          }
+        },
+        "6": {
+          "0": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "1": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "10": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "11": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "12": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "13": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "14": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "15": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "16": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "17": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "18": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "19": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "2": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "20": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "21": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "22": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "23": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "3": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "4": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "5": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "6": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "7": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "8": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "9": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          }
+        },
+        "7": {
+          "0": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "1": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "10": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "11": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "12": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "13": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "14": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "15": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "16": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "17": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "18": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "19": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "2": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "20": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "21": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "22": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "23": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "3": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "4": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "5": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "6": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "7": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "8": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          },
+          "9": {
+            "ENDMIN": 60,
+            "STARTMIN": 0,
+            "UACC": 0
+          }
+        }
+      },
+      "apparmor_policies": [],
+      "domain_policy_source_ids": [],
+      "enabled": true,
+      "limit": 6600,
+      "linux_device_policy": null,
+      "linux_uid": 1002,
+      "time_left_day": 2400,
+      "time_spent_day": 4200,
+      "weekly_schedule": {
+        "friday": 1.0,
+        "monday": 1.0,
+        "saturday": 1.5,
+        "sunday": 1.5,
+        "thursday": 1.0,
+        "tuesday": 1.0,
+        "wednesday": 1.0
+      }
+    }
+  }
+}
