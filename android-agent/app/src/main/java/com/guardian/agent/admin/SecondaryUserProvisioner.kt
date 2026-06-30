@@ -178,7 +178,7 @@ object SecondaryUserProvisioner {
     /** Returns true when the activity should close immediately (managed secondary profile). */
     fun blockManagementActivity(context: Context): Boolean {
         if (!isManagedSecondaryUser(context)) return false
-        prepareAtLaunch(context)
+        com.guardian.agent.enforcement.EnforcementCoordinator.schedulePrepareManagedSecondaryUser(context)
         hideManagementUi(context)
         return true
     }
