@@ -47,7 +47,7 @@ class AgentUpdateRequestTest {
         )
 
         assertEquals(
-            "https://github.com/pantherale0/guardian-webui/releases/download/v1.2.3/guardian-android-agent-v1.2.3.apk",
+            "https://github.com/pantherale0/timekpr-webui/releases/download/v1.2.3/guardian-android-agent-v1.2.3.apk",
             request.resolvedApkUrl(),
         )
     }
@@ -65,6 +65,21 @@ class AgentUpdateRequestTest {
     }
 
     @Test
+    fun resolvedChecksumUrl_derivesFromServerApkUrl() {
+        val request = AgentUpdateRequest(
+            targetVersion = "v1.2.3",
+            apkUrl = "https://example.com/dist/guardian-android-agent-v1.2.3.apk",
+            signatureChecksum = null,
+            updateAvailable = true,
+        )
+
+        assertEquals(
+            "https://example.com/dist/guardian-android-agent-v1.2.3.signature-checksum",
+            request.resolvedChecksumUrl(),
+        )
+    }
+
+    @Test
     fun resolvedChecksumUrl_fallsBackToGitHubReleaseAsset() {
         val request = AgentUpdateRequest(
             targetVersion = "1.2.3",
@@ -74,7 +89,22 @@ class AgentUpdateRequestTest {
         )
 
         assertEquals(
-            "https://github.com/pantherale0/guardian-webui/releases/download/v1.2.3/guardian-android-agent-v1.2.3.signature-checksum",
+            "https://example.com/agent.signature-checksum",
+            request.resolvedChecksumUrl(),
+        )
+    }
+
+    @Test
+    fun resolvedChecksumUrl_fallsBackToGitHubWhenApkUrlMissing() {
+        val request = AgentUpdateRequest(
+            targetVersion = "1.2.3",
+            apkUrl = null,
+            signatureChecksum = null,
+            updateAvailable = false,
+        )
+
+        assertEquals(
+            "https://github.com/pantherale0/timekpr-webui/releases/download/v1.2.3/guardian-android-agent-v1.2.3.signature-checksum",
             request.resolvedChecksumUrl(),
         )
     }

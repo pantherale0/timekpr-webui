@@ -22,6 +22,10 @@ data class AgentUpdateRequest(
     }
 
     fun resolvedChecksumUrl(): String? {
+        val apk = apkUrl?.trim().orEmpty()
+        if (apk.endsWith(".apk", ignoreCase = true)) {
+            return apk.dropLast(4) + ".signature-checksum"
+        }
         val version = targetVersion.trim()
         if (version.isEmpty()) {
             return null
@@ -44,7 +48,7 @@ data class AgentUpdateRequest(
         private const val KEY_SIGNATURE_CHECKSUM = "signature_checksum"
         private const val KEY_UPDATE_AVAILABLE = "update_available"
 
-        const val DEFAULT_GITHUB_REPO = "pantherale0/guardian-webui"
+        const val DEFAULT_GITHUB_REPO = "pantherale0/timekpr-webui"
 
         fun from(message: JSONObject): AgentUpdateRequest {
             return AgentUpdateRequest(

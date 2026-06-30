@@ -37,6 +37,7 @@ class AgentUpdater(private val context: Context) {
             ?: return UpdateResult.Failure("No APK signature checksum available")
 
         if (!canInstallPackages()) {
+            Log.w(TAG, "Install permission not granted for package updates")
             return UpdateResult.Failure("Install permission not granted for package updates")
         }
 
@@ -53,6 +54,7 @@ class AgentUpdater(private val context: Context) {
 
         if (!ApkSignatureVerifier.verifyApkChecksum(apkFile, checksum, packageManager)) {
             apkFile.delete()
+            Log.w(TAG, "APK signature verification failed for ${request.targetVersion}")
             return UpdateResult.Failure("APK signature verification failed")
         }
 
@@ -65,6 +67,7 @@ class AgentUpdater(private val context: Context) {
             return UpdateResult.AlreadyCurrent
         }
 
+        Log.i(TAG, "Installing agent update ${request.targetVersion} from ${apkFile.absolutePath}")
         return try {
             installApk(apkFile)
             UpdateResult.InstallStarted
