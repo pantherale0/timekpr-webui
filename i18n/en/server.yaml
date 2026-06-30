@@ -1443,8 +1443,7 @@ pages:
     no_contributors_desc: There are no active content filtering source profiles mapped to accounts on this machine.
     parental_access_code: Parental Access Code
     access_code_hint: Use offline to reset lock screen PIN
-    access_code_help: Enter this 6-digit code on the device lock screen. It rotates every 30 minutes. If the current code
-      fails, try the codes from the previous one or two windows as well.
+    access_code_help: Use this 6-digit code when required, this rotates every 30 minutes.
     device_management: Device Management
     device_management_lead: Remove this device from family management
     console_active: Console Active
