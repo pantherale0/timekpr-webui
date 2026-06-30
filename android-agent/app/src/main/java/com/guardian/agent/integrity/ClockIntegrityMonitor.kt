@@ -22,6 +22,22 @@ object ClockIntegrityMonitor {
     private const val ALARM_REQUEST_CODE = 42_001
     private const val ALARM_INTERVAL_MS = 60_000L
     private val ntpExecutor = Executors.newSingleThreadExecutor()
+    private val alarmWorkExecutor = Executors.newSingleThreadExecutor()
+
+    fun runAlarmWork(context: Context, onComplete: (() -> Unit)? = null) {
+        val appContext = context.applicationContext
+        alarmWorkExecutor.execute {
+            try {
+                ensureServicesRunning(appContext)
+                tickOnce(appContext)
+                scheduleAlarmFallback(appContext)
+            } catch (e: Exception) {
+                Log.w(TAG, "Clock integrity alarm work failed", e)
+            } finally {
+                onComplete?.invoke()
+            }
+        }
+    }
 
     data class TickResult(
         val status: String,
@@ -99,8 +115,13 @@ object ClockIntegrityMonitor {
     }
 
     fun ensureServicesRunning(context: Context) {
-        UsageMonitorService.start(context)
-        AgentPersistentConnectionService.start(context)
+        val appContext = context.applicationContext
+        if (!UsageMonitorService.isRunning()) {
+            UsageMonitorService.start(appContext)
+        }
+        if (!AgentPersistentConnectionService.isRunning()) {
+            AgentPersistentConnectionService.start(appContext)
+        }
     }
 
     private fun emitTamperAlert(

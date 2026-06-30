@@ -61,6 +61,7 @@ class UsageMonitorService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        running = true
         appPolicyStore = GuardianApplication.from(this).appPolicyStore
         enforcement = EnforcementController(this, appPolicyStore)
         packageChangeMonitor = PackageChangeMonitor(this, enforcement)
@@ -76,13 +77,16 @@ class UsageMonitorService : Service() {
         startForeground(NOTIFICATION_ID, buildNotification())
         packageChangeMonitor.register()
         monitorJob?.cancel()
-        ClockIntegrityMonitor.tickOnce(this)
-        ClockIntegrityMonitor.scheduleAlarmFallback(this)
+        scope.launch {
+            ClockIntegrityMonitor.tickOnce(this@UsageMonitorService)
+            ClockIntegrityMonitor.scheduleAlarmFallback(this@UsageMonitorService)
+        }
         monitorJob = scope.launch { monitorLoop() }
         return START_STICKY
     }
 
     override fun onDestroy() {
+        running = false
         packageChangeMonitor.unregister()
         monitorJob?.cancel()
         scope.cancel()
@@ -439,6 +443,11 @@ class UsageMonitorService : Service() {
         private const val TAG = "UsageMonitorService"
         private const val CHANNEL_ID = "guardian_usage"
         private const val NOTIFICATION_ID = 1003
+
+        @Volatile
+        private var running = false
+
+        fun isRunning(): Boolean = running
 
         fun start(context: Context) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {

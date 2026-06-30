@@ -8,9 +8,10 @@ import android.util.Log
 class ClockIntegrityAlarmReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent?) {
         Log.d(TAG, "Clock integrity alarm fired")
-        ClockIntegrityMonitor.ensureServicesRunning(context)
-        ClockIntegrityMonitor.tickOnce(context.applicationContext)
-        ClockIntegrityMonitor.scheduleAlarmFallback(context.applicationContext)
+        val pendingResult = goAsync()
+        ClockIntegrityMonitor.runAlarmWork(context.applicationContext) {
+            pendingResult.finish()
+        }
     }
 
     companion object {
