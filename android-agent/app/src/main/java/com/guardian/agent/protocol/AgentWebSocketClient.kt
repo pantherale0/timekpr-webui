@@ -175,18 +175,19 @@ class AgentWebSocketClient(
                 )
             }
             "auth_result" -> {
+                val updateRequest = AgentUpdateRequest.from(message)
+                val hasUpdatePackage = updateRequest.targetVersion.isNotBlank() &&
+                    updateRequest.updateAvailable
+
                 if (!message.optBoolean("success", false)) {
-                    if (message.optBoolean("update_required", false)) {
-                        val updateRequest = AgentUpdateRequest.from(message)
-                        if (updateRequest.targetVersion.isNotBlank()) {
-                            AgentUpdateWorker.enqueue(context, updateRequest)
-                            AgentConnectionState.update(
-                                AgentConnectionStatus.ERROR,
-                                "Updating to ${updateRequest.targetVersion}…",
-                            )
-                            onComplete(SessionResult(success = false, reason = "update_scheduled"))
-                            return
-                        }
+                    if (message.optBoolean("update_required", false) && hasUpdatePackage) {
+                        AgentUpdateWorker.enqueue(context, updateRequest)
+                        AgentConnectionState.update(
+                            AgentConnectionStatus.ERROR,
+                            "Updating to ${updateRequest.targetVersion}…",
+                        )
+                        onComplete(SessionResult(success = false, reason = "update_scheduled"))
+                        return
                     }
                     AgentConnectionState.update(
                         AgentConnectionStatus.ERROR,
@@ -195,6 +196,11 @@ class AgentWebSocketClient(
                     onComplete(SessionResult(success = false, reason = "auth_failed"))
                     return
                 }
+
+                if (message.optBoolean("update_available", false) && hasUpdatePackage) {
+                    AgentUpdateWorker.enqueue(context, updateRequest)
+                }
+
                 AgentConnectionState.update(AgentConnectionStatus.AUTHENTICATED, "Synced")
                 activeWebSocket = webSocket
                 AlertEventBus.setListener { pending ->

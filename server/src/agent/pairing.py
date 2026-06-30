@@ -145,20 +145,20 @@ def is_dev_server_version(version: str) -> bool:
 
 def default_android_apk_url(version: str) -> str:
     """Build the default GitHub release APK download URL for a server version."""
-    tag = (version or '').strip() or 'v0.0.0-dev'
-    return (
-        f'https://github.com/{GITHUB_RELEASE_REPO}/releases/download/'
-        f'{tag}/guardian-android-agent-{tag}.apk'
-    )
+    from src.agent.releases import build_github_download_url, get_github_release_repo, normalize_release_tag
+
+    tag = normalize_release_tag(version) or 'v0.0.0-dev'
+    asset_name = f'guardian-android-agent-{tag}.apk'
+    return build_github_download_url(get_github_release_repo(), tag, asset_name)
 
 
 def default_android_checksum_url(version: str) -> str:
     """Build the default GitHub release signature-checksum asset URL."""
-    tag = (version or '').strip() or 'v0.0.0-dev'
-    return (
-        f'https://github.com/{GITHUB_RELEASE_REPO}/releases/download/'
-        f'{tag}/guardian-android-agent-{tag}.signature-checksum'
-    )
+    from src.agent.releases import build_github_download_url, get_github_release_repo, normalize_release_tag
+
+    tag = normalize_release_tag(version) or 'v0.0.0-dev'
+    asset_name = f'guardian-android-agent-{tag}.signature-checksum'
+    return build_github_download_url(get_github_release_repo(), tag, asset_name)
 
 
 def get_android_apk_storage_dir() -> str:
@@ -566,11 +566,6 @@ def resolve_android_provisioning(
 
 def resolve_android_update_info(version: str, server_url: str = '') -> dict:
     """Resolve APK download metadata for Android agent auto-update."""
-    apk_url = resolve_android_apk_url(version, server_url=server_url)
-    signature_checksum = resolve_android_signature_checksum(version)
-    update_available = bool(apk_url and signature_checksum)
-    return {
-        'apk_url': apk_url or '',
-        'signature_checksum': signature_checksum or '',
-        'update_available': update_available,
-    }
+    from src.agent.releases import resolve_android_update_info as _resolve_android_update_info
+
+    return _resolve_android_update_info(version, server_url=server_url)

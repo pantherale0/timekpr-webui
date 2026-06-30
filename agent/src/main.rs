@@ -142,7 +142,15 @@ enum ServerMessage {
         #[serde(default)]
         update_required: bool,
         #[serde(default)]
+        update_available: bool,
+        #[serde(default)]
         target_version: Option<String>,
+        #[serde(default)]
+        github_repo: Option<String>,
+        #[serde(default)]
+        download_url: Option<String>,
+        #[serde(default)]
+        checksum_url: Option<String>,
     },
     #[serde(rename = "command_request")]
     CommandRequest {
@@ -202,6 +210,8 @@ pub(crate) enum ClientMessage {
         #[serde(skip_serializing_if = "Option::is_none")]
         paired: Option<bool>,
         platform: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        agent_arch: Option<String>,
         #[serde(skip_serializing_if = "Option::is_none")]
         hardware_oem: Option<String>,
         #[serde(skip_serializing_if = "Option::is_none")]
@@ -1002,7 +1012,45 @@ async fn download_release_bytes(
         .map(|bytes| bytes.to_vec())
 }
 
-async fn trigger_auto_update(target_version: &str, github_repo: &str) -> Result<(), String> {
+async fn handle_server_update(
+    label: &str,
+    target_version: Option<String>,
+    github_repo: Option<String>,
+    download_url: Option<String>,
+    checksum_url: Option<String>,
+) {
+    let Some(target_ver) = target_version else {
+        return;
+    };
+    let repo = github_repo
+        .as_deref()
+        .filter(|value| !value.trim().is_empty())
+        .unwrap_or("pantherale0/timekpr-webui");
+    println!("{label}: {target_ver}. Starting updater...");
+    match trigger_auto_update(
+        &target_ver,
+        repo,
+        download_url.as_deref(),
+        checksum_url.as_deref(),
+    )
+    .await
+    {
+        Ok(_) => {
+            println!("Successfully updated binary! Exiting to allow service restart.");
+            std::process::exit(0);
+        }
+        Err(err) => {
+            eprintln!("Auto-update failed: {}", err);
+        }
+    }
+}
+
+async fn trigger_auto_update(
+    target_version: &str,
+    github_repo: &str,
+    download_url: Option<&str>,
+    checksum_url: Option<&str>,
+) -> Result<(), String> {
     println!("Initializing auto-update to version {}...", target_version);
 
     if !update_verify::is_valid_release_version(target_version) {
@@ -1012,21 +1060,28 @@ async fn trigger_auto_update(target_version: &str, github_repo: &str) -> Result<
         return Err(format!("Refusing auto-update: invalid GitHub repository '{github_repo}'"));
     }
 
-    let arch = std::env::consts::ARCH;
-    let target = match arch {
-        "x86_64" => "x86_64-unknown-linux-gnu",
-        "aarch64" => "aarch64-unknown-linux-gnu",
-        other => return Err(format!("Unsupported architecture for auto-update: {}", other)),
-    };
+    let (download_url, checksum_url) = match (download_url, checksum_url) {
+        (Some(download), Some(checksum)) => (download.to_string(), checksum.to_string()),
+        _ => {
+            let arch = std::env::consts::ARCH;
+            let target = match arch {
+                "x86_64" => "x86_64-unknown-linux-gnu",
+                "aarch64" => "aarch64-unknown-linux-gnu",
+                other => return Err(format!("Unsupported architecture for auto-update: {}", other)),
+            };
 
-    let asset_name = format!("guardian-agent-{}.tar.gz", target);
-    let checksum_name = format!("{asset_name}.sha256");
-    let download_url = format!(
-        "https://github.com/{github_repo}/releases/download/{target_version}/{asset_name}"
-    );
-    let checksum_url = format!(
-        "https://github.com/{github_repo}/releases/download/{target_version}/{checksum_name}"
-    );
+            let asset_name = format!("guardian-agent-{}.tar.gz", target);
+            let checksum_name = format!("{asset_name}.sha256");
+            (
+                format!(
+                    "https://github.com/{github_repo}/releases/download/{target_version}/{asset_name}"
+                ),
+                format!(
+                    "https://github.com/{github_repo}/releases/download/{target_version}/{checksum_name}"
+                ),
+            )
+        }
+    };
 
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(60))
@@ -1649,6 +1704,7 @@ async fn start_agent_reconnect_loop_impl(
                     linux_users: Some(users_vec),
                     paired: Some(agent_token.is_some()),
                     platform: std::env::consts::OS.to_string(),
+                    agent_arch: Some(std::env::consts::ARCH.to_string()),
                     hardware_oem: Some(hardware_detect.oem),
                     hardware_oem_model: hardware_detect.model,
                 };
@@ -1716,28 +1772,37 @@ async fn start_agent_reconnect_loop_impl(
                                 success,
                                 message,
                                 update_required,
+                                update_available,
                                 target_version,
+                                github_repo,
+                                download_url,
+                                checksum_url,
                             }) => {
                                 println!("Handshake result: success = {}, message = {}", success, message);
                                 if success {
                                     authenticated = true;
                                     println!("Agent authenticated successfully!");
+                                    if update_available {
+                                        handle_server_update(
+                                            "Optional update available",
+                                            target_version,
+                                            github_repo,
+                                            download_url,
+                                            checksum_url,
+                                        )
+                                        .await;
+                                    }
                                 } else {
                                     eprintln!("Authentication failed: {}", message);
-                                    if update_required {
-                                        if let Some(target_ver) = target_version {
-                                            let github_repo = config.github_repo.clone().unwrap_or_else(|| "pantherale0/timekpr-webui".to_string());
-                                            println!("Version update required to: {}. Starting updater...", target_ver);
-                                            match trigger_auto_update(&target_ver, &github_repo).await {
-                                                Ok(_) => {
-                                                    println!("Successfully updated binary! Exiting to allow systemd to restart agent.");
-                                                    std::process::exit(0);
-                                                }
-                                                Err(err) => {
-                                                    eprintln!("Auto-update failed: {}", err);
-                                                }
-                                            }
-                                        }
+                                    if update_required && update_available {
+                                        handle_server_update(
+                                            "Version update required",
+                                            target_version,
+                                            github_repo,
+                                            download_url,
+                                            checksum_url,
+                                        )
+                                        .await;
                                     }
                                 }
                                 break;

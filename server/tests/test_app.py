@@ -1109,15 +1109,19 @@ def test_websocket_handler_version_checking(app, db_session, monkeypatch):
     assert 'signature_checksum' not in resp
 
     # 1b. Android mismatch includes update metadata when available
-    def _mock_update_info(version, server_url=''):
+    def _mock_update_info(platform, target_version, server_url='', agent_arch=None):
         return {
+            'github_repo': 'pantherale0/timekpr-webui',
             'apk_url': 'https://example.com/agent.apk',
             'signature_checksum': 'abc123checksum',
             'update_available': True,
+            'target_version': target_version,
+            'download_url': '',
+            'checksum_url': '',
         }
 
     monkeypatch.setattr(
-        'src.blueprints.websocket.resolve_android_update_info',
+        'src.agent.releases.resolve_agent_update_info',
         _mock_update_info,
     )
     ws_android_mismatch = MockWS([json.dumps({
@@ -1132,6 +1136,7 @@ def test_websocket_handler_version_checking(app, db_session, monkeypatch):
     assert len(ws_android_mismatch.sent_messages) == 1
     resp_android = json.loads(ws_android_mismatch.sent_messages[0])
     assert resp_android['update_required'] is True
+    assert resp_android['github_repo'] == 'pantherale0/timekpr-webui'
     assert resp_android['apk_url'] == 'https://example.com/agent.apk'
     assert resp_android['signature_checksum'] == 'abc123checksum'
     assert resp_android['update_available'] is True

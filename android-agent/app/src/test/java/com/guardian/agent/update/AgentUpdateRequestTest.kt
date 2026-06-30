@@ -38,11 +38,14 @@ class ApkSignatureVerifierTest {
 
 class AgentUpdateRequestTest {
     @Test
-    fun resolvedApkUrl_fallsBackToGitHubReleaseAsset() {
+    fun resolvedApkUrl_fallsBackToServerProvidedGitHubRepo() {
         val request = AgentUpdateRequest(
             targetVersion = "v1.2.3",
+            githubRepo = "pantherale0/timekpr-webui",
             apkUrl = null,
             signatureChecksum = "abc",
+            downloadUrl = null,
+            checksumUrl = null,
             updateAvailable = false,
         )
 
@@ -56,8 +59,11 @@ class AgentUpdateRequestTest {
     fun resolvedApkUrl_prefersServerProvidedUrl() {
         val request = AgentUpdateRequest(
             targetVersion = "v1.2.3",
+            githubRepo = "pantherale0/timekpr-webui",
             apkUrl = "https://example.com/agent.apk",
             signatureChecksum = "abc",
+            downloadUrl = null,
+            checksumUrl = null,
             updateAvailable = true,
         )
 
@@ -68,8 +74,11 @@ class AgentUpdateRequestTest {
     fun resolvedChecksumUrl_derivesFromServerApkUrl() {
         val request = AgentUpdateRequest(
             targetVersion = "v1.2.3",
+            githubRepo = "pantherale0/timekpr-webui",
             apkUrl = "https://example.com/dist/guardian-android-agent-v1.2.3.apk",
             signatureChecksum = null,
+            downloadUrl = null,
+            checksumUrl = null,
             updateAvailable = true,
         )
 
@@ -80,26 +89,14 @@ class AgentUpdateRequestTest {
     }
 
     @Test
-    fun resolvedChecksumUrl_fallsBackToGitHubReleaseAsset() {
+    fun resolvedChecksumUrl_fallsBackToServerProvidedGitHubRepo() {
         val request = AgentUpdateRequest(
             targetVersion = "1.2.3",
-            apkUrl = "https://example.com/agent.apk",
-            signatureChecksum = null,
-            updateAvailable = false,
-        )
-
-        assertEquals(
-            "https://example.com/agent.signature-checksum",
-            request.resolvedChecksumUrl(),
-        )
-    }
-
-    @Test
-    fun resolvedChecksumUrl_fallsBackToGitHubWhenApkUrlMissing() {
-        val request = AgentUpdateRequest(
-            targetVersion = "1.2.3",
+            githubRepo = "pantherale0/timekpr-webui",
             apkUrl = null,
             signatureChecksum = null,
+            downloadUrl = null,
+            checksumUrl = null,
             updateAvailable = false,
         )
 

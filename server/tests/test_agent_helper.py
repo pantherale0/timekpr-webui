@@ -63,6 +63,15 @@ def test_agent_versions_compatible_rejects_agent_ahead_of_server_patch():
     assert agent_versions_compatible('v0.10', 'v0.10.2') is False
 
 
+def test_agent_patch_update_recommended_when_server_is_newer_patch():
+    from src.agent.helper import agent_patch_update_recommended
+
+    assert agent_patch_update_recommended('v0.68.5', 'v0.68.0') is True
+    assert agent_patch_update_recommended('v0.68.5', 'v0.68.5') is False
+    assert agent_patch_update_recommended('v0.68.0', 'v0.68.5') is False
+    assert agent_patch_update_recommended('v0.69.0', 'v0.68.5') is False
+
+
 def test_agent_versions_compatible_rejects_different_minor_on_release_server():
     assert agent_versions_compatible('v0.10', 'v0.1.0-android') is False
     assert agent_versions_compatible('v0.68.5', 'v0.67.10') is False

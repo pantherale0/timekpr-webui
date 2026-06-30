@@ -208,11 +208,12 @@ def test_resolve_android_provisioning_not_ready_for_dev_without_overrides():
     assert context['is_dev_version'] is True
 
 
-@patch('src.agent.pairing.has_uploaded_android_apk', return_value=False)
+@patch('src.agent.releases.release_has_assets', return_value=True)
 @patch('src.agent.pairing._fetch_release_signature_checksum', return_value='release-checksum')
-def test_resolve_android_update_info_with_release_assets(mock_fetch, mock_uploaded):
+def test_resolve_android_update_info_with_release_assets(_mock_fetch, _mock_assets):
     info = resolve_android_update_info('v0.10', server_url='wss://example.com/ws')
     assert info['update_available'] is True
+    assert info['github_repo'] == 'pantherale0/timekpr-webui'
     assert info['apk_url'] == default_android_apk_url('v0.10')
     assert info['signature_checksum'] == 'release-checksum'
 

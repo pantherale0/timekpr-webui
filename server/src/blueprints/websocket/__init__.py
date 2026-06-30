@@ -8,15 +8,16 @@ from sqlalchemy.exc import SQLAlchemyError
 from src.models import db, AgentDevice
 from src.agent.helper import (
     AgentConnectionManager,
+    agent_patch_update_recommended,
     agent_versions_compatible,
     normalize_agent_alert_payload,
 )
+from src.agent.releases import enrich_auth_with_agent_update
 from src.agent.push import android_should_use_persistent_websocket, update_device_push_metadata
 from src.alerts.manager import _store_agent_alert
 from src.policy.apparmor import _store_app_usage_from_alert
 from src.device.installed_apps import handle_app_icon_report, handle_installed_apps_report
 from src.device.screenshots import handle_screenshot_report
-from src.agent.pairing import resolve_android_update_info
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -116,26 +117,28 @@ def ws_agent_handler(ws):
                 return
             
             agent_version = hello_msg.get("agent_version")
+            platform = hello_msg.get("platform")
+            agent_arch = hello_msg.get("agent_arch")
+            server_url = _agent_server_url_from_request()
             if not agent_versions_compatible(__version__, agent_version):
                 _LOGGER.warning(
                     "Connection rejected: Agent version %s is incompatible with server version %s",
                     agent_version or "unknown",
                     __version__,
                 )
-                rejection = {
-                    "type": "auth_result",
-                    "success": False,
-                    "message": f"Incompatible agent version. Please update to {__version__}.",
-                    "update_required": True,
-                    "target_version": __version__,
-                }
-                platform = hello_msg.get("platform")
-                if isinstance(platform, str) and platform.strip().lower() == "android":
-                    update_info = resolve_android_update_info(
-                        __version__,
-                        server_url=_agent_server_url_from_request(),
-                    )
-                    rejection.update(update_info)
+                rejection = enrich_auth_with_agent_update(
+                    {
+                        "type": "auth_result",
+                        "success": False,
+                        "message": f"Incompatible agent version. Please update to {__version__}.",
+                    },
+                    platform=platform if isinstance(platform, str) else None,
+                    server_version=__version__,
+                    agent_version=agent_version if isinstance(agent_version, str) else None,
+                    server_url=server_url,
+                    agent_arch=agent_arch if isinstance(agent_arch, str) else None,
+                    mandatory=True,
+                )
                 ws.send(json.dumps(rejection))
                 return
     
@@ -349,6 +352,20 @@ def ws_agent_handler(ws):
                         "success": True,
                         "message": "Authenticated successfully",
                     }
+                    if agent_patch_update_recommended(__version__, agent_version):
+                        auth_result = enrich_auth_with_agent_update(
+                            auth_result,
+                            platform=platform if isinstance(platform, str) else None,
+                            server_version=__version__,
+                            agent_version=agent_version if isinstance(agent_version, str) else None,
+                            server_url=server_url,
+                            agent_arch=agent_arch if isinstance(agent_arch, str) else None,
+                            mandatory=False,
+                        )
+                        if auth_result.get('update_available'):
+                            auth_result["message"] = (
+                                f"Authenticated successfully. Update available to {__version__}."
+                            )
                     if android_should_use_persistent_websocket(device):
                         auth_result["persistent_connection"] = True
                     ws.send(json.dumps(auth_result))

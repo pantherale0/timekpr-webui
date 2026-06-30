@@ -51,6 +51,19 @@ def agent_versions_compatible(server_version: str, agent_version: str | None) ->
         return False
     return server_tuple[:2] == agent_tuple[:2] and server_tuple[2] >= agent_tuple[2]
 
+
+def agent_patch_update_recommended(server_version: str, agent_version: str | None) -> bool:
+    """Return True when the server is a newer patch on the same release line."""
+    if is_dev_server_version(server_version) or not agent_version:
+        return False
+    server_tuple = _parse_release_version_tuple(server_version)
+    agent_tuple = _parse_release_version_tuple(agent_version)
+    if server_tuple is None or agent_tuple is None:
+        return False
+    if server_tuple[:2] != agent_tuple[:2]:
+        return False
+    return server_tuple[2] > agent_tuple[2]
+
 # Optional registration token firewall for new dynamic pairings
 REGISTRATION_TOKEN = os.environ.get('REGISTRATION_TOKEN')
 
