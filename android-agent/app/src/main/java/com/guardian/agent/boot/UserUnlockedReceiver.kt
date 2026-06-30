@@ -17,7 +17,11 @@ class UserUnlockedReceiver : BroadcastReceiver() {
         when {
             SecondaryUserProvisioner.isManagedSecondaryUser(context) -> {
                 Log.i(TAG, "Managed secondary user unlocked; preparing enforcement")
-                SecondaryUserProvisioner.prepareAtLaunch(context)
+                val pendingResult = goAsync()
+                com.guardian.agent.enforcement.EnforcementCoordinator
+                    .schedulePrepareManagedSecondaryUser(context) {
+                        pendingResult.finish()
+                    }
             }
             userId == 0 -> {
                 Log.i(TAG, "Owner user unlocked; starting mobile agent")

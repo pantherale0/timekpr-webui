@@ -8,7 +8,7 @@ import android.util.Log
 import com.guardian.agent.GuardianApplication
 import com.guardian.agent.admin.DeviceOwnerProvisioner
 import com.guardian.agent.policy.PolicyStorePayloadPush
-import com.guardian.agent.enforcement.EnforcementController
+import com.guardian.agent.enforcement.EnforcementCoordinator
 import com.guardian.agent.boot.SecondaryUserInitService
 import com.guardian.agent.monitor.UsageMonitorService
 import com.guardian.agent.service.AgentPersistentConnectionService
@@ -38,14 +38,9 @@ class UserSwitchedReceiver : BroadcastReceiver() {
         }
 
         val pendingResult = goAsync()
-        val appContext = context.applicationContext
-        Thread {
-            try {
-                EnforcementController(appContext, app.appPolicyStore).reconcileAllUsers()
-            } finally {
-                pendingResult.finish()
-            }
-        }.start()
+        EnforcementCoordinator.scheduleReconcile(context) {
+            pendingResult.finish()
+        }
     }
 
     private fun readSwitchedUserId(intent: Intent): Int? {
