@@ -12,7 +12,7 @@ Use it when hardening a deployment, choosing a [policy preset](../features/polic
 | **Partial** | Mitigated for some configurations, intentional trade-off, or residual OEM-specific risk. |
 | **Gap** | Meaningful exposure even with recommended preset; treat as hardening backlog. |
 | **N/A** | Technique targets a supervision model Guardian does not use (e.g. Google account supervision only). |
-| **Excluded** | Out of scope per [accountability policy](../../AGENTS.md) (rooted device, child granted admin, etc.). |
+| **Excluded** | Out of scope per accountability policy (rooted device, child granted admin, etc.). |
 
 **Baseline assumption:** Android agent provisioned as **Device Owner** via MDM QR, child profile uses **medium or high** bypass-risk [policy preset](../features/policy-presets.md). Low presets deliberately leave more freedom.
 
