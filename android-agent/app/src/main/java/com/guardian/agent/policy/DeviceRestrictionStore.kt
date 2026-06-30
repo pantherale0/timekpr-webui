@@ -251,9 +251,16 @@ class DeviceRestrictionStore(context: Context) {
         return globalPolicy
     }
 
-    fun syncPolicy(username: String, policyJson: JSONObject?) {
-        globalPolicy = DeviceRestrictionPolicy.parse(policyJson)
-        persist()
+    fun syncPolicy(username: String, policyJson: JSONObject?): Boolean {
+        val parsed = DeviceRestrictionPolicy.parse(policyJson)
+        val canonical = parsed.toJson().toString()
+        val existing = prefs.getString(KEY_POLICY, null)
+        globalPolicy = parsed
+        if (canonical == existing) {
+            return false
+        }
+        persist(canonical)
+        return true
     }
 
     fun restore() {
@@ -269,8 +276,8 @@ class DeviceRestrictionStore(context: Context) {
         }
     }
 
-    private fun persist() {
-        prefs.edit().putString(KEY_POLICY, globalPolicy.toJson().toString()).apply()
+    private fun persist(canonical: String = globalPolicy.toJson().toString()) {
+        prefs.edit().putString(KEY_POLICY, canonical).apply()
     }
 
     companion object {

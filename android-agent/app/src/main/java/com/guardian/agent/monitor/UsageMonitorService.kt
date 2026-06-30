@@ -77,7 +77,8 @@ class UsageMonitorService : Service() {
         }
         startForeground(NOTIFICATION_ID, buildNotification())
         packageChangeMonitor.register()
-        enforcement.reconcileAllUsers()
+        // DPM user-restriction calls are slow binder IPC; never run reconcile on the main thread.
+        scope.launch { enforcement.reconcileAllUsers() }
         monitorJob?.cancel()
         scope.launch {
             ClockIntegrityMonitor.tickOnce(this@UsageMonitorService)

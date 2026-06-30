@@ -805,6 +805,14 @@ def test_task_manager_syncs_android_device_policy(app, db_session):
     assert success is True
     assert message
 
+    ws.sent_messages.clear()
+    with app.app_context():
+        success, message = manager._sync_android_device_policy_system(device.system_id)
+
+    assert success is True
+    assert "already up to date" in message.lower()
+    assert not ws.sent_messages
+
     AgentConnectionManager.unregister(device.system_id)
 
 

@@ -266,6 +266,10 @@ def push_mapping_device_policy(mapping: ManagedUserDeviceMap) -> tuple[bool, str
         policy = get_or_create_policy(mapping)
         db.session.commit()
 
+    payload = build_device_policy_payload(policy)
+    if policy.is_synced and policy.revision == compute_revision(payload):
+        return True, 'Linux device policy already up to date'
+
     if not AgentConnectionManager.is_online(mapping.system_id):
         from src.agent.pending_commands import enqueue_policy_snapshot
 
@@ -279,7 +283,6 @@ def push_mapping_device_policy(mapping: ManagedUserDeviceMap) -> tuple[bool, str
         except ValueError as exc:
             return False, str(exc)
 
-    payload = build_device_policy_payload(policy)
     agent = AgentClient(system_id=mapping.system_id)
     return agent.sync_linux_device_policy(mapping.linux_username, payload)
 

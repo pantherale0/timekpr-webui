@@ -191,8 +191,8 @@ class CommandDispatcher(
 
     private fun handleAndroidDevicePolicy(username: String, args: JSONObject): DispatchResult {
         val devicePolicy = args.optJSONObject("device_policy")
-        app.deviceRestrictionStore.syncPolicy(username, devicePolicy)
-        onDeviceRestrictionChanged(username)
+        val changed = app.deviceRestrictionStore.syncPolicy(username, devicePolicy)
+        if (changed) onDeviceRestrictionChanged(username)
         return DispatchResult(true, "Android device policy synchronized", JSONObject())
     }
 

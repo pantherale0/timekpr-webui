@@ -355,6 +355,11 @@ def upsert_policy(device: AgentDevice, body: dict) -> MappingAndroidDevicePolicy
     return policy
 
 
+def _device_policy_up_to_date(policy: MappingAndroidDevicePolicy) -> bool:
+    payload = build_device_policy_payload(policy)
+    return bool(policy.is_synced) and policy.revision == compute_revision(payload)
+
+
 def push_device_policy(device: AgentDevice) -> tuple[bool, str]:
     """Push device restriction policy to the agent when online."""
     from src.agent.helper import AgentClient, AgentConnectionManager
@@ -366,6 +371,9 @@ def push_device_policy(device: AgentDevice) -> tuple[bool, str]:
     if policy is None:
         policy = get_or_create_policy(device)
         db.session.commit()
+
+    if _device_policy_up_to_date(policy):
+        return True, 'Android device policy already up to date'
 
     if not AgentConnectionManager.is_online(device.system_id):
         from src.agent.pending_commands import enqueue_policy_snapshot

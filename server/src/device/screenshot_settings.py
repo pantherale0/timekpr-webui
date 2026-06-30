@@ -148,6 +148,9 @@ def sync_screenshot_policy_for_device(device: AgentDevice) -> tuple[bool, str]:
 
     settings = get_or_create_settings(device)
     payload = build_screenshot_policy_payload(settings)
+    if settings.is_synced and settings.revision == compute_revision(payload):
+        return True, 'Screenshot policy already up to date'
+
     agent = AgentClient(device.system_id)
     success, message = agent.sync_screenshot_policy(payload)
     _mark_sync_result(settings, success, message)

@@ -37,8 +37,15 @@ class UserSwitchedReceiver : BroadcastReceiver() {
             AgentPersistentConnectionService.start(context)
         }
 
-        val enforcement = EnforcementController(context, app.appPolicyStore)
-        enforcement.reconcileAllUsers()
+        val pendingResult = goAsync()
+        val appContext = context.applicationContext
+        Thread {
+            try {
+                EnforcementController(appContext, app.appPolicyStore).reconcileAllUsers()
+            } finally {
+                pendingResult.finish()
+            }
+        }.start()
     }
 
     private fun readSwitchedUserId(intent: Intent): Int? {

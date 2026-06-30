@@ -46,6 +46,9 @@ class EnforcementController(
     private val lastClockTamperSuspendedByUser = mutableMapOf<String, Set<String>>()
     private var lastOwnerLockdownSuspended = emptySet<String>()
     private var ownerLockdownActive = false
+    private val reconcileLock = Any()
+    @Volatile
+    private var lastAppliedDeviceRestrictionPolicyJson: String? = null
 
     init {
         restoreTimeExhaustionSuspended()
@@ -56,10 +59,17 @@ class EnforcementController(
     }
 
     fun reconcileAllUsers() {
+        synchronized(reconcileLock) {
+            reconcileAllUsersLocked()
+        }
+    }
+
+    private fun reconcileAllUsersLocked() {
         val callingUserId = Process.myUid() / 100_000
         val configStore = GuardianApplication.from(context).configStore
         val mode = configStore.load().managementMode
         val allUsers = GuardianApplication.from(context).timeLimitStore.allUsernames()
+        val deviceRestrictionsAppliedForUid = mutableSetOf<Int>()
         allUsers.forEach { username ->
             val uid = getUidForUsername(username)
             if (uid < 0) {
@@ -79,10 +89,12 @@ class EnforcementController(
             }
             applyTimePoliciesForUser(username, uid)
             applyAppPoliciesForUser(username, uid)
-            applyDeviceRestrictionsForUser(username, uid)
+            if (deviceRestrictionsAppliedForUid.add(uid)) {
+                applyDeviceRestrictionsForUserLocked(username, uid)
+            }
         }
         DomainBlockVpnService.reconcile(context)
-        if (Process.myUid() / 100_000 == 0) {
+        if (Process.myUid() / 100_000 == 0 && !UsageMonitorService.isRunning()) {
             UsageMonitorService.start(context)
         }
         if (Process.myUid() / 100_000 == 0 && mode == AgentConfigStore.MANAGEMENT_MODE_EXCLUSIVE_DO) {
@@ -344,6 +356,12 @@ class EnforcementController(
     }
 
     fun applyDeviceRestrictionsForUser(username: String, uid: Int) {
+        synchronized(reconcileLock) {
+            applyDeviceRestrictionsForUserLocked(username, uid)
+        }
+    }
+
+    private fun applyDeviceRestrictionsForUserLocked(username: String, uid: Int) {
         if (!DeviceOwnerProvisioner.isDeviceOrProfileOwner(context)) return
         val userContext = AndroidUsers.getUserContext(context, uid) ?: context
         val dpm = userContext.getSystemService(DevicePolicyManager::class.java) ?: return
@@ -528,6 +546,12 @@ class EnforcementController(
     }
 
     private fun applyDeviceRestrictionPolicy(dpm: DevicePolicyManager, policy: DeviceRestrictionPolicy) {
+        val policyJson = policy.toJson().toString()
+        if (policyJson == lastAppliedDeviceRestrictionPolicyJson) {
+            return
+        }
+        lastAppliedDeviceRestrictionPolicyJson = policyJson
+
         dpm.setShortSupportMessage(adminComponent, policy.shortSupportMessage)
         dpm.setLongSupportMessage(adminComponent, policy.longSupportMessage)
         dpm.setScreenCaptureDisabled(adminComponent, policy.screenCaptureDisabled)
