@@ -529,6 +529,83 @@ def test_task_manager_ignores_small_time_drift_within_tolerance(app, db_session)
     AgentConnectionManager.unregister("sys-tolerant")
 
 
+def test_task_manager_skips_rebalance_for_natural_time_left_countdown(app, db_session):
+    manager = BackgroundTaskManager(app)
+
+    user = ManagedUser(
+        username="countdown_user",
+        system_ip="Unassigned",
+        is_valid=True,
+        last_config='{"TIME_SPENT_DAY": 600, "TIME_LEFT_DAY": 3000}',
+    )
+    device = AgentDevice(system_id="sys-countdown", status="approved", secure_token="tok")
+    db_session.add_all([user, device])
+    db_session.flush()
+
+    schedule = UserWeeklySchedule(user_id=user.id, is_synced=True)
+    weekday_columns = (
+        'monday_hours',
+        'tuesday_hours',
+        'wednesday_hours',
+        'thursday_hours',
+        'friday_hours',
+        'saturday_hours',
+        'sunday_hours',
+    )
+    setattr(schedule, weekday_columns[utc_today().weekday()], 1.0)
+    db_session.add(schedule)
+
+    mapping = ManagedUserDeviceMap(
+        managed_user_id=user.id,
+        system_id="sys-countdown",
+        linux_username="countdown_user",
+        is_valid=True,
+        last_config='{"TIME_SPENT_DAY": 600, "TIME_LEFT_DAY": 3000}',
+    )
+    db_session.add(mapping)
+    db_session.commit()
+
+    ws = StatefulTimeWS(time_spent=600, time_left=2990)
+    AgentConnectionManager.register("sys-countdown", ws, "10.0.0.8")
+
+    with app.app_context():
+        manager._update_user_data()
+
+    rebalance_calls = [
+        json.loads(message)
+        for message in ws.sent_messages
+        if json.loads(message).get("action") == "modify_time_left"
+    ]
+    assert not rebalance_calls, "Should not rebalance when only time_left counted down locally"
+
+    ws.time_left = 2980
+    ws.sent_messages = []
+    with app.app_context():
+        manager._update_user_data()
+
+    rebalance_calls = [
+        json.loads(message)
+        for message in ws.sent_messages
+        if json.loads(message).get("action") == "modify_time_left"
+    ]
+    assert not rebalance_calls, "Should keep skipping while shared pool usage is unchanged"
+
+    ws.time_spent = 650
+    ws.time_left = 2950
+    ws.sent_messages = []
+    with app.app_context():
+        manager._update_user_data()
+
+    rebalance_calls = [
+        json.loads(message)
+        for message in ws.sent_messages
+        if json.loads(message).get("action") == "modify_time_left"
+    ]
+    assert not rebalance_calls, "Agent should already match shared pool after usage update"
+
+    AgentConnectionManager.unregister("sys-countdown")
+
+
 def test_task_manager_failures_and_threads(app, db_session):
     manager = BackgroundTaskManager(app)
 

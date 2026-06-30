@@ -32,6 +32,7 @@ from src.models import (
     coerce_time_left_day,
     coerce_time_spent_day,
     ensure_offline_mapping_day_snapshot,
+    get_mapping_time_left_for_day,
     get_mapping_time_spent_for_day,
     stamp_usage_snapshot,
     utc_today,
@@ -599,6 +600,16 @@ class BackgroundTaskManager:
                     pending_adjustment_failed = False
                     applied_pending_adjustment = False
                     online_mappings = 0
+                    previous_shared_time_spent = coerce_time_spent_day(
+                        user.get_config_value('TIME_SPENT_DAY')
+                    )
+                    previous_shared_time_left = coerce_time_left_day(
+                        user.get_config_value('TIME_LEFT_DAY')
+                    )
+                    previous_mapping_time_left = {
+                        mapping.id: get_mapping_time_left_for_day(mapping, today)
+                        for mapping in mappings
+                    }
                     time_spent_by_mapping = {
                         mapping.id: get_mapping_time_spent_for_day(mapping, today)
                         for mapping in mappings
@@ -772,11 +783,26 @@ class BackgroundTaskManager:
                                 continue
 
                             delta = shared_time_left - current_time_left
-                            
+
                             # Use configurable tolerance to avoid notification spam
                             tolerance = _safe_int(Settings.get_value('time_sync_tolerance', '15'), 15)
                             if abs(delta) < tolerance:
                                 continue
+
+                            # Agents count down time_left locally between polls. When the shared
+                            # pool budget is unchanged, a lower agent value is expected — not drift.
+                            if delta > 0:
+                                pool_unchanged = (
+                                    shared_time_spent == previous_shared_time_spent
+                                    and shared_time_left == previous_shared_time_left
+                                )
+                                last_stored_left = previous_mapping_time_left.get(mapping.id)
+                                if (
+                                    pool_unchanged
+                                    and last_stored_left is not None
+                                    and current_time_left <= last_stored_left
+                                ):
+                                    continue
 
                             operation = "+" if delta > 0 else "-"
                             success, message = agent_client.modify_time_left(
