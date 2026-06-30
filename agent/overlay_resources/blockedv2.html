@@ -1065,6 +1065,16 @@
                             startSignupPolling();
                         }
                     );
+                } else if (typeof window.guardianBridge !== 'undefined' && window.guardianBridge.requestRegistration) {
+                    const responseJson = window.guardianBridge.requestRegistration(blockedSignupDomain);
+                    const response = JSON.parse(responseJson || '{}');
+                    if (response.success !== false) {
+                        signupRequestSent = true;
+                        showSignupToast(pendingMessage);
+                        startSignupPolling();
+                    } else if (signupBtn) {
+                        signupBtn.disabled = false;
+                    }
                 } else {
                     showSignupToast(pendingMessage);
                 }
@@ -1095,6 +1105,16 @@
                             }
                         }
                     );
+                } else if (typeof window.guardianBridge !== 'undefined' && window.guardianBridge.checkRegistration) {
+                    const responseJson = window.guardianBridge.checkRegistration(blockedSignupDomain);
+                    const response = JSON.parse(responseJson || '{}');
+                    if (response.allowed === true) {
+                        handleSignupApproved();
+                    } else if (response.pending === true) {
+                        signupRequestSent = true;
+                        const signupBtn = document.getElementById('btn-request-signup');
+                        if (signupBtn) signupBtn.disabled = true;
+                    }
                 }
             } catch (e) {
                 // Extension context invalidated — ignore

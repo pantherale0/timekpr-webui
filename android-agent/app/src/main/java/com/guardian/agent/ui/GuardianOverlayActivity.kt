@@ -8,13 +8,11 @@ import android.content.Intent
 import android.os.Bundle
 import android.util.Log
 import android.view.WindowManager
-import android.webkit.JavascriptInterface
 import android.webkit.WebChromeClient
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
-import com.guardian.agent.monitor.AlertEventBus
-import org.json.JSONObject
+import com.guardian.agent.telemetry.AgentTelemetryRouter
 
 /**
  * Full-screen Guardian Space overlay activity.
@@ -72,7 +70,10 @@ class GuardianOverlayActivity : Activity() {
         // Expose JavascriptInterface so sendQuickRequest / sendCustomRequest in blockedv2.html
         // can reach the server directly without chrome.runtime.sendMessage
         wv.addJavascriptInterface(
-            GuardianJsBridge(linuxUsername),
+            GuardianJsBridge(
+                linuxUsername,
+                AgentTelemetryRouter.from(applicationContext),
+            ),
             "guardianBridge",
         )
 
@@ -107,30 +108,6 @@ class GuardianOverlayActivity : Activity() {
         webView?.destroy()
         webView = null
         super.onDestroy()
-    }
-
-    // -------------------------------------------------------------------------
-    // Javascript bridge
-    // -------------------------------------------------------------------------
-
-    inner class GuardianJsBridge(private val linuxUsername: String) {
-
-        /**
-         * Called by blockedv2.html when the child taps a preset or custom request button.
-         * Emits an [AlertEventBus] event that the agent service forwards to the server.
-         */
-        @JavascriptInterface
-        fun sendAccessRequest(reason: String, message: String) {
-            Log.d(TAG, "Access request from $linuxUsername: reason=$reason message=$message")
-            AlertEventBus.emit(
-                "access_requested",
-                linuxUsername,
-                JSONObject()
-                    .put("request_type", "guardian_overlay")
-                    .put("reason", reason)
-                    .put("message", message),
-            )
-        }
     }
 
     companion object {

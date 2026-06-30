@@ -9,7 +9,9 @@ import com.guardian.agent.policy.DeviceRestrictionStore
 import com.guardian.agent.policy.DomainPolicyStore
 import com.guardian.agent.policy.TimeLimitStore
 import com.guardian.agent.policy.PolicyIpcServer
+import com.guardian.agent.telemetry.AgentTelemetryRouter
 import com.guardian.agent.util.DirectBootHelper
+import com.guardian.agent.work.TelemetryFlushWorker
 
 class GuardianApplication : Application() {
     lateinit var configStore: AgentConfigStore
@@ -19,7 +21,8 @@ class GuardianApplication : Application() {
     val domainPolicyStore: DomainPolicyStore by lazy { DomainPolicyStore(this).also { it.restore() } }
     val appPolicyStore: AppPolicyStore by lazy { AppPolicyStore(this).also { it.restore() } }
     val deviceRestrictionStore: DeviceRestrictionStore by lazy { DeviceRestrictionStore(this).also { it.restore() } }
-    val policyIpcServer: PolicyIpcServer by lazy { PolicyIpcServer(this) }
+    val telemetryRouter: AgentTelemetryRouter by lazy { AgentTelemetryRouter(this) }
+    val policyIpcServer: PolicyIpcServer by lazy { PolicyIpcServer(this, telemetryRouter) }
 
     override fun onCreate() {
         super.onCreate()
@@ -40,11 +43,13 @@ class GuardianApplication : Application() {
             configStore.migrateToDeviceProtectedStorageIfNeeded()
             if ((android.os.Process.myUid() / 100_000) == 0) {
                 policyIpcServer.start()
+                TelemetryFlushWorker.enqueue(this)
                 com.guardian.agent.admin.SecondaryUserProvisioner.ensurePrimaryUiVisible(this)
             }
             DeviceOwnerProvisioner.applyIfDeviceOwner(this)
         } else if ((android.os.Process.myUid() / 100_000) == 0) {
             policyIpcServer.start()
+            TelemetryFlushWorker.enqueue(this)
             DeviceOwnerProvisioner.applyIfDeviceOwner(this)
         }
     }

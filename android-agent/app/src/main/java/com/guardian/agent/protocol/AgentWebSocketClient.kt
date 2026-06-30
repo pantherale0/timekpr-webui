@@ -19,6 +19,7 @@ import com.guardian.agent.update.AgentUpdateRequest
 import com.guardian.agent.update.AgentUpdateWorker
 import com.guardian.agent.util.AndroidUsers
 import com.guardian.agent.vpn.DomainBlockVpnService
+import com.guardian.agent.work.TelemetryFlushWorker
 import kotlinx.coroutines.suspendCancellableCoroutine
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -215,6 +216,9 @@ class AgentWebSocketClient(
                 AlertEventBus.drain().forEach { pending ->
                     sendAlert(webSocket, pending.eventType, pending.linuxUsername, pending.details)
                 }
+
+                TelemetryFlushWorker.enqueue(context)
+                GuardianApplication.from(context).telemetryRouter.flushQueuedTelemetry()
 
                 InstalledAppsReporter.reportAllManagedUsers(context, webSocket)
                 // reconcileAllUsers in startAll() already applied policies for all local users.
