@@ -53,6 +53,7 @@ class UsageMonitorService : Service() {
     private var capabilityCheckCounter = 0
     private var clockIntegrityCounter = 0
     private var lastBootstrappedForegroundUser = -1
+    private val monitorTickSeconds = 2
 
     private var lastTimeLimitsModified = 0L
     private var lastDomainPolicyModified = 0L
@@ -76,6 +77,7 @@ class UsageMonitorService : Service() {
         }
         startForeground(NOTIFICATION_ID, buildNotification())
         packageChangeMonitor.register()
+        enforcement.reconcileAllUsers()
         monitorJob?.cancel()
         scope.launch {
             ClockIntegrityMonitor.tickOnce(this@UsageMonitorService)
@@ -193,6 +195,8 @@ class UsageMonitorService : Service() {
                 val accessAllowed = timeStore.isAccessAllowed(username)
                 if (!accessAllowed) {
                     enforcement.applyTimePoliciesForUser(username, activeUid)
+                } else if (activeSessions.isNotEmpty()) {
+                    billConcurrentActiveSessions(username, activeUid)
                 }
 
                 val event = UsageEvents.Event()
@@ -251,7 +255,24 @@ class UsageMonitorService : Service() {
                     }
                 }
             }
-            delay(2_000)
+            delay(monitorTickSeconds * 1000L)
+        }
+    }
+
+    /**
+     * Picture-in-picture / split-screen bypasses keep a "carrier" app resumed while the child
+     * uses another package in a floating window. Bill every concurrently active session each tick.
+     */
+    private fun billConcurrentActiveSessions(username: String, activeUid: Int) {
+        if (activeSessions.size < 2) {
+            return
+        }
+        val timeStore = GuardianApplication.from(this).timeLimitStore
+        activeSessions.keys.forEach { sessionKey ->
+            if (!sessionKey.startsWith("$activeUid:")) {
+                return@forEach
+            }
+            timeStore.recordUsage(username, monitorTickSeconds)
         }
     }
 

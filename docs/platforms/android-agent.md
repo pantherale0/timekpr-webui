@@ -373,6 +373,10 @@ The agent also handles `refresh_installed_apps` RPC for on-demand rescans of a s
 
 See [App discovery](../features/app-discovery.md) for the full protocol reference.
 
+## Anti-bypass hardening
+
+Known Android parental-control bypass techniques and Guardian's coverage are documented in the [Android bypass matrix](android-bypasses.md). Medium/high [policy presets](../features/policy-presets.md) apply the recommended device restrictions and anti-bypass app blocks automatically.
+
 ## Building
 
 ```bash

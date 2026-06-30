@@ -15,6 +15,8 @@ Higher bypass risk applies **stricter** lockdown within the same age bracket (mo
 | Daily screen time | Weekday and weekend hour limits on the weekly schedule |
 | Guardian Space overlay | Sets overlay age tier (`under8`, `eight12`, or `teen`) from the age bracket |
 | Linux device restrictions | Per linked Linux/Windows mapping: polkit, terminal, install blocks |
+| Android device restrictions | Per linked Android device: developer options, install blocks, USB, factory reset, user-management restrictions |
+| Anti-bypass app blocks | Medium/high presets block Island, Shelter, Test DPC, Tasker, Samsung Internet |
 | Chrome browser policies | SafeSearch, YouTube restrict, extension blocking, etc. |
 | Access approvals | Domain and app launch modes, registration approval |
 | Android profile type | `restricted` or `standard` on Android mappings when specified |
@@ -49,15 +51,15 @@ Policy presets reference the same curated blocklist catalog as the [Filter Marke
 
 Within each age bracket, bundles escalate from low → high bypass risk:
 
-- **Low** — Age-appropriate core filter packs; lighter device locks; `blocklist_only` domain mode; open app launch where age allows
-- **Medium** — Additional categories (e.g. VPN/proxy, social); terminal or install blocks; `approval_on_block` for blocked sites
-- **High** — Full relevant filter set; terminal, install, and pkexec blocks; `allowlist` app launch; extension blocking; registration approval where applicable
+- **Low** — Age-appropriate core filter packs; lighter device locks; `blocklist_only` domain mode; open app launch where age allows; Android developer options and USB left at platform default
+- **Medium** — Additional categories (e.g. VPN/proxy, social); terminal or install blocks; `approval_on_block` for blocked sites; Android **developer options disabled**, factory-reset protection, account-change block, USB file transfer blocked, **anti-bypass app blocks**, `DISALLOW_ADD_USER` / user-switch restrictions
+- **High** — Full relevant filter set; terminal, install, and pkexec blocks; `allowlist` app launch; extension blocking; registration approval where applicable; Android install/uninstall blocks, full USB lockdown, Wi‑Fi tethering block when VPN/proxy packs apply
 
 Younger age brackets and higher bypass risk both trend toward shorter daily screen-time limits.
 
 ## Configuration file
 
-Bundle definitions live in `server/src/policy_preset_matrix.json` (12 cells: 4 ages × 3 maturity levels). To adjust defaults, edit the JSON and restart the server — no code change required unless new bundle fields are introduced.
+Bundle definitions live in `server/src/policy/policy_preset_matrix.json` (12 cells: 4 ages × 3 maturity levels). Each bundle includes `linux_device_policy`, `android_device_policy`, `approval_settings`, and related fields. To adjust defaults, edit the JSON and restart the server — no code change required unless new bundle fields are introduced.
 
 ## API routes
 
@@ -68,6 +70,7 @@ Bundle definitions live in `server/src/policy_preset_matrix.json` (12 cells: 4 a
 
 ## See also
 
+- [Android bypass matrix](../platforms/android-bypasses.md)
 - [Child accounts & mappings](../web-ui/child-accounts-and-mappings.md)
 - [Web filters](../web-ui/web-filters.md)
 - [Schedules & limits](../web-ui/schedules-and-limits.md)

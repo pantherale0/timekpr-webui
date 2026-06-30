@@ -77,6 +77,7 @@ nav:
   - Platforms:
       - Linux agent: platforms/linux-agent.md
       - Android agent: platforms/android-agent.md
+      - Android bypass matrix: platforms/android-bypasses.md
       - Windows agent: platforms/windows-agent.md
       - Nintendo Switch: platforms/nintendo-switch.md
       - Xbox: platforms/xbox.md

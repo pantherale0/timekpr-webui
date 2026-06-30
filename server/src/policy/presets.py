@@ -108,9 +108,14 @@ def apply_policy_preset(
     Apply a composite policy preset to a managed child profile.
 
     Overwrites preset-controlled fields: marketplace blocklists, overlay tier,
-    weekly schedule, Linux device policy, approval settings, and Android profile type.
+    weekly schedule, Linux/Android device policy, approval settings, and Android profile type.
     """
     from src.user.approvals import get_or_create_settings
+    from src.policy.android import upsert_policy as upsert_android_policy
+    from src.policy.android_bypass import (
+        apply_android_bypass_app_blocks,
+        sync_android_app_policies_for_user,
+    )
     from src.policy.linux import upsert_policy
     from src.blocklist.marketplace import sync_marketplace_subscriptions
 
@@ -135,16 +140,28 @@ def apply_policy_preset(
             managed_user_id=user.id,
         ).all()
     linux_policy_body = bundle.get('linux_device_policy') or {}
+    android_policy_body = bundle.get('android_device_policy') or {}
     approval_body = bundle.get('approval_settings') or {}
     android_profile_type = bundle.get('android_profile_type')
 
     linux_mappings_updated = 0
     android_mappings_updated = 0
+    android_devices_updated = 0
+    android_devices_touched: set[str] = set()
 
     for mapping in target_mappings:
         if _is_linux_mapping(mapping) and linux_policy_body:
             upsert_policy(mapping, linux_policy_body)
             linux_mappings_updated += 1
+        if (
+            android_policy_body
+            and _is_android_mapping(mapping)
+            and mapping.device is not None
+            and mapping.system_id not in android_devices_touched
+        ):
+            upsert_android_policy(mapping.device, android_policy_body)
+            android_devices_touched.add(mapping.system_id)
+            android_devices_updated += 1
         if approval_body:
             settings = get_or_create_settings(mapping)
             if approval_body.get('app_launch_mode') is not None:
@@ -161,6 +178,9 @@ def apply_policy_preset(
         ):
             mapping.android_profile_type = android_profile_type
             android_mappings_updated += 1
+
+    bypass_rules_written = apply_android_bypass_app_blocks(user, normalized_maturity)
+    android_app_policies_synced = sync_android_app_policies_for_user(user)
 
     try:
         db.session.commit()
@@ -186,6 +206,9 @@ def apply_policy_preset(
         'weekly_schedule_hours': bundle.get('weekly_schedule_hours'),
         'linux_mappings_updated': linux_mappings_updated,
         'android_mappings_updated': android_mappings_updated,
+        'android_devices_updated': android_devices_updated,
+        'android_bypass_rules_written': bypass_rules_written,
+        'android_app_policies_synced': android_app_policies_synced,
         'applied_at': datetime.now(timezone.utc).isoformat(),
     }
 

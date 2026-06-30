@@ -159,7 +159,9 @@ class EnforcementController(
         val dpm = userContext.getSystemService(DevicePolicyManager::class.java) ?: return
         if (!dpm.isAdminActive(adminComponent)) return
 
-        val blocked = appPolicyStore.effectiveBlockedPackages(username, userContext)
+        val devicePolicy = GuardianApplication.from(context).deviceRestrictionStore.policyForUser(username)
+        val blocked = appPolicyStore.effectiveBlockedPackages(username, userContext) +
+            BypassHardening.extraBlockedPackages(devicePolicy)
         val previouslyEnforced = appPolicyStore.lastEnforcedBlockedPackages(username)
         val releasedBySync = appPolicyStore.consumePackagesReleasedBySync(username)
         var toUnsuspend = (previouslyEnforced + releasedBySync - blocked).toMutableSet()
@@ -197,7 +199,8 @@ class EnforcementController(
         }
 
         val exempt = timeExemptionResolver.exemptPackages(username)
-        val toSuspend = launcherPackagesForUser(uid) - exempt
+        val userContext = AndroidUsers.getUserContext(context, uid) ?: context
+        val toSuspend = lockoutPackagesForUser(uid, userContext, exempt)
         setPackagesSuspended(dpm, toSuspend.toTypedArray(), true)
         lastTimeExhaustionSuspendedByUser[username] = toSuspend
         persistTimeExhaustionSuspended()
@@ -255,7 +258,8 @@ class EnforcementController(
         }
 
         val exempt = timeExemptionResolver.exemptPackages(username)
-        val toSuspend = launcherPackagesForUser(uid) - exempt
+        val userContext = AndroidUsers.getUserContext(context, uid) ?: context
+        val toSuspend = lockoutPackagesForUser(uid, userContext, exempt)
         setPackagesSuspended(dpm, toSuspend.toTypedArray(), true)
         lastClockTamperSuspendedByUser[username] = toSuspend
     }
@@ -295,6 +299,16 @@ class EnforcementController(
     private fun delegateEnforcementToUser(targetUserId: Int) {
         PolicyStorePayloadPush.pushToUser(context, targetUserId)
         SecondaryUserInitService.startOnUser(context, targetUserId)
+    }
+
+    private fun lockoutPackagesForUser(
+        uid: Int,
+        userContext: Context,
+        exempt: Set<String>,
+    ): Set<String> {
+        return launcherPackagesForUser(uid) +
+            BypassHardening.settingsPackagesForLockout(userContext) -
+            exempt
     }
 
     private fun launcherPackagesForUser(uid: Int): Set<String> {
@@ -542,14 +556,23 @@ class EnforcementController(
             policy.developerSettingsDisabled -> {
                 setUserRestriction(dpm, UserManager.DISALLOW_DEBUGGING_FEATURES, true)
                 setUserRestriction(dpm, UserManager.DISALLOW_SAFE_BOOT, true)
+                setUserRestriction(dpm, UserManager.DISALLOW_ADD_USER, true)
+                setUserRestriction(dpm, UserManager.DISALLOW_REMOVE_USER, true)
+                setUserRestriction(dpm, UserManager.DISALLOW_USER_SWITCH, true)
             }
             policy.developerSettingsAllowed -> {
                 setUserRestriction(dpm, UserManager.DISALLOW_DEBUGGING_FEATURES, false)
                 setUserRestriction(dpm, UserManager.DISALLOW_SAFE_BOOT, false)
+                setUserRestriction(dpm, UserManager.DISALLOW_ADD_USER, false)
+                setUserRestriction(dpm, UserManager.DISALLOW_REMOVE_USER, false)
+                setUserRestriction(dpm, UserManager.DISALLOW_USER_SWITCH, false)
             }
             else -> {
                 setUserRestriction(dpm, UserManager.DISALLOW_DEBUGGING_FEATURES, false)
                 setUserRestriction(dpm, UserManager.DISALLOW_SAFE_BOOT, false)
+                setUserRestriction(dpm, UserManager.DISALLOW_ADD_USER, false)
+                setUserRestriction(dpm, UserManager.DISALLOW_REMOVE_USER, false)
+                setUserRestriction(dpm, UserManager.DISALLOW_USER_SWITCH, false)
             }
         }
 

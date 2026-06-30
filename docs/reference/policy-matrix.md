@@ -27,5 +27,6 @@ How Guardian policies map to each platform enforcement layer.
 
 ## Related
 
+- [Android bypass matrix](../platforms/android-bypasses.md)
 - [Platform docs](../platforms/linux-agent.md)
 - [Policy assignment](../workflows/policy-assignment.md)
