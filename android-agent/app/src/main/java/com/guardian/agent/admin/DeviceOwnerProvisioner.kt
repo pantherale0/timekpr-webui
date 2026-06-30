@@ -169,8 +169,12 @@ object DeviceOwnerProvisioner {
     fun hasVpnConsent(context: Context): Boolean = VpnService.prepare(context) == null
 
     /**
-     * Device/profile owners can pre-authorize the app's VPN via always-on VPN configuration.
-     * This avoids the system VPN consent dialog during provisioning.
+     * Device/profile owners can pre-authorize the app's VPN without the system consent dialog.
+     *
+     * [DomainBlockVpnService] is DNS-only: it intercepts UDP/53 on the TUN interface and does
+     * not forward other traffic. Always-on VPN routes all app traffic through the TUN, so leaving
+     * it enabled breaks general internet access. We therefore use always-on only as a one-shot
+     * consent grant, then clear it and rely on the foreground VPN service for DNS filtering.
      */
     fun grantVpnAuthorization(context: Context): Boolean {
         if (!isDeviceOrProfileOwner(context)) {
@@ -185,11 +189,22 @@ object DeviceOwnerProvisioner {
             return false
         }
         return try {
-            dpm.setAlwaysOnVpnPackage(admin, context.packageName, false)
+            if (!hasVpnConsent(context)) {
+                dpm.setAlwaysOnVpnPackage(admin, context.packageName, false)
+            }
+            disableAlwaysOnVpn(dpm, admin)
             hasVpnConsent(context)
         } catch (e: Exception) {
-            Log.w(TAG, "Failed to set always-on VPN package", e)
+            Log.w(TAG, "Failed to grant VPN authorization", e)
             false
+        }
+    }
+
+    private fun disableAlwaysOnVpn(dpm: DevicePolicyManager, admin: ComponentName) {
+        try {
+            dpm.setAlwaysOnVpnPackage(admin, null, false)
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to disable always-on VPN", e)
         }
     }
 
@@ -202,11 +217,7 @@ object DeviceOwnerProvisioner {
         }
         val dpm = context.getSystemService(DevicePolicyManager::class.java) ?: return
         val admin = ComponentName(context, GuardianDeviceAdminReceiver::class.java)
-        try {
-            dpm.setAlwaysOnVpnPackage(admin, null, false)
-        } catch (e: Exception) {
-            Log.w(TAG, "Failed to clear always-on VPN package", e)
-        }
+        disableAlwaysOnVpn(dpm, admin)
     }
 
     fun hasRequiredCapabilities(context: Context): Boolean {
