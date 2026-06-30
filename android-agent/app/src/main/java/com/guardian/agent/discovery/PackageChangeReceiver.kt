@@ -3,8 +3,7 @@ package com.guardian.agent.discovery
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import com.guardian.agent.GuardianApplication
-import com.guardian.agent.enforcement.EnforcementController
+import com.guardian.agent.enforcement.EnforcementCoordinator
 import com.guardian.agent.service.AgentSessionCoordinator
 import com.guardian.agent.util.AndroidUsers
 
@@ -32,14 +31,12 @@ class PackageChangeReceiver : BroadcastReceiver() {
         }
 
         val pendingResult = goAsync()
-
         val appContext = context.applicationContext
-        val appPolicyStore = GuardianApplication.from(appContext).appPolicyStore
-        val enforcement = EnforcementController(appContext, appPolicyStore)
         val username = AndroidUsers.currentLinuxUsername(appContext)
-        enforcement.applyAppPolicies(username)
-        AgentSessionCoordinator.scheduleSync(appContext, reason = "package_changed")
-        pendingResult.finish()
+        EnforcementCoordinator.scheduleApplyAppPolicies(appContext, username) {
+            AgentSessionCoordinator.scheduleSync(appContext, reason = "package_changed")
+            pendingResult.finish()
+        }
     }
 
     companion object {

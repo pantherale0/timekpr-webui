@@ -9,7 +9,7 @@ import androidx.work.WorkManager
 import com.guardian.agent.GuardianApplication
 import com.guardian.agent.admin.DeviceOwnerProvisioner
 import com.guardian.agent.admin.SecondaryUserProvisioner
-import com.guardian.agent.enforcement.EnforcementController
+import com.guardian.agent.enforcement.EnforcementCoordinator
 import com.guardian.agent.monitor.UsageMonitorService
 import com.guardian.agent.protocol.AgentWebSocketClient
 import com.guardian.agent.push.PushTokenProvider
@@ -29,7 +29,7 @@ object AgentSessionCoordinator {
     fun startMobileAgent(context: Context) {
         val appContext = context.applicationContext
         if (SecondaryUserProvisioner.isManagedSecondaryUser(appContext)) {
-            SecondaryUserProvisioner.prepareAtLaunch(appContext)
+            EnforcementCoordinator.schedulePrepareManagedSecondaryUser(appContext)
             return
         }
 
