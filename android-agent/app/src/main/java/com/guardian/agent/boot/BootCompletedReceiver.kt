@@ -19,7 +19,11 @@ class BootCompletedReceiver : BroadcastReceiver() {
             if (SecondaryUserProvisioner.isManagedSecondaryUser(context)) {
                 Log.i("BootCompletedReceiver", "Managed secondary user $userId received action: $action")
                 if (action == Intent.ACTION_BOOT_COMPLETED || action == Intent.ACTION_MY_PACKAGE_REPLACED) {
-                    SecondaryUserProvisioner.prepareAtLaunch(context)
+                    val pendingResult = goAsync()
+                    com.guardian.agent.enforcement.EnforcementCoordinator
+                        .schedulePrepareManagedSecondaryUser(context) {
+                            pendingResult.finish()
+                        }
                 }
             }
             return

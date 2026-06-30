@@ -6,6 +6,7 @@ import android.content.Intent
 import android.os.IBinder
 import android.util.Log
 import com.guardian.agent.admin.SecondaryUserProvisioner
+import com.guardian.agent.enforcement.EnforcementCoordinator
 
 /**
  * Lightweight entry point started on secondary users by the device owner (user 0)
@@ -15,7 +16,10 @@ class SecondaryUserInitService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (SecondaryUserProvisioner.isManagedSecondaryUser(this)) {
             Log.i(TAG, "Initializing managed secondary user ${android.os.Process.myUid() / 100_000}")
-            SecondaryUserProvisioner.prepareAtLaunch(this)
+            EnforcementCoordinator.schedulePrepareManagedSecondaryUser(this) {
+                stopSelf(startId)
+            }
+            return START_NOT_STICKY
         }
         stopSelf(startId)
         return START_NOT_STICKY

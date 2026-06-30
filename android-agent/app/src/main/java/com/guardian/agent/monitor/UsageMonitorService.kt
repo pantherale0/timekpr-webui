@@ -77,13 +77,13 @@ class UsageMonitorService : Service() {
         }
         startForeground(NOTIFICATION_ID, buildNotification())
         packageChangeMonitor.register()
-        enforcement.reconcileAllUsers()
         monitorJob?.cancel()
-        scope.launch {
+        monitorJob = scope.launch {
+            enforcement.reconcileAllUsers()
             ClockIntegrityMonitor.tickOnce(this@UsageMonitorService)
             ClockIntegrityMonitor.scheduleAlarmFallback(this@UsageMonitorService)
+            monitorLoop()
         }
-        monitorJob = scope.launch { monitorLoop() }
         return START_STICKY
     }
 
