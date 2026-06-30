@@ -15,6 +15,7 @@ import com.guardian.agent.protocol.AgentWebSocketClient
 import com.guardian.agent.service.AgentConnectionState
 import com.guardian.agent.service.AgentConnectionStatus
 import com.guardian.agent.service.AgentSessionCoordinator
+import com.guardian.agent.admin.ManagementUiVisibility
 import com.guardian.agent.ui.MainActivity
 import com.guardian.agent.util.GoogleAccountSetupHelper
 import kotlinx.coroutines.Job
@@ -267,6 +268,8 @@ class ManagementModeSetupController(
         if (isApproved()) {
             AgentSessionCoordinator.scheduleSync(activity, reason = "pairing_approved")
         }
+
+        ManagementUiVisibility.syncPrimaryUserVisibility(activity)
 
         if (complianceFlow) {
             activity.setResult(AppCompatActivity.RESULT_OK)

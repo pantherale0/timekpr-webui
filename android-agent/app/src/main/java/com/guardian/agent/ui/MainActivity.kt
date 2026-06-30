@@ -7,17 +7,15 @@ import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.guardian.agent.R
-import com.guardian.agent.GuardianApplication
 import com.guardian.agent.admin.DeviceOwnerProvisioner
 import com.guardian.agent.admin.ManagementModeSetupActivity
+import com.guardian.agent.admin.ManagementUiVisibility
 import com.guardian.agent.admin.ProvisioningBootstrap
 import com.guardian.agent.admin.SecondaryUserProvisioner
 import com.guardian.agent.service.AgentConnectionState
 import com.guardian.agent.service.AgentConnectionStatus
 import com.guardian.agent.service.AgentSessionCoordinator
 import com.guardian.agent.ui.wizard.SetupWizardActivity
-import com.guardian.agent.utils.permissions.PermissionState
-import com.guardian.agent.admin.DeviceAdminActivationActivity
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
@@ -36,12 +34,13 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
-        val config = GuardianApplication.from(this).configStore.load()
-        if (needsSetupWizard(config.serverUrl.isBlank())) {
+        if (ManagementUiVisibility.primaryUserNeedsSetup(this)) {
             startActivity(Intent(this, SetupWizardActivity::class.java))
             finish()
             return
         }
+
+        ManagementUiVisibility.syncPrimaryUserVisibility(this)
 
         setContentView(R.layout.activity_main)
         val statusView = findViewById<TextView>(R.id.statusText)
@@ -72,21 +71,6 @@ class MainActivity : AppCompatActivity() {
             return
         }
         DeviceOwnerProvisioner.applyIfDeviceOwner(this)
-        SecondaryUserProvisioner.ensurePrimaryUiVisible(this)
-    }
-
-    private fun needsSetupWizard(serverUrlBlank: Boolean): Boolean {
-        if (serverUrlBlank) return true
-        DeviceOwnerProvisioner.applyIfDeviceOwner(this)
-        if (DeviceOwnerProvisioner.skipsManualPermissionSetup(this)) {
-            return false
-        }
-        val state = PermissionState(
-            deviceAdmin = DeviceAdminActivationActivity.isActive(this) ||
-                DeviceOwnerProvisioner.isDeviceOrProfileOwner(this),
-            vpn = DeviceOwnerProvisioner.hasVpnConsent(this),
-            usageAccess = DeviceOwnerProvisioner.hasUsageAccess(this),
-        )
-        return !state.allGranted
+        ManagementUiVisibility.syncPrimaryUserVisibility(this)
     }
 }

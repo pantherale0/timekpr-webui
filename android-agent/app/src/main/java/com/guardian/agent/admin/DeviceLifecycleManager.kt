@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import com.guardian.agent.GuardianApplication
+import com.guardian.agent.admin.ManagementUiVisibility
 import com.guardian.agent.config.AgentConfigStore
 import com.guardian.agent.enforcement.EnforcementController
 import com.guardian.agent.monitor.UsageMonitorService
@@ -36,6 +37,7 @@ class DeviceLifecycleManager(private val context: Context) {
         context.stopService(Intent(context, UsageMonitorService::class.java))
         DomainBlockVpnService.reconcile(context)
         configStore.clearEnrollmentState()
+        ManagementUiVisibility.restorePrimaryLauncherForRecovery(context)
 
         return true to "Device unenrolled locally"
     }

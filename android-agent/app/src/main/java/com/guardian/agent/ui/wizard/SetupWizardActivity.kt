@@ -13,6 +13,7 @@ import com.guardian.agent.R
 import com.guardian.agent.admin.DeviceAdminActivationActivity
 import com.guardian.agent.admin.DeviceOwnerProvisioner
 import com.guardian.agent.admin.ManagementModeSetupActivity
+import com.guardian.agent.admin.ManagementUiVisibility
 import com.guardian.agent.admin.ProvisioningBootstrap
 import com.guardian.agent.admin.SecondaryUserProvisioner
 import com.guardian.agent.databinding.ActivitySetupWizardBinding
@@ -125,6 +126,7 @@ class SetupWizardActivity : AppCompatActivity(), WizardHost {
                 }
             }
             STEP_COMPLETE -> {
+                ManagementUiVisibility.syncPrimaryUserVisibility(this)
                 startActivity(Intent(this, MainActivity::class.java))
                 finish()
             }

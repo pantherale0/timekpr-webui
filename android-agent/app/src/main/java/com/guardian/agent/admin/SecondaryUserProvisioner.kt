@@ -175,20 +175,6 @@ object SecondaryUserProvisioner {
         Log.i(TAG, "Management UI hidden for user ${currentUserId(context)}")
     }
 
-    fun ensurePrimaryUiVisible(context: Context) {
-        if (currentUserId(context) != 0) return
-        val dpm = context.getSystemService(DevicePolicyManager::class.java)
-        val admin = ComponentName(context, GuardianDeviceAdminReceiver::class.java)
-        if (dpm != null && dpm.isAdminActive(admin)) {
-            try {
-                dpm.setApplicationHidden(admin, context.packageName, false)
-            } catch (e: Exception) {
-                Log.w(TAG, "Failed to show launcher icon on primary user", e)
-            }
-        }
-        disableManagementActivities(context, disabled = false)
-    }
-
     /** Returns true when the activity should close immediately (managed secondary profile). */
     fun blockManagementActivity(context: Context): Boolean {
         if (!isManagedSecondaryUser(context)) return false

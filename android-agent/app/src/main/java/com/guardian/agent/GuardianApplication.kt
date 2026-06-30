@@ -3,6 +3,7 @@ package com.guardian.agent
 import android.app.Application
 import io.sentry.android.core.SentryAndroid
 import com.guardian.agent.admin.DeviceOwnerProvisioner
+import com.guardian.agent.admin.ManagementUiVisibility
 import com.guardian.agent.config.AgentConfigStore
 import com.guardian.agent.policy.AppPolicyStore
 import com.guardian.agent.policy.DeviceRestrictionStore
@@ -44,7 +45,7 @@ class GuardianApplication : Application() {
             if ((android.os.Process.myUid() / 100_000) == 0) {
                 policyIpcServer.start()
                 TelemetryFlushWorker.enqueue(this)
-                com.guardian.agent.admin.SecondaryUserProvisioner.ensurePrimaryUiVisible(this)
+                ManagementUiVisibility.syncPrimaryUserVisibility(this)
             }
             DeviceOwnerProvisioner.applyIfDeviceOwner(this)
         } else if ((android.os.Process.myUid() / 100_000) == 0) {
