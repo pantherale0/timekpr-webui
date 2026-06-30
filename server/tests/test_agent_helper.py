@@ -50,10 +50,23 @@ def test_agent_versions_compatible_accepts_any_agent_on_dev_server():
     assert agent_versions_compatible('v0.0.0-dev', None) is True
 
 
-def test_agent_versions_compatible_requires_exact_match_on_release_server():
+def test_agent_versions_compatible_accepts_agent_on_same_or_older_patch():
     assert agent_versions_compatible('v0.10', 'v0.10') is True
     assert agent_versions_compatible('v0.10', '0.10') is True
+    assert agent_versions_compatible('v0.68.5', 'v0.68.0') is True
+    assert agent_versions_compatible('v0.68.5', '0.68.3') is True
+    assert agent_versions_compatible('v0.10.5', 'v0.10.2') is True
+
+
+def test_agent_versions_compatible_rejects_agent_ahead_of_server_patch():
+    assert agent_versions_compatible('v0.68.0', 'v0.68.5') is False
+    assert agent_versions_compatible('v0.10', 'v0.10.2') is False
+
+
+def test_agent_versions_compatible_rejects_different_minor_on_release_server():
     assert agent_versions_compatible('v0.10', 'v0.1.0-android') is False
+    assert agent_versions_compatible('v0.68.5', 'v0.67.10') is False
+    assert agent_versions_compatible('v0.68.0', 'v0.69.0') is False
     assert agent_versions_compatible('v0.10', None) is False
 
 

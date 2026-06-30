@@ -1164,6 +1164,32 @@ def test_websocket_handler_version_checking(app, db_session, monkeypatch):
     resp3 = json.loads(ws_matching.sent_messages[0])
     assert resp3['type'] == "pairing_status"
 
+    # 4. Older patch on the same release line is allowed (server v0.10 == v0.10.0)
+    ws_patch_match = MockWS([json.dumps({
+        "type": "hello",
+        "system_id": "sys-patch-match",
+        "agent_version": "v0.10.0",
+    })])
+    with app.test_request_context('/ws', environ_base={'REMOTE_ADDR': '127.0.0.1'}):
+        ws_agent_handler(ws_patch_match)
+    assert len(ws_patch_match.sent_messages) == 1
+    resp4 = json.loads(ws_patch_match.sent_messages[0])
+    assert resp4['type'] == "pairing_status"
+
+    # 5. Agent patch ahead of server patch is rejected
+    ws_patch_ahead = MockWS([json.dumps({
+        "type": "hello",
+        "system_id": "sys-patch-ahead",
+        "agent_version": "v0.10.2",
+    })])
+    with app.test_request_context('/ws', environ_base={'REMOTE_ADDR': '127.0.0.1'}):
+        ws_agent_handler(ws_patch_ahead)
+    assert len(ws_patch_ahead.sent_messages) == 1
+    resp5 = json.loads(ws_patch_ahead.sent_messages[0])
+    assert resp5['type'] == "auth_result"
+    assert resp5['success'] is False
+    assert resp5['update_required'] is True
+
 
 def test_new_endpoints(client, db_session):
     Settings.set_admin_password("admin")

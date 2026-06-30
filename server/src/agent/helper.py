@@ -17,15 +17,39 @@ from src.agent.pairing import is_dev_server_version
 logger = logging.getLogger(__name__)
 
 
+def _parse_release_version_tuple(version: str) -> tuple[int, int, int] | None:
+    """Parse major.minor.patch from a release version string."""
+    normalized = (version or '').strip().lstrip('v')
+    if not normalized:
+        return None
+
+    numeric_parts: list[int] = []
+    for part in re.split(r'[.\-_+]', normalized):
+        if not part:
+            continue
+        if not part.isdigit():
+            break
+        numeric_parts.append(int(part))
+
+    if len(numeric_parts) < 2:
+        return None
+    while len(numeric_parts) < 3:
+        numeric_parts.append(0)
+    return numeric_parts[0], numeric_parts[1], numeric_parts[2]
+
+
 def agent_versions_compatible(server_version: str, agent_version: str | None) -> bool:
     """Return True when an agent may connect to this server version."""
     if is_dev_server_version(server_version):
         return True
     if not agent_version:
         return False
-    stripped_server = server_version.lstrip('v')
-    stripped_agent = agent_version.lstrip('v')
-    return stripped_agent == stripped_server
+
+    server_tuple = _parse_release_version_tuple(server_version)
+    agent_tuple = _parse_release_version_tuple(agent_version)
+    if server_tuple is None or agent_tuple is None:
+        return False
+    return server_tuple[:2] == agent_tuple[:2] and server_tuple[2] >= agent_tuple[2]
 
 # Optional registration token firewall for new dynamic pairings
 REGISTRATION_TOKEN = os.environ.get('REGISTRATION_TOKEN')
