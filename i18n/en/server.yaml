@@ -1211,8 +1211,8 @@ pages:
     end_date: End Date
     apply_custom: Apply Custom Range
     heading: '{username} — Activity story'
-    lead: '{count} linked device • Usage patterns and gentle alerts'
-    lead_plural: '{count} linked devices • Usage patterns and gentle alerts'
+    lead: '{count} linked device • Usage patterns and activity logs'
+    lead_plural: '{count} linked devices • Usage patterns and activity logs'
     web_video_history: Web & Video History
     activity_nav_label: Activity views
     activity_tab_overview: Usage overview
@@ -1236,7 +1236,7 @@ pages:
     col_time_spent: Time Spent
     no_app_usage: No application usage records found for this period.
     activity_feed: Activity Feed
-    activity_feed_lead: A gentle feed of alerts — shield blocks, app pauses, and routine notices
+    activity_feed_lead: Shield blocks, app pauses, and routine notices
     search_activities: Search activities...
     filter_all: All Activities
     filter_alerts: Alerts Only
@@ -1341,7 +1341,7 @@ pages:
     tab_activity_short: Activity
     tab_advanced: Advanced
     tab_diagnostics: Diagnostics
-    lead: Accounts, apps, and gentle alerts for this device.
+    lead: Accounts, apps, and activity logs for this device.
     protection_status: Protection status
     protection_connected: Connected and protected
     protection_offline: Not connected right now
