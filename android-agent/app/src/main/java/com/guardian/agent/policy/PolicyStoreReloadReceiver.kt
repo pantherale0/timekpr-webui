@@ -7,6 +7,7 @@ import android.os.Handler
 import android.os.Looper
 import com.guardian.agent.GuardianApplication
 import com.guardian.agent.enforcement.EnforcementController
+import com.guardian.agent.notification.PolicyUpdateNotifier
 import java.io.File
 
 /** Reloads replicated policy stores on a managed secondary user. */
@@ -47,6 +48,7 @@ class PolicyStoreReloadReceiver : BroadcastReceiver() {
             app.domainPolicyStore.restore()
             app.deviceRestrictionStore.restore()
             EnforcementController(ctx, app.appPolicyStore).reconcileAllUsers()
+            PolicyUpdateNotifier.schedule(ctx)
         }
     }
 }

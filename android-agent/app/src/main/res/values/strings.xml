@@ -77,4 +77,8 @@
     <string name="otp_lock_cancel_unlock_admin">Cancel &amp; Unlock Admin</string>
     <string name="otp_lock_switch_user">Switch User</string>
     <string name="usage_monitor_notification_body">Monitoring app usage</string>
+    <string name="policy_update_notification_channel">Rule updates</string>
+    <string name="policy_update_notification_channel_desc">Alerts when your Guardian rules change</string>
+    <string name="policy_update_title">Rules updated</string>
+    <string name="policy_update_body">Your Guardian settings were refreshed from home.</string>
 </resources>

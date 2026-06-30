@@ -81,6 +81,10 @@ strings:
   otp_lock_cancel_unlock_admin: Cancel & Unlock Admin
   otp_lock_switch_user: Switch User
   usage_monitor_notification_body: Monitoring app usage
+  policy_update_notification_channel: Rule updates
+  policy_update_notification_channel_desc: Alerts when your Guardian rules change
+  policy_update_title: Rules updated
+  policy_update_body: Your Guardian settings were refreshed from home.
 
 overlay:
   under8:

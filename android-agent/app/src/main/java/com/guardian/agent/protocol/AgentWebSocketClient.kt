@@ -8,6 +8,7 @@ import com.guardian.agent.admin.DeviceOwnerProvisioner
 import com.guardian.agent.config.AgentConfig
 import com.guardian.agent.discovery.InstalledAppsReporter
 import com.guardian.agent.enforcement.EnforcementController
+import com.guardian.agent.notification.PolicyUpdateNotifier
 import com.guardian.agent.monitor.AlertEventBus
 import com.guardian.agent.policy.AppPolicyStore
 import com.guardian.agent.push.PushTokenProvider
@@ -307,16 +308,27 @@ class AgentWebSocketClient(
             val appPolicyStore = app.appPolicyStore
             app.domainPolicyStore.restore()
             val enforcement = EnforcementController(context, appPolicyStore)
+            val onPolicyUpdated = { PolicyUpdateNotifier.schedule(context) }
             val dispatcher = CommandDispatcher(
                 context = context,
                 appPolicyStore = appPolicyStore,
                 onDomainPolicyChanged = {
+                    onPolicyUpdated()
                     CrossUserStoreSync.replicateToAllSecondaryUsers(context)
                     DomainBlockVpnService.reconcile(context)
                 },
-                onAppPolicyChanged = { username -> enforcement.applyAppPolicies(username) },
-                onTimePolicyChanged = { username -> enforcement.applyTimePolicies(username) },
-                onDeviceRestrictionChanged = { username -> enforcement.applyDeviceRestrictions(username) },
+                onAppPolicyChanged = { username ->
+                    onPolicyUpdated()
+                    enforcement.applyAppPolicies(username)
+                },
+                onTimePolicyChanged = { username ->
+                    onPolicyUpdated()
+                    enforcement.applyTimePolicies(username)
+                },
+                onDeviceRestrictionChanged = { username ->
+                    onPolicyUpdated()
+                    enforcement.applyDeviceRestrictions(username)
+                },
             )
             return AgentWebSocketClient(context, dispatcher, enforcement)
         }
