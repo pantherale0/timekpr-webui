@@ -16,7 +16,7 @@
         <link rel="prev" href="../linux-agent/">
       
       
-        <link rel="next" href="../windows-agent/">
+        <link rel="next" href="../android-bypasses/">
       
       
         
@@ -723,6 +723,8 @@
       
         
       
+        
+      
     
     
     
@@ -1205,6 +1207,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#anti-bypass-hardening" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Anti-bypass hardening
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#building" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1247,6 +1260,34 @@
   
 </nav>
       
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../android-bypasses/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Android bypass matrix
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -2982,6 +3023,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#anti-bypass-hardening" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Anti-bypass hardening
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#building" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3440,6 +3492,8 @@
 <p>After each authenticated sync session the agent scans launcher-visible packages <strong>for every managed Android user</strong> (device owner on user 0 reports owner + secondary profiles via cross-user <code>PackageManager</code> contexts) and sends chunked <code>installed_apps_report</code> messages per <code>linux_username</code>, plus optional <code>app_icon_report</code> PNG uploads (64×64, content-addressed). The server uses this inventory in the application policies UI.</p>
 <p>The agent also handles <code>refresh_installed_apps</code> RPC for on-demand rescans of a specific mapped profile while connected.</p>
 <p>See <a href="../../features/app-discovery/">App discovery</a> for the full protocol reference.</p>
+<h2 id="anti-bypass-hardening">Anti-bypass hardening<a class="headerlink" href="#anti-bypass-hardening" title="Permanent link">&para;</a></h2>
+<p>Known Android parental-control bypass techniques and Guardian's coverage are documented in the <a href="../android-bypasses/">Android bypass matrix</a>. Medium/high <a href="../../features/policy-presets/">policy presets</a> apply the recommended device restrictions and anti-bypass app blocks automatically.</p>
 <h2 id="building">Building<a class="headerlink" href="#building" title="Permanent link">&para;</a></h2>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="nb">cd</span><span class="w"> </span>android-agent
 <a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>./gradlew<span class="w"> </span>assembleDebug<span class="w">      </span><span class="c1"># local testing</span>

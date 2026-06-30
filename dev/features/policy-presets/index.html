@@ -721,6 +721,8 @@
       
         
       
+        
+      
     
     
     
@@ -809,6 +811,34 @@
     
   
     Android agent
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../platforms/android-bypasses/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Android bypass matrix
   
 
     
@@ -2532,6 +2562,14 @@
 <td>Per linked Linux/Windows mapping: polkit, terminal, install blocks</td>
 </tr>
 <tr>
+<td>Android device restrictions</td>
+<td>Per linked Android device: developer options, install blocks, USB, factory reset, user-management restrictions</td>
+</tr>
+<tr>
+<td>Anti-bypass app blocks</td>
+<td>Medium/high presets block Island, Shelter, Test DPC, Tasker, Samsung Internet</td>
+</tr>
+<tr>
 <td>Chrome browser policies</td>
 <td>SafeSearch, YouTube restrict, extension blocking, etc.</td>
 </tr>
@@ -2564,13 +2602,13 @@
 <h2 id="bypass-risk-escalation">Bypass risk escalation<a class="headerlink" href="#bypass-risk-escalation" title="Permanent link">&para;</a></h2>
 <p>Within each age bracket, bundles escalate from low → high bypass risk:</p>
 <ul>
-<li><strong>Low</strong> — Age-appropriate core filter packs; lighter device locks; <code>blocklist_only</code> domain mode; open app launch where age allows</li>
-<li><strong>Medium</strong> — Additional categories (e.g. VPN/proxy, social); terminal or install blocks; <code>approval_on_block</code> for blocked sites</li>
-<li><strong>High</strong> — Full relevant filter set; terminal, install, and pkexec blocks; <code>allowlist</code> app launch; extension blocking; registration approval where applicable</li>
+<li><strong>Low</strong> — Age-appropriate core filter packs; lighter device locks; <code>blocklist_only</code> domain mode; open app launch where age allows; Android developer options and USB left at platform default</li>
+<li><strong>Medium</strong> — Additional categories (e.g. VPN/proxy, social); terminal or install blocks; <code>approval_on_block</code> for blocked sites; Android <strong>developer options disabled</strong>, factory-reset protection, account-change block, USB file transfer blocked, <strong>anti-bypass app blocks</strong>, <code>DISALLOW_ADD_USER</code> / user-switch restrictions</li>
+<li><strong>High</strong> — Full relevant filter set; terminal, install, and pkexec blocks; <code>allowlist</code> app launch; extension blocking; registration approval where applicable; Android install/uninstall blocks, full USB lockdown, Wi‑Fi tethering block when VPN/proxy packs apply</li>
 </ul>
 <p>Younger age brackets and higher bypass risk both trend toward shorter daily screen-time limits.</p>
 <h2 id="configuration-file">Configuration file<a class="headerlink" href="#configuration-file" title="Permanent link">&para;</a></h2>
-<p>Bundle definitions live in <code>server/src/policy_preset_matrix.json</code> (12 cells: 4 ages × 3 maturity levels). To adjust defaults, edit the JSON and restart the server — no code change required unless new bundle fields are introduced.</p>
+<p>Bundle definitions live in <code>server/src/policy/policy_preset_matrix.json</code> (12 cells: 4 ages × 3 maturity levels). Each bundle includes <code>linux_device_policy</code>, <code>android_device_policy</code>, <code>approval_settings</code>, and related fields. To adjust defaults, edit the JSON and restart the server — no code change required unless new bundle fields are introduced.</p>
 <h2 id="api-routes">API routes<a class="headerlink" href="#api-routes" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -2595,6 +2633,7 @@
 </table>
 <h2 id="see-also">See also<a class="headerlink" href="#see-also" title="Permanent link">&para;</a></h2>
 <ul>
+<li><a href="../../platforms/android-bypasses/">Android bypass matrix</a></li>
 <li><a href="../../web-ui/child-accounts-and-mappings/">Child accounts &amp; mappings</a></li>
 <li><a href="../../web-ui/web-filters/">Web filters</a></li>
 <li><a href="../../web-ui/schedules-and-limits/">Schedules &amp; limits</a></li>
