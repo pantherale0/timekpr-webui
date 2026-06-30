@@ -714,9 +714,9 @@
                         <div class="mb-3">
                             <label class="form-label fw-bold small text-muted text-uppercase mb-2" style="font-size: 0.7rem;">{{ t('tpl.admin_user_edit.role_preset') }}</label>
                             <div class="d-flex gap-2">
-                                <button type="button" class="btn btn-outline-secondary btn-sm flex-grow-1" onclick="applyPresetRole('viewer')">Viewer</button>
-                                <button type="button" class="btn btn-outline-secondary btn-sm flex-grow-1" onclick="applyPresetRole('manager')">Manager</button>
-                                <button type="button" class="btn btn-outline-secondary btn-sm flex-grow-1" onclick="applyPresetRole('co-parent')">Co-Parent</button>
+                                <button type="button" class="btn btn-outline-secondary btn-sm flex-grow-1" data-share-preset="viewer">Viewer</button>
+                                <button type="button" class="btn btn-outline-secondary btn-sm flex-grow-1" data-share-preset="manager">Manager</button>
+                                <button type="button" class="btn btn-outline-secondary btn-sm flex-grow-1" data-share-preset="co-parent">Co-Parent</button>
                             </div>
                         </div>
 
@@ -745,7 +745,7 @@
 
                         <!-- Invite Generation Actions -->
                         <div class="mb-3">
-                            <button type="button" class="btn guardian-btn-sage w-100 fw-bold py-2 shadow-sm" onclick="generateShareInvite({{ user.id }})">
+                            <button type="button" id="share-generate-invite-btn" class="btn guardian-btn-sage w-100 fw-bold py-2 shadow-sm">
                                 <i class="fas fa-link me-1"></i> Generate Invitation Link
                             </button>
                         </div>
@@ -755,7 +755,7 @@
                             <label class="form-label fw-bold small text-muted text-uppercase mb-1" style="font-size: 0.7rem;">{{ t('tpl.admin_user_edit.copy_invite_link') }}</label>
                             <div class="input-group">
                                 <input type="text" id="share-invite-link" class="form-control form-control-sm font-mono text-center" readonly style="font-size: 0.75rem;">
-                                <button class="btn btn-sm btn-outline-secondary" type="button" onclick="copyInviteLinkToClipboard()">
+                                <button class="btn btn-sm btn-outline-secondary" type="button" id="share-copy-invite-btn">
                                     <i class="fas fa-copy"></i>
                                 </button>
                             </div>
@@ -842,5 +842,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{{ url_for('static', filename='js/admin-user-edit.js') }}"></script>
+<script src="{{ url_for('static', filename='js/admin-user-edit.js', v=server_version) }}"></script>
 {% endblock %}

@@ -229,7 +229,7 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{{ url_for('static', filename='js/guardian-device-link.js') }}"></script>
+<script src="{{ url_for('static', filename='js/guardian-device-link.js', v=server_version) }}"></script>
 <script>
     document.addEventListener('DOMContentLoaded', () => {
         const searchInput = document.getElementById('user-search');

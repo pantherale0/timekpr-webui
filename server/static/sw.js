@@ -1,4 +1,4 @@
-const CACHE_NAME = 'guardian-shell-v1';
+const CACHE_NAME = 'guardian-shell-v2';
 const SHELL_ASSETS = [
   '/static/css/style.css',
   '/static/css/guardian-wizard.css',
@@ -30,7 +30,8 @@ self.addEventListener('activate', (event) => {
 function isNetworkFirst(url) {
   return url.pathname.startsWith('/api/')
     || url.pathname.startsWith('/ui/fragment/')
-    || url.pathname.startsWith('/ws');
+    || url.pathname.startsWith('/ws')
+    || url.pathname.endsWith('.js');
 }
 
 self.addEventListener('fetch', (event) => {

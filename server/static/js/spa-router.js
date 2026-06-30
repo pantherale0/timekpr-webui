@@ -23,6 +23,7 @@
 
     const navDefaults = {};
     const teardownCallbacks = [];
+    const loadedScriptSrcs = new Set();
     let managedHeadNodes = [];
     let currentPath = normalizePath(mainEl.dataset.initialPath || window.location.pathname);
 
@@ -217,56 +218,93 @@
         clearManagedHead();
     }
 
+    function canonicalScriptSrc(src) {
+        return new URL(src, window.location.origin).pathname;
+    }
+
+    function rememberLoadedScript(script) {
+        if (!script.src || script.dataset.spaLoadedSrc) {
+            return;
+        }
+        try {
+            const canonicalSrc = canonicalScriptSrc(script.src);
+            script.setAttribute('data-spa-loaded-src', canonicalSrc);
+            loadedScriptSrcs.add(canonicalSrc);
+        } catch (_) {
+            // ignore malformed script URLs
+        }
+    }
+
     function markExistingScripts(container) {
         document.querySelectorAll('script[src]').forEach((script) => {
             if (container && container.contains(script)) {
                 return;
             }
-            if (script.dataset.spaLoadedSrc) {
-                return;
-            }
-            try {
-                script.setAttribute('data-spa-loaded-src', new URL(script.src, window.location.origin).pathname);
-            } catch (_) {
-                // ignore malformed script URLs
-            }
+            rememberLoadedScript(script);
         });
     }
 
-    function executeScripts(container) {
+    function runInlineScript(oldScript) {
+        const code = (oldScript.textContent || '').trim();
+        oldScript.remove();
+        if (!code) {
+            return;
+        }
+
+        try {
+            // Run in a fresh function scope on every navigation (avoids const redeclaration).
+            const runner = new Function(code);
+            runner();
+        } catch (err) {
+            console.error('GuardianSPA fragment script failed:', err);
+        }
+    }
+
+    function loadExternalScript(oldScript) {
+        const src = oldScript.getAttribute('src');
+        oldScript.remove();
+        if (!src) {
+            return Promise.resolve();
+        }
+
+        let canonicalSrc;
+        try {
+            canonicalSrc = canonicalScriptSrc(src);
+        } catch (_) {
+            return Promise.resolve();
+        }
+
+        if (loadedScriptSrcs.has(canonicalSrc)) {
+            return Promise.resolve();
+        }
+
+        return new Promise((resolve) => {
+            const script = document.createElement('script');
+            Array.from(oldScript.attributes).forEach((attr) => {
+                script.setAttribute(attr.name, attr.value);
+            });
+            script.addEventListener('load', () => {
+                rememberLoadedScript(script);
+                resolve();
+            }, { once: true });
+            script.addEventListener('error', () => {
+                console.error('GuardianSPA failed to load script:', src);
+                resolve();
+            }, { once: true });
+            document.head.appendChild(script);
+        });
+    }
+
+    async function executeScripts(container) {
         markExistingScripts(container);
         const scripts = Array.from(container.querySelectorAll('script'));
-        scripts.forEach((oldScript) => {
-            const src = oldScript.getAttribute('src');
-            if (src) {
-                const canonicalSrc = new URL(src, window.location.origin).pathname;
-                if (document.querySelector(`script[data-spa-loaded-src="${canonicalSrc}"]`)) {
-                    oldScript.remove();
-                    return;
-                }
-                const script = document.createElement('script');
-                Array.from(oldScript.attributes).forEach((attr) => {
-                    script.setAttribute(attr.name, attr.value);
-                });
-                script.setAttribute('data-spa-loaded-src', canonicalSrc);
-                oldScript.replaceWith(script);
-                return;
+        for (const oldScript of scripts) {
+            if (oldScript.getAttribute('src')) {
+                await loadExternalScript(oldScript);
+            } else {
+                runInlineScript(oldScript);
             }
-
-            const code = (oldScript.textContent || '').trim();
-            oldScript.remove();
-            if (!code) {
-                return;
-            }
-
-            try {
-                // Run in a fresh function scope on every navigation (avoids const redeclaration).
-                const runner = new Function(code);
-                runner();
-            } catch (err) {
-                console.error('GuardianSPA fragment script failed:', err);
-            }
-        });
+        }
     }
 
     function dispatchPageReady(path) {
@@ -275,14 +313,14 @@
         }));
     }
 
-    function renderFragment(html, path, options) {
+    async function renderFragment(html, path, options) {
         document.dispatchEvent(new CustomEvent('guardian:route', { detail: { path } }));
 
         const parsed = extractFragment(html);
         applyNavChrome(parsed.regions);
         applyExtraHead(parsed.regions.extra_head);
         mainEl.innerHTML = parsed.content;
-        executeScripts(mainEl);
+        await executeScripts(mainEl);
 
         if (parsed.title) {
             document.title = parsed.title;
@@ -400,8 +438,7 @@
         renderFragment(initialFragmentTemplate.innerHTML, currentPath, {
             pushState: false,
             search: window.location.search,
-        });
-        initialFragmentTemplate.remove();
+        }).then(() => initialFragmentTemplate.remove());
     } else if (mainEl.querySelector('#spa-loading')) {
         navigateTo(currentPath, { pushState: false, force: true });
     } else if (mainEl.innerHTML.trim()) {

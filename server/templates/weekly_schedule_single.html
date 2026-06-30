@@ -206,5 +206,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{{ url_for('static', filename='js/guardian-routine.js') }}"></script>
+<script src="{{ url_for('static', filename='js/guardian-routine.js', v=server_version) }}"></script>
 {% endblock %}

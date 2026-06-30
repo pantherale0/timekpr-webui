@@ -523,6 +523,88 @@
         });
     }
 
+    function applyPresetRole(role) {
+        const viewCheck = document.getElementById('share-can-view-screentime');
+        const manageCheck = document.getElementById('share-can-manage-screentime');
+        const monitorCheck = document.getElementById('share-can-view-monitoring');
+        const policyCheck = document.getElementById('share-can-manage-policies');
+
+        if (viewCheck) viewCheck.checked = true; // always enabled
+        if (role === 'viewer') {
+            if (manageCheck) manageCheck.checked = false;
+            if (monitorCheck) monitorCheck.checked = false;
+            if (policyCheck) policyCheck.checked = false;
+        } else if (role === 'manager') {
+            if (manageCheck) manageCheck.checked = true;
+            if (monitorCheck) monitorCheck.checked = false;
+            if (policyCheck) policyCheck.checked = false;
+        } else if (role === 'co-parent') {
+            if (manageCheck) manageCheck.checked = true;
+            if (monitorCheck) monitorCheck.checked = true;
+            if (policyCheck) policyCheck.checked = true;
+        }
+    }
+
+    function generateShareInvite(childId) {
+        const payload = {
+            can_view_screentime: document.getElementById('share-can-view-screentime').checked,
+            can_manage_screentime: document.getElementById('share-can-manage-screentime').checked,
+            can_view_monitoring: document.getElementById('share-can-view-monitoring').checked,
+            can_manage_policies: document.getElementById('share-can-manage-policies').checked
+        };
+
+        fetch(`/api/profiles/${childId}/generate-invite`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                const fullUrl = window.location.origin + data.redeem_url;
+                document.getElementById('share-invite-link').value = fullUrl;
+                document.getElementById('share-result-container').classList.remove('d-none');
+            } else {
+                alert(data.message || i18n('profile_invite_generate_failed'));
+            }
+        })
+        .catch(() => alert(i18n('profile_invite_generate_failed')));
+    }
+
+    function copyInviteLinkToClipboard() {
+        const linkInput = document.getElementById('share-invite-link');
+        if (!linkInput) return;
+        linkInput.select();
+        linkInput.setSelectionRange(0, 99999);
+        navigator.clipboard.writeText(linkInput.value)
+            .then(() => {
+                alert(i18n('profile_invite_copied'));
+            })
+            .catch(() => {
+                alert(i18n('profile_invite_copy_failed'));
+            });
+    }
+
+    function bindShareTab(root) {
+        root.querySelectorAll('[data-share-preset]').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                applyPresetRole(btn.dataset.sharePreset);
+            });
+        });
+
+        const generateBtn = document.getElementById('share-generate-invite-btn');
+        if (generateBtn) {
+            generateBtn.addEventListener('click', () => {
+                generateShareInvite(root.dataset.userId);
+            });
+        }
+
+        const copyBtn = document.getElementById('share-copy-invite-btn');
+        if (copyBtn) {
+            copyBtn.addEventListener('click', copyInviteLinkToClipboard);
+        }
+    }
+
     function bindPresetModal() {
         const form = document.getElementById('apply-policy-preset-form');
         if (!form) return;
@@ -549,6 +631,7 @@
         bindAutosave(root);
         bindAppActions();
         bindPresetModal();
+        bindShareTab(root);
         updateSyncStatus();
         if (!syncStatusInterval) {
             syncStatusInterval = window.setInterval(updateSyncStatus, 15000);
@@ -590,65 +673,4 @@
     } else {
         boot();
     }
-    window.applyPresetRole = function (role) {
-        const viewCheck = document.getElementById('share-can-view-screentime');
-        const manageCheck = document.getElementById('share-can-manage-screentime');
-        const monitorCheck = document.getElementById('share-can-view-monitoring');
-        const policyCheck = document.getElementById('share-can-manage-policies');
-
-        if (viewCheck) viewCheck.checked = true; // always enabled
-        if (role === 'viewer') {
-            if (manageCheck) manageCheck.checked = false;
-            if (monitorCheck) monitorCheck.checked = false;
-            if (policyCheck) policyCheck.checked = false;
-        } else if (role === 'manager') {
-            if (manageCheck) manageCheck.checked = true;
-            if (monitorCheck) monitorCheck.checked = false;
-            if (policyCheck) policyCheck.checked = false;
-        } else if (role === 'co-parent') {
-            if (manageCheck) manageCheck.checked = true;
-            if (monitorCheck) monitorCheck.checked = true;
-            if (policyCheck) policyCheck.checked = true;
-        }
-    };
-
-    window.generateShareInvite = function (childId) {
-        const payload = {
-            can_view_screentime: document.getElementById('share-can-view-screentime').checked,
-            can_manage_screentime: document.getElementById('share-can-manage-screentime').checked,
-            can_view_monitoring: document.getElementById('share-can-view-monitoring').checked,
-            can_manage_policies: document.getElementById('share-can-manage-policies').checked
-        };
-
-        fetch(`/api/profiles/${childId}/generate-invite`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        })
-        .then(r => r.json())
-        .then(data => {
-            if (data.success) {
-                const fullUrl = window.location.origin + data.redeem_url;
-                document.getElementById('share-invite-link').value = fullUrl;
-                document.getElementById('share-result-container').classList.remove('d-none');
-            } else {
-                alert(data.message || i18n('profile_invite_generate_failed'));
-            }
-        })
-        .catch(() => alert(i18n('profile_invite_generate_failed')));
-    };
-
-    window.copyInviteLinkToClipboard = function () {
-        const linkInput = document.getElementById('share-invite-link');
-        if (!linkInput) return;
-        linkInput.select();
-        linkInput.setSelectionRange(0, 99999);
-        navigator.clipboard.writeText(linkInput.value)
-            .then(() => {
-                alert(i18n('profile_invite_copied'));
-            })
-            .catch(() => {
-                alert(i18n('profile_invite_copy_failed'));
-            });
-    };
 })();
