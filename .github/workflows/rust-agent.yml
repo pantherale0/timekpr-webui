@@ -52,6 +52,37 @@ jobs:
               - "scripts/i18n/**"
               - ".github/workflows/rust-agent.yml"
 
+  release-plan:
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    outputs:
+      release_mode: ${{ steps.plan.outputs.release_mode }}
+      previous_tag: ${{ steps.plan.outputs.previous_tag }}
+      publish_assets: ${{ steps.plan.outputs.publish_assets }}
+      build_linux: ${{ steps.plan.outputs.build_linux }}
+      build_windows: ${{ steps.plan.outputs.build_windows }}
+      build_android: ${{ steps.plan.outputs.build_android }}
+      build_cef: ${{ steps.plan.outputs.build_cef }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Plan release builds
+        id: plan
+        run: python3 scripts/ci/release_plan.py
+
+      - name: Summarize release plan
+        run: |
+          echo "Release mode: ${{ steps.plan.outputs.release_mode }}"
+          echo "Previous tag: ${{ steps.plan.outputs.previous_tag }}"
+          echo "Publish assets: ${{ steps.plan.outputs.publish_assets }}"
+          echo "Build linux: ${{ steps.plan.outputs.build_linux }}"
+          echo "Build windows: ${{ steps.plan.outputs.build_windows }}"
+          echo "Build android: ${{ steps.plan.outputs.build_android }}"
+          echo "Build cef overlay: ${{ steps.plan.outputs.build_cef }}"
+
   linux-check:
     needs: [i18n, changes]
     if: (!startsWith(github.ref, 'refs/tags/v')) && (needs.changes.outputs.linux_agent_changed == 'true' || github.event_name == 'workflow_dispatch')
@@ -187,8 +218,13 @@ jobs:
           echo "APK signature checksum: $checksum"
 
   linux-release-build:
-    needs: i18n
-    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [i18n, release-plan]
+    if: >-
+      always() &&
+      needs.i18n.result == 'success' &&
+      needs.release-plan.result == 'success' &&
+      startsWith(github.ref, 'refs/tags/v') &&
+      needs.release-plan.outputs.build_linux == 'true'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -264,8 +300,13 @@ jobs:
   # runtime files (libcef.so, locales/, Resources/, etc.) into a single
   # directory that can be archived and distributed.
   linux-cef-release-build:
-    needs: i18n
-    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [i18n, release-plan]
+    if: >-
+      always() &&
+      needs.i18n.result == 'success' &&
+      needs.release-plan.result == 'success' &&
+      startsWith(github.ref, 'refs/tags/v') &&
+      needs.release-plan.outputs.build_cef == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
@@ -364,8 +405,13 @@ jobs:
             dist/guardian-overlay-x86_64-unknown-linux-gnu.tar.gz.sha256
 
   windows-release-build:
-    needs: i18n
-    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [i18n, release-plan]
+    if: >-
+      always() &&
+      needs.i18n.result == 'success' &&
+      needs.release-plan.result == 'success' &&
+      startsWith(github.ref, 'refs/tags/v') &&
+      needs.release-plan.outputs.build_windows == 'true'
     runs-on: windows-latest
     steps:
       - name: Check out repository
@@ -435,8 +481,13 @@ jobs:
             dist/guardian-agent-x86_64-pc-windows-msvc.msi.sha256
 
   android-rust-build:
-    needs: i18n
-    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [i18n, release-plan]
+    if: >-
+      always() &&
+      needs.i18n.result == 'success' &&
+      needs.release-plan.result == 'success' &&
+      startsWith(github.ref, 'refs/tags/v') &&
+      needs.release-plan.outputs.build_android == 'true'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -489,8 +540,13 @@ jobs:
           path: agent/target/${{ matrix.target_rust }}/release/libguardian_agent.so
 
   android-release-build:
-    needs: [i18n, android-rust-build]
-    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [i18n, release-plan, android-rust-build]
+    if: >-
+      always() &&
+      needs.i18n.result == 'success' &&
+      needs.android-rust-build.result == 'success' &&
+      startsWith(github.ref, 'refs/tags/v') &&
+      needs.release-plan.outputs.build_android == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
@@ -622,24 +678,67 @@ jobs:
             dist/guardian-android-agent-${{ github.ref_name }}.signature-checksum
 
   publish-release:
-    needs: [linux-release-build, linux-cef-release-build, android-release-build, windows-release-build]
-    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [release-plan, linux-release-build, linux-cef-release-build, android-release-build, windows-release-build]
+    if: >-
+      always() &&
+      startsWith(github.ref, 'refs/tags/v') &&
+      needs.release-plan.outputs.publish_assets == 'true' &&
+      needs.release-plan.result == 'success' &&
+      (needs.linux-release-build.result == 'success' || needs.linux-release-build.result == 'skipped') &&
+      (needs.linux-cef-release-build.result == 'success' || needs.linux-cef-release-build.result == 'skipped') &&
+      (needs.android-release-build.result == 'success' || needs.android-release-build.result == 'skipped') &&
+      (needs.windows-release-build.result == 'success' || needs.windows-release-build.result == 'skipped')
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
-      - name: Download release assets
+      - name: Summarize published assets
+        run: |
+          echo "Release mode: ${{ needs.release-plan.outputs.release_mode }}"
+          echo "Previous tag: ${{ needs.release-plan.outputs.previous_tag }}"
+          echo "Linux: ${{ needs.linux-release-build.result }}"
+          echo "CEF overlay: ${{ needs.linux-cef-release-build.result }}"
+          echo "Android: ${{ needs.android-release-build.result }}"
+          echo "Windows: ${{ needs.windows-release-build.result }}"
+
+      - name: Download linux agent assets
+        if: needs.linux-release-build.result == 'success'
         uses: actions/download-artifact@v4
         with:
-          pattern: "*-agent-*"
+          pattern: guardian-linux-agent-*
           path: dist
           merge-multiple: true
 
       - name: Download overlay asset
+        if: needs.linux-cef-release-build.result == 'success'
         uses: actions/download-artifact@v4
         with:
           name: guardian-linux-overlay-x86_64
           path: dist
+
+      - name: Download windows agent assets
+        if: needs.windows-release-build.result == 'success'
+        uses: actions/download-artifact@v4
+        with:
+          name: guardian-windows-agent-msi
+          path: dist
+
+      - name: Download android agent assets
+        if: needs.android-release-build.result == 'success'
+        uses: actions/download-artifact@v4
+        with:
+          name: guardian-android-agent-apk
+          path: dist
+
+      - name: Verify release artifacts
+        run: |
+          shopt -s nullglob
+          files=(dist/*)
+          if [[ ${#files[@]} -eq 0 ]]; then
+            echo "No release artifacts were produced." >&2
+            exit 1
+          fi
+          ls -la dist
 
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v2

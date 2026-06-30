@@ -20,6 +20,19 @@ GitHub Actions workflows publish server Docker images, agent binaries, and docum
 
 Set `GUARDIAN_AGENT_VERSION` / tag name at build time. Server reads `TIMEKPR_SERVER_VERSION` for handshake matching.
 
+### Partial (patch) releases
+
+On tags that stay on the same `major.minor` line as the previous tag (for example `v0.68.4` → `v0.68.5`), the Agent CI workflow runs `scripts/ci/release_plan.py` to diff against the previous tag and only builds platforms whose paths changed:
+
+| Changed paths | Builds |
+|---------------|--------|
+| `agent/**` | Linux, Windows, and Android (JNI rebuild) |
+| `android-agent/**`, `i18n/**`, `scripts/i18n/**` | Android |
+| `agent/src/overlay_cef/**`, `agent/overlay_resources/**`, `agent/Cargo.toml` | CEF overlay bundle |
+| `server/**`, `docs/**`, or other non-agent paths | No agent assets (publish step skipped) |
+
+A new `major.minor` line (for example `v0.68.x` → `v0.69.0`) always builds every agent asset. The server only offers `update_available` for platforms that have assets on the GitHub release, so unchanged agents can keep running on the previous patch until a new binary is published.
+
 ## Android signing secrets
 
 Configure in GitHub repository secrets:
