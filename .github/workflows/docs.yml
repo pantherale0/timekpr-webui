@@ -66,6 +66,9 @@ jobs:
         (github.ref == 'refs/heads/master' && needs.changes.outputs.docs_changed == 'true')
       )
     runs-on: ubuntu-latest
+    concurrency:
+      group: docs-gh-pages
+      cancel-in-progress: false
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -84,6 +87,9 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Fetch gh-pages for mike
+        run: git fetch origin gh-pages:gh-pages --force
 
       - name: Deploy dev docs
         if: github.ref == 'refs/heads/master'
