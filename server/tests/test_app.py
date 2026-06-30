@@ -839,6 +839,15 @@ def test_rest_apis(client, db_session):
     assert b"restarted" in res.data
 
 def test_websocket_handler(app, db_session):
+    from simple_websocket.errors import ConnectionClosed
+
+    class DisconnectBeforeHelloWS(MockWS):
+        def receive(self, timeout=None):
+            raise ConnectionClosed(1005)
+
+    with app.test_request_context('/ws', environ_base={'REMOTE_ADDR': '127.0.0.1'}):
+        ws_agent_handler(DisconnectBeforeHelloWS([]))
+
     # 1. Connection attempt timeout (empty hello)
     ws_timeout = MockWS([])
     with app.test_request_context('/ws', environ_base={'REMOTE_ADDR': '127.0.0.1'}):

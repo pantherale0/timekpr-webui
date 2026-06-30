@@ -4,6 +4,7 @@ import secrets
 import threading
 from datetime import datetime, timezone
 from flask import Blueprint, request
+from simple_websocket.errors import ConnectionClosed
 from sqlalchemy.exc import SQLAlchemyError
 from src.models import db, AgentDevice
 from src.agent.helper import (
@@ -390,6 +391,20 @@ def ws_agent_handler(ws):
                         daemon=True,
                     ).start()
     
+        except ConnectionClosed as exc:
+            if system_id:
+                _LOGGER.info(
+                    "WebSocket closed during handshake for %s: %s",
+                    system_id,
+                    exc,
+                )
+            else:
+                _LOGGER.info(
+                    "WebSocket closed before hello from %s: %s",
+                    remote_ip,
+                    exc,
+                )
+            return
         except (
             OSError,
             RuntimeError,
