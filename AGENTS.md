@@ -134,6 +134,7 @@ Credits are modest, capped annually, and non-cash. All verified incidents become
 - Minimize cognitive load: clear hierarchy, few colors, generous whitespace.
 - Age-aware interfaces (simpler for younger children).
 - Every block screen includes a parent message + calm offline activity (breathing exercise, doodle canvas).
+- This service follows the Age Inclusive Web principals (https://raw.githubusercontent.com/Efury1/Age-Inclusive-Web/refs/heads/main/src/data/guidelines.js), while this is intended for public sector web services, it is partially applied to this applicationt too because we can never assume what accessible requirements a end user needs.
 
 **Color Palette**
 - Primary: Sage Green `#4A6B5D` (safe/active)
