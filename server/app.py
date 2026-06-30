@@ -12,6 +12,9 @@ from sentry_sdk.integrations.flask import FlaskIntegration
 
 # Initialize WebSocket support
 from flask_sock import Sock
+from src.common.websocket import disable_permessage_deflate_handshake
+
+disable_permessage_deflate_handshake()
 from flask_migrate import Migrate
 
 # Import DB and models for registration

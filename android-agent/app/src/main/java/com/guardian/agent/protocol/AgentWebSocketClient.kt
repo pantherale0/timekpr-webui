@@ -47,6 +47,9 @@ class AgentWebSocketClient(
         .pingInterval(15, TimeUnit.SECONDS)
         .readTimeout(90, TimeUnit.SECONDS)
         .connectTimeout(20, TimeUnit.SECONDS)
+        // Agent payloads are small JSON; skip outbound permessage-deflate to avoid
+        // MessageDeflater teardown crashes on connection failure (OkHttp #6719 / okio #1392).
+        .minWebSocketMessageToCompress(Long.MAX_VALUE)
         .build()
 
     suspend fun runSession(config: AgentConfig, mode: SessionMode): SessionResult {
@@ -77,10 +80,17 @@ class AgentWebSocketClient(
         return suspendCancellableCoroutine { continuation ->
             var completed = false
             val socketRef = arrayOf<WebSocket?>(null)
-            fun finish(result: SessionResult) {
+            fun finish(result: SessionResult, closeSocket: Boolean = true) {
                 if (completed) return
                 completed = true
-                socketRef[0]?.close(1000, "session completed")
+                if (closeSocket) {
+                    try {
+                        socketRef[0]?.close(1000, "session completed")
+                    } catch (_: Exception) {
+                        // OkHttp may already be tearing down the socket (failWebSocket).
+                    }
+                }
+                socketRef[0] = null
                 if (continuation.isActive) continuation.resume(result)
             }
 
@@ -100,7 +110,12 @@ class AgentWebSocketClient(
                     override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
                         clearAlertListener()
                         AgentConnectionState.update(AgentConnectionStatus.DISCONNECTED, reason)
-                        if (!completed) finish(SessionResult(success = code == 1000, reason = reason))
+                        if (!completed) {
+                            finish(
+                                SessionResult(success = code == 1000, reason = reason),
+                                closeSocket = false,
+                            )
+                        }
                     }
 
                     override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
@@ -109,13 +124,21 @@ class AgentWebSocketClient(
                             AgentConnectionStatus.ERROR,
                             t.message ?: "connection failed",
                         )
-                        finish(SessionResult(success = false, reason = t.message ?: "failure"))
+                        finish(
+                            SessionResult(success = false, reason = t.message ?: "failure"),
+                            closeSocket = false,
+                        )
                     }
                 },
             )
 
             continuation.invokeOnCancellation {
-                socketRef[0]?.close(1000, "cancelled")
+                try {
+                    socketRef[0]?.close(1000, "cancelled")
+                } catch (_: Exception) {
+                    // Best-effort; failWebSocket may already be running.
+                }
+                socketRef[0] = null
             }
         }
     }
