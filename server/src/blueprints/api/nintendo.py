@@ -220,9 +220,8 @@ def sync_nintendo_now():
         return jsonify({'success': False, 'message': 'Nintendo Account is not linked'}), 400
 
     try:
-        from app import task_manager
-        task_manager.sync_nintendo_devices(force=True)
-        return jsonify({'success': True, 'message': 'Nintendo cloud sync completed.'})
+        Settings.set_value('nintendo_sync_requested', '1')
+        return jsonify({'success': True, 'message': 'Nintendo cloud sync request queued.'}), 202
     except Exception as exc:
-        _LOGGER.error("Manual Nintendo sync failed: %s", exc)
+        _LOGGER.error("Manual Nintendo sync queue failed: %s", exc)
         return jsonify({'success': False, 'message': str(exc)}), 500

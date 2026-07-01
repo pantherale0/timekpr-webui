@@ -71,7 +71,7 @@ def create_blocklist_source():
         success, message = task_manager.refresh_external_blocklist_source(source.id)
         flash(message, 'success' if success else 'warning')
     else:
-        task_manager.notify_domain_policy_hint(reason='blocklist_catalog_updated')
+        task_manager.notify_domain_policy_hint(session.get('active_household_id'), reason='blocklist_catalog_updated')
         flash_t(
             'flash.blocklists.created',
             'success',
@@ -107,7 +107,7 @@ def delete_blocklist_source(source_id):
     db.session.commit()
     
     from app import task_manager
-    task_manager.notify_domain_policy_hint(reason='blocklist_catalog_updated')
+    task_manager.notify_domain_policy_hint(session.get('active_household_id'), reason='blocklist_catalog_updated')
     flash_t('flash.blocklists.deleted', 'success', name=source_name)
     return redirect(url_for('ui_dashboard.settings'))
 
@@ -134,7 +134,7 @@ def toggle_blocklist_source(source_id):
     db.session.commit()
     
     from app import task_manager
-    task_manager.notify_domain_policy_hint(reason='blocklist_catalog_updated')
+    task_manager.notify_domain_policy_hint(session.get('active_household_id'), reason='blocklist_catalog_updated')
     flash_t(
         'flash.blocklists.toggled',
         'success',
@@ -177,7 +177,7 @@ def add_blocklist_domain(source_id):
     db.session.commit()
     
     from app import task_manager
-    task_manager.notify_domain_policy_hint(reason='blocklist_catalog_updated')
+    task_manager.notify_domain_policy_hint(session.get('active_household_id'), reason='blocklist_catalog_updated')
     flash_t('flash.blocklists.domain_added', 'success', domain=domain, name=source.name)
     return redirect(url_for('ui_dashboard.settings'))
 
@@ -202,7 +202,7 @@ def delete_blocklist_domain(source_id, domain_id):
     db.session.commit()
     
     from app import task_manager
-    task_manager.notify_domain_policy_hint(reason='blocklist_catalog_updated')
+    task_manager.notify_domain_policy_hint(session.get('active_household_id'), reason='blocklist_catalog_updated')
     flash_t('flash.blocklists.domain_removed', 'success', domain=domain_text, name=source.name)
     return redirect(url_for('ui_dashboard.settings'))
 
@@ -244,7 +244,7 @@ def update_user_blocklists(user_id):
     db.session.commit()
     
     from app import task_manager
-    task_manager.notify_domain_policy_hint(reason='blocklist_assignment_updated')
+    task_manager.notify_domain_policy_hint(user.household_id, reason='blocklist_assignment_updated')
     if wants_json_response():
         return jsonify({
             'success': True,

@@ -224,6 +224,7 @@ def ws_agent_handler(ws):
                     try:
                         from app import task_manager
                         task_manager.notify_domain_policy_hint(
+                            device.household_id,
                             system_ids=policy_hint_system_ids,
                             reason='mapping_uid_updated',
                         )

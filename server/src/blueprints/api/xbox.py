@@ -238,9 +238,8 @@ def sync_xbox_now():
         return jsonify({'success': False, 'message': 'Xbox Account is not linked'}), 400
 
     try:
-        from app import task_manager
-        task_manager.sync_xbox_devices(force=True)
-        return jsonify({'success': True, 'message': 'Xbox cloud sync completed.'})
+        Settings.set_value('xbox_sync_requested', '1')
+        return jsonify({'success': True, 'message': 'Xbox cloud sync request queued.'}), 202
     except Exception as exc:
-        _LOGGER.error("Manual Xbox sync failed: %s", exc)
+        _LOGGER.error("Manual Xbox sync queue failed: %s", exc)
         return jsonify({'success': False, 'message': str(exc)}), 500

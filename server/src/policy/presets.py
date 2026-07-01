@@ -192,6 +192,7 @@ def apply_policy_preset(
     try:
         from app import task_manager
         task_manager.notify_domain_policy_hint(
+            user.household_id,
             system_ids=affected_system_ids or None,
             reason='policy_preset_applied',
         )

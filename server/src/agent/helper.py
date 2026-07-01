@@ -7,6 +7,7 @@ import logging
 import os
 import re
 import time
+import threading
 import uuid
 from datetime import datetime, timezone
 from queue import Queue, Empty
@@ -177,6 +178,9 @@ class AgentConnectionManagerMeta(type):
 class AgentConnectionManager(metaclass=AgentConnectionManagerMeta):
     """Track live agent connections and coordinate synchronous requests."""
 
+    _manager_lock = threading.Lock()
+    _connection_write_locks = {}
+
     # Active connections (fully approved & authenticated): system_id -> ws_object
     active_connections = {}
 
@@ -192,9 +196,12 @@ class AgentConnectionManager(metaclass=AgentConnectionManagerMeta):
     @classmethod
     def register(cls, system_id, ws, remote_ip):
         """Register an active WebSocket connection and snapshot its current IP"""
-        cls.active_connections[system_id] = ws
-        cls.active_ips[remote_ip] = system_id
-        cls.active_connections[system_id + "_ip"] = remote_ip
+        with cls._manager_lock:
+            cls.active_connections[system_id] = ws
+            cls.active_ips[remote_ip] = system_id
+            cls.active_connections[system_id + "_ip"] = remote_ip
+            if system_id not in cls._connection_write_locks:
+                cls._connection_write_locks[system_id] = threading.Lock()
         logger.info("Agent registered: %s from IP %s", system_id, remote_ip)
         from src.common.dashboard_events import notify_dashboard_changed
         notify_dashboard_changed('agent_online')
@@ -202,45 +209,52 @@ class AgentConnectionManager(metaclass=AgentConnectionManagerMeta):
     @classmethod
     def unregister(cls, system_id):
         """Unregister an active connection"""
-        if system_id in cls.active_connections:
-            ip = cls.active_connections.get(system_id + "_ip")
-            if ip in cls.active_ips:
-                del cls.active_ips[ip]
-            if system_id + "_ip" in cls.active_connections:
-                del cls.active_connections[system_id + "_ip"]
-            del cls.active_connections[system_id]
-            logger.info("Agent unregistered: %s", system_id)
-            from src.common.dashboard_events import notify_dashboard_changed
-            notify_dashboard_changed('agent_offline')
+        with cls._manager_lock:
+            if system_id in cls.active_connections:
+                ip = cls.active_connections.get(system_id + "_ip")
+                if ip in cls.active_ips:
+                    del cls.active_ips[ip]
+                if system_id + "_ip" in cls.active_connections:
+                    del cls.active_connections[system_id + "_ip"]
+                del cls.active_connections[system_id]
+                cls._connection_write_locks.pop(system_id, None)
+        logger.info("Agent unregistered: %s", system_id)
+        from src.common.dashboard_events import notify_dashboard_changed
+        notify_dashboard_changed('agent_offline')
 
     @classmethod
     def register_pending(cls, system_id, ws):
         """Register an active connection in a pending state"""
-        cls.pending_connections[system_id] = ws
+        with cls._manager_lock:
+            cls.pending_connections[system_id] = ws
         logger.info("Agent registered in PENDING state: %s", system_id)
 
     @classmethod
     def unregister_pending(cls, system_id):
         """Unregister a pending connection"""
-        if system_id in cls.pending_connections:
-            del cls.pending_connections[system_id]
-            logger.info("Agent PENDING connection removed: %s", system_id)
+        with cls._manager_lock:
+            if system_id in cls.pending_connections:
+                del cls.pending_connections[system_id]
+        logger.info("Agent PENDING connection removed: %s", system_id)
 
     @classmethod
     def get_pending_connection(cls, system_id):
         """Get the active pending connection for a system_id"""
-        return cls.pending_connections.get(system_id)
+        with cls._manager_lock:
+            return cls.pending_connections.get(system_id)
 
     @classmethod
     def get_connection(cls, system_id):
         """Get the active WebSocket connection for a system_id"""
-        return cls.active_connections.get(system_id)
+        with cls._manager_lock:
+            return cls.active_connections.get(system_id)
 
     @classmethod
     def is_online(cls, system_id):
         """Check if a system_id is currently online"""
-        if system_id in cls.active_connections:
-            return True
+        with cls._manager_lock:
+            if system_id in cls.active_connections:
+                return True
 
         # Hook for cloud-managed Nintendo devices
         try:
@@ -267,22 +281,26 @@ class AgentConnectionManager(metaclass=AgentConnectionManagerMeta):
     @classmethod
     def get_online_system_ids(cls):
         """Return sorted online system IDs without internal IP shadow keys."""
-        return sorted(
-            system_id
-            for system_id in cls.active_connections
-            if not system_id.endswith("_ip")
-        )
+        with cls._manager_lock:
+            return sorted(
+                system_id
+                for system_id in cls.active_connections
+                if not system_id.endswith("_ip")
+            )
 
     @classmethod
     def get_ip(cls, system_id):
         """Get the last snapshotted IP address for a system_id"""
-        return cls.active_connections.get(system_id + "_ip", "Offline")
+        with cls._manager_lock:
+            return cls.active_connections.get(system_id + "_ip", "Offline")
 
     @classmethod
     def route_response(cls, correlation_id, response_data):
         """Route a response message from client back to the waiting thread"""
-        if correlation_id in cls.pending_requests:
-            cls.pending_requests[correlation_id].put(response_data)
+        with cls._manager_lock:
+            response_queue = cls.pending_requests.get(correlation_id)
+        if response_queue:
+            response_queue.put(response_data)
             return True
         return False
 
@@ -328,7 +346,13 @@ class AgentConnectionManager(metaclass=AgentConnectionManagerMeta):
 
         correlation_id = str(uuid.uuid4())
         response_queue = Queue()
-        cls.pending_requests[correlation_id] = response_queue
+        with cls._manager_lock:
+            cls.pending_requests[correlation_id] = response_queue
+
+        with cls._manager_lock:
+            if system_id not in cls._connection_write_locks:
+                cls._connection_write_locks[system_id] = threading.Lock()
+            write_lock = cls._connection_write_locks[system_id]
 
         payload = {
             "type": "command_request",
@@ -339,10 +363,11 @@ class AgentConnectionManager(metaclass=AgentConnectionManagerMeta):
         }
 
         try:
-            ws.send(json.dumps(payload))
+            with write_lock:
+                ws.send(json.dumps(payload))
         except (OSError, RuntimeError, TypeError, ValueError) as exc:
-            if correlation_id in cls.pending_requests:
-                del cls.pending_requests[correlation_id]
+            with cls._manager_lock:
+                cls.pending_requests.pop(correlation_id, None)
             return False, f"Failed to send command over WebSocket: {exc}", None
 
         try:
@@ -355,8 +380,8 @@ class AgentConnectionManager(metaclass=AgentConnectionManagerMeta):
         except Empty:
             return False, f"Request timed out after {timeout} seconds", None
         finally:
-            if correlation_id in cls.pending_requests:
-                del cls.pending_requests[correlation_id]
+            with cls._manager_lock:
+                cls.pending_requests.pop(correlation_id, None)
 
     @classmethod
     def send_message(cls, system_id, payload):
@@ -371,8 +396,14 @@ class AgentConnectionManager(metaclass=AgentConnectionManagerMeta):
         if not ws:
             return False, f"Agent for system ID '{system_id}' is offline"
 
+        with cls._manager_lock:
+            if system_id not in cls._connection_write_locks:
+                cls._connection_write_locks[system_id] = threading.Lock()
+            write_lock = cls._connection_write_locks[system_id]
+
         try:
-            ws.send(json.dumps(payload))
+            with write_lock:
+                ws.send(json.dumps(payload))
             return True, "Message sent"
         except (OSError, RuntimeError, TypeError, ValueError) as exc:
             return False, f"Failed to send message over WebSocket: {exc}"

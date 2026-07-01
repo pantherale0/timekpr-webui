@@ -243,7 +243,7 @@ def add_user_mapping(user_id):
     db.session.commit()
 
     from app import task_manager
-    task_manager.notify_domain_policy_hint(system_ids={system_id}, reason='mapping_updated')
+    task_manager.notify_domain_policy_hint(user.household_id, system_ids={system_id}, reason='mapping_updated')
 
     flash_t(
         'flash.users.mapping_added',
@@ -322,9 +322,10 @@ def connect_user_mapping(user_id):
     if uid_changed:
         policy_hint_system_ids.add(system_id)
     from app import task_manager
-    task_manager.notify_domain_policy_hint(system_ids={system_id}, reason='mapping_updated')
+    task_manager.notify_domain_policy_hint(user.household_id, system_ids={system_id}, reason='mapping_updated')
     if policy_hint_system_ids:
         task_manager.notify_domain_policy_hint(
+            user.household_id,
             system_ids=policy_hint_system_ids,
             reason='mapping_updated',
         )
@@ -415,7 +416,7 @@ def add_user():
             _LOGGER.error("Failed to subscribe user %s to marketplace presets: %s", username, exc)
 
     from app import task_manager
-    task_manager.notify_domain_policy_hint(system_ids={system_id}, reason='mapping_updated')
+    task_manager.notify_domain_policy_hint(user.household_id, system_ids={system_id}, reason='mapping_updated')
     flash_t('flash.users.created_with_mapping', 'success', username=username)
     return redirect(url_for('ui_dashboard.admin'))
 
@@ -453,6 +454,7 @@ def validate_user(user_id):
     if policy_hint_system_ids:
         from app import task_manager
         task_manager.notify_domain_policy_hint(
+            user.household_id,
             system_ids=policy_hint_system_ids,
             reason='mapping_updated',
         )
@@ -487,6 +489,7 @@ def validate_mapping(user_id, mapping_id):
     if uid_changed or mapping.linux_uid != previous_linux_uid:
         from app import task_manager
         task_manager.notify_domain_policy_hint(
+            user.household_id,
             system_ids={mapping.system_id},
             reason='mapping_updated',
         )
@@ -520,7 +523,7 @@ def delete_mapping(user_id, mapping_id):
     notify_dashboard_changed('mapping_changed')
 
     from app import task_manager
-    task_manager.notify_domain_policy_hint(system_ids={affected_system_id}, reason='mapping_updated')
+    task_manager.notify_domain_policy_hint(user.household_id, system_ids={affected_system_id}, reason='mapping_updated')
     flash_t('flash.users.mapping_removed', 'success', label=mapping_label)
     return redirect(url_for('ui_dashboard.admin'))
 
@@ -538,7 +541,7 @@ def delete_user(user_id):
     db.session.commit()
     if affected_system_ids:
         from app import task_manager
-        task_manager.notify_domain_policy_hint(system_ids=affected_system_ids, reason='mapping_updated')
+        task_manager.notify_domain_policy_hint(user.household_id, system_ids=affected_system_ids, reason='mapping_updated')
     
     flash_t('flash.users.user_removed', 'success', username=username)
     return redirect(url_for('ui_dashboard.admin'))
@@ -1027,7 +1030,7 @@ def block_item(user_id):
         db.session.commit()
 
         from app import task_manager
-        task_manager.notify_domain_policy_hint(reason='blocklist_assignment_updated')
+        task_manager.notify_domain_policy_hint(user.household_id, reason='blocklist_assignment_updated')
 
         return jsonify({
             'success': True,

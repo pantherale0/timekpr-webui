@@ -787,6 +787,7 @@ def _trigger_policy_sync(mapping, reason='approval_changed'):
 
     try:
         task_manager.notify_domain_policy_hint(
+            mapping.device.household_id,
             system_ids={mapping.system_id},
             reason=reason,
         )

@@ -131,6 +131,6 @@ def sync_marketplace_subscriptions(user, selected_preset_ids):
     # 5. Notify agents to sync policy
     try:
         from app import task_manager
-        task_manager.notify_domain_policy_hint(reason='blocklist_assignment_updated')
+        task_manager.notify_domain_policy_hint(user.household_id, reason='blocklist_assignment_updated')
     except Exception as exc:
         _LOGGER.error("Failed to notify policy sync hint: %s", exc)

@@ -1559,7 +1559,7 @@ def test_alert_pages_for_user_and_device(client, db_session):
     # For device page
     device_page = client.get(f'/devices/{device.system_id}')
     assert device_page.status_code == 200
-    assert b'Accounts, apps, and gentle alerts for this device.' in device_page.data
+    assert b'Accounts, apps, and activity logs for this device.' in device_page.data
     assert b'jack' in device_page.data
     assert b'Manage routines' in device_page.data
 

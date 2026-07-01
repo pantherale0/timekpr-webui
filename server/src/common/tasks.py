@@ -315,6 +315,22 @@ class BackgroundTaskManager:
                 time.sleep(1)
 
     def _run_task_cycle(self):
+        try:
+            if Settings.get_value('nintendo_sync_requested') == '1':
+                logger.info("Processing manual Nintendo sync request")
+                self.sync_nintendo_devices(force=True)
+                Settings.set_value('nintendo_sync_requested', '0')
+        except Exception as exc:
+            logger.error("Failed to process manual Nintendo sync request in background: %s", exc)
+
+        try:
+            if Settings.get_value('xbox_sync_requested') == '1':
+                logger.info("Processing manual Xbox sync request")
+                self.sync_xbox_devices(force=True)
+                Settings.set_value('xbox_sync_requested', '0')
+        except Exception as exc:
+            logger.error("Failed to process manual Xbox sync request in background: %s", exc)
+
         if self.refresh_external_blocklists_enabled:
             logger.info("Refreshing external blocklists")
             self._refresh_external_blocklists()
@@ -849,6 +865,7 @@ class BackgroundTaskManager:
                     db.session.commit()
                     if domain_policy_hint_system_ids:
                         self.notify_domain_policy_hint(
+                            user.household_id,
                             system_ids=domain_policy_hint_system_ids,
                             reason='mapping_state_changed',
                         )
@@ -999,7 +1016,16 @@ class BackgroundTaskManager:
             updated_revision = source.content_revision
             db.session.commit()
             if updated_revision != previous_revision:
-                self.notify_domain_policy_hint(reason='blocklist_catalog_updated')
+                from src.models import ManagedUser, ManagedUserBlocklistAssignment
+                affected_households = db.session.query(ManagedUser.household_id).join(
+                    ManagedUserBlocklistAssignment,
+                    ManagedUserBlocklistAssignment.managed_user_id == ManagedUser.id
+                ).filter(
+                    ManagedUserBlocklistAssignment.source_id == source.id,
+                    ManagedUser.household_id.isnot(None)
+                ).distinct().all()
+                for (hid,) in affected_households:
+                    self.notify_domain_policy_hint(hid, reason='blocklist_catalog_updated')
             return True, f'Refreshed "{source.name}" with {domain_count} domain(s)'
         except (requests.RequestException, SQLAlchemyError, ValueError) as exc:
             db.session.rollback()
@@ -1025,25 +1051,30 @@ class BackgroundTaskManager:
             else:
                 logger.warning(message)
 
-    def notify_domain_policy_hint(self, system_ids=None, reason='server_update'):
-        """Notify online agents that domain policy state may have changed."""
+    def notify_domain_policy_hint(self, household_id: int, system_ids=None, reason='server_update'):
+        """Notify online agents that domain policy state may have changed within a household."""
         if not self.sync_domain_policies_enabled:
+            return 0
+        if household_id is None:
+            logger.warning("notify_domain_policy_hint called with None household_id")
             return 0
 
         from src.agent.push import notify_policy_sync_hint
+        from src.models import AgentDevice
+
+        devices_in_household = AgentDevice.query.filter_by(household_id=household_id).all()
+        device_ids = {d.system_id for d in devices_in_household}
 
         if system_ids is None:
-            online_ids = set(AgentConnectionManager.get_online_system_ids())
-            from src.models import AgentDevice
-
+            online_ids = set(AgentConnectionManager.get_online_system_ids()) & device_ids
             push_ids = {
                 device.system_id
-                for device in AgentDevice.query.filter(AgentDevice.fcm_token.isnot(None)).all()
-                if (device.fcm_token or '').strip()
+                for device in devices_in_household
+                if device.fcm_token and device.fcm_token.strip()
             }
             target_system_ids = sorted(online_ids | push_ids)
         else:
-            target_system_ids = sorted(set(system_ids))
+            target_system_ids = sorted(set(system_ids) & device_ids)
 
         notified = 0
         for system_id in target_system_ids:
