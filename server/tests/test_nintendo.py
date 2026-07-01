@@ -4,8 +4,14 @@ import json
 from unittest.mock import patch, MagicMock
 import pytest
 from datetime import datetime, timezone, timedelta
+from pynintendoauth.exceptions import HttpException
 from src.models import AgentDevice, Settings
 from src.agent.helper import AgentConnectionManager
+from src.blueprints.api.nintendo import (
+    NINTENDO_CODE_VERIFIER_KEY,
+    NINTENDO_LOGIN_URL_KEY,
+    normalize_nintendo_response_url,
+)
 
 @pytest.fixture
 def auth_client(client):
@@ -32,7 +38,71 @@ def test_login_url_authenticated(auth_client):
 
         # Check session
         with auth_client.session_transaction() as sess:
-            assert sess['nintendo_code_verifier'] == "test_verifier"
+            assert sess[NINTENDO_CODE_VERIFIER_KEY] == "test_verifier"
+            assert sess[NINTENDO_LOGIN_URL_KEY] == "https://mock.login.url"
+
+
+def test_login_url_reuses_cached_oauth_state(auth_client):
+    with auth_client.session_transaction() as sess:
+        sess[NINTENDO_CODE_VERIFIER_KEY] = 'cached_verifier'
+        sess[NINTENDO_LOGIN_URL_KEY] = 'https://cached.login.url'
+
+    with patch('src.blueprints.api.nintendo.run_async') as mock_run_async:
+        response = auth_client.get('/api/nintendo/login-url')
+        mock_run_async.assert_not_called()
+
+    assert response.status_code == 200
+    data = response.get_json()
+    assert data['success'] is True
+    assert data['login_url'] == 'https://cached.login.url'
+
+
+def test_login_url_force_regenerates_oauth_state(auth_client):
+    with auth_client.session_transaction() as sess:
+        sess[NINTENDO_CODE_VERIFIER_KEY] = 'cached_verifier'
+        sess[NINTENDO_LOGIN_URL_KEY] = 'https://cached.login.url'
+
+    with patch('src.blueprints.api.nintendo.Authenticator') as mock_auth_class:
+        mock_auth = MagicMock()
+        mock_auth._auth_code_verifier = 'fresh_verifier'
+        mock_auth.login_url = 'https://fresh.login.url'
+        mock_auth_class.return_value = mock_auth
+
+        response = auth_client.get('/api/nintendo/login-url?force=1')
+
+    assert response.status_code == 200
+    data = response.get_json()
+    assert data['login_url'] == 'https://fresh.login.url'
+    with auth_client.session_transaction() as sess:
+        assert sess[NINTENDO_CODE_VERIFIER_KEY] == 'fresh_verifier'
+        assert sess[NINTENDO_LOGIN_URL_KEY] == 'https://fresh.login.url'
+
+
+@pytest.mark.parametrize(
+    'raw_url,expected_fragment',
+    [
+        (
+            'npf54789befb391a838://auth#session_token_code=abc123&state=xyz',
+            'session_token_code=abc123&state=xyz',
+        ),
+        (
+            'npf54789befb391a838://auth?session_token_code=abc123&state=xyz',
+            'session_token_code=abc123&state=xyz',
+        ),
+        (
+            '  npf54789befb391a838://auth#session_token_code=abc%2B123  ',
+            'session_token_code=abc%2B123',
+        ),
+    ],
+)
+def test_normalize_nintendo_response_url(raw_url, expected_fragment):
+    normalized = normalize_nintendo_response_url(raw_url)
+    assert normalized.endswith(f'#{expected_fragment}')
+
+
+def test_normalize_nintendo_response_url_missing_code():
+    with pytest.raises(ValueError, match='session_token_code'):
+        normalize_nintendo_response_url('npf54789befb391a838://auth#state=only')
 
 def test_authenticate_requires_auth(client):
     response = client.post('/api/nintendo/authenticate', json={'response_url': 'http://localhost/callback'})
@@ -41,16 +111,57 @@ def test_authenticate_requires_auth(client):
 @patch('src.blueprints.api.nintendo.run_async')
 def test_authenticate_nintendo(mock_async_run, auth_client):
     with auth_client.session_transaction() as sess:
-        sess['nintendo_code_verifier'] = 'cached_verifier'
+        sess[NINTENDO_CODE_VERIFIER_KEY] = 'cached_verifier'
 
     mock_async_run.return_value = 'mock_session_token'
 
-    response = auth_client.post('/api/nintendo/authenticate', json={'response_url': 'http://localhost/callback'})
+    response = auth_client.post(
+        '/api/nintendo/authenticate',
+        json={'response_url': 'npf54789befb391a838://auth#session_token_code=abc123'},
+    )
     assert response.status_code == 200
     data = response.get_json()
     assert data['success'] is True
     assert Settings.get_value('nintendo_session_token') == 'mock_session_token'
     assert Settings.get_value('nintendo_linked_at')
+    with auth_client.session_transaction() as sess:
+        assert NINTENDO_CODE_VERIFIER_KEY not in sess
+        assert NINTENDO_LOGIN_URL_KEY not in sess
+
+
+@patch('src.blueprints.api.nintendo.run_async')
+def test_authenticate_nintendo_invalid_redirect_url(mock_async_run, auth_client):
+    with auth_client.session_transaction() as sess:
+        sess[NINTENDO_CODE_VERIFIER_KEY] = 'cached_verifier'
+
+    response = auth_client.post(
+        '/api/nintendo/authenticate',
+        json={'response_url': 'npf54789befb391a838://auth#state=only'},
+    )
+
+    assert response.status_code == 400
+    mock_async_run.assert_not_called()
+    data = response.get_json()
+    assert data['success'] is False
+    assert 'session_token_code' in data['message']
+
+
+@patch('src.blueprints.api.nintendo.run_async')
+def test_authenticate_nintendo_client_error_returns_400(mock_async_run, auth_client):
+    with auth_client.session_transaction() as sess:
+        sess[NINTENDO_CODE_VERIFIER_KEY] = 'cached_verifier'
+
+    mock_async_run.side_effect = HttpException(400, 'invalid_grant')
+
+    response = auth_client.post(
+        '/api/nintendo/authenticate',
+        json={'response_url': 'npf54789befb391a838://auth#session_token_code=abc123'},
+    )
+
+    assert response.status_code == 400
+    data = response.get_json()
+    assert data['success'] is False
+    assert 'invalid_grant' in data['message']
 
 def test_account_status_requires_auth(client):
     response = client.get('/api/nintendo/account-status')

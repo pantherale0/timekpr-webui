@@ -1279,7 +1279,10 @@
             if (expiredAlert) {
                 expiredAlert.classList.toggle('d-none', !showExpiredWarning);
             }
-            fetch('/api/nintendo/login-url')
+            const loginUrlEndpoint = showExpiredWarning
+                ? '/api/nintendo/login-url?force=1'
+                : '/api/nintendo/login-url';
+            fetch(loginUrlEndpoint)
                 .then(r => r.json())
                 .then(res => {
                     if (res.success) {
