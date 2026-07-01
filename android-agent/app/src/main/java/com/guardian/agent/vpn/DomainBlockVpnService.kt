@@ -135,6 +135,7 @@ class DomainBlockVpnService : VpnService() {
             .setSession("Guardian Web Policy")
             .addAddress(VPN_ADDRESS, VPN_PREFIX)
             .setBlocking(true)
+            .allowBypass()
             .allowFamily(android.system.OsConstants.AF_INET)
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -340,6 +341,7 @@ class DomainBlockVpnService : VpnService() {
 
             if (policy.blockedDomains.isEmpty()) {
                 lastPolicySignatureByUser.remove(userId)
+                DeviceOwnerProvisioner.clearVpnAuthorization(context)
                 context.stopService(
                     Intent(context, DomainBlockVpnService::class.java).setAction(ACTION_STOP),
                 )

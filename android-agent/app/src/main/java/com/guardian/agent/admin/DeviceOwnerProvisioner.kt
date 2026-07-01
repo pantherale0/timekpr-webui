@@ -172,9 +172,8 @@ object DeviceOwnerProvisioner {
      * Device/profile owners can pre-authorize the app's VPN without the system consent dialog.
      *
      * [DomainBlockVpnService] is DNS-only: it intercepts UDP/53 on the TUN interface and does
-     * not forward other traffic. Always-on VPN routes all app traffic through the TUN, so leaving
-     * it enabled breaks general internet access. We therefore use always-on only as a one-shot
-     * consent grant, then clear it and rely on the foreground VPN service for DNS filtering.
+     * not forward other traffic. We configure always-on VPN to grant consent and keep the service
+     * persistent, and disable always-on VPN only when the domain block policy is cleared (empty).
      */
     fun grantVpnAuthorization(context: Context): Boolean {
         if (!isDeviceOrProfileOwner(context)) {
@@ -189,10 +188,7 @@ object DeviceOwnerProvisioner {
             return false
         }
         return try {
-            if (!hasVpnConsent(context)) {
-                dpm.setAlwaysOnVpnPackage(admin, context.packageName, false)
-            }
-            disableAlwaysOnVpn(dpm, admin)
+            dpm.setAlwaysOnVpnPackage(admin, context.packageName, false)
             hasVpnConsent(context)
         } catch (e: Exception) {
             Log.w(TAG, "Failed to grant VPN authorization", e)
