@@ -2623,7 +2623,7 @@
 <h3 id="add-device-wizard-recommended">Add Device wizard (recommended)<a class="headerlink" href="#add-device-wizard-recommended" title="Permanent link">&para;</a></h3>
 <ol>
 <li>Open <strong>Add Device</strong> in the Web UI and choose <strong>Windows PC</strong>.</li>
-<li>Copy the PowerShell install command or download the MSI from <code>/api/pairing/windows/msi</code>.</li>
+<li>Copy the PowerShell install command or download the MSI from <code>/api/pairing/windows/msi</code> (requires a signed-in admin session).</li>
 <li>Run the installer <strong>as Administrator</strong> on the target PC.</li>
 <li>Approve the pending device under <strong>Admin → Devices</strong>.</li>
 <li>Map the Windows username to a child account.</li>
@@ -2705,7 +2705,7 @@
 <a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">  </span><span class="nt">&quot;password&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;&lt;plaintext over WSS/TLS&gt;&quot;</span>
 <a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="p">}</span>
 </code></pre></div>
-<p>The server encrypts this value with Fernet and exposes it through <code>GET /api/devices/&lt;system_id&gt;/windows-laps</code> and <code>POST .../windows-laps/reveal-password</code>.</p>
+<p>The server encrypts this value with Fernet and exposes it through <code>GET /api/devices/&lt;system_id&gt;/windows-laps</code> and <code>POST .../windows-laps/reveal-password</code> (reveal requires <code>can_manage_policies</code> or household admin).</p>
 <h2 id="limitations">Limitations<a class="headerlink" href="#limitations" title="Permanent link">&para;</a></h2>
 <ul>
 <li>No AppArmor or polkit — enforcement is process/DNS based</li>

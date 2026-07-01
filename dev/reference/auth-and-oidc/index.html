@@ -2106,6 +2106,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#household-invites" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Household invites
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#agent-authentication" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2405,6 +2416,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#household-invites" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Household invites
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#agent-authentication" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2454,8 +2476,8 @@
 <h1 id="auth-and-oidc">Auth and OIDC<a class="headerlink" href="#auth-and-oidc" title="Permanent link">&para;</a></h1>
 <p>Guardian supports <strong>local admin login</strong> and optional <strong>OpenID Connect</strong> SSO for the web UI.</p>
 <h2 id="local-login">Local login<a class="headerlink" href="#local-login" title="Permanent link">&para;</a></h2>
-<p>Default credentials after install: <strong>admin</strong> / <strong>admin</strong>. Change under <strong>Settings</strong>.</p>
-<p>Password hash stored in the database settings table.</p>
+<p>Default credentials after install: <strong>admin</strong> / <strong>admin</strong>. Change under <strong>Settings</strong> (new password must be at least <strong>12 characters</strong>).</p>
+<p>Password hash stored in the database settings table. Failed login attempts are rate-limited (10 per client IP per minute).</p>
 <h2 id="enable-oidc">Enable OIDC<a class="headerlink" href="#enable-oidc" title="Permanent link">&para;</a></h2>
 <p>Set all three required variables:</p>
 <table>
@@ -2528,7 +2550,7 @@
 </tr>
 </tbody>
 </table>
-<p>Bypass (not recommended for production):</p>
+<p>Bypass (not recommended; <strong>refused when <code>TESTING</code> is not <code>true</code></strong>):</p>
 <table>
 <thead>
 <tr>
@@ -2539,7 +2561,7 @@
 <tbody>
 <tr>
 <td><code>OIDC_ALLOW_ANY_AUTHENTICATED=true</code></td>
-<td>Any authenticated IdP user gets admin UI access</td>
+<td>Any authenticated IdP user gets admin UI access (test environments only)</td>
 </tr>
 </tbody>
 </table>
@@ -2551,6 +2573,8 @@
 <li>Session flag <code>logged_in</code> set on success</li>
 </ol>
 <p>If OIDC initialization fails, UI falls back to local password form.</p>
+<h2 id="household-invites">Household invites<a class="headerlink" href="#household-invites" title="Permanent link">&para;</a></h2>
+<p>Share links resolve to <code>/invite/redeem/&lt;token&gt;</code>. Visiting the link while signed in shows a confirmation page; accepting the invite requires <strong>POST</strong> (or the confirm form submit). Expired or exhausted invites return HTTP 410.</p>
 <h2 id="agent-authentication">Agent authentication<a class="headerlink" href="#agent-authentication" title="Permanent link">&para;</a></h2>
 <p>OIDC protects the <strong>web UI only</strong>. Agents use WebSocket HMAC tokens independent of OIDC sessions.</p>
 <h2 id="related">Related<a class="headerlink" href="#related" title="Permanent link">&para;</a></h2>

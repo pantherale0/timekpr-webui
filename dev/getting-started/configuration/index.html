@@ -753,6 +753,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#session-cookies-optional" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Session cookies (optional)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#oidc-optional" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2416,6 +2427,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#session-cookies-optional" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Session cookies (optional)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#oidc-optional" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2538,7 +2560,7 @@
 <tbody>
 <tr>
 <td><code>REGISTRATION_TOKEN</code></td>
-<td>Optional firewall: new pairings must include this token in <code>hello</code></td>
+<td>Optional global firewall: new pairings must include this token in <code>hello</code> (or the household enrollment token from pairing QR)</td>
 </tr>
 <tr>
 <td><code>FCM_SERVER_KEY</code></td>
@@ -2592,6 +2614,29 @@
 </tbody>
 </table>
 <p>Set a task flag to <code>0</code>, <code>false</code>, <code>no</code>, or <code>off</code> to disable. See <a href="../../reference/background-worker/">Background worker</a>.</p>
+<h2 id="session-cookies-optional">Session cookies (optional)<a class="headerlink" href="#session-cookies-optional" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Description</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SESSION_COOKIE_SECURE</code></td>
+<td>Set <code>true</code>/<code>1</code>/<code>yes</code>/<code>on</code> when the UI is served only over HTTPS</td>
+<td>off</td>
+</tr>
+<tr>
+<td><code>SESSION_COOKIE_SAMESITE</code></td>
+<td>Cookie SameSite attribute (<code>Lax</code>, <code>Strict</code>, <code>None</code>)</td>
+<td><code>Lax</code></td>
+</tr>
+</tbody>
+</table>
+<p>HttpOnly is always enabled for the Flask session cookie.</p>
 <h2 id="oidc-optional">OIDC (optional)<a class="headerlink" href="#oidc-optional" title="Permanent link">&para;</a></h2>
 <p>See <a href="../../reference/auth-and-oidc/">Auth &amp; OIDC</a> for <code>OIDC_*</code> and <code>ALLOWED_OIDC_*</code> variables.</p>
 <h2 id="agent-side-configuration">Agent-side configuration<a class="headerlink" href="#agent-side-configuration" title="Permanent link">&para;</a></h2>

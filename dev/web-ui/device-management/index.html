@@ -2435,9 +2435,10 @@
 <p>New agent connections appear here until approved. Review hostname, platform, IP, and reported user profiles before approving.</p>
 <p>Actions:</p>
 <ul>
-<li><strong>Approve</strong> — issues per-device secret; agent receives <code>pairing_approved</code></li>
+<li><strong>Approve</strong> — issues per-device secret; agent receives <code>pairing_approved</code> (requires <code>can_manage_policies</code> or household admin)</li>
 <li><strong>Reject</strong> — blocks future auth (unless pending factory reset exception on Android)</li>
 </ul>
+<p>Parents without <strong>Manage policies</strong> permission on a linked child can view devices but cannot approve, reject, unenroll, capture screenshots, or apply hardware baseline changes.</p>
 <h2 id="approved-devices">Approved devices<a class="headerlink" href="#approved-devices" title="Permanent link">&para;</a></h2>
 <p>Click a device name for <strong>device detail</strong> (<code>/devices/&lt;system_id&gt;</code>). The default <strong>At a glance</strong> tab shows protection status, linked children, and console play time. Deeper controls are grouped by tab:</p>
 <ul>

@@ -2484,7 +2484,13 @@
 <p><strong>Add Device → Windows PC</strong> — run PowerShell/MSI installer as Administrator; approve pending device.</p>
 <p>See <a href="../../platforms/windows-agent/">Windows agent</a>.</p>
 <h2 id="registration-token">Registration token<a class="headerlink" href="#registration-token" title="Permanent link">&para;</a></h2>
-<p>If <code>REGISTRATION_TOKEN</code> is set on the server, agents must include it in <code>hello</code> or pairing is refused.</p>
+<p>Pairing QR codes and agent config include a <strong><code>registration_token</code></strong> field. This may be:</p>
+<ul>
+<li>The server-wide <strong><code>REGISTRATION_TOKEN</code></strong> environment variable, when set, or</li>
+<li>The household <strong><code>enrollment_token</code></strong> (multi-tenant installs; shown in <strong>Settings → Agent pairing</strong>)</li>
+</ul>
+<p>Agents must send this value in <code>hello</code>. It is required again when an approved device reconnects with <code>paired: false</code> to receive <code>pairing_approved</code>.</p>
+<p>If neither token is configured, open registration assigns new devices to the default household (suitable for local dev; use a token in production).</p>
 <h2 id="after-approval">After approval<a class="headerlink" href="#after-approval" title="Permanent link">&para;</a></h2>
 <ol>
 <li>Create or select child account</li>

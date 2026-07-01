@@ -2438,7 +2438,7 @@
 <li>Use <strong>Apply hardware baseline</strong> to set the supervisor password and attempt USB boot / Secure Boot enforcement.</li>
 <li>Use <strong>Reveal supervisor password</strong> if you need the escrowed password stored on the Guardian server.</li>
 </ol>
-<p>Apply and audit require the agent to be online. Actions are manual only; nothing runs automatically on device approval.</p>
+<p>Apply and audit require the agent to be online. Actions are manual only; nothing runs automatically on device approval. <strong>Apply</strong>, <strong>audit</strong>, and <strong>reveal supervisor password</strong> require <code>can_manage_policies</code> on a child mapped to the device (or household admin).</p>
 <h2 id="password-escrow">Password escrow<a class="headerlink" href="#password-escrow" title="Permanent link">&para;</a></h2>
 <ul>
 <li>The agent generates a random supervisor password in memory only.</li>

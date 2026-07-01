@@ -2435,7 +2435,7 @@
 <p>Create sources that hold domain lists:</p>
 <ul>
 <li><strong>Manual</strong> — enter domains in the UI</li>
-<li><strong>External URL</strong> — periodic refresh by the background worker (<code>TIMEKPR_TASKS_REFRESH_EXTERNAL</code>)</li>
+<li><strong>External URL</strong> — periodic refresh by the background worker (<code>TIMEKPR_TASKS_REFRESH_EXTERNAL</code>). URLs must be public <code>http</code>/<code>https</code> endpoints; private, loopback, and link-local hosts are rejected (SSRF protection).</li>
 </ul>
 <h2 id="assign-to-children">Assign to children<a class="headerlink" href="#assign-to-children" title="Permanent link">&para;</a></h2>
 <p>On each child profile (<strong>Edit Profile → Web filters</strong>), select which sources apply. The server builds a per-user domain policy manifest and syncs to agents via WebSocket domain policy commands.</p>

@@ -2480,10 +2480,10 @@
 <h2 id="webhook-delivery">Webhook delivery<a class="headerlink" href="#webhook-delivery" title="Permanent link">&para;</a></h2>
 <p>Configure under <strong>Settings</strong>:</p>
 <ol>
-<li>Enable webhook + URL</li>
+<li>Enable webhook + URL (must resolve to a <strong>public</strong> <code>http</code>/<code>https</code> host; loopback and private-network targets are rejected)</li>
 <li>Optional shared secret for HMAC header <code>X-Timekpr-Signature: sha256=…</code></li>
 </ol>
-<p>The worker (<code>TIMEKPR_TASKS_DELIVER_ALERTS</code>) POSTs JSON for pending alerts. Failed deliveries remain retryable according to server logic.</p>
+<p>The worker (<code>TIMEKPR_TASKS_DELIVER_ALERTS</code>) POSTs JSON for pending alerts. Outbound requests do not follow redirects. Failed deliveries remain retryable according to server logic.</p>
 <h2 id="related">Related<a class="headerlink" href="#related" title="Permanent link">&para;</a></h2>
 <ul>
 <li><a href="../../web-ui/access-requests/">Access requests</a></li>

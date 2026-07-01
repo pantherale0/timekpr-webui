@@ -781,6 +781,39 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#web-ui-session-hardening" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Web UI session hardening
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#parent-authorization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Parent authorization
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#outbound-url-safety-ssrf" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Outbound URL safety (SSRF)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#nintendo-and-xbox-sessions" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2427,6 +2460,39 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#web-ui-session-hardening" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Web UI session hardening
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#parent-authorization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Parent authorization
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#outbound-url-safety-ssrf" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Outbound URL safety (SSRF)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#nintendo-and-xbox-sessions" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2501,18 +2567,33 @@
 <h2 id="token-lifecycle">Token lifecycle<a class="headerlink" href="#token-lifecycle" title="Permanent link">&para;</a></h2>
 <ol>
 <li><strong><code>AGENT_TOKEN</code></strong> — server-wide bootstrap secret used only during initial pairing.</li>
-<li><strong>Per-device token</strong> — issued on approval (<code>pairing_approved</code>); stored in agent config; used for HMAC <code>register</code> messages.</li>
-<li><strong><code>REGISTRATION_TOKEN</code></strong> — optional extra gate on new <code>hello</code> messages when set on server and agent.</li>
+<li><strong>Per-device token</strong> — issued on approval (<code>pairing_approved</code>); stored in agent config; used for HMAC <code>register</code> messages and agent HTTP APIs such as <code>POST /api/access-request</code>.</li>
+<li><strong><code>REGISTRATION_TOKEN</code></strong> — optional global gate on new <code>hello</code> messages when set on server and agent.</li>
+<li><strong>Household <code>enrollment_token</code></strong> — per-household pairing secret (shown in pairing QR when multi-tenant). Either this token or <code>REGISTRATION_TOKEN</code> must be presented in <code>hello</code> for new devices, and again when an approved but unpaired agent requests token delivery over WebSocket.</li>
 </ol>
 <p>If an agent config file leaks, <strong>revoke the device</strong> in the admin UI rather than rotating only <code>AGENT_TOKEN</code>.</p>
 <h2 id="file-permissions-linux-agent">File permissions (Linux agent)<a class="headerlink" href="#file-permissions-linux-agent" title="Permanent link">&para;</a></h2>
 <p>Keep <code>/etc/guardian-agent/config.json</code> owned by <code>root:root</code> with mode <code>0600</code>.</p>
 <h2 id="registration-firewall">Registration firewall<a class="headerlink" href="#registration-firewall" title="Permanent link">&para;</a></h2>
-<p>Enable <code>REGISTRATION_TOKEN</code> on both server and agents to prevent unauthorized pending devices on your dashboard.</p>
+<p>Set <strong><code>REGISTRATION_TOKEN</code></strong> on the server and include it in agent pairing config (or use the household <strong>enrollment token</strong> from <strong>Settings → Agent pairing</strong>) to prevent unauthorized pending devices on your dashboard. Without a configured token, open-registration mode still works for single-tenant installs but is not recommended on internet-exposed servers.</p>
+<p>Approved agents that report <code>paired: false</code> no longer receive <code>pairing_approved</code> over WebSocket unless they resubmit a valid enrollment or registration token.</p>
+<h2 id="web-ui-session-hardening">Web UI session hardening<a class="headerlink" href="#web-ui-session-hardening" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Session cookies are <strong>HttpOnly</strong> with <strong>SameSite=Lax</strong> by default.</li>
+<li>Set <code>SESSION_COOKIE_SECURE=true</code> behind HTTPS so cookies are not sent over plain HTTP.</li>
+<li>Optional override: <code>SESSION_COOKIE_SAMESITE</code> (<code>Lax</code>, <code>Strict</code>, or <code>None</code>).</li>
+<li>Local admin passwords must be <strong>at least 12 characters</strong> (change default <code>admin</code> / <code>admin</code> immediately after install).</li>
+<li>Local login is rate-limited (10 attempts per client IP per minute).</li>
+<li>Household invite links (<code>/invite/redeem/&lt;token&gt;</code>) show a confirmation page on GET; redemption is a POST after sign-in (no automatic GET side effects).</li>
+</ul>
+<h2 id="parent-authorization">Parent authorization<a class="headerlink" href="#parent-authorization" title="Permanent link">&para;</a></h2>
+<p>Beyond household membership, sensitive device actions (approve/reject, unenroll, screenshot capture, hardware baseline apply, Windows LAPS reveal, etc.) require <strong><code>can_manage_policies</code></strong> on a child mapped to that device, or household owner/admin role. Read-only parents cannot perform these mutations.</p>
+<h2 id="outbound-url-safety-ssrf">Outbound URL safety (SSRF)<a class="headerlink" href="#outbound-url-safety-ssrf" title="Permanent link">&para;</a></h2>
+<p>The background worker validates <strong>external blocklist URLs</strong> and <strong>alert webhook URLs</strong> before fetching or POSTing. Only <code>http</code>/<code>https</code> URLs that resolve to routable public addresses are allowed; private, loopback, and link-local targets are rejected. Webhook delivery does not follow HTTP redirects.</p>
 <h2 id="nintendo-and-xbox-sessions">Nintendo and Xbox sessions<a class="headerlink" href="#nintendo-and-xbox-sessions" title="Permanent link">&para;</a></h2>
 <p>Linked cloud account tokens are stored in the server database. Restrict admin UI access and unlink accounts from <strong>Settings</strong> if the server may have been compromised.</p>
 <h2 id="oidc">OIDC<a class="headerlink" href="#oidc" title="Permanent link">&para;</a></h2>
-<p>When OIDC is enabled, configure allowlists (<code>ALLOWED_OIDC_ADMINS</code>, domains, roles, or groups). Avoid <code>OIDC_ALLOW_ANY_AUTHENTICATED=true</code> in production unless intentional.</p>
+<p>When OIDC is enabled, configure allowlists (<code>ALLOWED_OIDC_ADMINS</code>, domains, roles, or groups). <strong><code>OIDC_ALLOW_ANY_AUTHENTICATED=true</code> is refused in production</strong> (only honored when <code>TESTING=true</code>). Do not rely on it outside automated tests.</p>
 <p>See <a href="../../reference/auth-and-oidc/">Auth &amp; OIDC</a>.</p>
 <h2 id="alert-webhooks">Alert webhooks<a class="headerlink" href="#alert-webhooks" title="Permanent link">&para;</a></h2>
 <p>Webhook URLs configured in <strong>Settings</strong> receive JSON POSTs. Enable HMAC signing in settings to verify <code>X-Timekpr-Signature</code> on your receiver.</p>

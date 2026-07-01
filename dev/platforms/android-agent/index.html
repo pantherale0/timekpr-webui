@@ -3199,15 +3199,15 @@
 <ol>
 <li>Open <strong>Settings → Agent pairing</strong> in the TimeKpr WebUI.</li>
 <li>On the phone, open the app and tap <strong>Scan server QR code</strong> (or complete first-run setup).</li>
-<li>The app stores <code>server_url</code> (and optional <code>registration_token</code>) then opens a WebSocket <code>hello</code>.</li>
+<li>The app stores <code>server_url</code> and <code>registration_token</code> (household enrollment or global <code>REGISTRATION_TOKEN</code>) then opens a WebSocket <code>hello</code>.</li>
 <li>Approve the pending device in <strong>Admin → Devices</strong>.</li>
-<li>The server issues <code>pairing_approved</code>; the app stores the per-device token and reconnects with HMAC auth.</li>
+<li>The server issues <code>pairing_approved</code> when the client presents a valid enrollment token (required if the app reconnects with <code>paired: false</code>); the app stores the per-device token and reconnects with HMAC auth.</li>
 </ol>
 <p>Payload schema:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="p">{</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;timekpr_pairing&quot;</span><span class="p">,</span>
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span><span class="nt">&quot;server_url&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;wss://your-server.example/ws&quot;</span><span class="p">,</span>
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">  </span><span class="nt">&quot;registration_token&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;optional-firewall-token&quot;</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">  </span><span class="nt">&quot;registration_token&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;household-enrollment-or-global-token&quot;</span>
 <a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="p">}</span>
 </code></pre></div>
 <h3 id="android-mdm-provisioning-qr-factory-reset-6-tap">Android MDM provisioning QR (factory-reset / 6-tap)<a class="headerlink" href="#android-mdm-provisioning-qr-factory-reset-6-tap" title="Permanent link">&para;</a></h3>
@@ -3230,7 +3230,7 @@
 <li>Checksum: companion <code>guardian-android-agent-{tag}.signature-checksum</code> asset</li>
 </ul>
 <h4 id="development-servers">Development servers<a class="headerlink" href="#development-servers" title="Permanent link">&para;</a></h4>
-<p>When the server runs as <code>v0.0.0-dev</code>, no release assets exist. Build a <strong>release</strong> APK locally and upload it in <strong>Settings → Android MDM provisioning QR</strong>. The server stores the file, serves it at <code>/api/pairing/provisioning/apk</code>, and computes the signature checksum automatically (requires <code>apksigner</code> in <code>ANDROID_HOME</code> or <code>~/Android/Sdk/build-tools</code> on the server host).</p>
+<p>When the server runs as <code>v0.0.0-dev</code>, no release assets exist. Build a <strong>release</strong> APK locally and upload it in <strong>Settings → Android MDM provisioning QR</strong>. The server stores the file, serves it at <code>/api/pairing/provisioning/apk</code> (admin login required), and computes the signature checksum automatically (requires <code>apksigner</code> in <code>ANDROID_HOME</code> or <code>~/Android/Sdk/build-tools</code> on the server host).</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nb">cd</span><span class="w"> </span>android-agent
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>./gradlew<span class="w"> </span>assembleRelease
 </code></pre></div>
@@ -3524,7 +3524,7 @@
 <li>Reconnects after install via <code>PACKAGE_REPLACED</code> / install callback</li>
 </ol>
 <p><strong>Release servers:</strong> APK from <code>https://github.com/pantherale0/timekpr-webui/releases/download/{tag}/guardian-android-agent-{tag}.apk</code> with companion <code>.signature-checksum</code> asset.</p>
-<p><strong>Development servers:</strong> Upload a signed release APK in <strong>Settings → Android MDM provisioning QR</strong>; the server serves it at <code>/api/pairing/provisioning/apk</code> and includes that URL in the update response.</p>
+<p><strong>Development servers:</strong> Upload a signed release APK in <strong>Settings → Android MDM provisioning QR</strong>; the server serves it at <code>/api/pairing/provisioning/apk</code> (admin session required) and includes that URL in the update response.</p>
 <p>If <code>update_available</code> is false (dev server without uploaded APK), the agent shows the server error message and retries on the next sync cycle.</p>
 
 

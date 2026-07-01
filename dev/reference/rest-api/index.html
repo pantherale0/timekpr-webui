@@ -2116,6 +2116,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#access-requests-guardian-space-overlay" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Access requests (Guardian Space overlay)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#dashboard-and-tasks" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2548,6 +2559,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#access-requests-guardian-space-overlay" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Access requests (Guardian Space overlay)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#dashboard-and-tasks" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2609,7 +2631,7 @@
 <p>Guardian exposes JSON and form endpoints through Flask blueprints under <code>server/src/blueprints/api/</code>. Session cookie auth applies to most admin routes unless noted.</p>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
-<p>This reference lists primary routes; see source blueprints for full request bodies and CSRF requirements.</p>
+<p>This reference lists primary routes; see source blueprints for full request bodies and CSRF requirements. Browser form POSTs to session-backed routes require a valid CSRF token (<code>X-CSRFToken</code> header or hidden field). Bearer-token agent routes (<code>/api/access-request</code>, YouTube ingest, AI) are CSRF-exempt.</p>
 </div>
 <h2 id="devices">Devices<a class="headerlink" href="#devices" title="Permanent link">&para;</a></h2>
 <table>
@@ -2629,20 +2651,21 @@
 <tr>
 <td>POST</td>
 <td><code>/api/device/approve/&lt;system_id&gt;</code></td>
-<td>Approve device</td>
+<td>Approve device (requires <code>can_manage_policies</code> on a linked child or household admin)</td>
 </tr>
 <tr>
 <td>POST</td>
 <td><code>/api/device/reject/&lt;system_id&gt;</code></td>
-<td>Reject device</td>
+<td>Reject device (same permission as approve)</td>
 </tr>
 <tr>
 <td>POST</td>
 <td><code>/api/device/&lt;system_id&gt;/unenroll</code></td>
-<td>Unenroll device</td>
+<td>Unenroll device (admin permission required)</td>
 </tr>
 </tbody>
 </table>
+<p>Sensitive device routes (approve/reject, unenroll, screenshot capture/delete, hardware baseline apply/audit, Windows LAPS password reveal, Safe Mode lockdown clear) additionally require the signed-in parent to hold <strong><code>can_manage_policies</code></strong> on a child mapped to that device, or household owner/admin membership.</p>
 <h2 id="pairing">Pairing<a class="headerlink" href="#pairing" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -2676,12 +2699,12 @@
 <tr>
 <td>GET</td>
 <td><code>/api/pairing/provisioning/apk</code></td>
-<td>Dev/uploaded APK</td>
+<td>Dev/uploaded APK (session login required)</td>
 </tr>
 <tr>
 <td>GET</td>
 <td><code>/api/pairing/windows/msi</code></td>
-<td>Windows MSI download</td>
+<td>Windows MSI download (session login required)</td>
 </tr>
 </tbody>
 </table>
@@ -2777,7 +2800,7 @@
 <tr>
 <td>POST</td>
 <td><code>/blocklists/sources/&lt;id&gt;/refresh</code></td>
-<td>Refresh external URL</td>
+<td>Refresh external URL (public <code>http</code>/<code>https</code> only; SSRF-safe fetch)</td>
 </tr>
 <tr>
 <td>POST</td>
@@ -2891,6 +2914,40 @@
 <p>See <a href="../../platforms/nintendo-switch/">Nintendo Switch</a> and <a href="../../platforms/xbox/">Xbox</a> for <code>/api/nintendo/*</code> and <code>/api/xbox/*</code> routes.</p>
 <h2 id="screenshots">Screenshots<a class="headerlink" href="#screenshots" title="Permanent link">&para;</a></h2>
 <p>See <a href="../../features/screenshots/">Screenshots</a>.</p>
+<h2 id="access-requests-guardian-space-overlay">Access requests (Guardian Space overlay)<a class="headerlink" href="#access-requests-guardian-space-overlay" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Path</th>
+<th>Auth</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>POST</td>
+<td><code>/api/access-request</code></td>
+<td><code>Authorization: Bearer &lt;device secure_token&gt;</code></td>
+<td>Child overlay message → <code>access_requested</code> alert</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/access-request</code></td>
+<td>Session</td>
+<td>List recent overlay access requests</td>
+</tr>
+</tbody>
+</table>
+<p>POST body (JSON):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="p">{</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="nt">&quot;linux_username&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;child&quot;</span><span class="p">,</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span><span class="nt">&quot;reason&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;locked&quot;</span><span class="p">,</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">  </span><span class="nt">&quot;message&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Can I finish this level?&quot;</span><span class="p">,</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">  </span><span class="nt">&quot;system_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;optional-must-match-token-device&quot;</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="p">}</span>
+</code></pre></div>
+<p>Rate limit: 30 requests per client IP per minute. Agents must send the per-device token issued at approval (<code>pairing_approved</code>), not the bootstrap <code>AGENT_TOKEN</code>.</p>
 <h2 id="dashboard-and-tasks">Dashboard and tasks<a class="headerlink" href="#dashboard-and-tasks" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -2919,7 +2976,7 @@
 <tr>
 <td>POST</td>
 <td><code>/restart-tasks</code></td>
-<td>Restart worker hooks</td>
+<td>Restart worker hooks (POST only; session + CSRF)</td>
 </tr>
 </tbody>
 </table>

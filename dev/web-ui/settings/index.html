@@ -2455,15 +2455,19 @@
 <p><strong>Settings</strong> (<code>/settings</code>) covers server administration and integration setup.</p>
 <h2 id="account">Account<a class="headerlink" href="#account" title="Permanent link">&para;</a></h2>
 <ul>
-<li>Change local admin password</li>
+<li>Change local admin password (minimum <strong>12 characters</strong>)</li>
 <li><strong>OIDC</strong> — when env vars configured, login redirects to IdP (see <a href="../../reference/auth-and-oidc/">Auth &amp; OIDC</a>)</li>
 </ul>
 <h2 id="agent-pairing">Agent pairing<a class="headerlink" href="#agent-pairing" title="Permanent link">&para;</a></h2>
 <ul>
-<li><strong>In-app QR</strong> — JSON payload with <code>wss://</code> server URL and optional <code>registration_token</code></li>
+<li><strong>In-app QR</strong> — JSON payload with <code>wss://</code> server URL and <code>registration_token</code> (household enrollment token or global <code>REGISTRATION_TOKEN</code>)</li>
 <li><strong>Android MDM provisioning QR</strong> — factory-reset 6-tap flow; upload dev release APK when running <code>v0.0.0-dev</code></li>
 <li>Set <strong><code>TIMEKPR_AGENT_WS_URL</code></strong> when behind a reverse proxy so QR codes are correct</li>
 </ul>
+<div class="admonition note">
+<p class="admonition-title">Installer downloads</p>
+<p>Dev APK (<code>/api/pairing/provisioning/apk</code>) and Windows MSI (<code>/api/pairing/windows/msi</code>) require an authenticated admin session. Sign in to the dashboard before downloading or copying direct links into installers.</p>
+</div>
 <h2 id="cloud-accounts">Cloud accounts<a class="headerlink" href="#cloud-accounts" title="Permanent link">&para;</a></h2>
 <ul>
 <li><strong>Nintendo Switch Account</strong> — link once for console import</li>
@@ -2471,7 +2475,7 @@
 </ul>
 <h2 id="alerts">Alerts<a class="headerlink" href="#alerts" title="Permanent link">&para;</a></h2>
 <ul>
-<li>Enable outbound <strong>webhook</strong> URL</li>
+<li>Enable outbound <strong>webhook</strong> URL (must be a public <code>http</code>/<code>https</code> endpoint; private/internal hosts are rejected)</li>
 <li>Optional HMAC secret for signature verification</li>
 </ul>
 <h2 id="app-settings">App settings<a class="headerlink" href="#app-settings" title="Permanent link">&para;</a></h2>

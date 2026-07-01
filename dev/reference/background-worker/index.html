@@ -2535,7 +2535,7 @@
 <tbody>
 <tr>
 <td><code>TIMEKPR_TASKS_REFRESH_EXTERNAL</code></td>
-<td>Download/update external blocklist URLs</td>
+<td>Download/update external blocklist URLs (SSRF-validated; redirects not followed on fetch)</td>
 </tr>
 <tr>
 <td><code>TIMEKPR_TASKS_UPDATE_USER_DATA</code></td>
@@ -2566,7 +2566,7 @@
 <h2 id="monitoring">Monitoring<a class="headerlink" href="#monitoring" title="Permanent link">&para;</a></h2>
 <ul>
 <li><code>GET /api/task-status</code> — JSON status</li>
-<li><code>POST /restart-tasks</code> — administrative restart hook</li>
+<li><code>POST /restart-tasks</code> — administrative restart hook (POST only; session auth + CSRF)</li>
 </ul>
 <h2 id="production-guidance">Production guidance<a class="headerlink" href="#production-guidance" title="Permanent link">&para;</a></h2>
 <div class="admonition warning">

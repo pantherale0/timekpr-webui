@@ -2409,6 +2409,7 @@
 
 <h1 id="access-requests">Access requests<a class="headerlink" href="#access-requests" title="Permanent link">&para;</a></h1>
 <p>When a child uses <strong>allowlist</strong>, <strong>blocklist</strong>, or <strong>approval on block</strong> modes, agents emit <code>access_requested</code> alerts. Review them under <strong>Admin → Access Requests</strong> (<code>/admin/approvals</code>).</p>
+<p>Guardian Space overlay messages use the same alert type and are submitted by agents via <strong><code>POST /api/access-request</code></strong> with <code>Authorization: Bearer &lt;per-device secure_token&gt;</code>.</p>
 <h2 id="request-types">Request types<a class="headerlink" href="#request-types" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
