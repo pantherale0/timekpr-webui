@@ -381,14 +381,17 @@
         }
     }
 
-    function prepareNintendoSettingsLogin() {
+    function prepareNintendoSettingsLogin(forceNewLogin) {
         if (nintendoSettingsLinkPanel) {
             nintendoSettingsLinkPanel.classList.remove('d-none');
         }
         if (nintendoSettingsRedirectUrl) {
             nintendoSettingsRedirectUrl.value = '';
         }
-        fetch('/api/nintendo/login-url')
+        const loginUrlEndpoint = forceNewLogin
+            ? '/api/nintendo/login-url?force=1'
+            : '/api/nintendo/login-url';
+        fetch(loginUrlEndpoint)
             .then(r => r.json())
             .then(res => {
                 if (res.success && nintendoSettingsLoginBtn) {
@@ -439,7 +442,7 @@
     }
 
     if (nintendoSettingsRelinkBtn) {
-        nintendoSettingsRelinkBtn.addEventListener('click', prepareNintendoSettingsLogin);
+        nintendoSettingsRelinkBtn.addEventListener('click', () => prepareNintendoSettingsLogin(true));
     }
 
     if (nintendoSettingsUnlinkBtn) {

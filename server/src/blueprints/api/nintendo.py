@@ -1,16 +1,21 @@
 import aiohttp
 import logging
 from datetime import datetime, timezone
+from urllib.parse import unquote, urlencode, urlparse, urlunparse
+
 from flask import Blueprint, jsonify, request, session
-from src.models import db, AgentDevice, Settings
-from src.common.nintendo_sync import run_async
 from pynintendoparental import Authenticator, NintendoParental
+from pynintendoauth.exceptions import HttpException
+from src.common.nintendo_sync import run_async
+from src.models import AgentDevice, Settings, db
 
 _LOGGER = logging.getLogger(__name__)
 api_nintendo_bp = Blueprint('api_nintendo', __name__)
 
 NINTENDO_SESSION_TOKEN_KEY = 'nintendo_session_token'
 NINTENDO_LINKED_AT_KEY = 'nintendo_linked_at'
+NINTENDO_LOGIN_URL_KEY = 'nintendo_login_url'
+NINTENDO_CODE_VERIFIER_KEY = 'nintendo_code_verifier'
 
 
 def get_nintendo_account_summary(*, validate=False):
@@ -52,6 +57,53 @@ def _enrolled_nintendo_device_ids():
         for device in AgentDevice.query.filter_by(platform='nintendo').all()
     }
 
+
+def _truthy_query_flag(value: str) -> bool:
+    return value.strip().lower() in {'1', 'true', 'yes'}
+
+
+def _clear_nintendo_oauth_session() -> None:
+    session.pop(NINTENDO_LOGIN_URL_KEY, None)
+    session.pop(NINTENDO_CODE_VERIFIER_KEY, None)
+
+
+def normalize_nintendo_response_url(response_url: str) -> str:
+    """Normalize pasted Nintendo OAuth redirect URLs for pynintendoauth."""
+    response_url = (response_url or '').strip()
+    if not response_url:
+        raise ValueError('Redirect URL is required.')
+
+    parsed = urlparse(response_url)
+    params = {}
+    for part in (parsed.fragment, parsed.query):
+        if not part:
+            continue
+        for param in part.split('&'):
+            if '=' not in param:
+                continue
+            key, value = param.split('=', 1)
+            params[key] = unquote(value)
+        if params:
+            break
+
+    if 'session_token_code' not in params:
+        raise ValueError(
+            'Could not find session_token_code in the redirect URL. '
+            'Paste the full npf...://auth#... link from Nintendo sign-in.'
+        )
+
+    fragment = urlencode(params)
+    return urlunparse((parsed.scheme, parsed.netloc, parsed.path, '', '', fragment))
+
+
+def _nintendo_auth_client_error(exc: Exception) -> bool:
+    if isinstance(exc, ValueError):
+        return True
+    if isinstance(exc, HttpException) and exc.status_code < 500:
+        return True
+    return False
+
+
 async def _get_login_url_async():
     async with aiohttp.ClientSession() as client_session:
         auth = Authenticator(client_session=client_session)
@@ -63,9 +115,19 @@ def get_login_url():
     if not session.get('logged_in'):
         return jsonify({'success': False, 'message': 'Not authenticated'}), 401
 
+    force = _truthy_query_flag(request.args.get('force', ''))
+    cached_login_url = session.get(NINTENDO_LOGIN_URL_KEY)
+    cached_verifier = session.get(NINTENDO_CODE_VERIFIER_KEY)
+    if not force and cached_login_url and cached_verifier:
+        return jsonify({
+            'success': True,
+            'login_url': cached_login_url,
+        })
+
     try:
         login_url, code_verifier = run_async(_get_login_url_async())
-        session['nintendo_code_verifier'] = code_verifier
+        session[NINTENDO_CODE_VERIFIER_KEY] = code_verifier
+        session[NINTENDO_LOGIN_URL_KEY] = login_url
         return jsonify({
             'success': True,
             'login_url': login_url
@@ -74,12 +136,13 @@ def get_login_url():
         _LOGGER.error("Failed to generate login URL: %s", exc)
         return jsonify({'success': False, 'message': f'Failed to generate login URL: {str(exc)}'}), 500
 
+
 async def _authenticate_async(response_url, code_verifier):
     async with aiohttp.ClientSession() as client_session:
         auth = Authenticator(client_session=client_session)
         # Restore the verifier to match the initial challenge generated
         auth._auth_code_verifier = code_verifier
-        await auth.async_complete_login(response_url)
+        await auth.async_complete_login(normalize_nintendo_response_url(response_url))
         return auth.session_token
 
 @api_nintendo_bp.route('/api/nintendo/authenticate', methods=['POST'])
@@ -90,20 +153,29 @@ def authenticate_nintendo():
 
     payload = request.get_json() or {}
     response_url = payload.get('response_url')
-    code_verifier = session.get('nintendo_code_verifier')
+    code_verifier = session.get(NINTENDO_CODE_VERIFIER_KEY)
 
     if not response_url or not code_verifier:
         return jsonify({'success': False, 'message': 'Missing response URL or session state'}), 400
+
+    try:
+        normalize_nintendo_response_url(response_url)
+    except ValueError as exc:
+        _LOGGER.warning("Nintendo login rejected: %s", exc)
+        return jsonify({'success': False, 'message': str(exc)}), 400
 
     try:
         session_token = run_async(_authenticate_async(response_url, code_verifier))
         if session_token:
             Settings.set_value(NINTENDO_SESSION_TOKEN_KEY, session_token)
             Settings.set_value(NINTENDO_LINKED_AT_KEY, datetime.now(timezone.utc).isoformat())
-            session.pop('nintendo_code_verifier', None)
+            _clear_nintendo_oauth_session()
             return jsonify({'success': True, 'message': 'Successfully linked Nintendo Account!'})
         return jsonify({'success': False, 'message': 'Failed to obtain session token'}), 400
     except Exception as exc:
+        if _nintendo_auth_client_error(exc):
+            _LOGGER.warning("Nintendo login rejected: %s", exc)
+            return jsonify({'success': False, 'message': f'Authentication failed: {str(exc)}'}), 400
         _LOGGER.error("Nintendo login error: %s", exc)
         return jsonify({'success': False, 'message': f'Authentication failed: {str(exc)}'}), 500
 
@@ -171,7 +243,7 @@ def unlink_nintendo_account():
 
     Settings.set_value(NINTENDO_SESSION_TOKEN_KEY, '')
     Settings.set_value(NINTENDO_LINKED_AT_KEY, '')
-    session.pop('nintendo_code_verifier', None)
+    _clear_nintendo_oauth_session()
     return jsonify({'success': True, 'message': 'Nintendo Account unlinked.'})
 
 @api_nintendo_bp.route('/api/nintendo/import-device', methods=['POST'])
