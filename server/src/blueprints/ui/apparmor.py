@@ -235,6 +235,9 @@ def update_user_app_policies(user_id):
         flash_t('flash.auth.login_required', 'warning')
         return redirect(url_for('ui_auth.login'))
 
+    from src.common.helpers import check_parent_child_access
+    check_parent_child_access(user_id)
+
     user = ManagedUser.query.get_or_404(user_id)
     selected_ids = {
         int(raw_id)

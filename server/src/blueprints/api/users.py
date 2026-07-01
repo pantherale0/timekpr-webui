@@ -155,6 +155,9 @@ def apply_policy_preset_route(user_id):
     if not session.get('logged_in'):
         return jsonify({'success': False, 'message': api_message('not_authenticated')}), 401
 
+    from src.common.helpers import check_parent_child_access
+    check_parent_child_access(user_id)
+
     user = ManagedUser.query.get_or_404(user_id)
     policy_age_bracket = (request.form.get('policy_age_bracket') or '').strip()
     policy_maturity_level = (request.form.get('policy_maturity_level') or '').strip()
@@ -186,6 +189,9 @@ def apply_policy_preset_route(user_id):
 def add_user_mapping(user_id):
     if not session.get('logged_in'):
         return jsonify({'success': False, 'message': api_message('not_authenticated')}), 401
+
+    from src.common.helpers import check_parent_child_access
+    check_parent_child_access(user_id)
 
     user = ManagedUser.query.get_or_404(user_id)
     system_id = (request.form.get('system_id') or '').strip()
@@ -259,6 +265,9 @@ def add_user_mapping(user_id):
 def connect_user_mapping(user_id):
     if not session.get('logged_in'):
         return jsonify({'success': False, 'message': api_message('not_authenticated')}), 401
+
+    from src.common.helpers import check_parent_child_access
+    check_parent_child_access(user_id)
 
     payload = request.get_json(silent=True) or {}
     system_id = (payload.get('system_id') or '').strip()
@@ -426,6 +435,9 @@ def validate_user(user_id):
     if not session.get('logged_in'):
         return jsonify({'success': False, 'message': api_message('not_authenticated')}), 401
 
+    from src.common.helpers import check_parent_child_access
+    check_parent_child_access(user_id)
+
     user = ManagedUser.query.get_or_404(user_id)
     mappings = list(user.device_mappings)
     if not mappings:
@@ -477,6 +489,9 @@ def validate_mapping(user_id, mapping_id):
     if not session.get('logged_in'):
         return jsonify({'success': False, 'message': api_message('not_authenticated')}), 401
 
+    from src.common.helpers import check_parent_child_access
+    check_parent_child_access(user_id)
+
     user = ManagedUser.query.get_or_404(user_id)
     mapping = ManagedUserDeviceMap.query.filter_by(id=mapping_id, managed_user_id=user.id).first_or_404()
     previous_linux_uid = mapping.linux_uid
@@ -511,6 +526,9 @@ def delete_mapping(user_id, mapping_id):
     if not session.get('logged_in'):
         return jsonify({'success': False, 'message': api_message('not_authenticated')}), 401
 
+    from src.common.helpers import check_parent_child_access
+    check_parent_child_access(user_id)
+
     user = ManagedUser.query.get_or_404(user_id)
     mapping = ManagedUserDeviceMap.query.filter_by(id=mapping_id, managed_user_id=user.id).first_or_404()
     mapping_label = _mapping_display_label(mapping)
@@ -533,6 +551,9 @@ def delete_user(user_id):
     if not session.get('logged_in'):
         return jsonify({'success': False, 'message': api_message('not_authenticated')}), 401
     
+    from src.common.helpers import check_parent_child_access
+    check_parent_child_access(user_id)
+
     user = ManagedUser.query.get_or_404(user_id)
     username = user.username
     affected_system_ids = {mapping.system_id for mapping in user.device_mappings}
@@ -553,6 +574,9 @@ def get_user_usage(user_id):
     if not session.get('logged_in'):
         return jsonify({'success': False, 'message': api_message('not_authenticated')}), 401
     
+    from src.common.helpers import check_parent_child_access
+    check_parent_child_access(user_id)
+
     user = ManagedUser.query.get_or_404(user_id)
     days = request.args.get('days', 7, type=int)
     
@@ -658,6 +682,9 @@ def get_user_stats(user_id):
     """API endpoint to get user usage analytics, including daily totals and per-app usage in a date range."""
     if not session.get('logged_in'):
         return jsonify({'success': False, 'message': api_message('not_authenticated')}), 401
+
+    from src.common.helpers import check_parent_child_access
+    check_parent_child_access(user_id)
 
     user = ManagedUser.query.get_or_404(user_id)
     start_date_str = request.args.get('start_date')
@@ -769,6 +796,9 @@ def update_overlay_settings(user_id):
     if not session.get('logged_in'):
         return jsonify({'success': False, 'message': api_message('not_authenticated')}), 401
 
+    from src.common.helpers import check_parent_child_access
+    check_parent_child_access(user_id)
+
     user = ManagedUser.query.get_or_404(user_id)
     data = request.get_json(silent=True) or {}
 
@@ -804,6 +834,9 @@ def update_overlay_settings(user_id):
 def inspect_item(user_id):
     if not session.get('logged_in'):
         return jsonify({'success': False, 'message': 'Not authenticated'}), 401
+
+    from src.common.helpers import check_parent_child_access
+    check_parent_child_access(user_id)
 
     user = ManagedUser.query.get_or_404(user_id)
     inspect_type = request.args.get('type', '').strip().lower()
@@ -926,6 +959,9 @@ def whitelist_item(user_id):
     if not session.get('logged_in'):
         return jsonify({'success': False, 'message': 'Not authenticated'}), 401
 
+    from src.common.helpers import check_parent_child_access
+    check_parent_child_access(user_id)
+
     user = ManagedUser.query.get_or_404(user_id)
     inspect_type = request.form.get('type', '').strip().lower()
     value = request.form.get('value', '').strip()
@@ -974,6 +1010,9 @@ def whitelist_item(user_id):
 def block_item(user_id):
     if not session.get('logged_in'):
         return jsonify({'success': False, 'message': 'Not authenticated'}), 401
+
+    from src.common.helpers import check_parent_child_access
+    check_parent_child_access(user_id)
 
     user = ManagedUser.query.get_or_404(user_id)
     inspect_type = request.form.get('type', '').strip().lower()

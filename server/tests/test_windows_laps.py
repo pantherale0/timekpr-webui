@@ -82,3 +82,26 @@ def test_clear_safe_mode_lockdown_offline(auth_client, windows_device, monkeypat
         json={},
     )
     assert response.status_code == 409
+
+
+def test_windows_laps_status_denies_unauthorized_household(auth_client, windows_device, db_session):
+    from src.models import ParentAccount, Household, HouseholdParentMembership
+    
+    # 1. Create a parent and a household they belong to
+    parent = ParentAccount(email='other_parent@local', name='Other Parent')
+    db_session.add(parent)
+    household = Household(name='Other Household')
+    db_session.add(household)
+    db_session.flush()
+    
+    membership = HouseholdParentMembership(household_id=household.id, parent_account_id=parent.id)
+    db_session.add(membership)
+    db_session.commit()
+    
+    # 2. Login the client as this other parent
+    with auth_client.session_transaction() as sess:
+        sess['parent_account_id'] = parent.id
+        
+    # 3. Request LAPS status for a device that is NOT in this household
+    response = auth_client.get(f'/api/devices/{windows_device.system_id}/windows-laps')
+    assert response.status_code == 403

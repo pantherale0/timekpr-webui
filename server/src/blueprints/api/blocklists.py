@@ -90,9 +90,14 @@ def delete_blocklist_source(source_id):
     source_row = db.session.query(
         BlocklistSource.id,
         BlocklistSource.name,
+        BlocklistSource.is_marketplace,
+        BlocklistSource.preset_id,
     ).filter_by(id=source_id).first()
     if source_row is None:
         abort(404)
+
+    if source_row.is_marketplace or source_row.preset_id:
+        abort(403)
 
     source_name = source_row.name
     ManagedUserBlocklistAssignment.query.filter_by(source_id=source_id).delete(
@@ -129,6 +134,8 @@ def toggle_blocklist_source(source_id):
         return jsonify({'success': False, 'message': 'Not authenticated'}), 401
 
     source = BlocklistSource.query.get_or_404(source_id)
+    if source.is_marketplace or source.preset_id:
+        abort(403)
     source.is_enabled = request.form.get('is_enabled') == 'on'
     source.updated_at = datetime.now(timezone.utc)
     db.session.commit()
@@ -150,6 +157,8 @@ def add_blocklist_domain(source_id):
         return jsonify({'success': False, 'message': 'Not authenticated'}), 401
 
     source = BlocklistSource.query.get_or_404(source_id)
+    if source.is_marketplace or source.preset_id:
+        abort(403)
     if source.source_type != BlocklistSource.TYPE_MANUAL:
         flash_t('flash.blocklists.manual_only', 'warning')
         return redirect(url_for('ui_dashboard.settings'))
@@ -188,6 +197,8 @@ def delete_blocklist_domain(source_id, domain_id):
         return jsonify({'success': False, 'message': 'Not authenticated'}), 401
 
     source = BlocklistSource.query.get_or_404(source_id)
+    if source.is_marketplace or source.preset_id:
+        abort(403)
     domain = BlocklistDomain.query.filter_by(id=domain_id, source_id=source.id).first_or_404()
     domain_text = domain.domain
     db.session.delete(domain)
@@ -209,8 +220,8 @@ def delete_blocklist_domain(source_id, domain_id):
 
 @api_blocklists_bp.route('/managed-users/<int:user_id>/blocklists/update', methods=['POST'])
 def update_user_blocklists(user_id):
-    if not session.get('logged_in'):
-        return jsonify({'success': False, 'message': 'Not authenticated'}), 401
+    from src.common.helpers import check_parent_child_access
+    check_parent_child_access(user_id)
 
     user = ManagedUser.query.get_or_404(user_id)
     selected_ids = {
@@ -256,8 +267,8 @@ def update_user_blocklists(user_id):
 
 @api_blocklists_bp.route('/api/user/<int:user_id>/blocklists/sync-status')
 def get_blocklist_sync_status(user_id):
-    if not session.get('logged_in'):
-        return jsonify({'success': False, 'message': 'Not authenticated'}), 401
+    from src.common.helpers import check_parent_child_access
+    check_parent_child_access(user_id)
 
     user = ManagedUser.query.get_or_404(user_id)
     status = _build_user_blocklist_sync_status(user)
@@ -275,8 +286,8 @@ def get_blocklist_sync_status(user_id):
 
 @api_blocklists_bp.route('/managed-users/<int:user_id>/blocklists/subscribe-marketplace', methods=['POST'])
 def subscribe_user_marketplace(user_id):
-    if not session.get('logged_in'):
-        return jsonify({'success': False, 'message': 'Not authenticated'}), 401
+    from src.common.helpers import check_parent_child_access
+    check_parent_child_access(user_id)
 
     user = ManagedUser.query.get_or_404(user_id)
     selected_preset_ids = request.form.getlist('preset_ids')

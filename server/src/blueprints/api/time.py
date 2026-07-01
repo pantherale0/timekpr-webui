@@ -30,6 +30,9 @@ def modify_time():
     except ValueError:
         return jsonify({'success': False, 'message': api_message('invalid_params')}), 400
     
+    from src.common.helpers import check_parent_child_access
+    check_parent_child_access(user_id)
+    
     if operation not in ['+', '-']:
         return jsonify({'success': False, 'message': api_message('invalid_operation')}), 400
     

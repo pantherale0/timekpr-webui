@@ -26,6 +26,8 @@ def windows_laps_status(system_id):
     denied = _require_admin_session()
     if denied:
         return denied
+    from src.common.helpers import check_parent_device_access
+    check_parent_device_access(system_id)
     device = AgentDevice.query.get(system_id)
     if not device:
         return jsonify({'success': False, 'message': api_message('device_not_found')}), 404
@@ -38,6 +40,8 @@ def windows_laps_reveal_password(system_id):
     denied = _require_admin_session()
     if denied:
         return denied
+    from src.common.helpers import check_parent_device_access
+    check_parent_device_access(system_id)
     result = reveal_escrowed_password(system_id)
     status_code = result.pop('status_code', 200)
     return jsonify(result), status_code
@@ -48,6 +52,8 @@ def windows_laps_clear_safe_mode_lockdown(system_id):
     denied = _require_admin_session()
     if denied:
         return denied
+    from src.common.helpers import check_parent_device_access
+    check_parent_device_access(system_id)
     result = clear_safe_mode_lockdown(system_id)
     status_code = result.pop('status_code', 200)
     return jsonify(result), status_code

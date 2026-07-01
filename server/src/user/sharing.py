@@ -6,7 +6,7 @@ def process_pending_invite_redemption(parent_account_id, token_code):
     Process the redemption of a child profile sharing invitation.
     Creates a ManagedUserShare entry and marks the invite as used.
     """
-    invite = ManagedUserShareInvite.query.filter_by(invite_code=token_code).first()
+    invite = ManagedUserShareInvite.query.filter_by(invite_code=token_code).with_for_update().first()
     if not invite:
         return False, "Invitation code not found."
 
