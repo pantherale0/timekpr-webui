@@ -2,6 +2,7 @@ import sqlite3
 import bcrypt
 from sqlalchemy import event
 from sqlalchemy.engine import Engine
+from sqlalchemy.exc import IntegrityError
 from flask_sqlalchemy import SQLAlchemy
 
 db = SQLAlchemy()
@@ -40,7 +41,17 @@ class Settings(db.Model):
             setting.key = key
             setting.value = value
             db.session.add(setting)
-        db.session.commit()
+        
+        try:
+            db.session.commit()
+        except IntegrityError:
+            db.session.rollback()
+            setting = cls.query.filter_by(key=key).first()
+            if setting:
+                setting.value = value
+                db.session.commit()
+            else:
+                raise
         return setting
     
     @classmethod

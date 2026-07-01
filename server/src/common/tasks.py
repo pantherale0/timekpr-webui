@@ -199,6 +199,8 @@ class BackgroundTaskManager:
         self._domain_policy_sync_lock = threading.Lock()
         self._domain_policy_sync_in_progress = set()
         self._domain_policy_sync_pending = set()
+        self._blocklist_sync_lock = threading.Lock()
+        self._blocklist_sync_locks = {}
         self.refresh_external_blocklists_enabled = refresh_external_blocklists
         self.update_user_data_enabled = update_user_data
         self.sync_domain_policies_enabled = sync_domain_policies
@@ -574,6 +576,7 @@ class BackgroundTaskManager:
                                 today,
                             )
                             effective_daily_limit_seconds = user.get_effective_daily_limit_seconds(today)
+                            db.session.flush()
                         except ValueError:
                             logger.warning(
                                 "Ignoring invalid pending adjustment for %s: %s%s",
@@ -781,6 +784,16 @@ class BackgroundTaskManager:
                         for interval in unsynced_intervals:
                             interval.mark_synced()
 
+                    db.session.flush()
+
+                    try:
+                        db.session.refresh(user)
+                        for m in mappings:
+                            db.session.refresh(m)
+                        effective_daily_limit_seconds = user.get_effective_daily_limit_seconds(today)
+                    except Exception as exc:
+                        logger.warning("Failed to refresh user/mapping state during sync: %s", exc)
+
                     if user.pending_time_adjustment is not None and user.pending_time_operation is not None:
                         if effective_daily_limit_seconds is not None and online_mappings > 0:
                             user.pending_time_adjustment = None
@@ -903,6 +916,15 @@ class BackgroundTaskManager:
 
     def refresh_external_blocklist_source(self, source_id, force=False):
         """Refresh a single external blocklist source and persist its new revision."""
+        with self._blocklist_sync_lock:
+            if source_id not in self._blocklist_sync_locks:
+                self._blocklist_sync_locks[source_id] = threading.Lock()
+            lock = self._blocklist_sync_locks[source_id]
+
+        with lock:
+            return self._refresh_external_blocklist_source_locked(source_id, force=force)
+
+    def _refresh_external_blocklist_source_locked(self, source_id, force=False):
         source = BlocklistSource.query.get(source_id)
         if not source:
             return False, 'Blocklist source not found'

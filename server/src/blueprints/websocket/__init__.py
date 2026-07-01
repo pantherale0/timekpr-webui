@@ -386,11 +386,14 @@ def ws_agent_handler(ws):
                         if deliver_pending_factory_reset_on_connect(system_id):
                             return
 
-                    threading.Thread(
-                        target=_flush_pending_commands_on_connect,
-                        args=(system_id, app),
-                        daemon=True,
-                    ).start()
+                    if app.config.get('TESTING'):
+                        _flush_pending_commands_on_connect(system_id, app)
+                    else:
+                        threading.Thread(
+                            target=_flush_pending_commands_on_connect,
+                            args=(system_id, app),
+                            daemon=True,
+                        ).start()
     
         except ConnectionClosed as exc:
             if system_id:

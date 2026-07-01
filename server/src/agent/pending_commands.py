@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import threading
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
@@ -508,83 +509,98 @@ def expire_stale_commands() -> int:
     return len(expired_rows)
 
 
+_flush_locks = {}
+_flush_locks_lock = threading.Lock()
+
+
 def flush_pending_commands(system_id: str, *, app=None) -> FlushResult:
     """Deliver pending commands for a device in FIFO order."""
     from src.agent.helper import AgentConnectionManager
 
-    result = FlushResult()
-    if app is not None:
-        ctx = app.app_context()
-        ctx.push()
+    with _flush_locks_lock:
+        if system_id not in _flush_locks:
+            _flush_locks[system_id] = threading.Lock()
+        lock = _flush_locks[system_id]
 
-    try:
-        expire_stale_commands()
+    with lock:
+        result = FlushResult()
+        if app is not None:
+            ctx = app.app_context()
+            ctx.push()
 
-        while AgentConnectionManager.is_online(system_id):
-            row = (
-                PendingCommand.query.filter_by(
-                    system_id=system_id,
-                    status=PendingCommand.STATUS_PENDING,
+        try:
+            expire_stale_commands()
+
+            while AgentConnectionManager.is_online(system_id):
+                row = (
+                    PendingCommand.query.filter_by(
+                        system_id=system_id,
+                        status=PendingCommand.STATUS_PENDING,
+                    )
+                    .order_by(PendingCommand.created_at.asc())
+                    .first()
                 )
-                .order_by(PendingCommand.created_at.asc())
-                .first()
-            )
-            if row is None:
-                break
+                if row is None:
+                    break
 
-            if _is_expired(row.expires_at):
-                _mark_row_expired(row)
-                db.session.commit()
-                result.expired += 1
-                continue
+                if _is_expired(row.expires_at):
+                    _mark_row_expired(row)
+                    db.session.commit()
+                    result.expired += 1
+                    continue
 
-            row.status = PendingCommand.STATUS_IN_FLIGHT
-            row.updated_at = _utcnow()
-            db.session.commit()
-
-            try:
-                success, message = _execute_pending_row(row)
-            except (OSError, RuntimeError, SQLAlchemyError, TypeError, ValueError) as exc:
-                success = False
-                message = str(exc)
-
-            if not AgentConnectionManager.is_online(system_id):
-                row.status = PendingCommand.STATUS_PENDING
+                row.status = PendingCommand.STATUS_IN_FLIGHT
                 row.updated_at = _utcnow()
                 db.session.commit()
-                result.skipped_offline += 1
-                break
 
-            if success:
-                _mark_row_completed(row)
-                if row.action == 'factory_reset':
-                    device = AgentDevice.query.get(system_id)
-                    if device is not None:
-                        device.pending_factory_reset = False
-                db.session.commit()
-                result.delivered += 1
-                _LOGGER.info(
-                    'Delivered pending command %s (%s) to %s',
-                    row.id,
-                    row.action,
-                    system_id,
-                )
-            else:
-                _mark_row_failed(row, message)
-                db.session.commit()
-                result.failed += 1
-                _LOGGER.warning(
-                    'Pending command %s (%s) failed for %s: %s',
-                    row.id,
-                    row.action,
-                    system_id,
-                    message,
-                )
-    finally:
-        if app is not None:
-            ctx.pop()
+                try:
+                    success, message = _execute_pending_row(row)
+                except (OSError, RuntimeError, SQLAlchemyError, TypeError, ValueError) as exc:
+                    success = False
+                    message = str(exc)
 
-    return result
+                if not AgentConnectionManager.is_online(system_id):
+                    row.status = PendingCommand.STATUS_PENDING
+                    row.updated_at = _utcnow()
+                    db.session.commit()
+                    result.skipped_offline += 1
+                    break
+
+                if success:
+                    _mark_row_completed(row)
+                    if row.action == 'factory_reset':
+                        device = AgentDevice.query.get(system_id)
+                        if device is not None:
+                            device.pending_factory_reset = False
+                    db.session.commit()
+                    result.delivered += 1
+                    _LOGGER.info(
+                        'Delivered pending command %s (%s) to %s',
+                        row.id,
+                        row.action,
+                        system_id,
+                    )
+                else:
+                    _mark_row_failed(row, message)
+                    db.session.commit()
+                    result.failed += 1
+                    _LOGGER.warning(
+                        'Pending command %s (%s) failed for %s: %s',
+                        row.id,
+                        row.action,
+                        system_id,
+                        message,
+                    )
+        except Exception as exc:
+            import traceback
+            with open("/home/jordanh/Documents/timekpr-webui/server/background_error.log", "w") as f:
+                f.write(f"Exception in flush_pending_commands: {exc}\n{traceback.format_exc()}")
+            raise
+        finally:
+            if app is not None:
+                ctx.pop()
+
+        return result
 
 
 def backfill_pending_factory_reset_commands() -> int:
