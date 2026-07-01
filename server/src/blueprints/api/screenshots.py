@@ -154,6 +154,9 @@ def get_screenshot_image(screenshot_id):
     if screenshot is None:
         return jsonify({'success': False, 'message': 'Screenshot not found'}), 404
 
+    from src.common.helpers import check_parent_device_access
+    check_parent_device_access(screenshot.system_id)
+
     return send_file(
         BytesIO(screenshot.data),
         mimetype=screenshot.mime_type,

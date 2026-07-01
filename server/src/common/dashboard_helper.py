@@ -113,7 +113,11 @@ def build_dashboard_snapshot(active_household_id=None, parent_account_id=None):
     pending_approvals = {'total': 0, 'by_user': {}, 'items': []}
     try:
         from src.user.approvals import build_pending_approvals_snapshot
-        pending_approvals = build_pending_approvals_snapshot(limit=5)
+        pending_approvals = build_pending_approvals_snapshot(
+            limit=5,
+            active_household_id=active_household_id,
+            parent_account_id=parent_account_id,
+        )
     except (ImportError, RuntimeError, TypeError, ValueError):
         pass
 

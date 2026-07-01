@@ -190,7 +190,7 @@ def add_user_mapping(user_id):
     if not session.get('logged_in'):
         return jsonify({'success': False, 'message': api_message('not_authenticated')}), 401
 
-    from src.common.helpers import check_parent_child_access
+    from src.common.helpers import check_parent_child_access, check_parent_can_link_device
     check_parent_child_access(user_id)
 
     user = ManagedUser.query.get_or_404(user_id)
@@ -201,6 +201,8 @@ def add_user_mapping(user_id):
     if not system_id or not linux_username:
         flash_t('flash.users.mapping_fields_required', 'danger')
         return redirect(url_for('ui_dashboard.admin'))
+
+    check_parent_can_link_device(user.id, system_id)
 
     device = AgentDevice.query.get(system_id)
     if not device or device.status != 'approved':
@@ -266,7 +268,7 @@ def connect_user_mapping(user_id):
     if not session.get('logged_in'):
         return jsonify({'success': False, 'message': api_message('not_authenticated')}), 401
 
-    from src.common.helpers import check_parent_child_access
+    from src.common.helpers import check_parent_child_access, check_parent_can_link_device
     check_parent_child_access(user_id)
 
     payload = request.get_json(silent=True) or {}
@@ -281,6 +283,7 @@ def connect_user_mapping(user_id):
         }), 400
 
     user = ManagedUser.query.get_or_404(user_id)
+    check_parent_can_link_device(user.id, system_id)
     device = AgentDevice.query.get(system_id)
     if not device or device.status != 'approved':
         return jsonify({
@@ -667,6 +670,10 @@ def api_create_user():
         p = ParentAccount.query.get(parent_id)
         if p and p.memberships:
             target_hh_id = p.memberships[0].household_id
+
+    if parent_id and target_hh_id:
+        from src.common.helpers import check_parent_household_membership
+        check_parent_household_membership(parent_id, target_hh_id)
 
     user = ManagedUser(username=username, is_valid=False, system_ip='Unassigned', household_id=target_hh_id)
     db.session.add(user)

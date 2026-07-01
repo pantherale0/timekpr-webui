@@ -144,7 +144,10 @@ def get_pending_devices():
     if not session.get('logged_in'):
         return jsonify({'success': False, 'message': api_message('not_authenticated')}), 401
     
-    pending = AgentDevice.query.filter_by(status='pending').all()
+    from src.common.helpers import filter_pending_devices_for_parent, resolve_session_parent_id
+
+    parent_id = resolve_session_parent_id()
+    pending = filter_pending_devices_for_parent(parent_id)
     label_map = _build_device_label_map(pending)
     results = []
     for device in pending:

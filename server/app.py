@@ -348,13 +348,25 @@ def enforce_household_isolation():
     if not session.get('logged_in') or not parent_id:
         return
 
-    from src.common.helpers import parent_has_access_to_child, parent_has_access_to_device
-    from src.models import ManagedUserDeviceMap, ApprovalRequest
+    from src.common.helpers import (
+        parent_has_access_to_child,
+        parent_has_access_to_device,
+        parent_can_manage_blocklist_source,
+        parent_can_manage_app_policy,
+        get_parent_household_ids,
+    )
+    from src.models import ManagedUserDeviceMap, ApprovalRequest, PolicyApprovalGrant, DeviceScreenshot, AppPolicyRule
 
     user_id = None
     if request.view_args and 'user_id' in request.view_args:
         try:
             user_id = int(request.view_args['user_id'])
+        except (ValueError, TypeError):
+            pass
+
+    if user_id is None and request.view_args and 'managed_user_id' in request.view_args:
+        try:
+            user_id = int(request.view_args['managed_user_id'])
         except (ValueError, TypeError):
             pass
 
@@ -364,6 +376,10 @@ def enforce_household_isolation():
                 user_id = int(request.form['user_id'])
             elif request.is_json and request.json and 'user_id' in request.json:
                 user_id = int(request.json['user_id'])
+            elif request.form and 'managed_user_id' in request.form:
+                user_id = int(request.form['managed_user_id'])
+            elif request.is_json and request.json and 'managed_user_id' in request.json:
+                user_id = int(request.json['managed_user_id'])
         except Exception:
             pass
 
@@ -380,12 +396,16 @@ def enforce_household_isolation():
         try:
             required_perm = 'can_view_screentime'
             path = request.path
-            if any(p in path for p in ['/whitelist', '/block', '/policy', '/presets', '/apparmor', '/installed-apps']):
+            if any(p in path for p in ['/whitelist', '/block', '/policy', '/presets', '/apparmor']):
+                required_perm = 'can_manage_policies'
+            elif '/installed-apps' in path and request.method not in ('GET', 'HEAD', 'OPTIONS'):
                 required_perm = 'can_manage_policies'
             elif any(p in path for p in ['/schedule', '/limits', '/screentime', '/pause', '/add-time', '/intervals', '/tamper']):
                 required_perm = 'can_manage_screentime'
             elif any(p in path for p in ['/inspect', '/stats', '/history', '/logs']):
                 required_perm = 'can_view_monitoring'
+            elif '/approvals/' in path and (path.endswith('/approve') or path.endswith('/deny')):
+                required_perm = 'can_manage_policies'
 
             if not parent_has_access_to_child(parent_id, user_id, required_perm):
                 abort(403)
@@ -414,6 +434,113 @@ def enforce_household_isolation():
                 abort(403)
         except (ValueError, TypeError):
             pass
+
+    if request.view_args and 'grant_id' in request.view_args:
+        try:
+            grant_id = int(request.view_args['grant_id'])
+            grant = PolicyApprovalGrant.query.get(grant_id)
+            if not grant:
+                abort(404)
+            mapping = grant.device_map
+            if not mapping:
+                abort(404)
+            if not parent_has_access_to_child(parent_id, mapping.managed_user_id, 'can_manage_policies'):
+                abort(403)
+            if not parent_has_access_to_device(parent_id, mapping.system_id):
+                abort(403)
+        except (ValueError, TypeError):
+            pass
+
+    if request.view_args and 'screenshot_id' in request.view_args:
+        try:
+            screenshot_id = int(request.view_args['screenshot_id'])
+            screenshot = DeviceScreenshot.query.get(screenshot_id)
+            if not screenshot:
+                abort(404)
+            if not parent_has_access_to_device(parent_id, screenshot.system_id):
+                abort(403)
+        except (ValueError, TypeError):
+            pass
+
+    if request.view_args and 'source_id' in request.view_args and '/blocklists/sources/' in request.path:
+        try:
+            source_id = int(request.view_args['source_id'])
+            if not parent_can_manage_blocklist_source(parent_id, source_id):
+                abort(403)
+        except (ValueError, TypeError):
+            pass
+
+    if request.view_args and 'policy_id' in request.view_args and '/app-policies/' in request.path:
+        try:
+            policy_id = int(request.view_args['policy_id'])
+            if not parent_can_manage_app_policy(parent_id, policy_id):
+                abort(403)
+        except (ValueError, TypeError):
+            pass
+
+    if request.view_args and 'rule_id' in request.view_args and '/app-policies/' in request.path:
+        try:
+            rule_id = int(request.view_args['rule_id'])
+            rule = AppPolicyRule.query.get(rule_id)
+            if not rule:
+                abort(404)
+            if not parent_can_manage_app_policy(parent_id, rule.policy_id):
+                abort(403)
+        except (ValueError, TypeError):
+            pass
+
+    if request.path.startswith('/api/alerts'):
+        system_id_filter = None
+        managed_user_filter = None
+        if request.args.get('system_id'):
+            system_id_filter = str(request.args.get('system_id')).strip()
+        if request.args.get('managed_user_id'):
+            try:
+                managed_user_filter = int(request.args.get('managed_user_id'))
+            except (ValueError, TypeError):
+                pass
+        if request.method == 'POST' and request.is_json and request.json:
+            if request.json.get('system_id'):
+                system_id_filter = str(request.json.get('system_id')).strip()
+            if request.json.get('managed_user_id') is not None:
+                try:
+                    managed_user_filter = int(request.json.get('managed_user_id'))
+                except (ValueError, TypeError):
+                    pass
+        if system_id_filter and not parent_has_access_to_device(parent_id, system_id_filter):
+            abort(403)
+        if managed_user_filter is not None and not parent_has_access_to_child(parent_id, managed_user_filter):
+            abort(403)
+
+    if (
+        '/mappings/' in request.path
+        or request.path.endswith('/mappings/add')
+        or request.path.endswith('/mappings/connect')
+    ):
+        linked_system_id = None
+        try:
+            if request.form and request.form.get('system_id'):
+                linked_system_id = str(request.form.get('system_id')).strip()
+            elif request.is_json and request.json and request.json.get('system_id'):
+                linked_system_id = str(request.json.get('system_id')).strip()
+        except Exception:
+            pass
+        if linked_system_id and not parent_has_access_to_device(parent_id, linked_system_id):
+            abort(403)
+
+    if request.path == '/api/user/create' and request.method == 'POST':
+        household_raw = None
+        if request.is_json and request.json:
+            household_raw = request.json.get('household_id')
+        elif request.form:
+            household_raw = request.form.get('household_id')
+        if household_raw is not None:
+            try:
+                household_id = int(household_raw)
+                if household_id not in get_parent_household_ids(parent_id):
+                    abort(403)
+            except (ValueError, TypeError):
+                pass
 
 
 app.register_blueprint(ui_auth_bp)

@@ -56,6 +56,9 @@ def get_managed_user_installed_apps(managed_user_id):
     if auth_error:
         return auth_error
 
+    from src.common.helpers import check_parent_child_access
+    check_parent_child_access(managed_user_id)
+
     user = ManagedUser.query.get(managed_user_id)
     if user is None:
         return jsonify({'success': False, 'message': 'Managed user not found'}), 404

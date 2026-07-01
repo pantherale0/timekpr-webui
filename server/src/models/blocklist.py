@@ -25,6 +25,7 @@ class BlocklistSource(db.Model):
     etag = db.Column(db.String(255), nullable=True)
     source_last_modified = db.Column(db.String(255), nullable=True)
     content_revision = db.Column(db.String(64), nullable=True)
+    household_id = db.Column(db.Integer, db.ForeignKey('household.id', ondelete='SET NULL'), nullable=True)
     created_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
     updated_at = db.Column(
         db.DateTime(timezone=True),

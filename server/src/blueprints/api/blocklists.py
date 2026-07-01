@@ -58,6 +58,10 @@ def create_blocklist_source():
         is_enabled=True,
         content_revision=compute_source_revision(domains),
     )
+    from src.common.helpers import resolve_session_parent_id, resolve_active_household_for_write
+    parent_id = resolve_session_parent_id()
+    if parent_id:
+        source.household_id = resolve_active_household_for_write(parent_id)
     db.session.add(source)
     db.session.flush()
 

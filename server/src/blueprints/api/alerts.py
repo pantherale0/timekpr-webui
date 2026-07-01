@@ -32,7 +32,11 @@ def get_alerts():
     end_date_str = request.args.get('end_date')
     include_commands = request.args.get('include_commands', 'false').lower() == 'true'
 
+    from src.common.helpers import resolve_session_parent_id, scope_alerts_query_for_parent
+
+    parent_id = resolve_session_parent_id()
     query = AgentAlert.query
+    query = scope_alerts_query_for_parent(query, parent_id)
 
     if start_date_str:
         try:
@@ -142,9 +146,13 @@ def prune_alerts():
     system_id = payload.get('system_id')
     managed_user_id = payload.get('managed_user_id')
 
+    from src.common.helpers import resolve_session_parent_id, scope_alerts_query_for_parent
+
+    parent_id = resolve_session_parent_id()
     cutoff_date = datetime.now(timezone.utc) - timedelta(days=older_than_days)
     
     query = AgentAlert.query.filter(AgentAlert.occurred_at < cutoff_date)
+    query = scope_alerts_query_for_parent(query, parent_id)
     
     if system_id:
         query = query.filter(AgentAlert.system_id == system_id)

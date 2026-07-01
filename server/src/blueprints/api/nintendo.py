@@ -187,6 +187,11 @@ def import_device():
     if not device_id:
         return jsonify({'success': False, 'message': 'Device ID is required'}), 400
 
+    from src.common.helpers import resolve_session_parent_id, resolve_active_household_for_write
+
+    parent_id = resolve_session_parent_id()
+    household_id = resolve_active_household_for_write(parent_id) if parent_id else None
+
     existing = AgentDevice.query.get(device_id)
     if existing:
         return jsonify({'success': False, 'message': 'Device is already enrolled'}), 400
@@ -195,7 +200,8 @@ def import_device():
         system_id=device_id,
         system_hostname=display_name,
         platform='nintendo',
-        status='approved'
+        status='approved',
+        household_id=household_id,
     )
     db.session.add(device)
     db.session.commit()

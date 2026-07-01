@@ -94,6 +94,10 @@ def create_app_policy():
         return redirect(url_for('ui_apparmor.admin_app_policies'))
 
     policy = AppPolicy(name=name, platform=platform)
+    from src.common.helpers import resolve_session_parent_id, resolve_active_household_for_write
+    parent_id = resolve_session_parent_id()
+    if parent_id:
+        policy.household_id = resolve_active_household_for_write(parent_id)
     db.session.add(policy)
     db.session.commit()
 
@@ -108,6 +112,8 @@ def delete_app_policy(policy_id):
         return redirect(url_for('ui_auth.login'))
 
     policy = AppPolicy.query.get_or_404(policy_id)
+    from src.common.helpers import check_parent_app_policy_access
+    check_parent_app_policy_access(policy_id)
     policy_name = policy.name
 
     # Collect affected users for compilation & sync
@@ -133,6 +139,8 @@ def add_app_policy_rule(policy_id):
         return redirect(url_for('ui_auth.login'))
 
     policy = AppPolicy.query.get_or_404(policy_id)
+    from src.common.helpers import check_parent_app_policy_access
+    check_parent_app_policy_access(policy_id)
 
     app_name = (request.form.get('application_name') or '').strip()
     match_type = (request.form.get('match_type') or AppPolicyRule.MATCH_TYPE_EXECUTABLE).strip()

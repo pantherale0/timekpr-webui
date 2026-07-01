@@ -281,6 +281,9 @@ def revoke_approval_grant(grant_id):
     if error_response is not None:
         return error_response
 
+    from src.common.helpers import check_parent_grant_access
+    check_parent_grant_access(grant_id)
+
     actor = get_session_actor()
     try:
         grant = revoke_grant(grant_id, revoked_by=actor)
@@ -462,7 +465,10 @@ def get_user_online_accounts(user_id):
     if not session.get('logged_in'):
         return jsonify({'success': False, 'message': api_message('not_authenticated')}), 401
         
+    from src.common.helpers import check_parent_child_access
     from src.models import ManagedUser, UserOnlineAccount
+
+    check_parent_child_access(user_id)
     user = ManagedUser.query.get_or_404(user_id)
     
     # Query all online accounts for this user

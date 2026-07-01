@@ -198,7 +198,8 @@ def parent_has_access_to_child(parent_id: int, child_id: int, required_perm: str
         if perms.get('is_owner') or perms.get('is_admin'):
             return True
         if required_perm:
-            return perms.get(required_perm, False)
+            default_val = True if required_perm == 'can_view_screentime' else False
+            return bool(perms.get(required_perm, default_val))
         return True # Default structural membership access
         
     # 2. Check if the child is individually shared with this parent
@@ -260,12 +261,9 @@ def check_parent_child_access(child_id: int, required_perm: str = None):
     where admin@local does not yet exist), access is granted. Tenant isolation only
     engages when a concrete parent_id is established.
     """
-    from flask import session, abort
-    from src.models import ParentAccount
-    parent_id = session.get('parent_account_id')
-    if not parent_id and session.get('logged_in'):
-        p = ParentAccount.query.filter_by(email='admin@local').first()
-        parent_id = p.id if p else None
+    from flask import abort
+
+    parent_id = resolve_session_parent_id()
     # No parent identity → single-tenant local mode, allow through.
     if not parent_id:
         return
@@ -279,15 +277,214 @@ def check_parent_device_access(system_id: str):
     Falls through when no parent identity is available (local admin / test mode).
     """
     from flask import session, abort
-    from src.models import ParentAccount
-    parent_id = session.get('parent_account_id')
-    if not parent_id and session.get('logged_in'):
-        p = ParentAccount.query.filter_by(email='admin@local').first()
-        parent_id = p.id if p else None
+    parent_id = resolve_session_parent_id()
     # No parent identity → single-tenant local mode, allow through.
     if not parent_id:
         return
     if not parent_has_access_to_device(parent_id, system_id):
         abort(403)
+
+
+def resolve_session_parent_id():
+    """Return the authenticated parent account id, with local-admin fallback."""
+    from flask import session
+    from src.models import ParentAccount
+
+    parent_id = session.get('parent_account_id')
+    if not parent_id and session.get('logged_in'):
+        parent = ParentAccount.query.filter_by(email='admin@local').first()
+        parent_id = parent.id if parent else None
+    return parent_id
+
+
+def get_parent_household_ids(parent_id: int) -> set:
+    """Household ids the parent belongs to."""
+    if not parent_id:
+        return set()
+    from src.models import ParentAccount
+
+    parent = ParentAccount.query.get(parent_id)
+    if not parent:
+        return set()
+    return {membership.household_id for membership in parent.memberships if membership.household_id}
+
+
+def resolve_active_household_for_write(parent_id: int):
+    """Pick the household to associate with a new catalog object."""
+    from flask import session
+
+    if not parent_id:
+        return None
+    household_ids = get_parent_household_ids(parent_id)
+    if not household_ids:
+        return None
+    active = session.get('active_household_id')
+    if active in household_ids:
+        return active
+    return next(iter(household_ids))
+
+
+def check_parent_household_membership(parent_id: int, household_id: int):
+    """Raise 403 when the parent is not a member of the household."""
+    from flask import abort
+
+    if not parent_id:
+        return
+    if household_id not in get_parent_household_ids(parent_id):
+        abort(403)
+
+
+def check_parent_can_link_device(child_id: int, system_id: str, required_perm: str = 'can_manage_policies'):
+    """Verify parent may attach a device mapping for this child/device pair."""
+    from flask import abort
+    from src.models import ManagedUser, AgentDevice
+
+    check_parent_child_access(child_id, required_perm)
+    check_parent_device_access(system_id)
+    child = ManagedUser.query.get(child_id)
+    device = AgentDevice.query.get(system_id)
+    if child and device and child.household_id and device.household_id:
+        if child.household_id != device.household_id:
+            abort(403)
+
+
+def scope_alerts_query_for_parent(query, parent_id: int):
+    """Restrict an AgentAlert query to devices mapped to accessible children."""
+    from src.models import AgentAlert, ManagedUserDeviceMap
+
+    if not parent_id:
+        return query
+
+    allowed_child_ids = get_accessible_child_ids(parent_id)
+    if not allowed_child_ids:
+        return query.filter(False)
+
+    allowed_system_ids = {
+        mapping.system_id
+        for mapping in ManagedUserDeviceMap.query.filter(
+            ManagedUserDeviceMap.managed_user_id.in_(allowed_child_ids),
+        ).all()
+    }
+    if not allowed_system_ids:
+        return query.filter(False)
+    return query.filter(AgentAlert.system_id.in_(allowed_system_ids))
+
+
+def check_parent_alert_filter_access(
+    parent_id: int,
+    system_id: str = None,
+    managed_user_id: int = None,
+):
+    """Raise 403 when alert filter params reference inaccessible objects."""
+    from flask import abort
+
+    if not parent_id:
+        return
+    if system_id and not parent_has_access_to_device(parent_id, system_id):
+        abort(403)
+    if managed_user_id is not None and not parent_has_access_to_child(parent_id, int(managed_user_id)):
+        abort(403)
+
+
+def check_parent_screenshot_access(screenshot_db_id: int):
+    """Load a screenshot only when the parent may access its device."""
+    from flask import abort
+    from src.device.screenshots import get_screenshot_by_id
+
+    screenshot = get_screenshot_by_id(screenshot_db_id)
+    if screenshot is None:
+        abort(404)
+    check_parent_device_access(screenshot.system_id)
+    return screenshot
+
+
+def check_parent_grant_access(grant_id: int, required_perm: str = 'can_manage_policies'):
+    """Raise 403/404 when the parent cannot manage an approval grant."""
+    from flask import abort
+    from src.models import PolicyApprovalGrant
+
+    grant = PolicyApprovalGrant.query.get(grant_id)
+    if grant is None:
+        abort(404)
+    mapping = grant.device_map
+    if mapping is None:
+        abort(404)
+    check_parent_child_access(mapping.managed_user_id, required_perm)
+    check_parent_device_access(mapping.system_id)
+
+
+def parent_can_manage_blocklist_source(parent_id: int, source_id: int) -> bool:
+    """True when the parent may mutate a non-marketplace blocklist source."""
+    from src.models import BlocklistSource, ManagedUserBlocklistAssignment
+
+    source = BlocklistSource.query.get(source_id)
+    if source is None or source.is_marketplace or source.preset_id:
+        return False
+    if not parent_id:
+        return True
+    if source.household_id is not None:
+        return source.household_id in get_parent_household_ids(parent_id)
+
+    accessible_child_ids = get_accessible_child_ids(parent_id)
+    assignments = ManagedUserBlocklistAssignment.query.filter_by(source_id=source_id).all()
+    if not assignments:
+        return False
+    return any(assignment.managed_user_id in accessible_child_ids for assignment in assignments)
+
+
+def check_parent_blocklist_source_access(source_id: int):
+    """Raise 403 when the parent cannot manage a blocklist source."""
+    from flask import abort
+
+    parent_id = resolve_session_parent_id()
+    if not parent_id:
+        return
+    if not parent_can_manage_blocklist_source(parent_id, source_id):
+        abort(403)
+
+
+def parent_can_manage_app_policy(parent_id: int, policy_id: int) -> bool:
+    """True when the parent may mutate an app policy."""
+    from src.models import AppPolicy, ManagedUserAppPolicyAssignment
+
+    policy = AppPolicy.query.get(policy_id)
+    if policy is None:
+        return False
+    if not parent_id:
+        return True
+    if policy.household_id is not None:
+        return policy.household_id in get_parent_household_ids(parent_id)
+
+    accessible_child_ids = get_accessible_child_ids(parent_id)
+    assignments = ManagedUserAppPolicyAssignment.query.filter_by(policy_id=policy_id).all()
+    if not assignments:
+        return False
+    return any(assignment.managed_user_id in accessible_child_ids for assignment in assignments)
+
+
+def check_parent_app_policy_access(policy_id: int):
+    """Raise 403 when the parent cannot manage an app policy."""
+    from flask import abort
+
+    parent_id = resolve_session_parent_id()
+    if not parent_id:
+        return
+    if not parent_can_manage_app_policy(parent_id, policy_id):
+        abort(403)
+
+
+def filter_pending_devices_for_parent(parent_id: int):
+    """Return pending devices visible to the authenticated parent."""
+    from src.models import AgentDevice
+
+    if not parent_id:
+        return AgentDevice.query.filter_by(status='pending').all()
+    household_ids = get_parent_household_ids(parent_id)
+    if not household_ids:
+        return []
+    return AgentDevice.query.filter(
+        AgentDevice.status == 'pending',
+        AgentDevice.household_id.in_(household_ids),
+    ).all()
 
 

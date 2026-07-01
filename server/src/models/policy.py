@@ -273,6 +273,7 @@ class AppPolicy(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(120), unique=True, nullable=False)
     platform = db.Column(db.String(20), nullable=False, default=PLATFORM_LINUX)
+    household_id = db.Column(db.Integer, db.ForeignKey('household.id', ondelete='SET NULL'), nullable=True)
     created_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
     updated_at = db.Column(
         db.DateTime(timezone=True),
