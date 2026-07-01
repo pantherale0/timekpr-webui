@@ -81,6 +81,7 @@ def test_push_nintendo_schedule_skips_bedtime_when_unconfigured(app, db_session)
 
 def test_run_async_with_running_event_loop():
     import asyncio
+    import pytest
     from src.common.nintendo_sync import run_async
 
     async def sample():
@@ -89,7 +90,8 @@ def test_run_async_with_running_event_loop():
     async def runner():
         return run_async(sample())
 
-    assert asyncio.run(runner()) == 'ok'
+    with pytest.raises(RuntimeError, match='cannot be called from inside a coroutine'):
+        asyncio.run(runner())
 
 
 def test_build_nintendo_console_view_context(app, db_session):

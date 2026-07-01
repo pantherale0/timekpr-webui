@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import pytest
 from datetime import date, datetime, timezone
 from unittest.mock import MagicMock
 
@@ -138,7 +139,8 @@ def test_build_xbox_console_view_context(app, db_session):
 
 
 def test_run_async_with_running_event_loop():
-    from src.common.xbox_sync import run_async
+    import asyncio
+    from src.common.async_compat import run_async
 
     async def sample():
         return 'ok'
@@ -146,7 +148,8 @@ def test_run_async_with_running_event_loop():
     async def runner():
         return run_async(sample())
 
-    assert asyncio.run(runner()) == 'ok'
+    with pytest.raises(RuntimeError, match='cannot be called from inside a coroutine'):
+        asyncio.run(runner())
 
 
 def test_push_xbox_schedule_changes(app, db_session):
