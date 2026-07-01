@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-import asyncio
-import concurrent.futures
 import json
 import logging
 from datetime import date, datetime, time as dt_time, timezone
 
+from src.common.asyncio_sync import run_async
 from src.models import (
     AgentDevice,
     ManagedUserDeviceMap,
@@ -21,21 +20,6 @@ from src.models import (
 _LOGGER = logging.getLogger(__name__)
 
 NINTENDO_CONSOLE_STATS_PREFIX = 'nintendo_console_stats_'
-
-
-def run_async(coro):
-    """Run a coroutine from synchronous code.
-
-    Works when no event loop is running, and when the caller is already inside
-    one (e.g. gevent-monkeypatched asyncio under gunicorn).
-    """
-    try:
-        asyncio.get_running_loop()
-    except RuntimeError:
-        return asyncio.run(coro)
-
-    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-        return executor.submit(asyncio.run, coro).result()
 
 
 def nintendo_console_stats_key(system_id: str) -> str:

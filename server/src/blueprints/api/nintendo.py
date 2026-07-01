@@ -201,10 +201,9 @@ def import_device():
     db.session.commit()
 
     try:
-        from app import task_manager
-        task_manager.sync_nintendo_devices(force=True)
+        Settings.set_value('nintendo_sync_requested', '1')
     except Exception as exc:
-        _LOGGER.warning("Initial Nintendo sync after import failed: %s", exc)
+        _LOGGER.warning("Initial Nintendo sync queue after import failed: %s", exc)
 
     return jsonify({'success': True, 'message': f'Console {display_name} enrolled successfully!'})
 
