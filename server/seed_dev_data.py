@@ -94,7 +94,8 @@ def seed_data():
             system_ip="192.168.1.102",
             status="approved",
             secure_token=random_token(),
-            platform="android"
+            platform="android",
+            is_device_owner=True
         )
         leo_device = AgentDevice(
             system_id="leo-device-uuid",
