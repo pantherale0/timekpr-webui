@@ -6,6 +6,7 @@ import json
 import logging
 from datetime import date, datetime, time as dt_time, timezone
 
+from src.common.asyncio_sync import run_async
 from src.models import (
     AgentDevice,
     ManagedUserDeviceMap,
