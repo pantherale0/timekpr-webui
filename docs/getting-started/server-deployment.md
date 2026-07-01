@@ -34,7 +34,7 @@
 
    This runs the Flask **web** service and the **tasks** background worker.
 
-4. Open the dashboard and log in (`admin` / `admin` by default). Change the password under **Settings**.
+4. Open the dashboard and log in (`admin` / `admin` by default). Change the password under **Settings** (minimum **12 characters**).
 
 ## Manual deployment
 

@@ -115,7 +115,8 @@ Both fields are optional.  Send `null` to clear.
 2. The overlay JavaScript calls `chrome.runtime.sendMessage({ type: "ACCESS_REQUEST", reason, message })` (browser extension) or `window.guardianBridge.sendAccessRequest(reason, message)` (Android WebView).
 3. The browser extension's background worker forwards the request to the native agent via the native messaging IPC socket (`com.guardian.agent`).
 4. The Rust/Android agent sends a `POST /api/access-request` to the server with:
-   - `system_id` — the device UUID
+   - `Authorization: Bearer <per-device secure_token>` — the token from `pairing_approved`, not the bootstrap `AGENT_TOKEN`
+   - `system_id` — the device UUID (optional; must match the token if sent)
    - `linux_username` — the managed account
    - `reason` — overlay trigger reason
    - `message` — the child's message

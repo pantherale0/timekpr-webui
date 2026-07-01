@@ -276,28 +276,26 @@ def ws_agent_handler(ws):
                     return
     
                 if device.status == 'approved' and not paired:
-                    # When the server has a registration token (locked-down mode),
-                    # verify that the reconnecting client also knows it — this prevents
-                    # arbitrary connections from harvesting the device token via device ID.
-                    # In open-registration mode (no token configured) we trust the device
-                    # ID alone, preserving backward compatibility.
+                    # Never deliver secure_token without enrollment proof.
                     from src.models import Household
                     hh = Household.query.get(device.household_id) if device.household_id else None
                     hh_token = hh.enrollment_token if hh else None
 
-                    is_locked_down = bool(expected_reg_token or hh_token)
-                    if is_locked_down:
-                        token_valid = (
-                            (hh_token and reg_token == hh_token) or
-                            (expected_reg_token and reg_token == expected_reg_token)
+                    token_valid = (
+                        (hh_token and reg_token == hh_token) or
+                        (expected_reg_token and reg_token == expected_reg_token)
+                    )
+                    if not token_valid:
+                        _LOGGER.warning(
+                            "Token delivery rejected: missing or invalid enrollment token from %s",
+                            system_id,
                         )
-                        if not token_valid:
-                            _LOGGER.warning(
-                                "Token delivery rejected: Invalid registration token from %s",
-                                system_id,
-                            )
-                            ws.send(json.dumps({"type": "auth_result", "success": False, "message": "Invalid registration token"}))
-                            return
+                        ws.send(json.dumps({
+                            "type": "auth_result",
+                            "success": False,
+                            "message": "Valid enrollment token required for pairing",
+                        }))
+                        return
 
                     _LOGGER.info(
                         "Device %s is approved but client reports it is unpaired. Delivering token.",

@@ -292,6 +292,15 @@ class OIDCHelper:
 
         allow_any = os.environ.get('OIDC_ALLOW_ANY_AUTHENTICATED', '').strip().lower()
         if allow_any in {'true', '1', 'yes', 'on'}:
+            testing = os.environ.get('TESTING', '').strip().lower() in {'true', '1', 'yes', 'on'}
+            if not testing:
+                logger.error(
+                    'OIDC_ALLOW_ANY_AUTHENTICATED is set but refused outside TESTING mode'
+                )
+                return False, (
+                    'OIDC_ALLOW_ANY_AUTHENTICATED is disabled in production. '
+                    'Configure ALLOWED_OIDC_ADMINS or related allowlists.'
+                )
             logger.warning(
                 'OIDC_ALLOW_ANY_AUTHENTICATED is enabled; any authenticated identity may access the admin console'
             )

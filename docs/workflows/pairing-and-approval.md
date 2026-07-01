@@ -43,7 +43,14 @@ See [Windows agent](../platforms/windows-agent.md).
 
 ## Registration token
 
-If `REGISTRATION_TOKEN` is set on the server, agents must include it in `hello` or pairing is refused.
+Pairing QR codes and agent config include a **`registration_token`** field. This may be:
+
+- The server-wide **`REGISTRATION_TOKEN`** environment variable, when set, or
+- The household **`enrollment_token`** (multi-tenant installs; shown in **Settings → Agent pairing**)
+
+Agents must send this value in `hello`. It is required again when an approved device reconnects with `paired: false` to receive `pairing_approved`.
+
+If neither token is configured, open registration assigns new devices to the default household (suitable for local dev; use a token in production).
 
 ## After approval
 

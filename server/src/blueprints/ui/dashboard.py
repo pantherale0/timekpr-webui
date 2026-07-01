@@ -94,12 +94,13 @@ def settings():
                 flash_t('flash.settings.password_wrong', 'danger')
             elif new_password != confirm_password:
                 flash_t('flash.settings.password_mismatch', 'danger')
-            elif len(new_password) < 4:
+            elif len(new_password) < 12:
                 flash_t('flash.settings.password_short', 'danger')
             else:
                 Settings.set_admin_password(new_password)
                 flash_t('flash.settings.password_updated', 'success')
                 return redirect(url_for('ui_dashboard.settings'))
+            return redirect(url_for('ui_dashboard.settings'))
 
     return render_spa_shell('settings')
 

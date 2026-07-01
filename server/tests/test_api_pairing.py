@@ -91,19 +91,24 @@ def test_provisioning_qr_png_authenticated(mock_uploaded, auth_client):
     assert response.data[:8] == b'\x89PNG\r\n\x1a\n'
 
 
-@patch('src.blueprints.api.pairing.has_uploaded_android_apk', return_value=False)
-def test_provisioning_apk_requires_upload(mock_uploaded, client):
+def test_provisioning_apk_requires_auth(client):
     response = client.get('/api/pairing/provisioning/apk')
+    assert response.status_code == 401
+
+
+@patch('src.blueprints.api.pairing.has_uploaded_android_apk', return_value=False)
+def test_provisioning_apk_requires_upload(mock_uploaded, auth_client):
+    response = auth_client.get('/api/pairing/provisioning/apk')
     assert response.status_code == 404
 
 
 @patch('src.agent.pairing.has_uploaded_android_apk', return_value=True)
-def test_provisioning_apk_serves_uploaded_file(mock_uploaded, client, tmp_path, monkeypatch):
+def test_provisioning_apk_serves_uploaded_file(mock_uploaded, auth_client, tmp_path, monkeypatch):
     apk_path = tmp_path / 'android-agent.apk'
     apk_path.write_bytes(b'PK\x03\x04fake-apk')
     monkeypatch.setenv('TIMEKPR_ANDROID_APK_PATH', str(apk_path))
 
-    response = client.get('/api/pairing/provisioning/apk')
+    response = auth_client.get('/api/pairing/provisioning/apk')
     assert response.status_code == 200
     assert response.mimetype == 'application/vnd.android.package-archive'
     assert response.data == b'PK\x03\x04fake-apk'

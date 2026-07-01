@@ -59,4 +59,4 @@ See the full [policy matrix](reference/policy-matrix.md) for how each restrictio
 
 ## Default credentials
 
-After a fresh install, sign in with **admin** / **admin** and change the password immediately under **Settings**.
+After a fresh install, sign in with **admin** / **admin** and change the password immediately under **Settings** (minimum 12 characters).

@@ -5,9 +5,11 @@ from datetime import datetime, timezone
 
 from flask import Blueprint, jsonify, request
 
-from src.models import AgentAlert, AgentDevice, db
+from src.models import AgentAlert, db
 from src.agent.helper import normalize_agent_alert_payload
 from src.common.settings import _get_alert_webhook_settings
+from src.common.agent_auth import authenticate_agent_mapping
+from src.common.rate_limit import rate_limit_client
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -22,28 +24,34 @@ def submit_access_request():
     so it appears on the parent dashboard.
 
     Request body JSON:
-        system_id (str)      – device UUID
+        system_id (str)      – device UUID (must match bearer token device)
         linux_username (str) – account on that device
         reason (str)         – overlay reason: sleep | filtered | locked | signup
         message (str)        – the message the child typed / selected
     """
+    rate_limit_client('access-request', limit=30, window_seconds=60)
+
     data = request.get_json(silent=True) or {}
-    system_id = (data.get("system_id") or "").strip()
     linux_username = (data.get("linux_username") or "").strip()
     reason = (data.get("reason") or "").strip()
     message = (data.get("message") or "").strip()
 
-    if not system_id or not linux_username:
-        return jsonify({"success": False, "message": "system_id and linux_username are required"}), 400
+    device, mapping, error_response = authenticate_agent_mapping(linux_username)
+    if error_response is not None:
+        return error_response
 
-    device = AgentDevice.query.get(system_id)
-    if not device:
-        return jsonify({"success": False, "message": "Unknown device"}), 404
+    system_id = device.system_id
+    payload_system_id = (data.get("system_id") or "").strip()
+    if payload_system_id and payload_system_id != system_id:
+        return jsonify({
+            "success": False,
+            "message": "system_id does not match authenticated device",
+        }), 403
 
     try:
         payload = normalize_agent_alert_payload(system_id, {
             "event_type": "access_requested",
-            "linux_username": linux_username,
+            "linux_username": mapping.linux_username,
             "occurred_at": datetime.now(timezone.utc).isoformat(),
             "details": {
                 "reason": reason,
@@ -69,7 +77,7 @@ def submit_access_request():
 
     _LOGGER.info(
         "Guardian Space access request from %s@%s: reason=%s",
-        linux_username,
+        mapping.linux_username,
         system_id,
         reason,
     )

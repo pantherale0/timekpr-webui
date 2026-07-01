@@ -21,9 +21,9 @@ def get_task_status():
     })
 
 
-@api_tasks_bp.route('/restart-tasks')
+@api_tasks_bp.route('/restart-tasks', methods=['POST'])
 def restart_tasks():
-    """Restart the background task manager"""
+    """Restart the background task manager."""
     if not session.get('logged_in'):
         flash_t('flash.auth.login_required', 'warning')
         return redirect(url_for('ui_auth.login'))

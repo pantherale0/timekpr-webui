@@ -92,6 +92,10 @@ app.config.setdefault('WTF_CSRF_TIME_LIMIT', None)
 _session_days = int(os.environ.get('PERMANENT_SESSION_LIFETIME_DAYS', '30'))
 from datetime import timedelta
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=_session_days)
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = os.environ.get('SESSION_COOKIE_SAMESITE', 'Lax')
+if os.environ.get('SESSION_COOKIE_SECURE', '').strip().lower() in {'1', 'true', 'yes', 'on'}:
+    app.config['SESSION_COOKIE_SECURE'] = True
 
 csrf = CSRFProtect(app)
 _default_db_uri = 'sqlite:///:memory:' if os.environ.get('TESTING') else 'sqlite:///timekpr.db'
@@ -353,6 +357,8 @@ def enforce_household_isolation():
         parent_has_access_to_device,
         parent_can_manage_blocklist_source,
         parent_can_manage_app_policy,
+        parent_can_manage_device,
+        device_route_requires_admin,
         get_parent_household_ids,
     )
     from src.models import ManagedUserDeviceMap, ApprovalRequest, PolicyApprovalGrant, DeviceScreenshot, AppPolicyRule
@@ -418,6 +424,9 @@ def enforce_household_isolation():
             system_id = str(request.view_args['system_id'])
             if not parent_has_access_to_device(parent_id, system_id):
                 abort(403)
+            if device_route_requires_admin(request.path, request.method):
+                if not parent_can_manage_device(parent_id, system_id):
+                    abort(403)
         except (ValueError, TypeError):
             pass
 
@@ -566,15 +575,12 @@ app.register_blueprint(api_xbox_bp)
 app.register_blueprint(api_screenshots_bp)
 app.register_blueprint(api_youtube_bp)
 app.register_blueprint(api_hardware_baseline_bp)
-csrf.exempt(api_hardware_baseline_bp)
 app.register_blueprint(api_windows_laps_bp)
-csrf.exempt(api_windows_laps_bp)
 csrf.exempt(api_youtube_bp)
 app.register_blueprint(api_access_requests_bp)
 csrf.exempt(api_access_requests_bp)
 app.register_blueprint(sharing_api_bp)
 app.register_blueprint(api_session_bp)
-csrf.exempt(sharing_api_bp)
 app.register_blueprint(api_ai_bp)
 csrf.exempt(api_ai_bp)
 app.register_blueprint(websocket_bp)

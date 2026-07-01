@@ -34,7 +34,7 @@ Screenshots upload via WebSocket `screenshot_report` messages and are stored ser
 | `/api/devices/<system_id>/screenshots` | GET/DELETE | List / purge |
 | `/api/screenshots/<id>` | GET | Image bytes |
 
-Session auth required.
+Session auth required. Changing settings, capturing, or deleting screenshots additionally requires **`can_manage_policies`** on a child mapped to the device (or household admin).
 
 ## Related
 

@@ -187,6 +187,10 @@ def provisioning_qr_png():
 @api_pairing_bp.route('/api/pairing/provisioning/apk', methods=['GET'])
 def provisioning_apk():
     """Serve the uploaded Android agent APK for MDM device provisioning."""
+    from flask import session
+    if not session.get('logged_in'):
+        return jsonify({'success': False, 'message': 'Not authenticated'}), 401
+
     if not has_uploaded_android_apk():
         return jsonify({'success': False, 'message': 'No Android APK uploaded'}), 404
 
@@ -204,6 +208,10 @@ def provisioning_apk():
 @api_pairing_bp.route('/api/pairing/windows/msi', methods=['GET'])
 def windows_msi():
     """Serve the local Windows agent MSI installer or redirect to GitHub Releases."""
+    from flask import session
+    if not session.get('logged_in'):
+        return jsonify({'success': False, 'message': 'Not authenticated'}), 401
+
     msi_filename = 'guardian-agent-x86_64-pc-windows-msvc.msi'
     local_path = os.path.join(get_android_apk_storage_dir(), msi_filename)
     if os.path.isfile(local_path) and os.path.getsize(local_path) > 0:

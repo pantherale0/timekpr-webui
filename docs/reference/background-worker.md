@@ -16,7 +16,7 @@ Disabled when value is `0`, `false`, `no`, or `off`. Default: **enabled**.
 
 | Variable | Task |
 |----------|------|
-| `TIMEKPR_TASKS_REFRESH_EXTERNAL` | Download/update external blocklist URLs |
+| `TIMEKPR_TASKS_REFRESH_EXTERNAL` | Download/update external blocklist URLs (SSRF-validated; redirects not followed on fetch) |
 | `TIMEKPR_TASKS_UPDATE_USER_DATA` | Push user schedule data to online agents; **Nintendo + Xbox cloud sync** |
 | `TIMEKPR_TASKS_SYNC_DOMAIN_POLICIES` | Domain policy sync coordination |
 | `TIMEKPR_TASKS_DELIVER_ALERTS` | POST alert webhooks |
@@ -42,7 +42,7 @@ On WebSocket authentication success, a background thread drains the queue for th
 ## Monitoring
 
 - `GET /api/task-status` — JSON status
-- `POST /restart-tasks` — administrative restart hook
+- `POST /restart-tasks` — administrative restart hook (POST only; session auth + CSRF)
 
 ## Production guidance
 

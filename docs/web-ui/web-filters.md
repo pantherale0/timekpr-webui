@@ -7,7 +7,7 @@ Manage under **Admin → Web Content Filters** (`/admin/restrictions`).
 Create sources that hold domain lists:
 
 - **Manual** — enter domains in the UI
-- **External URL** — periodic refresh by the background worker (`TIMEKPR_TASKS_REFRESH_EXTERNAL`)
+- **External URL** — periodic refresh by the background worker (`TIMEKPR_TASKS_REFRESH_EXTERNAL`). URLs must be public `http`/`https` endpoints; private, loopback, and link-local hosts are rejected (SSRF protection).
 
 ## Assign to children
 

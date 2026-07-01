@@ -70,9 +70,12 @@ def test_generate_and_redeem_sharing_invite(app, client):
         sess['logged_in'] = True
         sess['parent_account_id'] = second_parent.id
 
-    # Hit the OIDC callback or trigger a request that processes login session
-    # Let's hit the redeem URL again while logged in to trigger immediate redemption
+    # Hit the redeem URL again while logged in — should show confirmation, not auto-redeem
     resp = client.get(redeem_url)
+    assert resp.status_code == 200
+    assert b'Accept invite' in resp.data
+
+    resp = client.post(redeem_url)
     assert resp.status_code == 302
     assert "dashboard" in resp.location
 

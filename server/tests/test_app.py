@@ -351,11 +351,11 @@ def test_settings_page(client, db_session):
     assert b"Passwords do not match" in res.data
 
     # POST Change Password - Too short
-    res = client.post('/settings', data={'current_password': 'admin', 'new_password': 'pw', 'confirm_password': 'pw'}, follow_redirects=True)
-    assert b"must be at least 4 characters" in res.data
+    res = client.post('/settings', data={'current_password': 'admin', 'new_password': 'short', 'confirm_password': 'short'}, follow_redirects=True)
+    assert b"must be at least 12 characters" in res.data
 
     # POST Change Password - Success
-    res = client.post('/settings', data={'current_password': 'admin', 'new_password': 'newadmin', 'confirm_password': 'newadmin'}, follow_redirects=True)
+    res = client.post('/settings', data={'current_password': 'admin', 'new_password': 'newadminpass12', 'confirm_password': 'newadminpass12'}, follow_redirects=True)
     assert b"updated successfully" in res.data
 
     # POST alert webhook settings
@@ -835,7 +835,7 @@ def test_rest_apis(client, db_session):
     data = json.loads(res.data)
     assert 'running' in data['status']
 
-    res = client.get('/restart-tasks', follow_redirects=True)
+    res = client.post('/restart-tasks', follow_redirects=True)
     assert b"restarted" in res.data
 
 def test_websocket_handler(app, db_session):
@@ -922,30 +922,64 @@ def test_websocket_handshake_saves_linux_users(app, db_session):
 
 def test_websocket_handshake_unpaired_approved_device(app, db_session):
     from app import ws_agent_handler
+    from src.models import Household
     
     system_id = "approved-but-unpaired"
     token = "approved-token-value"
-    device = AgentDevice(system_id=system_id, status="approved", secure_token=token)
+    household = Household(name='Test Home', enrollment_token='enroll-test-token')
+    db_session.add(household)
+    db_session.flush()
+    device = AgentDevice(
+        system_id=system_id,
+        status="approved",
+        secure_token=token,
+        household_id=household.id,
+    )
     db_session.add(device)
     db_session.commit()
 
-    # Client connects with paired: False
     hello_msg = json.dumps({
         "type": "hello",
         "system_id": system_id,
         "agent_version": "v0.10",
-        "paired": False
+        "paired": False,
+        "registration_token": "enroll-test-token",
     })
 
     ws = MockWS([hello_msg])
     with app.test_request_context('/ws', environ_base={'REMOTE_ADDR': '127.0.0.1'}):
         ws_agent_handler(ws)
 
-    # Check that pairing_approved with token was sent to the client
     assert len(ws.sent_messages) == 1
     resp = json.loads(ws.sent_messages[0])
     assert resp['type'] == "pairing_approved"
     assert resp['token'] == token
+
+
+def test_websocket_unpaired_approved_device_rejects_missing_enrollment_token(app, db_session):
+    from app import ws_agent_handler
+
+    system_id = "approved-no-enrollment"
+    token = "approved-token-value"
+    device = AgentDevice(system_id=system_id, status="approved", secure_token=token)
+    db_session.add(device)
+    db_session.commit()
+
+    hello_msg = json.dumps({
+        "type": "hello",
+        "system_id": system_id,
+        "agent_version": "v0.10",
+        "paired": False,
+    })
+
+    ws = MockWS([hello_msg])
+    with app.test_request_context('/ws', environ_base={'REMOTE_ADDR': '127.0.0.1'}):
+        ws_agent_handler(ws)
+
+    assert len(ws.sent_messages) == 1
+    resp = json.loads(ws.sent_messages[0])
+    assert resp['type'] == "auth_result"
+    assert resp['success'] is False
 
 
     # 6. Approved Device authentication flow (HMAC challenge-response)

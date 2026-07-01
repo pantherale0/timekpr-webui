@@ -57,6 +57,9 @@ def login():
     error = None
     username_value = request.form.get('username', '').strip() if request.method == 'POST' else ''
     if request.method == 'POST':
+        from src.common.rate_limit import rate_limit_client
+        rate_limit_client('local-login', limit=10, window_seconds=60)
+
         username = username_value
         password = request.form.get('password')
         
@@ -383,7 +386,7 @@ def switch_household(household_id):
     return redirect(url_for('ui_dashboard.dashboard'))
 
 
-@ui_auth_bp.route('/invite/redeem/<token>')
+@ui_auth_bp.route('/invite/redeem/<token>', methods=['GET', 'POST'])
 def redeem_invite_link(token):
     # Retrieve invite from database
     invite = ManagedUserShareInvite.query.filter_by(invite_code=token).first()
@@ -398,22 +401,24 @@ def redeem_invite_link(token):
     if invite.used_count >= invite.max_uses:
         return render_template('expired_invite.html'), 410
 
-    # Cache token in session
-    session['pending_invite_token'] = token
-
     parent_id = session.get('parent_account_id')
-    if parent_id:
-        # Already logged in, redeem immediately!
-        from src.user.sharing import process_pending_invite_redemption
-        success, msg = process_pending_invite_redemption(parent_id, token)
-        session.pop('pending_invite_token', None)
-        if success:
-            flash_t('flash.sharing.redeem_success', 'success')
-            return redirect(url_for('ui_dashboard.dashboard'))
-        else:
-            flash_t('flash.sharing.redeem_error', 'danger', reason=msg)
-            return redirect(url_for('ui_dashboard.dashboard'))
 
-    # Redirect to login/OIDC pathway
-    return redirect(url_for('ui_auth.login'))
+    if request.method == 'GET':
+        session['pending_invite_token'] = token
+        if parent_id:
+            return render_template('invite_redeem_confirm.html', token=token)
+        return redirect(url_for('ui_auth.login'))
+
+    if not parent_id:
+        session['pending_invite_token'] = token
+        return redirect(url_for('ui_auth.login'))
+
+    from src.user.sharing import process_pending_invite_redemption
+    success, msg = process_pending_invite_redemption(parent_id, token)
+    session.pop('pending_invite_token', None)
+    if success:
+        flash_t('flash.sharing.redeem_success', 'success')
+        return redirect(url_for('ui_dashboard.dashboard'))
+    flash_t('flash.sharing.redeem_error', 'danger', reason=msg)
+    return redirect(url_for('ui_dashboard.dashboard'))
 

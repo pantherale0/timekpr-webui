@@ -254,6 +254,66 @@ def parent_has_access_to_device(parent_id: int, system_id: str) -> bool:
     return membership is not None
 
 
+def parent_can_manage_device(parent_id: int, system_id: str) -> bool:
+    """True when the parent may perform administrative actions on a device."""
+    from src.models import AgentDevice, HouseholdParentMembership, ManagedUserDeviceMap
+
+    if not parent_id:
+        return True
+    if not parent_has_access_to_device(parent_id, system_id):
+        return False
+
+    device = AgentDevice.query.get(system_id)
+    if device and device.household_id:
+        membership = HouseholdParentMembership.query.filter_by(
+            parent_account_id=parent_id,
+            household_id=device.household_id,
+        ).first()
+        if membership:
+            perms = membership.permissions_json or {}
+            if perms.get('is_owner') or perms.get('is_admin'):
+                return True
+
+    mappings = ManagedUserDeviceMap.query.filter_by(system_id=system_id).all()
+    for mapping in mappings:
+        if parent_has_access_to_child(parent_id, mapping.managed_user_id, 'can_manage_policies'):
+            return True
+    return False
+
+
+def check_parent_device_admin_access(system_id: str):
+    """Raise 403 when the parent cannot administer the device."""
+    from flask import abort
+
+    parent_id = resolve_session_parent_id()
+    if not parent_id:
+        return
+    if not parent_can_manage_device(parent_id, system_id):
+        abort(403)
+
+
+def device_route_requires_admin(path: str, method: str) -> bool:
+    """Return True for device routes that mutate policy or reveal secrets."""
+    normalized = (path or '').lower()
+    if normalized.endswith('/reveal-password'):
+        return True
+    if 'clear-safe-mode-lockdown' in normalized:
+        return True
+    if '/hardware-baseline/apply' in normalized or '/hardware-baseline/audit' in normalized:
+        return True
+    if '/api/device/approve/' in normalized or '/api/device/reject/' in normalized:
+        return True
+    if '/unenroll' in normalized:
+        return True
+    if '/screenshots/capture' in normalized:
+        return True
+    if method == 'DELETE' and '/screenshots' in normalized:
+        return True
+    if method in {'PUT', 'POST'} and 'screenshot-settings' in normalized:
+        return True
+    return False
+
+
 def check_parent_child_access(child_id: int, required_perm: str = None):
     """Raise 403 if the logged in parent does not have access to the child.
 

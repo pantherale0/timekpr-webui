@@ -1116,7 +1116,7 @@ def test_task_manager_refreshes_external_blocklists_in_chunks(app, db_session):
 
     with app.app_context(), \
          patch('src.common.url_safety.is_safe_outbound_url', return_value=True), \
-         patch('src.common.tasks.requests.get', return_value=response):
+         patch('src.common.url_safety.safe_requests_get', return_value=response):
         success, message = manager.refresh_external_blocklist_source(source.id, force=True)
 
     assert success

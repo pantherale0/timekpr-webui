@@ -2,6 +2,8 @@
 
 When a child uses **allowlist**, **blocklist**, or **approval on block** modes, agents emit `access_requested` alerts. Review them under **Admin → Access Requests** (`/admin/approvals`).
 
+Guardian Space overlay messages use the same alert type and are submitted by agents via **`POST /api/access-request`** with `Authorization: Bearer <per-device secure_token>`.
+
 ## Request types
 
 | Target | Source |

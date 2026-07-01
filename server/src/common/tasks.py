@@ -951,12 +951,19 @@ class BackgroundTaskManager:
             return False, message
 
         try:
-            response = requests.get(
+            from src.common.url_safety import safe_requests_get
+
+            response = safe_requests_get(
                 source.source_url,
                 headers=headers,
                 timeout=10,
                 stream=True,
             )
+        except ValueError as exc:
+            message = f'Blocked refresh for "{source.name}": {exc}'
+            source.mark_sync_error(message)
+            db.session.commit()
+            return False, message
         except requests.RequestException as exc:
             source.mark_sync_error(str(exc))
             db.session.commit()
@@ -1748,7 +1755,9 @@ class BackgroundTaskManager:
                 )
 
                 alert.mark_delivery_attempt()
-                response = requests.post(
+                from src.common.url_safety import safe_requests_post
+
+                response = safe_requests_post(
                     webhook_settings['url'],
                     data=payload_body,
                     headers=headers,

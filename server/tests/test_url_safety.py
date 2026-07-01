@@ -1,6 +1,6 @@
 """Tests for outbound URL SSRF protections."""
 
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -28,3 +28,17 @@ def test_validate_safe_outbound_url_rejects_unsafe_targets(url):
 def test_is_safe_outbound_url_rejects_private_dns_resolution():
     with patch('src.common.url_safety.socket.getaddrinfo', return_value=[(2, 1, 6, '', ('10.0.0.12', 0))]):
         assert not is_safe_outbound_url('https://public.example.com/list.txt')
+
+
+def test_safe_requests_post_rejects_redirect_response():
+    from src.common.url_safety import safe_requests_post
+
+    redirect_response = MagicMock()
+    redirect_response.status_code = 302
+    redirect_response.headers = {'Location': 'https://other.example/hook'}
+
+    with patch('src.common.url_safety.validate_safe_outbound_url', return_value='https://hooks.example/alert'):
+        with patch('requests.post', return_value=redirect_response):
+            with pytest.raises(ValueError, match='redirects are not allowed'):
+                safe_requests_post('https://hooks.example/alert', data='{}')
+

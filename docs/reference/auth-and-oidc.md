@@ -4,9 +4,9 @@ Guardian supports **local admin login** and optional **OpenID Connect** SSO for 
 
 ## Local login
 
-Default credentials after install: **admin** / **admin**. Change under **Settings**.
+Default credentials after install: **admin** / **admin**. Change under **Settings** (new password must be at least **12 characters**).
 
-Password hash stored in the database settings table.
+Password hash stored in the database settings table. Failed login attempts are rate-limited (10 per client IP per minute).
 
 ## Enable OIDC
 
@@ -38,11 +38,11 @@ Configure at least one allowlist:
 | `ALLOWED_OIDC_ADMIN_ROLES` | `roles` or `role` claim |
 | `ALLOWED_OIDC_ADMIN_GROUPS` | `groups` or `group` claim |
 
-Bypass (not recommended for production):
+Bypass (not recommended; **refused when `TESTING` is not `true`**):
 
 | Variable | Effect |
 |----------|--------|
-| `OIDC_ALLOW_ANY_AUTHENTICATED=true` | Any authenticated IdP user gets admin UI access |
+| `OIDC_ALLOW_ANY_AUTHENTICATED=true` | Any authenticated IdP user gets admin UI access (test environments only) |
 
 ## Flow
 
@@ -52,6 +52,10 @@ Bypass (not recommended for production):
 4. Session flag `logged_in` set on success
 
 If OIDC initialization fails, UI falls back to local password form.
+
+## Household invites
+
+Share links resolve to `/invite/redeem/<token>`. Visiting the link while signed in shows a confirmation page; accepting the invite requires **POST** (or the confirm form submit). Expired or exhausted invites return HTTP 410.
 
 ## Agent authentication
 

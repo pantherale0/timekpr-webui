@@ -71,9 +71,9 @@ Use when the APK is already on the device (sideload, adb install, or manual down
 
 1. Open **Settings → Agent pairing** in the TimeKpr WebUI.
 2. On the phone, open the app and tap **Scan server QR code** (or complete first-run setup).
-3. The app stores `server_url` (and optional `registration_token`) then opens a WebSocket `hello`.
+3. The app stores `server_url` and `registration_token` (household enrollment or global `REGISTRATION_TOKEN`) then opens a WebSocket `hello`.
 4. Approve the pending device in **Admin → Devices**.
-5. The server issues `pairing_approved`; the app stores the per-device token and reconnects with HMAC auth.
+5. The server issues `pairing_approved` when the client presents a valid enrollment token (required if the app reconnects with `paired: false`); the app stores the per-device token and reconnects with HMAC auth.
 
 Payload schema:
 
@@ -81,7 +81,7 @@ Payload schema:
 {
   "type": "timekpr_pairing",
   "server_url": "wss://your-server.example/ws",
-  "registration_token": "optional-firewall-token"
+  "registration_token": "household-enrollment-or-global-token"
 }
 ```
 
@@ -108,7 +108,7 @@ When `TIMEKPR_SERVER_VERSION` matches a GitHub release tag (e.g. `v1.2.3`), the 
 
 #### Development servers
 
-When the server runs as `v0.0.0-dev`, no release assets exist. Build a **release** APK locally and upload it in **Settings → Android MDM provisioning QR**. The server stores the file, serves it at `/api/pairing/provisioning/apk`, and computes the signature checksum automatically (requires `apksigner` in `ANDROID_HOME` or `~/Android/Sdk/build-tools` on the server host).
+When the server runs as `v0.0.0-dev`, no release assets exist. Build a **release** APK locally and upload it in **Settings → Android MDM provisioning QR**. The server stores the file, serves it at `/api/pairing/provisioning/apk` (admin login required), and computes the signature checksum automatically (requires `apksigner` in `ANDROID_HOME` or `~/Android/Sdk/build-tools` on the server host).
 
 ```bash
 cd android-agent
@@ -419,6 +419,6 @@ The Android agent handles this automatically:
 
 **Release servers:** APK from `https://github.com/pantherale0/timekpr-webui/releases/download/{tag}/guardian-android-agent-{tag}.apk` with companion `.signature-checksum` asset.
 
-**Development servers:** Upload a signed release APK in **Settings → Android MDM provisioning QR**; the server serves it at `/api/pairing/provisioning/apk` and includes that URL in the update response.
+**Development servers:** Upload a signed release APK in **Settings → Android MDM provisioning QR**; the server serves it at `/api/pairing/provisioning/apk` (admin session required) and includes that URL in the update response.
 
 If `update_available` is false (dev server without uploaded APK), the agent shows the server error message and retries on the next sync cycle.

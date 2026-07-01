@@ -30,7 +30,7 @@ On service stop, DNS settings and policies are restored.
 ### Add Device wizard (recommended)
 
 1. Open **Add Device** in the Web UI and choose **Windows PC**.
-2. Copy the PowerShell install command or download the MSI from `/api/pairing/windows/msi`.
+2. Copy the PowerShell install command or download the MSI from `/api/pairing/windows/msi` (requires a signed-in admin session).
 3. Run the installer **as Administrator** on the target PC.
 4. Approve the pending device under **Admin → Devices**.
 5. Map the Windows username to a child account.
@@ -91,7 +91,7 @@ After a successful WebSocket authentication on normal boot, the agent audits the
 }
 ```
 
-The server encrypts this value with Fernet and exposes it through `GET /api/devices/<system_id>/windows-laps` and `POST .../windows-laps/reveal-password`.
+The server encrypts this value with Fernet and exposes it through `GET /api/devices/<system_id>/windows-laps` and `POST .../windows-laps/reveal-password` (reveal requires `can_manage_policies` or household admin).
 
 ## Limitations
 

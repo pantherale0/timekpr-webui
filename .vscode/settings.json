@@ -21,5 +21,6 @@
         "**/agent/**",
         "**/server/**",
         "**/node_modules/**"
-    ]
+    ],
+    "python-envs.pythonProjects": []
 }

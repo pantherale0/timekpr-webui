@@ -22,7 +22,7 @@ Environment variables for the Guardian server. Docker Compose reads these from `
 
 | Variable | Description |
 |----------|-------------|
-| `REGISTRATION_TOKEN` | Optional firewall: new pairings must include this token in `hello` |
+| `REGISTRATION_TOKEN` | Optional global firewall: new pairings must include this token in `hello` (or the household enrollment token from pairing QR) |
 | `FCM_SERVER_KEY` | Firebase legacy HTTP API key for Android push wake |
 | `FIREBASE_CREDENTIALS_JSON` | Path or inline JSON for Firebase HTTP v1 (preferred) |
 | `FIREBASE_PROJECT_ID` | Optional when service account JSON omits `project_id` |
@@ -38,6 +38,15 @@ Environment variables for the Guardian server. Docker Compose reads these from `
 | `TIMEKPR_TASKS_DELIVER_ALERTS` | Outbound alert webhook delivery | enabled |
 
 Set a task flag to `0`, `false`, `no`, or `off` to disable. See [Background worker](../reference/background-worker.md).
+
+## Session cookies (optional)
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `SESSION_COOKIE_SECURE` | Set `true`/`1`/`yes`/`on` when the UI is served only over HTTPS | off |
+| `SESSION_COOKIE_SAMESITE` | Cookie SameSite attribute (`Lax`, `Strict`, `None`) | `Lax` |
+
+HttpOnly is always enabled for the Flask session cookie.
 
 ## OIDC (optional)
 

@@ -71,3 +71,5 @@ def cleanup_background_tasks():
     """Stop the shared background task manager after each test."""
     yield
     app_module.task_manager.stop()
+    from src.common.rate_limit import reset_rate_limits_for_tests
+    reset_rate_limits_for_tests()

@@ -40,10 +40,10 @@ Retention pruning: `POST /api/alerts/prune` (automated by worker when configured
 
 Configure under **Settings**:
 
-1. Enable webhook + URL
+1. Enable webhook + URL (must resolve to a **public** `http`/`https` host; loopback and private-network targets are rejected)
 2. Optional shared secret for HMAC header `X-Timekpr-Signature: sha256=…`
 
-The worker (`TIMEKPR_TASKS_DELIVER_ALERTS`) POSTs JSON for pending alerts. Failed deliveries remain retryable according to server logic.
+The worker (`TIMEKPR_TASKS_DELIVER_ALERTS`) POSTs JSON for pending alerts. Outbound requests do not follow redirects. Failed deliveries remain retryable according to server logic.
 
 ## Related
 

@@ -17,7 +17,7 @@ Wondering how this compares to Google Family Link, Microsoft Family Safety, Bark
 ## Typical deployment flow
 
 1. [Deploy the server](server-deployment.md) (Docker recommended).
-2. Sign in and change the default password.
+2. Sign in and change the default password (minimum 12 characters).
 3. Create child accounts under **Admin → Child Accounts**.
 4. Pair agents or import cloud consoles ([pairing workflow](../workflows/pairing-and-approval.md)).
 5. Map each device profile to a child account.

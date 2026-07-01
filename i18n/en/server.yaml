@@ -234,7 +234,7 @@ flash:
     web_video_updated: Web & Video Settings updated successfully
     password_wrong: Current password is incorrect
     password_mismatch: New passwords do not match
-    password_short: New password must be at least 4 characters long
+    password_short: New password must be at least 12 characters long
     password_updated: Password updated successfully
     inventory_no_account: No linked account available to refresh application inventory
     inventory_offline: Device is offline. Inventory will refresh when the agent reconnects.
@@ -666,7 +666,7 @@ pages:
     current_password_label: CURRENT PASSWORD
     current_password_placeholder: Enter current password
     new_password_label: NEW PASSWORD
-    new_password_placeholder: Minimum 4 characters
+    new_password_placeholder: Minimum 12 characters
     confirm_password_label: CONFIRM NEW PASSWORD
     confirm_password_placeholder: Verify new password
     update_password: Update Password

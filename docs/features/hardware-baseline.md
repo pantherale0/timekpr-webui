@@ -35,7 +35,7 @@ Payload manifests live in `server/static/bios-payloads/manifest.json`. Productio
 3. Use **Apply hardware baseline** to set the supervisor password and attempt USB boot / Secure Boot enforcement.
 4. Use **Reveal supervisor password** if you need the escrowed password stored on the Guardian server.
 
-Apply and audit require the agent to be online. Actions are manual only; nothing runs automatically on device approval.
+Apply and audit require the agent to be online. Actions are manual only; nothing runs automatically on device approval. **Apply**, **audit**, and **reveal supervisor password** require `can_manage_policies` on a child mapped to the device (or household admin).
 
 ## Password escrow
 

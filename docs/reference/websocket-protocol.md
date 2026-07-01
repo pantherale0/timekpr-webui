@@ -15,13 +15,25 @@ First message after connect (10s timeout):
   "platform": "linux",
   "linux_users": [{"username": "child", "uid": 1000, "platform": "linux"}],
   "paired": true,
-  "registration_token": "optional",
+  "registration_token": "household-enrollment-or-global-token",
   "fcm_token": "android-only",
   "is_device_owner": false
 }
 ```
 
 Server updates device record (`linux_users_json`, hostname, IP, push metadata).
+
+### Registration / enrollment token
+
+New devices must present a token the server accepts:
+
+| Token source | When accepted |
+|--------------|---------------|
+| Household `enrollment_token` | Matches the household that will own the pending device |
+| `REGISTRATION_TOKEN` env | Matches global server token (assigns default/first household) |
+| *(none configured)* | Open registration — first/default household (dev/single-tenant only) |
+
+Invalid or missing tokens on a **new** `hello` are rejected with `auth_result` failure.
 
 ## Version check
 
@@ -33,7 +45,7 @@ New devices → `status: pending`. Server sends `pairing_status` and holds conne
 
 ## Pairing approved
 
-Server → agent:
+Server → agent (only after admin approval **and** valid enrollment/registration token when client reports `paired: false`):
 
 ```json
 {
@@ -42,7 +54,7 @@ Server → agent:
 }
 ```
 
-Agent stores token and reconnects with `paired: true`.
+Agents store the token and reconnect with `paired: true`. Cleartext token delivery over an unauthenticated WebSocket is never performed without enrollment proof.
 
 ## Authentication (paired devices)
 

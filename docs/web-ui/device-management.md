@@ -8,8 +8,10 @@ New agent connections appear here until approved. Review hostname, platform, IP,
 
 Actions:
 
-- **Approve** — issues per-device secret; agent receives `pairing_approved`
+- **Approve** — issues per-device secret; agent receives `pairing_approved` (requires `can_manage_policies` or household admin)
 - **Reject** — blocks future auth (unless pending factory reset exception on Android)
+
+Parents without **Manage policies** permission on a linked child can view devices but cannot approve, reject, unenroll, capture screenshots, or apply hardware baseline changes.
 
 ## Approved devices
 
